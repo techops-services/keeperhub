@@ -13,10 +13,10 @@ export interface NodeOutputs {
 /**
  * Replace template variables in a string with actual values from node outputs
  * Supports:
- * - Simple fields: {{nodeName.field}}
- * - Nested fields: {{nodeName.nested.field}}
- * - Array access: {{nodeName.items[0]}}
- * - Entire node output: {{nodeName}}
+ * - Node ID references: {{$nodeId.field}} or {{$nodeId}}
+ * - Label references: {{nodeName.field}} or {{nodeName}}
+ * - Nested fields: {{$nodeId.nested.field}}
+ * - Array access: {{$nodeId.items[0]}}
  */
 export function processTemplate(template: string, nodeOutputs: NodeOutputs): string {
   if (!template || typeof template !== 'string') {
@@ -29,21 +29,44 @@ export function processTemplate(template: string, nodeOutputs: NodeOutputs): str
   return template.replace(pattern, (match, expression) => {
     const trimmed = expression.trim();
 
-    // Handle special case: {{nodeName}} (entire output)
-    if (!trimmed.includes('.') && !trimmed.includes('[')) {
-      const nodeOutput = findNodeOutputByLabel(trimmed, nodeOutputs);
-      if (nodeOutput) {
-        return formatValue(nodeOutput.data);
+    // Check if this is a node ID reference (starts with $)
+    const isNodeIdRef = trimmed.startsWith('$');
+
+    if (isNodeIdRef) {
+      const withoutDollar = trimmed.substring(1);
+
+      // Handle special case: {{$nodeId}} (entire output)
+      if (!withoutDollar.includes('.') && !withoutDollar.includes('[')) {
+        const nodeOutput = nodeOutputs[withoutDollar];
+        if (nodeOutput) {
+          return formatValue(nodeOutput.data);
+        }
+        console.warn(`[Template] Node with ID "${withoutDollar}" not found in outputs`);
+        return match;
       }
-      console.warn(`[Template] Node "${trimmed}" not found in outputs`);
-      return match; // Keep original if not found
-    }
 
-    // Parse expression like "nodeName.field.nested" or "nodeName.items[0]"
-    const value = resolveExpression(trimmed, nodeOutputs);
+      // Parse expression like "$nodeId.field.nested" or "$nodeId.items[0]"
+      const value = resolveExpressionById(withoutDollar, nodeOutputs);
+      if (value !== undefined && value !== null) {
+        return formatValue(value);
+      }
+    } else {
+      // Legacy label-based references
+      // Handle special case: {{nodeName}} (entire output)
+      if (!trimmed.includes('.') && !trimmed.includes('[')) {
+        const nodeOutput = findNodeOutputByLabel(trimmed, nodeOutputs);
+        if (nodeOutput) {
+          return formatValue(nodeOutput.data);
+        }
+        console.warn(`[Template] Node "${trimmed}" not found in outputs`);
+        return match;
+      }
 
-    if (value !== undefined && value !== null) {
-      return formatValue(value);
+      // Parse expression like "nodeName.field.nested" or "nodeName.items[0]"
+      const value = resolveExpression(trimmed, nodeOutputs);
+      if (value !== undefined && value !== null) {
+        return formatValue(value);
+      }
     }
 
     // Log warning for debugging
@@ -92,6 +115,57 @@ function findNodeOutputByLabel(
   }
 
   return undefined;
+}
+
+/**
+ * Resolve a dotted/bracketed expression using node ID like "nodeId.field.nested" or "nodeId.items[0]"
+ */
+function resolveExpressionById(expression: string, nodeOutputs: NodeOutputs): unknown {
+  // Split by dots, but handle array brackets
+  const parts = expression.split('.');
+
+  if (parts.length === 0) {
+    return undefined;
+  }
+
+  // First part is the node ID
+  const nodeId = parts[0].trim();
+  const nodeOutput = nodeOutputs[nodeId];
+
+  if (!nodeOutput) {
+    console.warn(`[Template] Node with ID "${nodeId}" not found in outputs`);
+    return undefined;
+  }
+
+  // Start with the node's data
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let current: any = nodeOutput.data;
+
+  console.log(`[Template] Resolving "${expression}". Node data:`, JSON.stringify(current, null, 2));
+
+  // Navigate through remaining parts
+  for (let i = 1; i < parts.length; i++) {
+    const part = parts[i].trim();
+
+    if (!part) {
+      continue;
+    }
+
+    // Handle array access like "items[0]"
+    const arrayMatch = part.match(/^([^[]+)\[(\d+)\]$/);
+    if (arrayMatch) {
+      const [, field, index] = arrayMatch;
+      current = current?.[field]?.[parseInt(index, 10)];
+    } else {
+      current = current?.[part];
+    }
+
+    if (current === undefined || current === null) {
+      return undefined;
+    }
+  }
+
+  return current;
 }
 
 /**

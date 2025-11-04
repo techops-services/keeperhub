@@ -11,6 +11,42 @@ interface AvailableOutputsProps {
   onInsertTemplate?: (template: string) => void;
 }
 
+// Helper to get a display name for a node
+const getNodeDisplayName = (node: {
+  id: string;
+  data: {
+    label?: string;
+    type: string;
+    config?: Record<string, unknown>;
+  };
+}): string => {
+  // If user has set a custom label, use it
+  if (node.data.label) {
+    return node.data.label;
+  }
+
+  // Otherwise, use type-specific defaults
+  if (node.data.type === 'action') {
+    const actionType = node.data.config?.actionType as string | undefined;
+    return actionType || 'HTTP Request';
+  }
+
+  if (node.data.type === 'trigger') {
+    const triggerType = node.data.config?.triggerType as string | undefined;
+    return triggerType || 'Manual';
+  }
+
+  if (node.data.type === 'condition') {
+    return 'Condition';
+  }
+
+  if (node.data.type === 'transform') {
+    return 'Transform';
+  }
+
+  return 'Node';
+};
+
 export function AvailableOutputs({ onInsertTemplate }: AvailableOutputsProps) {
   const [nodes] = useAtom(nodesAtom);
   const [edges] = useAtom(edgesAtom);
@@ -135,7 +171,7 @@ export function AvailableOutputs({ onInsertTemplate }: AvailableOutputsProps) {
                   ) : (
                     <ChevronRight className="h-3 w-3" />
                   )}
-                  <span className="text-sm font-medium">{node.data.label}</span>
+                  <span className="text-sm font-medium">{getNodeDisplayName(node)}</span>
                 </div>
                 <Button
                   variant="ghost"
@@ -143,7 +179,7 @@ export function AvailableOutputs({ onInsertTemplate }: AvailableOutputsProps) {
                   className="h-6 px-2"
                   onClick={(e) => {
                     e.stopPropagation();
-                    insertTemplate(`{{${node.data.label}}}`);
+                    insertTemplate(`{{$${node.id}}}`);
                   }}
                 >
                   <Copy className="h-3 w-3" />
@@ -167,7 +203,7 @@ export function AvailableOutputs({ onInsertTemplate }: AvailableOutputsProps) {
                         variant="ghost"
                         size="sm"
                         className="ml-2 h-6 px-2"
-                        onClick={() => insertTemplate(`{{${node.data.label}.${field.field}}}`)}
+                        onClick={() => insertTemplate(`{{$${node.id}.${field.field}}}`)}
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
