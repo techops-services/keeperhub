@@ -1,6 +1,7 @@
 'use client';
 
 import { useAtom, useSetAtom } from 'jotai';
+import { useState, useEffect, useRef } from 'react';
 import {
   selectedNodeAtom,
   nodesAtom,
@@ -17,18 +18,86 @@ import { TriggerConfig } from './config/trigger-config';
 import { ActionConfig } from './config/action-config';
 import { AvailableOutputs } from './available-outputs';
 
+const MIN_WIDTH = 280;
+const MAX_WIDTH = 600;
+const DEFAULT_WIDTH = 320;
+
 export function NodeConfigPanel() {
   const [selectedNodeId, setSelectedNodeId] = useAtom(selectedNodeAtom);
   const [nodes] = useAtom(nodesAtom);
   const [isGenerating] = useAtom(isGeneratingAtom);
   const updateNodeData = useSetAtom(updateNodeDataAtom);
   const deleteNode = useSetAtom(deleteNodeAtom);
+  const [panelWidth, setPanelWidth] = useState(() => {
+    // Load saved width from localStorage on mount
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('nodeConfigPanelWidth');
+      if (saved) {
+        const width = parseInt(saved, 10);
+        if (width >= MIN_WIDTH && width <= MAX_WIDTH) {
+          return width;
+        }
+      }
+    }
+    return DEFAULT_WIDTH;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
 
+  // Handle resize
+  useEffect(() => {
+    if (!isResizing) return;
+
+    // Prevent text selection while resizing
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!panelRef.current) return;
+      const panelRect = panelRef.current.getBoundingClientRect();
+      const newWidth = panelRect.right - e.clientX;
+      const clampedWidth = Math.min(Math.max(newWidth, MIN_WIDTH), MAX_WIDTH);
+      setPanelWidth(clampedWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      localStorage.setItem('nodeConfigPanelWidth', panelWidth.toString());
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+  }, [isResizing, panelWidth]);
+
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  };
+
   if (!selectedNode) {
     return (
-      <Card className="hidden h-full w-80 flex-col rounded-none border-t-0 border-r-0 border-b-0 border-l md:flex">
+      <Card
+        ref={panelRef}
+        className="relative hidden h-full flex-col rounded-none border-t-0 border-r-0 border-b-0 border-l md:flex"
+        style={{ width: panelWidth }}
+      >
+        {/* Resize handle */}
+        <div
+          className="absolute top-0 bottom-0 left-0 z-10 w-1 cursor-col-resize hover:bg-blue-500 active:bg-blue-600"
+          onMouseDown={handleResizeStart}
+          style={{ cursor: isResizing ? 'col-resize' : undefined }}
+        />
         <CardHeader>
           <CardTitle className="text-lg">Properties</CardTitle>
         </CardHeader>
@@ -71,8 +140,18 @@ export function NodeConfigPanel() {
         aria-hidden="true"
       />
 
-      {/* Properties panel - Mobile: Fixed sidebar, Desktop: Normal sidebar */}
-      <Card className="fixed top-0 right-0 bottom-0 z-50 flex h-full w-80 flex-col rounded-none border-t-0 border-r-0 border-b-0 border-l md:relative md:z-0">
+      {/* Properties panel - Mobile: Fixed sidebar, Desktop: Resizable sidebar */}
+      <Card
+        ref={panelRef}
+        className="fixed top-0 right-0 bottom-0 z-50 flex h-full w-80 flex-col rounded-none border-t-0 border-r-0 border-b-0 border-l md:relative md:z-0"
+        style={{ width: `${panelWidth}px` }}
+      >
+        {/* Resize handle - only visible on desktop */}
+        <div
+          className="absolute top-0 bottom-0 left-0 z-10 hidden w-1 cursor-col-resize hover:bg-blue-500 active:bg-blue-600 md:block"
+          onMouseDown={handleResizeStart}
+          style={{ cursor: isResizing ? 'col-resize' : undefined }}
+        />
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-lg">Properties</CardTitle>
           <Button variant="ghost" size="icon" onClick={handleClose}>
