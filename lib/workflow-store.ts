@@ -26,6 +26,11 @@ export const isGeneratingAtom = atom(false);
 export const currentWorkflowIdAtom = atom<string | null>(null);
 export const currentWorkflowNameAtom = atom<string>('Untitled');
 
+// UI state atoms
+export const propertiesPanelWidthAtom = atom<number>(320);
+export const propertiesPanelResizingAtom = atom<boolean>(false);
+export const propertiesPanelActiveTabAtom = atom<string>('runs');
+
 // Derived atoms for node/edge operations
 export const onNodesChangeAtom = atom(null, (get, set, changes: NodeChange[]) => {
   const currentNodes = get(nodesAtom);

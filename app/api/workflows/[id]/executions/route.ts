@@ -37,7 +37,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       limit: 50,
     });
 
-    return NextResponse.json({ executions });
+    return NextResponse.json(executions);
   } catch (error) {
     console.error('Failed to fetch executions:', error);
     return NextResponse.json(

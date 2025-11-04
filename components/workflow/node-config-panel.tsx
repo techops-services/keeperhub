@@ -1,22 +1,27 @@
 'use client';
 
 import { useAtom, useSetAtom } from 'jotai';
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   selectedNodeAtom,
   nodesAtom,
   updateNodeDataAtom,
   deleteNodeAtom,
   isGeneratingAtom,
+  propertiesPanelWidthAtom,
+  propertiesPanelResizingAtom,
+  propertiesPanelActiveTabAtom,
 } from '@/lib/workflow-store';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Trash2, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { TriggerConfig } from './config/trigger-config';
 import { ActionConfig } from './config/action-config';
 import { AvailableOutputs } from './available-outputs';
+import { WorkflowRuns } from './workflow-runs';
 
 const MIN_WIDTH = 280;
 const MAX_WIDTH = 600;
@@ -28,8 +33,9 @@ export function NodeConfigPanel() {
   const [isGenerating] = useAtom(isGeneratingAtom);
   const updateNodeData = useSetAtom(updateNodeDataAtom);
   const deleteNode = useSetAtom(deleteNodeAtom);
-  const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
-  const [isResizing, setIsResizing] = useState(false);
+  const [panelWidth, setPanelWidth] = useAtom(propertiesPanelWidthAtom);
+  const [isResizing, setIsResizing] = useAtom(propertiesPanelResizingAtom);
+  const [activeTab, setActiveTab] = useAtom(propertiesPanelActiveTabAtom);
   const panelRef = useRef<HTMLDivElement>(null);
 
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
@@ -99,10 +105,25 @@ export function NodeConfigPanel() {
           style={{ cursor: isResizing ? 'col-resize' : undefined }}
         />
         <CardHeader>
-          <CardTitle className="text-lg">Properties</CardTitle>
+          <CardTitle className="text-lg">Workflow</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="text-muted-foreground text-sm">Select a node to configure</div>
+        <CardContent className="flex-1 overflow-y-auto">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
+            <TabsList className="w-full">
+              <TabsTrigger value="properties" className="flex-1">
+                Properties
+              </TabsTrigger>
+              <TabsTrigger value="runs" className="flex-1">
+                Runs
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="properties" className="mt-4">
+              <div className="text-muted-foreground text-sm">Select a node to configure</div>
+            </TabsContent>
+            <TabsContent value="runs" className="mt-4">
+              <WorkflowRuns isActive={activeTab === 'runs'} />
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     );
@@ -153,100 +174,115 @@ export function NodeConfigPanel() {
           style={{ cursor: isResizing ? 'col-resize' : undefined }}
         />
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-lg">Properties</CardTitle>
+          <CardTitle className="text-lg">Workflow</CardTitle>
           <Button variant="ghost" size="icon" onClick={handleClose}>
             <X className="h-4 w-4" />
           </Button>
         </CardHeader>
-        <CardContent className="flex-1 space-y-4 overflow-y-auto">
-          <div className="space-y-2">
-            <Label htmlFor="label">Label</Label>
-            <Input
-              id="label"
-              value={selectedNode.data.label}
-              onChange={(e) => handleUpdateLabel(e.target.value)}
-              disabled={isGenerating}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Input
-              id="description"
-              value={selectedNode.data.description || ''}
-              onChange={(e) => handleUpdateDescription(e.target.value)}
-              placeholder="Optional description"
-              disabled={isGenerating}
-            />
-          </div>
-
-          {/* Show available outputs from previous nodes */}
-          {(selectedNode.data.type === 'action' ||
-            selectedNode.data.type === 'condition' ||
-            selectedNode.data.type === 'transform') && <AvailableOutputs />}
-
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Configuration</Label>
-            <div className="space-y-2">
-              {selectedNode.data.type === 'trigger' && (
-                <TriggerConfig
-                  config={selectedNode.data.config || {}}
-                  onUpdateConfig={handleUpdateConfig}
+        <CardContent className="flex-1 overflow-y-auto">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
+            <TabsList className="w-full">
+              <TabsTrigger value="properties" className="flex-1">
+                Properties
+              </TabsTrigger>
+              <TabsTrigger value="runs" className="flex-1">
+                Runs
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="properties" className="mt-4 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="label">Label</Label>
+                <Input
+                  id="label"
+                  value={selectedNode.data.label}
+                  onChange={(e) => handleUpdateLabel(e.target.value)}
                   disabled={isGenerating}
                 />
-              )}
+              </div>
 
-              {selectedNode.data.type === 'action' && (
-                <ActionConfig
-                  config={selectedNode.data.config || {}}
-                  onUpdateConfig={handleUpdateConfig}
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Input
+                  id="description"
+                  value={selectedNode.data.description || ''}
+                  onChange={(e) => handleUpdateDescription(e.target.value)}
+                  placeholder="Optional description"
                   disabled={isGenerating}
                 />
-              )}
+              </div>
 
-              {selectedNode.data.type === 'condition' && (
+              {/* Show available outputs from previous nodes */}
+              {(selectedNode.data.type === 'action' ||
+                selectedNode.data.type === 'condition' ||
+                selectedNode.data.type === 'transform') && <AvailableOutputs />}
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Configuration</Label>
                 <div className="space-y-2">
-                  <Label htmlFor="condition" className="text-xs">
-                    Condition
-                  </Label>
-                  <Input
-                    id="condition"
-                    value={(selectedNode.data.config?.condition as string) || ''}
-                    onChange={(e) => handleUpdateConfig('condition', e.target.value)}
-                    placeholder="e.g., value > 100"
-                    disabled={isGenerating}
-                  />
-                </div>
-              )}
+                  {selectedNode.data.type === 'trigger' && (
+                    <TriggerConfig
+                      config={selectedNode.data.config || {}}
+                      onUpdateConfig={handleUpdateConfig}
+                      disabled={isGenerating}
+                    />
+                  )}
 
-              {selectedNode.data.type === 'transform' && (
-                <div className="space-y-2">
-                  <Label htmlFor="transformType" className="text-xs">
-                    Transform Type
-                  </Label>
-                  <Input
-                    id="transformType"
-                    value={(selectedNode.data.config?.transformType as string) || ''}
-                    onChange={(e) => handleUpdateConfig('transformType', e.target.value)}
-                    placeholder="e.g., Map Data, Filter, Aggregate"
-                    disabled={isGenerating}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
+                  {selectedNode.data.type === 'action' && (
+                    <ActionConfig
+                      config={selectedNode.data.config || {}}
+                      onUpdateConfig={handleUpdateConfig}
+                      disabled={isGenerating}
+                    />
+                  )}
 
-          <div className="border-t pt-4">
-            <Button
-              variant="destructive"
-              className="w-full"
-              onClick={handleDelete}
-              disabled={isGenerating}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete Node
-            </Button>
-          </div>
+                  {selectedNode.data.type === 'condition' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="condition" className="text-xs">
+                        Condition
+                      </Label>
+                      <Input
+                        id="condition"
+                        value={(selectedNode.data.config?.condition as string) || ''}
+                        onChange={(e) => handleUpdateConfig('condition', e.target.value)}
+                        placeholder="e.g., value > 100"
+                        disabled={isGenerating}
+                      />
+                    </div>
+                  )}
+
+                  {selectedNode.data.type === 'transform' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="transformType" className="text-xs">
+                        Transform Type
+                      </Label>
+                      <Input
+                        id="transformType"
+                        value={(selectedNode.data.config?.transformType as string) || ''}
+                        onChange={(e) => handleUpdateConfig('transformType', e.target.value)}
+                        placeholder="e.g., Map Data, Filter, Aggregate"
+                        disabled={isGenerating}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  onClick={handleDelete}
+                  disabled={isGenerating}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Node
+                </Button>
+              </div>
+            </TabsContent>
+            <TabsContent value="runs" className="mt-4">
+              <WorkflowRuns isActive={activeTab === 'runs'} />
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </>

@@ -271,7 +271,8 @@ class ServerWorkflowExecutor {
             try {
               const { generateText } = await import('ai');
 
-              const modelId = (processedConfig?.aiModel as string) || 'gpt-4o-mini';
+              // Use original config (not processed) for model to avoid template processing
+              const modelId = (node.data.config?.aiModel as string) || 'gpt-4o-mini';
               const prompt = (processedConfig?.aiPrompt as string) || '';
 
               if (!prompt) {
@@ -313,7 +314,8 @@ class ServerWorkflowExecutor {
             try {
               const { experimental_generateImage: generateImage } = await import('ai');
 
-              const modelString = (processedConfig?.imageModel as string) || 'openai/gpt-5-nano';
+              // Use original config (not processed) for model to avoid template processing
+              const modelString = (node.data.config?.imageModel as string) || 'openai/gpt-5-nano';
               const prompt = (processedConfig?.imagePrompt as string) || '';
 
               if (!prompt) {
@@ -322,6 +324,8 @@ class ServerWorkflowExecutor {
                   error: 'Prompt is required for Generate Image action',
                 };
               } else {
+                console.log('Generating image with model:', modelString, 'prompt:', prompt);
+
                 const { image } = await generateImage({
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   model: modelString as any,
@@ -337,6 +341,7 @@ class ServerWorkflowExecutor {
                 };
               }
             } catch (error) {
+              console.error('Generate Image error:', error);
               result = {
                 success: false,
                 error: error instanceof Error ? error.message : 'Failed to generate image',
