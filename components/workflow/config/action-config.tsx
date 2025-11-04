@@ -68,6 +68,13 @@ export function ActionConfig({ config, onUpdateConfig, disabled }: ActionConfigP
               <SelectItem value="Create Ticket">Create Ticket</SelectItem>
               <SelectItem value="Find Issues">Find Issues</SelectItem>
             </SelectGroup>
+            <SelectGroup>
+              <SelectLabel className="flex items-center gap-2">
+                <Settings className="h-3 w-3" />
+                AI Gateway
+              </SelectLabel>
+              <SelectItem value="Generate Text">Generate Text</SelectItem>
+            </SelectGroup>
           </SelectContent>
         </Select>
       </div>
@@ -378,6 +385,46 @@ export function ActionConfig({ config, onUpdateConfig, disabled }: ActionConfigP
                 theme="vs-dark"
               />
             </div>
+          </div>
+        </>
+      )}
+
+      {/* Generate Text fields */}
+      {config?.actionType === 'Generate Text' && (
+        <>
+          <div className="space-y-2">
+            <Label htmlFor="aiModel" className="text-xs">
+              Model
+            </Label>
+            <Select
+              value={(config?.aiModel as string) || 'gpt-4o-mini'}
+              onValueChange={(value) => onUpdateConfig('aiModel', value)}
+              disabled={disabled}
+            >
+              <SelectTrigger id="aiModel">
+                <SelectValue placeholder="Select model" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="gpt-4o">GPT-4o</SelectItem>
+                <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
+                <SelectItem value="gpt-4-turbo">GPT-4 Turbo</SelectItem>
+                <SelectItem value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</SelectItem>
+                <SelectItem value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="aiPrompt" className="text-xs">
+              Prompt
+            </Label>
+            <Textarea
+              id="aiPrompt"
+              value={(config?.aiPrompt as string) || ''}
+              onChange={(e) => onUpdateConfig('aiPrompt', e.target.value)}
+              placeholder="Enter your prompt here. Use {{$nodeId.field}} to reference previous outputs."
+              disabled={disabled}
+              rows={4}
+            />
           </div>
         </>
       )}

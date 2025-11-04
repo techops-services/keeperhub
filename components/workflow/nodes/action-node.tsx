@@ -21,6 +21,7 @@ const getIntegrationFromActionType = (actionType: string): string => {
     'Find Issues': 'Linear',
     'HTTP Request': 'System',
     'Database Query': 'System',
+    'Generate Text': 'AI Gateway',
   };
   return integrationMap[actionType] || 'System';
 };

@@ -232,6 +232,48 @@ class ServerWorkflowExecutor {
           ) {
             const dbResult = await queryData('your_table', {});
             result = { success: dbResult.status === 'success', data: dbResult };
+          } else if (actionType === 'Generate Text') {
+            try {
+              const { generateText } = await import('ai');
+
+              const modelId = (processedConfig?.aiModel as string) || 'gpt-4o-mini';
+              const prompt = (processedConfig?.aiPrompt as string) || '';
+
+              if (!prompt) {
+                result = {
+                  success: false,
+                  error: 'Prompt is required for Generate Text action',
+                };
+              } else {
+                // Convert model ID to provider/model format
+                let modelString: string;
+                if (modelId.startsWith('gpt-') || modelId.startsWith('o1-')) {
+                  modelString = `openai/${modelId}`;
+                } else if (modelId.startsWith('claude-')) {
+                  modelString = `anthropic/${modelId}`;
+                } else {
+                  modelString = modelId;
+                }
+
+                const { text } = await generateText({
+                  model: modelString,
+                  prompt,
+                });
+
+                result = {
+                  success: true,
+                  data: {
+                    text,
+                    model: modelId,
+                  },
+                };
+              }
+            } catch (error) {
+              result = {
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to generate text',
+              };
+            }
           } else if (actionType === 'HTTP Request' || endpoint) {
             const httpMethod = (processedConfig?.httpMethod as string) || 'POST';
             const httpHeaders = processedConfig?.httpHeaders

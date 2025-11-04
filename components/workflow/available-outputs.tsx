@@ -132,6 +132,11 @@ export function AvailableOutputs({ onInsertTemplate }: AvailableOutputsProps) {
         { field: 'data', description: 'Response data' },
         { field: 'status', description: 'HTTP status code' },
       ];
+    } else if (actionType === 'Generate Text') {
+      return [
+        { field: 'text', description: 'Generated text' },
+        { field: 'model', description: 'Model used' },
+      ];
     } else if (node.data.type === 'trigger') {
       return [
         { field: 'triggered', description: 'Trigger status' },
