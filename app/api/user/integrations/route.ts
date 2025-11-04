@@ -19,6 +19,8 @@ export async function GET(request: NextRequest) {
         resendFromEmail: true,
         linearApiKey: true,
         slackApiKey: true,
+        vercelApiToken: true,
+        vercelTeamId: true,
       },
     });
 
@@ -38,9 +40,12 @@ export async function GET(request: NextRequest) {
       resendFromEmail: userData.resendFromEmail,
       linearApiKey: maskApiKey(userData.linearApiKey),
       slackApiKey: maskApiKey(userData.slackApiKey),
+      vercelApiToken: maskApiKey(userData.vercelApiToken),
+      vercelTeamId: userData.vercelTeamId,
       hasResendKey: !!userData.resendApiKey,
       hasLinearKey: !!userData.linearApiKey,
       hasSlackKey: !!userData.slackApiKey,
+      hasVercelToken: !!userData.vercelApiToken,
     });
   } catch (error) {
     console.error('Failed to fetch integrations:', error);
@@ -63,13 +68,22 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { resendApiKey, resendFromEmail, linearApiKey, slackApiKey } = body;
+    const {
+      resendApiKey,
+      resendFromEmail,
+      linearApiKey,
+      slackApiKey,
+      vercelApiToken,
+      vercelTeamId,
+    } = body;
 
     const updates: {
       resendApiKey?: string | null;
       resendFromEmail?: string | null;
       linearApiKey?: string | null;
       slackApiKey?: string | null;
+      vercelApiToken?: string | null;
+      vercelTeamId?: string | null;
     } = {};
 
     if (resendApiKey !== undefined) {
@@ -86,6 +100,14 @@ export async function PATCH(request: NextRequest) {
 
     if (slackApiKey !== undefined) {
       updates.slackApiKey = slackApiKey || null;
+    }
+
+    if (vercelApiToken !== undefined) {
+      updates.vercelApiToken = vercelApiToken || null;
+    }
+
+    if (vercelTeamId !== undefined) {
+      updates.vercelTeamId = vercelTeamId || null;
     }
 
     await db.update(user).set(updates).where(eq(user.id, session.user.id));

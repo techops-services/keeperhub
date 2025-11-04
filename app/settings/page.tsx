@@ -24,9 +24,12 @@ interface Integrations {
   resendFromEmail: string | null;
   linearApiKey: string | null;
   slackApiKey: string | null;
+  vercelApiToken: string | null;
+  vercelTeamId: string | null;
   hasResendKey: boolean;
   hasLinearKey: boolean;
   hasSlackKey: boolean;
+  hasVercelToken: boolean;
 }
 
 interface DataSource {
@@ -54,6 +57,8 @@ export default function SettingsPage() {
   const [resendFromEmail, setResendFromEmail] = useState('');
   const [linearApiKey, setLinearApiKey] = useState('');
   const [slackApiKey, setSlackApiKey] = useState('');
+  const [vercelApiToken, setVercelApiToken] = useState('');
+  const [vercelTeamId, setVercelTeamId] = useState('');
   const [savingIntegrations, setSavingIntegrations] = useState(false);
 
   // Data sources state
@@ -99,6 +104,7 @@ export default function SettingsPage() {
         const data = await response.json();
         setIntegrations(data);
         setResendFromEmail(data.resendFromEmail || '');
+        setVercelTeamId(data.vercelTeamId || '');
       }
     } catch (error) {
       console.error('Failed to load integrations:', error);
@@ -144,12 +150,16 @@ export default function SettingsPage() {
         resendFromEmail?: string;
         linearApiKey?: string;
         slackApiKey?: string;
+        vercelApiToken?: string;
+        vercelTeamId?: string;
       } = {};
 
       if (resendApiKey) updates.resendApiKey = resendApiKey;
       if (resendFromEmail) updates.resendFromEmail = resendFromEmail;
       if (linearApiKey) updates.linearApiKey = linearApiKey;
       if (slackApiKey) updates.slackApiKey = slackApiKey;
+      if (vercelApiToken) updates.vercelApiToken = vercelApiToken;
+      if (vercelTeamId) updates.vercelTeamId = vercelTeamId;
 
       const response = await fetch('/api/user/integrations', {
         method: 'PATCH',
@@ -162,6 +172,7 @@ export default function SettingsPage() {
         setResendApiKey('');
         setLinearApiKey('');
         setSlackApiKey('');
+        setVercelApiToken('');
       }
     } catch (error) {
       console.error('Failed to save integrations:', error);
@@ -399,6 +410,55 @@ export default function SettingsPage() {
                     >
                       api.slack.com/apps
                     </a>
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Vercel</CardTitle>
+                <CardDescription>
+                  Configure your Vercel API token to manage projects and deployments from workflows
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="vercelApiToken">API Token</Label>
+                  <Input
+                    id="vercelApiToken"
+                    type="password"
+                    value={vercelApiToken}
+                    onChange={(e) => setVercelApiToken(e.target.value)}
+                    placeholder={
+                      integrations?.hasVercelToken
+                        ? 'API token is configured'
+                        : 'Enter your Vercel API token'
+                    }
+                  />
+                  <p className="text-muted-foreground text-sm">
+                    Get your API token from{' '}
+                    <a
+                      href="https://vercel.com/account/tokens"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      vercel.com/account/tokens
+                    </a>
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="vercelTeamId">Team ID (Optional)</Label>
+                  <Input
+                    id="vercelTeamId"
+                    value={vercelTeamId}
+                    onChange={(e) => setVercelTeamId(e.target.value)}
+                    placeholder="team_xxxxxxxxxxxxx"
+                  />
+                  <p className="text-muted-foreground text-sm">
+                    Only required if you want to manage team projects instead of personal projects
                   </p>
                 </div>
 

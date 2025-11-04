@@ -6,6 +6,7 @@ export interface WorkflowData {
   description?: string;
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
+  vercelProjectId?: string;
 }
 
 export interface SavedWorkflow extends WorkflowData {
@@ -13,6 +14,11 @@ export interface SavedWorkflow extends WorkflowData {
   name: string;
   createdAt: string;
   updatedAt: string;
+  vercelProject?: {
+    id: string;
+    name: string;
+    vercelProjectId: string;
+  } | null;
 }
 
 // Auto-save debounce delay (ms)

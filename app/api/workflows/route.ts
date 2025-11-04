@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, description, nodes, edges } = body;
+    const { name, description, nodes, edges, vercelProjectId } = body;
 
     if (!name || !nodes || !edges) {
       return NextResponse.json({ error: 'Name, nodes, and edges are required' }, { status: 400 });
@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
         nodes,
         edges,
         userId: session.user.id,
+        vercelProjectId: vercelProjectId || null,
       })
       .returning();
 

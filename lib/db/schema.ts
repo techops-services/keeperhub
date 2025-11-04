@@ -1,5 +1,6 @@
 import { pgTable, text, timestamp, jsonb, boolean } from 'drizzle-orm/pg-core';
 import { customAlphabet } from 'nanoid';
+import { relations } from 'drizzle-orm';
 
 // Create a nanoid generator with URL-safe characters
 const nanoid = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz', 21);
@@ -18,6 +19,8 @@ export const user = pgTable('user', {
   resendFromEmail: text('resend_from_email'),
   linearApiKey: text('linear_api_key'),
   slackApiKey: text('slack_api_key'),
+  vercelApiToken: text('vercel_api_token'),
+  vercelTeamId: text('vercel_team_id'),
 });
 
 export const session = pgTable('session', {
@@ -60,6 +63,21 @@ export const verification = pgTable('verification', {
   updatedAt: timestamp('updatedAt'),
 });
 
+// Vercel Projects table
+export const vercelProjects = pgTable('vercel_projects', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => nanoid()),
+  userId: text('user_id')
+    .notNull()
+    .references(() => user.id),
+  vercelProjectId: text('vercel_project_id').notNull(),
+  name: text('name').notNull(),
+  framework: text('framework'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 // Workflows table with user association
 export const workflows = pgTable('workflows', {
   id: text('id')
@@ -70,6 +88,7 @@ export const workflows = pgTable('workflows', {
   userId: text('userId')
     .notNull()
     .references(() => user.id),
+  vercelProjectId: text('vercel_project_id').references(() => vercelProjects.id),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   nodes: jsonb('nodes').notNull().$type<Array<any>>(),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -140,8 +159,22 @@ export const dataSources = pgTable('data_sources', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+// Relations
+export const workflowsRelations = relations(workflows, ({ one }) => ({
+  vercelProject: one(vercelProjects, {
+    fields: [workflows.vercelProjectId],
+    references: [vercelProjects.id],
+  }),
+}));
+
+export const vercelProjectsRelations = relations(vercelProjects, ({ many }) => ({
+  workflows: many(workflows),
+}));
+
 export type User = typeof user.$inferSelect;
 export type Session = typeof session.$inferSelect;
+export type VercelProject = typeof vercelProjects.$inferSelect;
+export type NewVercelProject = typeof vercelProjects.$inferInsert;
 export type Workflow = typeof workflows.$inferSelect;
 export type NewWorkflow = typeof workflows.$inferInsert;
 export type WorkflowExecution = typeof workflowExecutions.$inferSelect;

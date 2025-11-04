@@ -16,6 +16,7 @@ import {
   updateNodeDataAtom,
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
+  currentVercelProjectNameAtom,
   isEditingWorkflowNameAtom,
   editingWorkflowNameAtom,
   showClearDialogAtom,
@@ -52,6 +53,7 @@ export function WorkflowToolbar({}: { workflowId?: string }) {
   const updateNodeData = useSetAtom(updateNodeDataAtom);
   const [currentWorkflowId] = useAtom(currentWorkflowIdAtom);
   const [workflowName, setWorkflowName] = useAtom(currentWorkflowNameAtom);
+  const [vercelProjectName] = useAtom(currentVercelProjectNameAtom);
   const router = useRouter();
   const [isEditing, setIsEditing] = useAtom(isEditingWorkflowNameAtom);
   const [editingName, setEditingName] = useAtom(editingWorkflowNameAtom);
@@ -197,6 +199,12 @@ export function WorkflowToolbar({}: { workflowId?: string }) {
     />
   ) : (
     <div className="group flex items-center gap-2">
+      {vercelProjectName && (
+        <>
+          <span className="text-muted-foreground text-xl font-semibold">{vercelProjectName}</span>
+          <span className="text-muted-foreground text-xl">/</span>
+        </>
+      )}
       <span className="text-xl font-semibold">{workflowName}</span>
       {currentWorkflowId && (
         <Button

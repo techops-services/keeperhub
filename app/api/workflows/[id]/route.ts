@@ -7,7 +7,12 @@ import { eq } from 'drizzle-orm';
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const [workflow] = await db.select().from(workflows).where(eq(workflows.id, id));
+    const workflow = await db.query.workflows.findFirst({
+      where: eq(workflows.id, id),
+      with: {
+        vercelProject: true,
+      },
+    });
 
     if (!workflow) {
       return NextResponse.json({ error: 'Workflow not found' }, { status: 404 });

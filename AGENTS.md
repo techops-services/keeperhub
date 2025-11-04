@@ -47,6 +47,7 @@ If any of the above commands fail or show errors:
 ## Documentation Guidelines
 - **No Emojis**: Do not use emojis in any code, documentation, or README files
 - **No File Structure**: Do not include file/folder structure diagrams in README files
+- **No Random Documentation**: Do not create markdown documentation files unless explicitly requested by the user. This includes integration guides, feature documentation, or any other .md files
 
 ## Component Guidelines
 - **Use shadcn/ui**: Always use shadcn/ui components when available. Do not create custom components that duplicate shadcn functionality

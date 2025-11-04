@@ -13,6 +13,7 @@ import {
   edgesAtom,
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
+  currentVercelProjectNameAtom,
   isLoadingAtom,
   isGeneratingAtom,
   isExecutingAtom,
@@ -35,6 +36,7 @@ function WorkflowEditor({ params }: { params: Promise<{ workflowId: string }> })
   const setEdges = useSetAtom(edgesAtom);
   const setCurrentWorkflowId = useSetAtom(currentWorkflowIdAtom);
   const setCurrentWorkflowName = useSetAtom(currentWorkflowNameAtom);
+  const setCurrentVercelProjectName = useSetAtom(currentVercelProjectNameAtom);
   const updateNodeData = useSetAtom(updateNodeDataAtom);
   const setSelectedNodeId = useSetAtom(selectedNodeAtom);
 
@@ -102,6 +104,7 @@ function WorkflowEditor({ params }: { params: Promise<{ workflowId: string }> })
           setEdges(workflow.edges);
           setCurrentWorkflowId(workflow.id);
           setCurrentWorkflowName(workflow.name);
+          setCurrentVercelProjectName(workflow.vercelProject?.name || null);
 
           // Sync selected node if any node is selected
           const selectedNode = workflow.nodes.find((n) => n.selected);
@@ -122,6 +125,7 @@ function WorkflowEditor({ params }: { params: Promise<{ workflowId: string }> })
     searchParams,
     setCurrentWorkflowId,
     setCurrentWorkflowName,
+    setCurrentVercelProjectName,
     setNodes,
     setEdges,
     setIsLoading,
