@@ -14,7 +14,7 @@ import {
 } from '@/lib/workflow-store';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Trash2, X } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -25,10 +25,9 @@ import { WorkflowRuns } from './workflow-runs';
 
 const MIN_WIDTH = 280;
 const MAX_WIDTH = 600;
-const DEFAULT_WIDTH = 320;
 
 export function NodeConfigPanel() {
-  const [selectedNodeId, setSelectedNodeId] = useAtom(selectedNodeAtom);
+  const [selectedNodeId] = useAtom(selectedNodeAtom);
   const [nodes] = useAtom(nodesAtom);
   const [isGenerating] = useAtom(isGeneratingAtom);
   const updateNodeData = useSetAtom(updateNodeDataAtom);
@@ -46,11 +45,10 @@ export function NodeConfigPanel() {
     if (saved) {
       const width = parseInt(saved, 10);
       if (width >= MIN_WIDTH && width <= MAX_WIDTH) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setPanelWidth(width);
       }
     }
-  }, []);
+  }, [setPanelWidth]);
 
   // Handle resize
   useEffect(() => {
@@ -84,7 +82,7 @@ export function NodeConfigPanel() {
       document.body.style.userSelect = '';
       document.body.style.cursor = '';
     };
-  }, [isResizing, panelWidth]);
+  }, [isResizing, panelWidth, setPanelWidth, setIsResizing]);
 
   const handleResizeStart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -148,18 +146,10 @@ export function NodeConfigPanel() {
     }
   };
 
-  const handleClose = () => {
-    setSelectedNodeId(null);
-  };
-
   return (
     <>
       {/* Mobile overlay backdrop */}
-      <div
-        className="fixed inset-0 z-40 bg-black/50 md:hidden"
-        onClick={handleClose}
-        aria-hidden="true"
-      />
+      <div className="fixed inset-0 z-40 bg-black/50 md:hidden" aria-hidden="true" />
 
       {/* Properties panel - Mobile: Fixed sidebar, Desktop: Resizable sidebar */}
       <Card
@@ -173,11 +163,8 @@ export function NodeConfigPanel() {
           onMouseDown={handleResizeStart}
           style={{ cursor: isResizing ? 'col-resize' : undefined }}
         />
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <CardHeader>
           <CardTitle className="text-lg">Workflow</CardTitle>
-          <Button variant="ghost" size="icon" onClick={handleClose}>
-            <X className="h-4 w-4" />
-          </Button>
         </CardHeader>
         <CardContent className="flex-1 overflow-y-auto">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">

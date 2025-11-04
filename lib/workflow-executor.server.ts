@@ -94,9 +94,14 @@ class ServerWorkflowExecutor {
   }
 
   private async startNodeExecution(node: WorkflowNode, input?: unknown): Promise<void> {
-    if (!this.context.executionId) return;
+    if (!this.context.executionId) {
+      console.warn('[Executor] No executionId, skipping log for node:', node.id);
+      return;
+    }
 
     try {
+      console.log(`[Executor] Starting node ${node.id} (${node.data.type})`);
+
       const [log] = await db
         .insert(workflowExecutionLogs)
         .values({
@@ -109,6 +114,8 @@ class ServerWorkflowExecutor {
           startedAt: new Date(),
         })
         .returning();
+
+      console.log(`[Executor] Created log entry:`, log.id);
 
       this.executionLogs.set(node.id, {
         logId: log.id,
@@ -125,13 +132,23 @@ class ServerWorkflowExecutor {
     output?: unknown,
     error?: string
   ): Promise<void> {
-    if (!this.context.executionId) return;
+    if (!this.context.executionId) {
+      console.warn('[Executor] No executionId, skipping completion for node:', node.id);
+      return;
+    }
 
     const logInfo = this.executionLogs.get(node.id);
-    if (!logInfo?.logId) return;
+    if (!logInfo?.logId) {
+      console.warn('[Executor] No log entry found for node:', node.id);
+      return;
+    }
 
     try {
       const duration = Date.now() - logInfo.startTime;
+
+      console.log(
+        `[Executor] Completing node ${node.id} with status ${status}, duration ${duration}ms`
+      );
 
       await db
         .update(workflowExecutionLogs)
@@ -143,6 +160,8 @@ class ServerWorkflowExecutor {
           duration: duration.toString(),
         })
         .where(eq(workflowExecutionLogs.id, logInfo.logId));
+
+      console.log(`[Executor] Updated log entry ${logInfo.logId}`);
     } catch (err) {
       console.error('Failed to complete node execution log:', err);
     }
@@ -150,14 +169,43 @@ class ServerWorkflowExecutor {
 
   private async executeNode(node: WorkflowNode): Promise<ExecutionResult> {
     try {
-      await this.startNodeExecution(node, this.context.input);
+      // Build config properly for logging and execution
+      const nodeConfig = node.data.config || {};
+
+      await this.startNodeExecution(node, nodeConfig);
 
       let result: ExecutionResult = { success: true };
 
+      // Get actionType from original config (not processed) to avoid template corruption
+      const actionType = nodeConfig.actionType as string;
+
       // Process templates in node configuration using outputs from previous nodes
-      const processedConfig = node.data.config
-        ? processConfigTemplates(node.data.config as Record<string, unknown>, this.nodeOutputs)
-        : {};
+      // But exclude actionType, aiModel, and imageModel from processing
+      const configToProcess = { ...nodeConfig };
+      delete configToProcess.actionType;
+      delete configToProcess.aiModel;
+      delete configToProcess.imageModel;
+
+      const processedConfig = processConfigTemplates(
+        configToProcess as Record<string, unknown>,
+        this.nodeOutputs
+      );
+
+      // Add back the non-processed values
+      processedConfig.actionType = actionType;
+      if (nodeConfig.aiModel) {
+        processedConfig.aiModel = nodeConfig.aiModel;
+      }
+      if (nodeConfig.imageModel) {
+        processedConfig.imageModel = nodeConfig.imageModel;
+      }
+
+      console.log(`[Executor] Node ${node.id} (${node.data.type}):`, {
+        actionType,
+        aiModel: processedConfig.aiModel,
+        imageModel: processedConfig.imageModel,
+        hasPrompt: !!(processedConfig.aiPrompt || processedConfig.imagePrompt),
+      });
 
       switch (node.data.type) {
         case 'trigger':
@@ -172,7 +220,6 @@ class ServerWorkflowExecutor {
           break;
 
         case 'action':
-          const actionType = processedConfig?.actionType as string;
           const endpoint = processedConfig?.endpoint as string;
 
           // Determine the type of action and execute accordingly
@@ -271,8 +318,7 @@ class ServerWorkflowExecutor {
             try {
               const { generateText } = await import('ai');
 
-              // Use original config (not processed) for model to avoid template processing
-              const modelId = (node.data.config?.aiModel as string) || 'gpt-4o-mini';
+              const modelId = (processedConfig?.aiModel as string) || 'gpt-4o-mini';
               const prompt = (processedConfig?.aiPrompt as string) || '';
 
               if (!prompt) {
@@ -314,8 +360,7 @@ class ServerWorkflowExecutor {
             try {
               const { experimental_generateImage: generateImage } = await import('ai');
 
-              // Use original config (not processed) for model to avoid template processing
-              const modelString = (node.data.config?.imageModel as string) || 'openai/gpt-5-nano';
+              const modelString = (processedConfig?.imageModel as string) || 'openai/gpt-5-nano';
               const prompt = (processedConfig?.imagePrompt as string) || '';
 
               if (!prompt) {
