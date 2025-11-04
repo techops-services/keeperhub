@@ -4,7 +4,9 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { user } from "@/lib/db/schema";
 
-export async function GET(request: NextRequest) {
+const MASK_LENGTH = 4;
+
+export const GET = async (request: NextRequest) => {
   try {
     const session = await auth.api.getSession({ headers: request.headers });
 
@@ -30,9 +32,15 @@ export async function GET(request: NextRequest) {
 
     // Mask API keys for security (show only last 4 characters)
     const maskApiKey = (key: string | null) => {
-      if (!key) return null;
-      if (key.length <= 4) return key;
-      return "*".repeat(key.length - 4) + key.slice(-4);
+      if (!key) {
+        return null;
+      }
+
+      if (key.length <= MASK_LENGTH) {
+        return key;
+      }
+
+      return `${"*".repeat(key.length - MASK_LENGTH)}${key.slice(-MASK_LENGTH)}`;
     };
 
     return NextResponse.json({
@@ -57,9 +65,9 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+};
 
-export async function PATCH(request: NextRequest) {
+export const PATCH = async (request: NextRequest) => {
   try {
     const session = await auth.api.getSession({ headers: request.headers });
 
@@ -123,4 +131,4 @@ export async function PATCH(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+};

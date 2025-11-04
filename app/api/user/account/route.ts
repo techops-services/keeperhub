@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { user } from "@/lib/db/schema";
 
-export async function GET(request: NextRequest) {
+export const GET = async (request: NextRequest) => {
   try {
     const session = await auth.api.getSession({ headers: request.headers });
 
@@ -37,9 +37,9 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+};
 
-export async function PATCH(request: NextRequest) {
+export const PATCH = async (request: NextRequest) => {
   try {
     const session = await auth.api.getSession({ headers: request.headers });
 
@@ -52,8 +52,12 @@ export async function PATCH(request: NextRequest) {
 
     const updates: { name?: string; email?: string } = {};
 
-    if (name !== undefined) updates.name = name;
-    if (email !== undefined) updates.email = email;
+    if (name !== undefined) {
+      updates.name = name;
+    }
+    if (email !== undefined) {
+      updates.email = email;
+    }
 
     await db.update(user).set(updates).where(eq(user.id, session.user.id));
 
@@ -68,4 +72,4 @@ export async function PATCH(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+};

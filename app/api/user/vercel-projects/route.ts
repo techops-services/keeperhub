@@ -5,11 +5,7 @@ import { db } from "@/lib/db";
 import { user, vercelProjects } from "@/lib/db/schema";
 import { createProject, listProjects } from "@/lib/integrations/vercel";
 
-/**
- * GET /api/user/vercel-projects
- * Fetch Vercel projects from the Vercel API and sync with local database
- */
-export async function GET(request: NextRequest) {
+export const GET = async (request: NextRequest) => {
   try {
     const session = await auth.api.getSession({ headers: request.headers });
 
@@ -89,13 +85,9 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+};
 
-/**
- * POST /api/user/vercel-projects
- * Create a new Vercel project (creates actual project on Vercel if API token is configured)
- */
-export async function POST(request: NextRequest) {
+export const POST = async (request: NextRequest) => {
   try {
     const session = await auth.api.getSession({ headers: request.headers });
 
@@ -106,7 +98,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { name, framework } = body;
 
-    if (!(name && name.trim())) {
+    if (!name?.trim()) {
       return NextResponse.json(
         { error: "Project name is required" },
         { status: 400 }
@@ -173,13 +165,9 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+};
 
-/**
- * DELETE /api/user/vercel-projects?id=projectId
- * Remove a Vercel project from local database (doesn't delete from Vercel)
- */
-export async function DELETE(request: NextRequest) {
+export const DELETE = async (request: NextRequest) => {
   try {
     const session = await auth.api.getSession({ headers: request.headers });
 
@@ -215,4 +203,4 @@ export async function DELETE(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+};

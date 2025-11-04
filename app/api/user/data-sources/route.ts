@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { dataSources } from "@/lib/db/schema";
 
-export async function GET(request: NextRequest) {
+export const GET = async (request: NextRequest) => {
   try {
     const session = await auth.api.getSession({ headers: request.headers });
 
@@ -33,9 +33,9 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+};
 
-export async function POST(request: NextRequest) {
+export const POST = async (request: NextRequest) => {
   try {
     const session = await auth.api.getSession({ headers: request.headers });
 
@@ -86,19 +86,24 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+};
 
-function maskConnectionString(connStr: string): string {
+const maskConnectionString = (connStr: string): string => {
   // Mask password in connection string
   try {
     const url = new URL(connStr);
+
     if (url.password) {
       url.password = "****";
     }
+
     return url.toString();
   } catch {
     // If not a valid URL, just mask the middle part
-    if (connStr.length <= 10) return connStr;
-    return connStr.slice(0, 5) + "****" + connStr.slice(-5);
+    if (connStr.length <= 10) {
+      return connStr;
+    }
+
+    return `${connStr.slice(0, 5)}****${connStr.slice(-5)}`;
   }
-}
+};

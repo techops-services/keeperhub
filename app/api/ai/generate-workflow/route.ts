@@ -2,18 +2,7 @@ import { streamText } from "ai";
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 
-export async function POST(req: NextRequest) {
-  try {
-    const session = await auth.api.getSession({ headers: req.headers });
-    if (!session) {
-      return new Response("Unauthorized", { status: 401 });
-    }
-
-    const { prompt } = await req.json();
-
-    const result = streamText({
-      model: process.env.AI_MODEL || "openai/gpt-4o-mini",
-      system: `You are a workflow automation expert. Generate a workflow based on the user's description.
+const system = `You are a workflow automation expert. Generate a workflow based on the user's description.
           
 Return a JSON object with this structure:
 {
@@ -70,7 +59,21 @@ IMPORTANT:
 - For Send Email actions, include emailTo, emailSubject, and emailBody
 - For Send Slack Message actions, include slackChannel and slackMessage
 - Position nodes in a left-to-right flow with proper spacing (x: 100, 400, 700, etc., y: 200)
-- Return ONLY valid JSON, no markdown or explanations`,
+- Return ONLY valid JSON, no markdown or explanations`;
+
+export const POST = async (req: NextRequest) => {
+  try {
+    const session = await auth.api.getSession({ headers: req.headers });
+
+    if (!session) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+
+    const { prompt } = await req.json();
+
+    const result = streamText({
+      model: process.env.AI_MODEL || "openai/gpt-4o-mini",
+      system,
       prompt,
       temperature: 0.7,
     });
@@ -87,6 +90,7 @@ IMPORTANT:
     console.error("Failed to generate workflow:", error);
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
+
     return NextResponse.json(
       {
         error: "Failed to generate workflow",
@@ -95,4 +99,4 @@ IMPORTANT:
       { status: 500 }
     );
   }
-}
+};

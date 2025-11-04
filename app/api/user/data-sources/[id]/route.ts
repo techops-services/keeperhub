@@ -4,10 +4,10 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { dataSources } from "@/lib/db/schema";
 
-export async function DELETE(
+export const DELETE = async (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   try {
     const session = await auth.api.getSession({ headers: request.headers });
 
@@ -45,12 +45,12 @@ export async function DELETE(
       { status: 500 }
     );
   }
-}
+};
 
-export async function PATCH(
+export const PATCH = async (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   try {
     const session = await auth.api.getSession({ headers: request.headers });
 
@@ -82,9 +82,14 @@ export async function PATCH(
       isDefault?: boolean;
     } = {};
 
-    if (body.name !== undefined) updates.name = body.name;
-    if (body.connectionString !== undefined)
+    if (body.name !== undefined) {
+      updates.name = body.name;
+    }
+
+    if (body.connectionString !== undefined) {
       updates.connectionString = body.connectionString;
+    }
+
     if (body.isDefault !== undefined) {
       updates.isDefault = body.isDefault;
 
@@ -114,4 +119,4 @@ export async function PATCH(
       { status: 500 }
     );
   }
-}
+};
