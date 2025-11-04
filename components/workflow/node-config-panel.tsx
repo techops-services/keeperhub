@@ -2,7 +2,7 @@
 
 import { useAtom, useSetAtom } from "jotai";
 import { MoreVertical, Trash2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,28 +29,22 @@ import {
   isGeneratingAtom,
   nodesAtom,
   propertiesPanelActiveTabAtom,
-  propertiesPanelResizingAtom,
-  propertiesPanelWidthAtom,
   selectedNodeAtom,
   updateNodeDataAtom,
 } from "@/lib/workflow-store";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { AvailableOutputs } from "./available-outputs";
 import { ActionConfig } from "./config/action-config";
 import { TriggerConfig } from "./config/trigger-config";
 import { WorkflowRuns } from "./workflow-runs";
 
-const MIN_WIDTH = 280;
-const MAX_WIDTH = 600;
-
-export function NodeConfigPanel() {
+export const NodeConfigPanel = () => {
   const [selectedNodeId] = useAtom(selectedNodeAtom);
   const [nodes] = useAtom(nodesAtom);
   const [isGenerating] = useAtom(isGeneratingAtom);
   const [currentWorkflowId] = useAtom(currentWorkflowIdAtom);
   const updateNodeData = useSetAtom(updateNodeDataAtom);
   const deleteNode = useSetAtom(deleteNodeAtom);
-  const [panelWidth, setPanelWidth] = useAtom(propertiesPanelWidthAtom);
-  const [isResizing, setIsResizing] = useAtom(propertiesPanelResizingAtom);
   const [activeTab, setActiveTab] = useAtom(propertiesPanelActiveTabAtom);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -58,56 +52,6 @@ export function NodeConfigPanel() {
   const [showDeleteRunsAlert, setShowDeleteRunsAlert] = useState(false);
 
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
-
-  // Load saved width from localStorage after mount to avoid hydration mismatch
-  useEffect(() => {
-    const saved = localStorage.getItem("nodeConfigPanelWidth");
-    if (saved) {
-      const width = Number.parseInt(saved, 10);
-      if (width >= MIN_WIDTH && width <= MAX_WIDTH) {
-        setPanelWidth(width);
-      }
-    }
-  }, [setPanelWidth]);
-
-  // Handle resize
-  useEffect(() => {
-    if (!isResizing) return;
-
-    // Prevent text selection while resizing
-    document.body.style.userSelect = "none";
-    document.body.style.cursor = "col-resize";
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!panelRef.current) return;
-      const panelRect = panelRef.current.getBoundingClientRect();
-      const newWidth = panelRect.right - e.clientX;
-      const clampedWidth = Math.min(Math.max(newWidth, MIN_WIDTH), MAX_WIDTH);
-      setPanelWidth(clampedWidth);
-    };
-
-    const handleMouseUp = () => {
-      setIsResizing(false);
-      localStorage.setItem("nodeConfigPanelWidth", panelWidth.toString());
-      document.body.style.userSelect = "";
-      document.body.style.cursor = "";
-    };
-
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-      document.body.style.userSelect = "";
-      document.body.style.cursor = "";
-    };
-  }, [isResizing, panelWidth, setPanelWidth, setIsResizing]);
-
-  const handleResizeStart = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
-  };
 
   const handleDelete = () => {
     if (selectedNodeId) {
@@ -150,63 +94,35 @@ export function NodeConfigPanel() {
   if (!selectedNode) {
     return (
       <>
-        <Card
-          className="relative hidden h-full flex-col rounded-none border-t-0 border-r-0 border-b-0 border-l md:flex"
+        <div
+          className="absolute top-20 right-4 bottom-4 hidden w-89 flex-col rounded-lg border bg-background/80 backdrop-blur-sm md:flex"
           ref={panelRef}
-          style={{ width: `${panelWidth}px` }}
         >
-          {/* Resize handle */}
-          <div
-            className="absolute top-0 bottom-0 left-0 z-10 w-1 cursor-col-resize hover:bg-blue-500 active:bg-blue-600"
-            onMouseDown={handleResizeStart}
-            style={{ cursor: isResizing ? "col-resize" : undefined }}
-          />
-          <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-3">
-            <Button
-              className={activeTab === "properties" ? "font-semibold" : ""}
-              onClick={() => setActiveTab("properties")}
-              variant="ghost"
-            >
-              Properties
-            </Button>
-            <Button
-              className={activeTab === "runs" ? "font-semibold" : ""}
-              onClick={() => setActiveTab("runs")}
-              variant="ghost"
-            >
-              Runs
-            </Button>
-            <div className="ml-auto">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button className="h-8 w-8" size="icon" variant="ghost">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {activeTab === "runs" && (
-                    <DropdownMenuItem
-                      onClick={() => setShowDeleteRunsAlert(true)}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete All Runs
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto">
-            {activeTab === "properties" && (
+          <Tabs>
+            <TabsList className="h-auto w-full rounded-none border-b bg-transparent p-3">
+              <TabsTrigger
+                className="bg-transparent text-muted-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                value="properties"
+              >
+                Properties
+              </TabsTrigger>
+              <TabsTrigger
+                className="bg-transparent text-muted-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                value="runs"
+              >
+                Runs
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent className="p-3" value="properties">
               <div className="text-muted-foreground text-sm">
                 Select a node to configure
               </div>
-            )}
-            {activeTab === "runs" && (
+            </TabsContent>
+            <TabsContent className="p-3" value="runs">
               <WorkflowRuns isActive={activeTab === "runs"} />
-            )}
-          </CardContent>
-        </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
 
         {/* Delete All Runs Alert Dialog */}
         <AlertDialog
@@ -438,4 +354,4 @@ export function NodeConfigPanel() {
       </AlertDialog>
     </>
   );
-}
+};

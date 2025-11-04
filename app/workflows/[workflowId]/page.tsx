@@ -253,17 +253,15 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
+    <div className="flex h-screen w-full flex-col overflow-hidden">
       <WorkflowToolbar workflowId={workflowId} />
-      <div className="flex flex-1 overflow-hidden">
-        <main className="relative flex-1 overflow-hidden">
-          <ReactFlowProvider>
-            <WorkflowCanvas />
-            <NodeToolbar />
-          </ReactFlowProvider>
-        </main>
-        <NodeConfigPanel />
-      </div>
+      <main className="relative size-full overflow-hidden">
+        <ReactFlowProvider>
+          <WorkflowCanvas />
+          <NodeToolbar />
+        </ReactFlowProvider>
+      </main>
+      <NodeConfigPanel />
     </div>
   );
 };
