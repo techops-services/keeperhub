@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select';
 import { IntegrationIcon } from '@/components/ui/integration-icon';
 import Editor from '@monaco-editor/react';
+import { SchemaBuilder, type SchemaField } from './schema-builder';
 
 interface ActionConfigProps {
   config: Record<string, unknown>;
@@ -356,6 +357,22 @@ export function ActionConfig({ config, onUpdateConfig, disabled }: ActionConfigP
       {config?.actionType === 'Generate Text' && (
         <>
           <div className="space-y-2">
+            <Label htmlFor="aiFormat">Format</Label>
+            <Select
+              value={(config?.aiFormat as string) || 'text'}
+              onValueChange={(value) => onUpdateConfig('aiFormat', value)}
+              disabled={disabled}
+            >
+              <SelectTrigger id="aiFormat" className="w-full">
+                <SelectValue placeholder="Select format" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="text">Text</SelectItem>
+                <SelectItem value="object">Object</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="aiModel">Model</Label>
             <Select
               value={(config?.aiModel as string) || 'gpt-4o-mini'}
@@ -385,6 +402,18 @@ export function ActionConfig({ config, onUpdateConfig, disabled }: ActionConfigP
               rows={4}
             />
           </div>
+          {config?.aiFormat === 'object' && (
+            <div className="space-y-2">
+              <Label>Schema</Label>
+              <SchemaBuilder
+                schema={
+                  config?.aiSchema ? (JSON.parse(config.aiSchema as string) as SchemaField[]) : []
+                }
+                onChange={(schema) => onUpdateConfig('aiSchema', JSON.stringify(schema))}
+                disabled={disabled}
+              />
+            </div>
+          )}
         </>
       )}
 
