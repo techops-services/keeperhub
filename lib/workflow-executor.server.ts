@@ -10,7 +10,9 @@ import { db } from './db';
 import { workflowExecutionLogs, user } from './db/schema';
 import { eq } from 'drizzle-orm';
 import { processConfigTemplates, type NodeOutputs } from './utils/template';
-import { generateText } from 'ai';
+import { generateText, generateObject } from 'ai';
+import { z } from 'zod';
+import type { SchemaField } from '../components/workflow/config/schema-builder';
 import OpenAI from 'openai';
 import { GoogleGenAI } from '@google/genai';
 
@@ -36,6 +38,71 @@ interface UserIntegrations {
   resendFromEmail?: string | null;
   linearApiKey?: string | null;
   slackApiKey?: string | null;
+}
+
+/**
+ * Convert SchemaField[] to Zod schema
+ */
+function schemaFieldsToZod(fields: SchemaField[]): z.ZodObject<Record<string, z.ZodTypeAny>> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const shape: Record<string, any> = {};
+
+  for (const field of fields) {
+    let zodType: z.ZodTypeAny;
+
+    switch (field.type) {
+      case 'string':
+        zodType = z.string();
+        if (field.description) {
+          zodType = zodType.describe(field.description);
+        }
+        break;
+      case 'number':
+        zodType = z.number();
+        if (field.description) {
+          zodType = zodType.describe(field.description);
+        }
+        break;
+      case 'boolean':
+        zodType = z.boolean();
+        if (field.description) {
+          zodType = zodType.describe(field.description);
+        }
+        break;
+      case 'array':
+        if (field.itemType === 'string') {
+          zodType = z.array(z.string());
+        } else if (field.itemType === 'number') {
+          zodType = z.array(z.number());
+        } else if (field.itemType === 'boolean') {
+          zodType = z.array(z.boolean());
+        } else if (field.itemType === 'object' && field.fields) {
+          zodType = z.array(schemaFieldsToZod(field.fields));
+        } else {
+          zodType = z.array(z.any());
+        }
+        if (field.description) {
+          zodType = zodType.describe(field.description);
+        }
+        break;
+      case 'object':
+        if (field.fields && field.fields.length > 0) {
+          zodType = schemaFieldsToZod(field.fields);
+        } else {
+          zodType = z.object({});
+        }
+        if (field.description) {
+          zodType = zodType.describe(field.description);
+        }
+        break;
+      default:
+        zodType = z.any();
+    }
+
+    shape[field.name] = zodType;
+  }
+
+  return z.object(shape);
 }
 
 class ServerWorkflowExecutor {
@@ -337,9 +404,12 @@ class ServerWorkflowExecutor {
             try {
               const modelId = (processedConfig?.aiModel as string) || 'gpt-4o-mini';
               const prompt = (processedConfig?.aiPrompt as string) || '';
+              const aiFormat = (processedConfig?.aiFormat as string) || 'text';
+              const aiSchema = processedConfig?.aiSchema as string | undefined;
 
               console.log('[Executor] Using model ID:', modelId);
               console.log('[Executor] Using prompt:', prompt);
+              console.log('[Executor] Format:', aiFormat);
 
               if (!prompt) {
                 result = {
@@ -358,25 +428,56 @@ class ServerWorkflowExecutor {
                 }
 
                 console.log('[Executor] Converted to model string:', modelString);
-                console.log('[Executor] Calling generateText with:', {
-                  model: modelString,
-                  promptLength: prompt.length,
-                });
 
-                const { text } = await generateText({
-                  model: modelString,
-                  prompt,
-                });
+                if (aiFormat === 'object' && aiSchema) {
+                  // Use generateObject with schema
+                  try {
+                    const schemaFields = JSON.parse(aiSchema) as SchemaField[];
+                    const zodSchema = schemaFieldsToZod(schemaFields);
 
-                console.log('[Executor] Text generated successfully, length:', text?.length);
+                    console.log('[Executor] Calling generateObject with schema');
 
-                result = {
-                  success: true,
-                  data: {
-                    text,
-                    model: modelId,
-                  },
-                };
+                    const { object } = await generateObject({
+                      model: modelString,
+                      schema: zodSchema,
+                      prompt,
+                    });
+
+                    console.log('[Executor] Object generated successfully:', object);
+
+                    result = {
+                      success: true,
+                      data: object,
+                    };
+                  } catch (schemaError) {
+                    console.error('[Executor] Schema parsing error:', schemaError);
+                    result = {
+                      success: false,
+                      error: `Schema error: ${schemaError instanceof Error ? schemaError.message : 'Invalid schema'}`,
+                    };
+                  }
+                } else {
+                  // Use generateText for text format
+                  console.log('[Executor] Calling generateText with:', {
+                    model: modelString,
+                    promptLength: prompt.length,
+                  });
+
+                  const { text } = await generateText({
+                    model: modelString,
+                    prompt,
+                  });
+
+                  console.log('[Executor] Text generated successfully, length:', text?.length);
+
+                  result = {
+                    success: true,
+                    data: {
+                      text,
+                      model: modelId,
+                    },
+                  };
+                }
               }
             } catch (error) {
               console.error('[Executor] Generate Text error:', error);
