@@ -17,12 +17,6 @@ function escapeString(str: string): string {
     .replace(/\t/g, '\\t'); // Escape tabs
 }
 
-/**
- * Check if a string contains template variables
- */
-function hasTemplateVariables(str: string): boolean {
-  return /\{\{[^}]+\}\}/.test(str);
-}
 
 /**
  * Generate workflow SDK code from workflow definition
@@ -54,17 +48,8 @@ export function generateWorkflowSDKCode(
   // Always import sleep and FatalError
   imports.add("import { sleep, FatalError } from 'workflow';");
 
-  // Add template processing utilities
-  const needsTemplateProcessing = nodes.some((node) => {
-    const config = node.data.config || {};
-    return Object.values(config).some(
-      (val) => typeof val === 'string' && hasTemplateVariables(val)
-    );
-  });
-
-  if (needsTemplateProcessing) {
-    imports.add('// Template processing utilities are included below');
-  }
+  // Always include template processing utilities comment
+  imports.add('// Template processing utilities are included below');
 
   function generateStepFunction(node: WorkflowNode, uniqueStepName?: string): string {
     // Use provided unique step name or generate one
@@ -177,11 +162,30 @@ export function generateWorkflowSDKCode(
   console.log('Image generated');
   return { base64: response.data[0].b64_json };`;
         } else if (actionType === 'HTTP Request') {
+          // Parse headers if provided
+          let headersCode = "'Content-Type': 'application/json'";
+          if (config.httpHeaders) {
+            try {
+              const headers =
+                typeof config.httpHeaders === 'string'
+                  ? JSON.parse(config.httpHeaders as string)
+                  : config.httpHeaders;
+              const headerEntries = Object.entries(headers as Record<string, string>)
+                .map(([key, value]) => `'${key}': '${value}'`)
+                .join(',\n      ');
+              if (headerEntries) {
+                headersCode = headerEntries;
+              }
+            } catch {
+              // If parsing fails, use default
+              headersCode = "'Content-Type': 'application/json'";
+            }
+          }
+
           stepBody = `  const response = await fetch('${config.endpoint || 'https://api.example.com'}', {
     method: '${config.httpMethod || 'POST'}',
     headers: {
-      'Content-Type': 'application/json',
-      ${config.httpHeaders ? JSON.stringify(config.httpHeaders) : '{}'}
+      ${headersCode}
     },
     body: JSON.stringify(input),
   });
@@ -344,9 +348,8 @@ ${stepBody}
 ${workflowBody.join('\n')}
 }`;
 
-  // Add template processing utilities if needed
-  const templateUtilities = needsTemplateProcessing
-    ? `
+  // Always add template processing utilities (they're small and useful)
+  const templateUtilities = `
 // Template processing utilities
 function processTemplate(template: string, outputs: Record<string, { label: string; data: unknown }>): string {
   if (!template || typeof template !== 'string') {
@@ -403,12 +406,12 @@ function formatValue(value: unknown): string {
   }
   return String(value);
 }
-`
-    : '';
+`;
 
-  // Combine everything
+  // Combine everything - template utilities MUST come before step functions
   const code = `${Array.from(imports).join('\n')}
 ${templateUtilities}
+
 ${stepFunctions.join('\n\n')}
 
 ${mainFunction}

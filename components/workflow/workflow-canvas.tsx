@@ -32,7 +32,7 @@ import { TriggerNode } from './nodes/trigger-node';
 import { ActionNode } from './nodes/action-node';
 import { ConditionNode } from './nodes/condition-node';
 import { TransformNode } from './nodes/transform-node';
-import { v4 as uuidv4 } from 'uuid';
+import { nanoid } from 'nanoid';
 import { Loader2, PlayCircle, Zap, GitBranch, Shuffle } from 'lucide-react';
 
 const nodeTemplates = [
@@ -143,7 +143,7 @@ export function WorkflowCanvas() {
   const onConnect: OnConnect = useCallback(
     (connection: Connection) => {
       const newEdge = {
-        id: uuidv4(),
+        id: nanoid(),
         ...connection,
         type: 'default',
       };
@@ -224,7 +224,7 @@ export function WorkflowCanvas() {
       });
 
       const newNode: WorkflowNode = {
-        id: uuidv4(),
+        id: nanoid(),
         type: template.type,
         position,
         data: {
@@ -240,7 +240,7 @@ export function WorkflowCanvas() {
 
       // Create connection from the source node to the new node
       const newEdge = {
-        id: uuidv4(),
+        id: nanoid(),
         source: menu.id,
         target: newNode.id,
         type: 'default',

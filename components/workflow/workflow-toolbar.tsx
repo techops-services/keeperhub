@@ -118,8 +118,16 @@ export function WorkflowToolbar({}: { workflowId?: string }) {
       try {
         toast.info('Triggering production workflow...');
 
+        // Construct the workflow-specific API endpoint
+        const workflowFileName = workflowName
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, '-')
+          .replace(/-+/g, '-')
+          .replace(/^-|-$/g, '');
+        const workflowApiUrl = `${deploymentUrl}/api/workflows/${workflowFileName}`;
+
         // Call the deployed workflow's API endpoint
-        const response = await fetch(deploymentUrl, {
+        const response = await fetch(workflowApiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({}), // Empty input for now

@@ -81,21 +81,39 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       );
     }
 
-    // Update status to deploying
-    await db.update(workflows).set({ deploymentStatus: 'deploying' }).where(eq(workflows.id, id));
+    // Get all workflows for this Vercel project
+    const projectWorkflows = await db.query.workflows.findMany({
+      where: and(
+        eq(workflows.vercelProjectId, workflow.vercelProjectId!),
+        eq(workflows.userId, session.user.id)
+      ),
+    });
 
-    // Deploy workflow using the actual Vercel project ID
+    // Update status to deploying for all workflows in the project
+    await db
+      .update(workflows)
+      .set({ deploymentStatus: 'deploying' })
+      .where(
+        and(
+          eq(workflows.vercelProjectId, workflow.vercelProjectId!),
+          eq(workflows.userId, session.user.id)
+        )
+      );
+
+    // Deploy all workflows in the project
     const result = await deployWorkflowToVercel({
-      workflowId: workflow.id,
-      workflowName: workflow.name,
-      nodes: workflow.nodes,
-      edges: workflow.edges,
+      workflows: projectWorkflows.map((w) => ({
+        id: w.id,
+        name: w.name,
+        nodes: w.nodes,
+        edges: w.edges,
+      })),
       vercelToken: userData.vercelApiToken,
       vercelTeamId: userData.vercelTeamId || undefined,
       vercelProjectId: vercelProject.vercelProjectId, // Use the actual Vercel project ID
     });
 
-    // Update workflow with deployment result
+    // Update all workflows in the project with deployment result
     await db
       .update(workflows)
       .set({
@@ -103,7 +121,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         deploymentUrl: result.deploymentUrl,
         lastDeployedAt: new Date(),
       })
-      .where(eq(workflows.id, id));
+      .where(
+        and(
+          eq(workflows.vercelProjectId, workflow.vercelProjectId!),
+          eq(workflows.userId, session.user.id)
+        )
+      );
 
     return NextResponse.json({
       success: result.success,

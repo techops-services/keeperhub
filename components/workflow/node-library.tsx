@@ -2,7 +2,7 @@
 
 import { useSetAtom } from 'jotai';
 import { PlayCircle, Zap, GitBranch, Shuffle } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
+import { nanoid } from 'nanoid';
 import { addNodeAtom, type WorkflowNode, type WorkflowNodeType } from '@/lib/workflow-store';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
@@ -56,7 +56,7 @@ export function NodeLibrary() {
     const randomY = Math.random() * 300 + 100;
 
     const newNode: WorkflowNode = {
-      id: uuidv4(),
+      id: nanoid(),
       type: template.type,
       position: {
         x: randomX,

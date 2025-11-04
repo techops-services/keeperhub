@@ -6,10 +6,12 @@ import type { WorkflowNode, WorkflowEdge } from './workflow-store';
 import { generateWorkflowSDKCode } from './workflow-codegen-sdk';
 
 export interface DeploymentOptions {
-  workflowId: string;
-  workflowName: string;
-  nodes: WorkflowNode[];
-  edges: WorkflowEdge[];
+  workflows: Array<{
+    id: string;
+    name: string;
+    nodes: WorkflowNode[];
+    edges: WorkflowEdge[];
+  }>;
   vercelToken: string;
   vercelTeamId?: string;
   vercelProjectId?: string;
@@ -33,20 +35,11 @@ export async function deployWorkflowToVercel(
 
   try {
     logs.push('Starting deployment process...');
-    logs.push('Generating workflow code...');
+    logs.push(`Deploying ${options.workflows.length} workflow(s)...`);
 
-    // Generate the workflow code
-    const workflowCode = generateWorkflowSDKCode(
-      options.workflowName,
-      options.nodes,
-      options.edges
-    );
-
-    logs.push('Workflow code generated successfully');
-    logs.push(`Generated code length: ${workflowCode.length} characters`);
-
-    // Get all project files
+    // Get all project files with all workflows
     const files = await generateProjectFiles(options);
+    logs.push(`Generated code for ${options.workflows.length} workflow(s)`);
 
     // Add Vercel project configuration to link to the specific project
     files['.vercel/project.json'] = JSON.stringify(
@@ -213,16 +206,12 @@ export async function deployWorkflowToVercel(
       }
     }
 
-    // Construct the API endpoint URL for triggering the workflow
-    const workflowFileName = sanitizeFileName(options.workflowName);
-    const apiEndpointUrl = `${deploymentUrl}/api/workflows/${workflowFileName}`;
-
     logs.push(`Deployment successful: ${deploymentUrl}`);
-    logs.push(`API endpoint: ${apiEndpointUrl}`);
+    logs.push(`Deployed ${options.workflows.length} workflow(s) to production`);
 
     return {
       success: true,
-      deploymentUrl: apiEndpointUrl, // Store the API endpoint URL
+      deploymentUrl, // Store the base deployment URL
       logs,
     };
   } catch (error) {
@@ -246,14 +235,60 @@ export async function deployWorkflowToVercel(
  * Generate all project files for the Next.js workflow app
  */
 async function generateProjectFiles(options: DeploymentOptions): Promise<Record<string, string>> {
-  const { workflowName, nodes, edges } = options;
+  const files: Record<string, string> = {};
 
-  // Generate workflow code
-  const workflowCode = generateWorkflowSDKCode(workflowName, nodes, edges);
+  // Generate code for each workflow
+  const workflowFiles: Array<{ name: string; code: string; fileName: string }> = [];
+
+  for (const workflow of options.workflows) {
+    const workflowCode = generateWorkflowSDKCode(workflow.name, workflow.nodes, workflow.edges);
+    const fileName = sanitizeFileName(workflow.name);
+
+    workflowFiles.push({
+      name: workflow.name,
+      code: workflowCode,
+      fileName,
+    });
+
+    // Add workflow file
+    files[`workflows/${fileName}.ts`] = workflowCode;
+
+    // Add API route for this workflow
+    const functionName = sanitizeFunctionName(workflow.name);
+    files[`app/api/workflows/${fileName}/route.ts`] = `import { start } from 'workflow/api';
+import { ${functionName} } from '@/workflows/${fileName}';
+import { NextResponse } from 'next/server';
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    
+    // Start the workflow execution
+    await start(${functionName}, [body]);
+    
+    return NextResponse.json({
+      success: true,
+      message: 'Workflow started successfully',
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    );
+  }
+}
+`;
+  }
+
+  // Collect all nodes from all workflows for dependency detection
+  const allNodes = options.workflows.flatMap((w) => w.nodes);
 
   // Generate package.json
   const packageJson = {
-    name: `workflow-${options.workflowId}`,
+    name: `workflows`,
     version: '0.1.0',
     private: true,
     scripts: {
@@ -266,8 +301,8 @@ async function generateProjectFiles(options: DeploymentOptions): Promise<Record<
       react: '19.2.0',
       'react-dom': '19.2.0',
       workflow: '4.0.1-beta.7',
-      // Add integration dependencies based on nodes
-      ...getIntegrationDependencies(nodes),
+      // Add integration dependencies based on all nodes
+      ...getIntegrationDependencies(allNodes),
     },
   };
 
@@ -280,7 +315,44 @@ const nextConfig: NextConfig = {};
 export default withWorkflow(nextConfig);
 `;
 
-  // Generate tsconfig.json
+  // Generate app page listing all workflows
+  const workflowsList = workflowFiles
+    .map((wf) => `<li><a href="/api/workflows/${wf.fileName}">${wf.name}</a></li>`)
+    .join('\n          ');
+
+  files['app/page.tsx'] = `export default function Home() {
+  return (
+    <main className="p-8">
+      <h1 className="text-2xl font-bold mb-4">Workflows</h1>
+      <p className="mb-4">Available workflow endpoints:</p>
+      <ul className="list-disc pl-6 space-y-2">
+        ${workflowsList}
+      </ul>
+    </main>
+  );
+}
+`;
+
+  files['app/layout.tsx'] = `export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
+}
+`;
+
+  files['package.json'] = JSON.stringify(packageJson, null, 2);
+  files['next.config.ts'] = nextConfig;
+  files['.gitignore'] = `node_modules
+.next
+.env*.local
+`;
+
   const tsConfig = {
     compilerOptions: {
       target: 'ES2017',
@@ -312,72 +384,9 @@ export default withWorkflow(nextConfig);
     exclude: ['node_modules'],
   };
 
-  // Generate API route to trigger workflow
-  const apiRoute = `import { start } from 'workflow/api';
-import { ${sanitizeFunctionName(workflowName)} } from '@/workflows/${sanitizeFileName(workflowName)}';
-import { NextResponse } from 'next/server';
+  files['tsconfig.json'] = JSON.stringify(tsConfig, null, 2);
 
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    
-    // Start the workflow execution
-    await start(${sanitizeFunctionName(workflowName)}, [body]);
-    
-    return NextResponse.json({
-      success: true,
-      message: 'Workflow started successfully',
-    });
-  } catch (error) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    );
-  }
-}
-`;
-
-  // Generate app layout
-  const appLayout = `export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <html lang="en">
-      <body>{children}</body>
-    </html>
-  );
-}
-`;
-
-  // Generate app page
-  const appPage = `export default function Home() {
-  return (
-    <main>
-      <h1>Workflow: ${workflowName}</h1>
-      <p>Workflow is running. Trigger via API at /api/workflows/${sanitizeFileName(workflowName)}</p>
-    </main>
-  );
-}
-`;
-
-  return {
-    'package.json': JSON.stringify(packageJson, null, 2),
-    'next.config.ts': nextConfig,
-    'tsconfig.json': JSON.stringify(tsConfig, null, 2),
-    [`workflows/${sanitizeFileName(workflowName)}.ts`]: workflowCode,
-    [`app/api/workflows/${sanitizeFileName(workflowName)}/route.ts`]: apiRoute,
-    'app/layout.tsx': appLayout,
-    'app/page.tsx': appPage,
-    '.gitignore': `node_modules
-.next
-.env*.local
-`,
-  };
+  return files;
 }
 
 /**
