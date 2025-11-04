@@ -33,6 +33,14 @@ import {
   newProjectNameAtom,
   creatingProjectAtom,
 } from '@/lib/atoms/vercel-projects';
+import {
+  PromptInput,
+  PromptInputBody,
+  PromptInputFooter,
+  PromptInputProvider,
+  PromptInputSubmit,
+  PromptInputTextarea,
+} from "@/components/ai-elements/prompt-input";
 
 export function WorkflowPrompt() {
   // Local component state (dumb state that doesn't need to persist)
@@ -171,6 +179,19 @@ export function WorkflowPrompt() {
 
   return (
     <div className="mx-auto w-full max-w-2xl">
+
+      <PromptInputProvider>
+        <PromptInput globalDrop multiple onSubmit={(message, event) => handleGenerate(event)}>
+          <PromptInputBody>
+            <PromptInputTextarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Describe your workflow..." ref={textareaRef} />
+          </PromptInputBody>
+          <PromptInputFooter>
+            <div />
+            <PromptInputSubmit status={isGenerating ? 'submitted' : 'ready'} />
+          </PromptInputFooter>
+        </PromptInput>
+      </PromptInputProvider>
+
       <form onSubmit={handleGenerate}>
         <div className="bg-muted/30 relative cursor-text overflow-hidden rounded-2xl border shadow-sm">
           {/* Textarea */}
@@ -185,7 +206,7 @@ export function WorkflowPrompt() {
               required
               rows={3}
               autoFocus
-              className="w-full resize-none border-0 !bg-transparent p-4 text-base focus-visible:ring-0 focus-visible:ring-offset-0"
+              className="w-full resize-none border-0 bg-transparent! p-4 text-base focus-visible:ring-0 focus-visible:ring-offset-0"
             />
           </div>
 
