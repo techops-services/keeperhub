@@ -1,5 +1,6 @@
 "use client";
 
+import { HistoryIcon } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useSession } from "@/lib/auth-client";
@@ -61,12 +62,13 @@ export const Recents = ({ limit }: RecentsProps = {}) => {
     <div className="grid w-full gap-1">
       {displayedWorkflows.map((workflow) => (
         <Link
-          className="flex w-full items-center justify-between rounded-full border bg-background px-3 py-1.5 text-xs"
+          className="flex w-full items-center justify-between gap-1.5 rounded-full border bg-background px-3 py-1.5 text-xs"
           href={`/workflows/${workflow.id}`}
           key={workflow.id}
         >
-          <h3>{workflow.name}</h3>
-          <p className="text-muted-foreground text-xs">
+          <HistoryIcon className="size-3 shrink-0 text-muted-foreground" />
+          <p className="flex-1 font-medium">{workflow.name}</p>
+          <p className="shrink-0 text-muted-foreground text-xs">
             {getRelativeTime(workflow.updatedAt)}
           </p>
         </Link>
