@@ -1,7 +1,7 @@
 "use client";
 
 import { Provider } from "jotai";
-import { AuthProvider } from "@/components/auth/auth-provider";
+import { AuthProvider } from "@/components/auth/provider";
 import { WorkflowsList } from "@/components/workflows/workflows-list";
 
 export default function WorkflowsPage() {

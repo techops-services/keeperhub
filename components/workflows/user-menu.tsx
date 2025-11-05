@@ -3,7 +3,7 @@
 import { LogOut, Moon, Settings, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useState } from "react";
-import { AuthDialog } from "@/components/auth/auth-dialog";
+import { AuthDialog } from "@/components/auth/dialog";
 import { SettingsDialog } from "@/components/settings";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
