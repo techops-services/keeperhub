@@ -1,12 +1,11 @@
 "use client";
 
 import { ReactFlowProvider } from "@xyflow/react";
-import { Provider, useAtom, useSetAtom } from "jotai";
+import { useAtom, useSetAtom } from "jotai";
 import { useSearchParams } from "next/navigation";
 import { use, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import { generate } from "@/app/actions/ai/generate";
-import { AuthProvider } from "@/components/auth/provider";
 import { NodeConfigPanel } from "@/components/workflow/node-config-panel";
 import { WorkflowCanvas } from "@/components/workflow/workflow-canvas";
 import { WorkflowSkeleton } from "@/components/workflow/workflow-skeleton";
@@ -249,11 +248,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
 };
 
 const WorkflowPage = ({ params }: WorkflowPageProps) => (
-  <Provider>
-    <AuthProvider>
-      <WorkflowEditor params={params} />
-    </AuthProvider>
-  </Provider>
+  <WorkflowEditor params={params} />
 );
 
 export default WorkflowPage;

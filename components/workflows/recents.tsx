@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { getRelativeTime } from "@/lib/utils/time";
 import { type SavedWorkflow, workflowApi } from "@/lib/workflow-api";
 import { Skeleton } from "../ui/skeleton";
+import { WorkflowsDialog } from "./workflows-dialog";
 
 type RecentsProps = {
   limit?: number;
@@ -51,6 +52,7 @@ export const Recents = ({ limit }: RecentsProps = {}) => {
         {new Array(limit).fill(0).map((_, index) => (
           <Skeleton className="h-[30px] w-full rounded-full" key={index} />
         ))}
+        <Skeleton className="mt-2 h-4 w-12 rounded-full" />
       </div>
     );
   }
@@ -77,6 +79,7 @@ export const Recents = ({ limit }: RecentsProps = {}) => {
           </p>
         </Link>
       ))}
+      <WorkflowsDialog />
     </div>
   );
 };

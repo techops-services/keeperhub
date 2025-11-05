@@ -1,4 +1,3 @@
-import { Provider } from "jotai";
 import type { Metadata } from "next";
 import { Canvas } from "@/components/ai-elements/canvas";
 import { Panel } from "@/components/ai-elements/panel";
@@ -13,22 +12,20 @@ export const metadata: Metadata = {
 };
 
 const Home = () => (
-  <Provider>
-    <div className="fixed top-0 left-0 z-0 h-screen w-screen">
-      <Canvas>
-        <Panel className="rounded-full p-0" position="top-right">
-          <UserMenu />
-        </Panel>
-        <WorkflowIndexPrompt />
-        <Panel
-          className="w-full max-w-sm border-none bg-transparent p-0"
-          position="bottom-center"
-        >
-          <Recents limit={3} />
-        </Panel>
-      </Canvas>
-    </div>
-  </Provider>
+  <div className="fixed top-0 left-0 z-0 h-screen w-screen">
+    <Canvas>
+      <Panel className="rounded-full p-0" position="top-right">
+        <UserMenu />
+      </Panel>
+      <WorkflowIndexPrompt />
+      <Panel
+        className="w-full max-w-sm border-none bg-transparent p-0"
+        position="bottom-center"
+      >
+        <Recents limit={3} />
+      </Panel>
+    </Canvas>
+  </div>
 );
 
 export default Home;

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import type { ReactNode } from "react";
+import { Provider } from "jotai";
+import { AuthProvider } from "@/components/auth/provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { mono, sans } from "@/lib/fonts";
@@ -25,8 +27,12 @@ const RootLayout = ({ children }: RootLayoutProps) => (
         disableTransitionOnChange
         enableSystem
       >
-        {children}
-        <Toaster />
+        <Provider>
+          <AuthProvider>
+            {children}
+            <Toaster />
+          </AuthProvider>
+        </Provider>
       </ThemeProvider>
     </body>
   </html>
