@@ -11,7 +11,6 @@ import {
   FolderOpen,
   Loader2,
   MoreVertical,
-  Pencil,
   Play,
   Redo2,
   Rocket,
@@ -39,7 +38,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -58,8 +56,6 @@ import {
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
   edgesAtom,
-  editingWorkflowNameAtom,
-  isEditingWorkflowNameAtom,
   isExecutingAtom,
   isGeneratingAtom,
   isSavingAtom,
@@ -85,13 +81,11 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
   const clearWorkflow = useSetAtom(clearWorkflowAtom);
   const updateNodeData = useSetAtom(updateNodeDataAtom);
   const [currentWorkflowId] = useAtom(currentWorkflowIdAtom);
-  const [workflowName, setWorkflowName] = useAtom(currentWorkflowNameAtom);
+  const [workflowName] = useAtom(currentWorkflowNameAtom);
   const [vercelProjectName, setVercelProjectName] = useAtom(
     currentVercelProjectNameAtom
   );
   const router = useRouter();
-  const [isEditing, setIsEditing] = useAtom(isEditingWorkflowNameAtom);
-  const [editingName, setEditingName] = useAtom(editingWorkflowNameAtom);
   const [showClearDialog, setShowClearDialog] = useAtom(showClearDialogAtom);
   const [showDeleteDialog, setShowDeleteDialog] = useAtom(showDeleteDialogAtom);
   const [isSaving, setIsSaving] = useAtom(isSavingAtom);
@@ -215,40 +209,6 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
       }
     } finally {
       setIsExecuting(false);
-    }
-  };
-
-  const handleStartEdit = () => {
-    setEditingName(workflowName);
-    setIsEditing(true);
-  };
-
-  const handleSaveWorkflowName = async () => {
-    if (!(editingName.trim() && currentWorkflowId)) {
-      setIsEditing(false);
-      return;
-    }
-
-    try {
-      await workflowApi.update(currentWorkflowId, { name: editingName.trim() });
-      setWorkflowName(editingName.trim());
-      setIsEditing(false);
-    } catch (error) {
-      console.error("Failed to rename workflow:", error);
-      setIsEditing(false);
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setEditingName(workflowName);
-    setIsEditing(false);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      handleSaveWorkflowName();
-    } else if (e.key === "Escape") {
-      handleCancelEdit();
     }
   };
 
@@ -419,40 +379,6 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
     navigator.clipboard.writeText(generatedCode);
     toast.success("Code copied to clipboard");
   };
-
-  const titleElement = isEditing ? (
-    <Input
-      autoFocus
-      className="h-8 w-64"
-      onBlur={handleSaveWorkflowName}
-      onChange={(e) => setEditingName(e.target.value)}
-      onKeyDown={handleKeyDown}
-      value={editingName}
-    />
-  ) : (
-    <div className="group flex items-center gap-2">
-      {vercelProjectName && (
-        <>
-          <span className="font-semibold text-muted-foreground text-xl">
-            {vercelProjectName}
-          </span>
-          <span className="text-muted-foreground text-xl">/</span>
-        </>
-      )}
-      <span className="font-semibold text-xl">{workflowName}</span>
-      {currentWorkflowId && (
-        <Button
-          className="h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100"
-          onClick={handleStartEdit}
-          size="icon"
-          title="Rename workflow"
-          variant="ghost"
-        >
-          <Pencil className="h-3 w-3" />
-        </Button>
-      )}
-    </div>
-  );
 
   const handleBack = () => {
     router.push("/");

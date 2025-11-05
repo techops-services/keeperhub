@@ -169,8 +169,6 @@ export const saveWorkflowAsAtom = atom(
 );
 
 // Workflow toolbar UI state atoms
-export const isEditingWorkflowNameAtom = atom(false);
-export const editingWorkflowNameAtom = atom("");
 export const showClearDialogAtom = atom(false);
 export const showDeleteDialogAtom = atom(false);
 export const isSavingAtom = atom(false);
