@@ -14,24 +14,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const timeout = setTimeout(() => {
       if (isPending) {
         console.warn("Session check timed out, redirecting to login");
-        router.push("/login");
+
+        if (pathname !== "/") {
+          router.push("/");
+        }
       }
     }, 5000);
 
     return () => clearTimeout(timeout);
-  }, [isPending, router]);
+  }, [isPending, router, pathname]);
 
   useEffect(() => {
-    if (!(isPending || session) && pathname !== "/login") {
-      router.push("/login");
+    if (!(isPending || session) && pathname !== "/") {
+      router.push("/");
     }
   }, [session, isPending, router, pathname]);
 
   // Show error if session check failed
   if (error) {
     console.error("Auth error:", error);
-    if (pathname !== "/login") {
-      router.push("/login");
+    if (pathname !== "/") {
+      router.push("/");
     }
     return null;
   }

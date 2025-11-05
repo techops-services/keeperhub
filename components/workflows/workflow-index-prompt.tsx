@@ -1,12 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { WorkflowPrompt } from "@/components/workflows/workflow-prompt";
 import { useSession } from "@/lib/auth-client";
 import { workflowApi } from "@/lib/workflow-api";
-import Link from "next/link";
 
 export const WorkflowIndexPrompt = () => {
   const { data: session } = useSession();
@@ -15,7 +15,7 @@ export const WorkflowIndexPrompt = () => {
   const handleNewWorkflow = async () => {
     // Check if user is logged in
     if (!session) {
-      router.push("/login");
+      router.push("/");
       return;
     }
 
@@ -44,7 +44,7 @@ export const WorkflowIndexPrompt = () => {
             <p className="text-muted-foreground text-sm">
               Powered by{" "}
               <Link
-                className="underline hover:no-underline underline-offset-2"
+                className="underline underline-offset-2 hover:no-underline"
                 href="https://useworkflow.dev/"
                 rel="noopener noreferrer"
                 target="_blank"
@@ -53,7 +53,7 @@ export const WorkflowIndexPrompt = () => {
               </Link>
               ,{" "}
               <Link
-                className="underline hover:no-underline underline-offset-2"
+                className="underline underline-offset-2 hover:no-underline"
                 href="https://ai-sdk.dev/"
                 rel="noopener noreferrer"
                 target="_blank"
@@ -62,7 +62,7 @@ export const WorkflowIndexPrompt = () => {
               </Link>
               ,{" "}
               <Link
-                className="underline hover:no-underline underline-offset-2"
+                className="underline underline-offset-2 hover:no-underline"
                 href="https://vercel.com/ai-gateway"
                 rel="noopener noreferrer"
                 target="_blank"
@@ -71,7 +71,7 @@ export const WorkflowIndexPrompt = () => {
               </Link>
               , and{" "}
               <Link
-                className="underline hover:no-underline underline-offset-2"
+                className="underline underline-offset-2 hover:no-underline"
                 href="https://ai-sdk.dev/elements"
                 rel="noopener noreferrer"
                 target="_blank"

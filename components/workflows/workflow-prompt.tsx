@@ -5,8 +5,8 @@ import { Loader2, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { getAll as getAllVercelProjects } from "@/app/actions/vercel-project/get-all";
 import { create as createVercelProject } from "@/app/actions/vercel-project/create";
+import { getAll as getAllVercelProjects } from "@/app/actions/vercel-project/get-all";
 import {
   PromptInput,
   PromptInputBody,
@@ -126,7 +126,7 @@ export function WorkflowPrompt() {
     // Check if user is logged in
     if (!session) {
       // Redirect to login page
-      router.push("/login");
+      router.push("/");
       return;
     }
 
