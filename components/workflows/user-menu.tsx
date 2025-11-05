@@ -4,7 +4,7 @@ import { LogOut, Moon, Settings, Sun } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useState } from "react";
-import { SettingsDialog } from "@/components/settings-dialog";
+import { SettingsDialog } from "@/components/settings";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -107,7 +107,7 @@ export function UserMenu() {
           <span>Logout</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <SettingsDialog onOpenChange={setSettingsOpen} open={settingsOpen} />
     </DropdownMenu>
   );
 }
