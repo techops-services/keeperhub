@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { WorkflowPrompt } from "@/components/workflows/workflow-prompt";
 import { useSession } from "@/lib/auth-client";
 import { workflowApi } from "@/lib/workflow-api";
+import Link from "next/link";
 
 export const WorkflowIndexPrompt = () => {
   const { data: session } = useSession();
@@ -42,45 +43,45 @@ export const WorkflowIndexPrompt = () => {
             </h1>
             <p className="text-muted-foreground text-sm">
               Powered by{" "}
-              <a
-                className="underline hover:no-underline"
+              <Link
+                className="underline hover:no-underline underline-offset-2"
                 href="https://useworkflow.dev/"
                 rel="noopener noreferrer"
                 target="_blank"
               >
                 Workflow
-              </a>
+              </Link>
               ,{" "}
-              <a
-                className="underline hover:no-underline"
+              <Link
+                className="underline hover:no-underline underline-offset-2"
                 href="https://ai-sdk.dev/"
                 rel="noopener noreferrer"
                 target="_blank"
               >
                 AI SDK
-              </a>
+              </Link>
               ,{" "}
-              <a
-                className="underline hover:no-underline"
+              <Link
+                className="underline hover:no-underline underline-offset-2"
                 href="https://vercel.com/ai-gateway"
                 rel="noopener noreferrer"
                 target="_blank"
               >
                 AI Gateway
-              </a>
+              </Link>
               , and{" "}
-              <a
-                className="underline hover:no-underline"
+              <Link
+                className="underline hover:no-underline underline-offset-2"
                 href="https://ai-sdk.dev/elements"
                 rel="noopener noreferrer"
                 target="_blank"
               >
                 AI Elements
-              </a>
+              </Link>
             </p>
           </div>
           <WorkflowPrompt />
-          <div className="mt-4 flex justify-center">
+          <div className="mt-2 flex justify-center">
             <Button onClick={handleNewWorkflow} size="sm" variant="link">
               or start from scratch
             </Button>
