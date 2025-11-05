@@ -15,6 +15,7 @@ import {
   Play,
   Redo2,
   Rocket,
+  RotateCwIcon,
   Save,
   Trash2,
   Undo2,
@@ -466,7 +467,7 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
           title="Back to workflows"
           variant="ghost"
         >
-          <ArrowLeftIcon className="h-4 w-4" />
+          <ArrowLeftIcon className="size-4" />
         </Button>
         <p className="font-medium">{workflowName}</p>
       </Panel>
@@ -483,7 +484,7 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
             title="Undo"
             variant="outline"
           >
-            <Undo2 className="h-4 w-4" />
+            <Undo2 className="size-4" />
           </Button>
           <Button
             disabled={!canRedo || isGenerating}
@@ -492,7 +493,7 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
             title="Redo"
             variant="outline"
           >
-            <Redo2 className="h-4 w-4" />
+            <Redo2 className="size-4" />
           </Button>
         </ButtonGroup>
         <ButtonGroup>
@@ -504,9 +505,9 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
             variant="outline"
           >
             {isSaving ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="size-4 animate-spin" />
             ) : (
-              <Save className="h-4 w-4" />
+              <Save className="size-4" />
             )}
           </Button>
           <Button
@@ -526,9 +527,9 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
             variant="outline"
           >
             {isDeploying ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="size-4 animate-spin" />
             ) : (
-              <Rocket className="h-4 w-4" />
+              <Rocket className="size-4" />
             )}
           </Button>
           {deploymentUrl && (
@@ -538,7 +539,7 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
               title="Open deployment"
               variant="outline"
             >
-              <ExternalLink className="h-4 w-4" />
+              <ExternalLink className="size-4" />
             </Button>
           )}
           <DropdownMenu>
@@ -549,7 +550,7 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
                 title="More options"
                 variant="outline"
               >
-                <MoreVertical className="h-4 w-4" />
+                <MoreVertical className="size-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -557,21 +558,21 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
                 disabled={!currentWorkflowId}
                 onClick={handleViewCode}
               >
-                <Code className="mr-2 h-4 w-4" />
+                <Code className="size-4" />
                 <span>View Generated Code</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 disabled={!currentWorkflowId}
                 onClick={() => setShowChangeProjectDialog(true)}
               >
-                <FolderOpen className="mr-2 h-4 w-4" />
+                <FolderOpen className="size-4" />
                 <span>Change Project</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 disabled={nodes.length === 0}
                 onClick={() => setShowClearDialog(true)}
               >
-                <Trash2 className="mr-2 h-4 w-4" />
+                <RotateCwIcon className="size-4" />
                 <span>Clear Workflow</span>
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -579,7 +580,7 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
                 disabled={!currentWorkflowId}
                 onClick={() => setShowDeleteDialog(true)}
               >
-                <Trash2 className="mr-2 h-4 w-4" />
+                <Trash2 className="size-4 text-destructive" />
                 <span>Delete Workflow</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -595,9 +596,9 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
             variant="outline"
           >
             {isExecuting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="size-4 animate-spin" />
             ) : (
-              <Play className="h-4 w-4" />
+              <Play className="size-4" />
             )}
             {runMode === "test" && !isExecuting && (
               <div className="absolute right-0.5 bottom-0.5">
@@ -623,18 +624,18 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" side="bottom" sideOffset={5}>
               <DropdownMenuItem onClick={() => setRunMode("test")}>
-                <Play className="mr-2 h-4 w-4" />
+                <Play className="size-4" />
                 <span>Test Run (Local)</span>
-                {runMode === "test" && <Check className="ml-auto h-4 w-4" />}
+                {runMode === "test" && <Check className="ml-auto size-4" />}
               </DropdownMenuItem>
               <DropdownMenuItem
                 disabled={!deploymentUrl}
                 onClick={() => setRunMode("production")}
               >
-                <Play className="mr-2 h-4 w-4" />
+                <Play className="size-4" />
                 <span>Production Run</span>
                 {runMode === "production" && (
-                  <Check className="ml-auto h-4 w-4" />
+                  <Check className="ml-auto size-4" />
                 )}
               </DropdownMenuItem>
             </DropdownMenuContent>
