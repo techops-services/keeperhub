@@ -9,6 +9,7 @@ import { generate } from "@/app/actions/ai/generate";
 import { AuthProvider } from "@/components/auth/provider";
 import { NodeConfigPanel } from "@/components/workflow/node-config-panel";
 import { WorkflowCanvas } from "@/components/workflow/workflow-canvas";
+import { WorkflowSkeleton } from "@/components/workflow/workflow-skeleton";
 import { WorkflowToolbar } from "@/components/workflow/workflow-toolbar";
 import { workflowApi } from "@/lib/workflow-api";
 import {
@@ -231,14 +232,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   }, [handleSave, handleRun]);
 
   if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-center">
-          <div className="font-semibold text-lg">Loading workflow...</div>
-          <div className="text-muted-foreground text-sm">Please wait</div>
-        </div>
-      </div>
-    );
+    return <WorkflowSkeleton />;
   }
 
   return (
