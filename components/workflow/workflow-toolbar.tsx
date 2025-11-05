@@ -47,7 +47,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { vercelProjectsAtom } from "@/lib/atoms/vercel-projects";
 import { workflowApi } from "@/lib/workflow-api";
 import {
@@ -460,7 +459,7 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
 
   return (
     <>
-      <Panel className="flex items-center gap-2 pr-4" position="top-left">
+      <Panel className="flex items-center gap-4 pr-4" position="top-left">
         <Button
           onClick={handleBack}
           size="icon"
@@ -473,122 +472,127 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
       </Panel>
 
       <Panel
-        className="my-3! mr-16! flex items-center gap-2"
+        className="flex items-center gap-2 border-none bg-transparent p-0"
         position="top-right"
       >
-        <Button
-          disabled={!canUndo || isGenerating}
-          onClick={() => undo()}
-          size="icon"
-          title="Undo"
-          variant="ghost"
-        >
-          <Undo2 className="h-4 w-4" />
-        </Button>
-        <Button
-          disabled={!canRedo || isGenerating}
-          onClick={() => redo()}
-          size="icon"
-          title="Redo"
-          variant="ghost"
-        >
-          <Redo2 className="h-4 w-4" />
-        </Button>
-        <Separator className="h-6" orientation="vertical" />
-        <Button
-          disabled={!currentWorkflowId || isGenerating || isSaving}
-          onClick={handleSave}
-          size="icon"
-          title={isSaving ? "Saving..." : "Save workflow"}
-          variant="ghost"
-        >
-          {isSaving ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Save className="h-4 w-4" />
-          )}
-        </Button>
-        <Button
-          disabled={
-            isDeploying ||
-            nodes.length === 0 ||
-            isGenerating ||
-            !currentWorkflowId
-          }
-          onClick={handleDeploy}
-          size="icon"
-          title={
-            isDeploying ? "Deploying to production..." : "Deploy to production"
-          }
-          variant="ghost"
-        >
-          {isDeploying ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Rocket className="h-4 w-4" />
-          )}
-        </Button>
-        {deploymentUrl && (
+        <ButtonGroup>
           <Button
-            onClick={() => window.open(deploymentUrl, "_blank")}
+            disabled={!canUndo || isGenerating}
+            onClick={() => undo()}
             size="icon"
-            title="Open deployment"
-            variant="ghost"
+            title="Undo"
+            variant="outline"
           >
-            <ExternalLink className="h-4 w-4" />
+            <Undo2 className="h-4 w-4" />
           </Button>
-        )}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+          <Button
+            disabled={!canRedo || isGenerating}
+            onClick={() => redo()}
+            size="icon"
+            title="Redo"
+            variant="outline"
+          >
+            <Redo2 className="h-4 w-4" />
+          </Button>
+        </ButtonGroup>
+        <ButtonGroup>
+          <Button
+            disabled={!currentWorkflowId || isGenerating || isSaving}
+            onClick={handleSave}
+            size="icon"
+            title={isSaving ? "Saving..." : "Save workflow"}
+            variant="outline"
+          >
+            {isSaving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+          </Button>
+          <Button
+            disabled={
+              isDeploying ||
+              nodes.length === 0 ||
+              isGenerating ||
+              !currentWorkflowId
+            }
+            onClick={handleDeploy}
+            size="icon"
+            title={
+              isDeploying
+                ? "Deploying to production..."
+                : "Deploy to production"
+            }
+            variant="outline"
+          >
+            {isDeploying ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Rocket className="h-4 w-4" />
+            )}
+          </Button>
+          {deploymentUrl && (
             <Button
-              disabled={isGenerating}
+              onClick={() => window.open(deploymentUrl, "_blank")}
               size="icon"
-              title="More options"
-              variant="ghost"
+              title="Open deployment"
+              variant="outline"
             >
-              <MoreVertical className="h-4 w-4" />
+              <ExternalLink className="h-4 w-4" />
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              disabled={!currentWorkflowId}
-              onClick={handleViewCode}
-            >
-              <Code className="mr-2 h-4 w-4" />
-              <span>View Generated Code</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              disabled={!currentWorkflowId}
-              onClick={() => setShowChangeProjectDialog(true)}
-            >
-              <FolderOpen className="mr-2 h-4 w-4" />
-              <span>Change Project</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              disabled={nodes.length === 0}
-              onClick={() => setShowClearDialog(true)}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              <span>Clear Workflow</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
-              disabled={!currentWorkflowId}
-              onClick={() => setShowDeleteDialog(true)}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              <span>Delete Workflow</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <Separator className="h-6" orientation="vertical" />
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                disabled={isGenerating}
+                size="icon"
+                title="More options"
+                variant="outline"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                disabled={!currentWorkflowId}
+                onClick={handleViewCode}
+              >
+                <Code className="mr-2 h-4 w-4" />
+                <span>View Generated Code</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={!currentWorkflowId}
+                onClick={() => setShowChangeProjectDialog(true)}
+              >
+                <FolderOpen className="mr-2 h-4 w-4" />
+                <span>Change Project</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={nodes.length === 0}
+                onClick={() => setShowClearDialog(true)}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                <span>Clear Workflow</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                disabled={!currentWorkflowId}
+                onClick={() => setShowDeleteDialog(true)}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                <span>Delete Workflow</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </ButtonGroup>
+
         <ButtonGroup>
           <Button
             className="relative"
             disabled={isExecuting || nodes.length === 0 || isGenerating}
             onClick={() => handleExecute()}
             size="icon"
-            variant="ghost"
+            variant="outline"
           >
             {isExecuting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -612,7 +616,7 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
                 disabled={isExecuting || nodes.length === 0 || isGenerating}
                 size="icon"
                 title="Select run mode"
-                variant="ghost"
+                variant="outline"
               >
                 <ChevronDown className="h-3 w-3" />
               </Button>
@@ -636,10 +640,10 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
             </DropdownMenuContent>
           </DropdownMenu>
         </ButtonGroup>
-      </Panel>
 
-      <Panel className="rounded-full p-0" position="top-right">
-        <UserMenu />
+        <div className="rounded-full border">
+          <UserMenu />
+        </div>
       </Panel>
 
       {/* Clear Workflow Dialog */}
