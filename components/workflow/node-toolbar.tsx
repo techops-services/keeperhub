@@ -10,7 +10,6 @@ import {
   type WorkflowNode,
   type WorkflowNodeType,
 } from "@/lib/workflow-store";
-import { Panel } from "../ai-elements/panel";
 
 const nodeTemplates = [
   {
@@ -78,10 +77,7 @@ export function NodeToolbar() {
   };
 
   return (
-    <Panel
-      className="-translate-x-[178px] flex items-center gap-1"
-      position="bottom-center"
-    >
+    <div className="flex items-center gap-1 rounded-md border bg-background">
       {nodeTemplates.map((template) => (
         <Button
           disabled={isGenerating}
@@ -94,6 +90,6 @@ export function NodeToolbar() {
           <template.icon className="size-4" />
         </Button>
       ))}
-    </Panel>
+    </div>
   );
 }

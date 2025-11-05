@@ -68,6 +68,7 @@ import {
 } from "@/lib/workflow-store";
 import { Panel } from "../ai-elements/panel";
 import { UserMenu } from "../workflows/user-menu";
+import { NodeToolbar } from "./node-toolbar";
 
 type WorkflowToolbarProps = {
   workflowId?: string;
@@ -321,7 +322,9 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
   useEffect(() => {
     if (currentWorkflowId) {
       import("@/app/actions/workflow/get-deployment-status")
-        .then(({ getDeploymentStatus }) => getDeploymentStatus(currentWorkflowId))
+        .then(({ getDeploymentStatus }) =>
+          getDeploymentStatus(currentWorkflowId)
+        )
         .then((data) => {
           setDeploymentUrl(data.deploymentUrl || null);
         })
@@ -358,16 +361,22 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
 
   return (
     <>
-      <Panel className="flex items-center gap-2 p-0.5 pr-3" position="top-left">
-        <Button
-          onClick={handleBack}
-          size="icon-sm"
-          title="Back to workflows"
-          variant="ghost"
-        >
-          <ArrowLeftIcon className="size-4" />
-        </Button>
-        <p className="font-medium text-sm">{workflowName}</p>
+      <Panel
+        className="flex items-center gap-2 rounded-none border-none bg-transparent p-0.5 pr-3"
+        position="top-left"
+      >
+        <div className="flex items-center gap-2 rounded-md border bg-background py-0.5 pr-3">
+          <Button
+            onClick={handleBack}
+            size="icon-sm"
+            title="Back to workflows"
+            variant="ghost"
+          >
+            <ArrowLeftIcon className="size-4" />
+          </Button>
+          <p className="font-medium text-sm">{workflowName}</p>
+        </div>
+        <NodeToolbar />
       </Panel>
 
       <Panel

@@ -6,7 +6,6 @@ import { useSearchParams } from "next/navigation";
 import { use, useCallback, useEffect } from "react";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { NodeConfigPanel } from "@/components/workflow/node-config-panel";
-import { NodeToolbar } from "@/components/workflow/node-toolbar";
 import { WorkflowCanvas } from "@/components/workflow/workflow-canvas";
 import { WorkflowToolbar } from "@/components/workflow/workflow-toolbar";
 import { workflowApi } from "@/lib/workflow-api";
@@ -249,7 +248,6 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
       <main className="relative size-full overflow-hidden">
         <ReactFlowProvider>
           <WorkflowCanvas />
-          <NodeToolbar />
         </ReactFlowProvider>
       </main>
       <NodeConfigPanel />
