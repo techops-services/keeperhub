@@ -331,7 +331,11 @@ export function WorkflowCanvas() {
         onSelectionChange={isGenerating ? undefined : onSelectionChange}
       >
         <Controls />
-        <MiniMap bgColor="var(--sidebar)" nodeStrokeColor="var(--border)" />
+        <MiniMap
+          bgColor="var(--sidebar)"
+          className="hidden md:flex"
+          nodeStrokeColor="var(--border)"
+        />
       </Canvas>
 
       {menu && (
