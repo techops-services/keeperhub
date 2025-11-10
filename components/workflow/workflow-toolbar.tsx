@@ -2,7 +2,6 @@
 
 import { useAtom, useSetAtom } from "jotai";
 import {
-  ArrowLeftIcon,
   Check,
   ChevronDown,
   Code,
@@ -42,6 +41,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -73,7 +73,6 @@ import {
 import { Panel } from "../ai-elements/panel";
 import { UserMenu } from "../workflows/user-menu";
 import { NodeToolbar } from "./node-toolbar";
-import { WorkflowSettings } from "./workflow-settings";
 
 type WorkflowToolbarProps = {
   workflowId?: string;
@@ -110,6 +109,19 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
   const [showCodeDialog, setShowCodeDialog] = useState(false);
   const [generatedCode, setGeneratedCode] = useState<string>("");
   const [runMode, setRunMode] = useState<"test" | "production">("test");
+  const [allWorkflows, setAllWorkflows] = useState<
+    Array<{
+      id: string;
+      name: string;
+      updatedAt: string;
+      vercelProjectId?: string | null;
+    }>
+  >([]);
+  const [selectedProjectFilter, setSelectedProjectFilter] = useState<
+    string | null
+  >(null);
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
+  const [newWorkflowName, setNewWorkflowName] = useState(workflowName);
 
   const handleExecute = async (mode: "test" | "production" = runMode) => {
     if (!currentWorkflowId) {
@@ -242,7 +254,31 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
     }
   };
 
-  const handleChangeProject = async () => {
+  const handleProjectFilterChange = (projectId: string | null) => {
+    setSelectedProjectFilter(projectId);
+  };
+
+  const handleRenameWorkflow = async () => {
+    if (!currentWorkflowId || !newWorkflowName.trim()) {
+      return;
+    }
+
+    try {
+      await workflowApi.update(currentWorkflowId, {
+        name: newWorkflowName,
+      });
+      setShowRenameDialog(false);
+      toast.success("Workflow renamed successfully");
+      // Reload workflows to update the list
+      const workflows = await workflowApi.getAll();
+      setAllWorkflows(workflows);
+    } catch (error) {
+      console.error("Failed to rename workflow:", error);
+      toast.error("Failed to rename workflow. Please try again.");
+    }
+  };
+
+  const handleChangeProjectFromDialog = async () => {
     if (!currentWorkflowId) {
       return;
     }
@@ -334,6 +370,41 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
     }
   }, [currentWorkflowId]);
 
+  // Load all workflows for the dropdown
+  useEffect(() => {
+    const loadWorkflows = async () => {
+      try {
+        const workflows = await workflowApi.getAll();
+        setAllWorkflows(workflows);
+      } catch (error) {
+        console.error("Failed to load workflows:", error);
+      }
+    };
+
+    loadWorkflows();
+  }, []);
+
+  // Sync newWorkflowName when workflowName changes
+  useEffect(() => {
+    setNewWorkflowName(workflowName);
+  }, [workflowName]);
+
+  // Set initial project filter based on current workflow's project
+  useEffect(() => {
+    if (vercelProjectName && vercelProjects.length > 0) {
+      const project = vercelProjects.find((p) => p.name === vercelProjectName);
+      if (project) {
+        setSelectedProjectFilter(project.id);
+      }
+    }
+  }, [vercelProjectName, vercelProjects]);
+
+  // Filter workflows based on selected project
+  const filteredWorkflows =
+    selectedProjectFilter === null
+      ? allWorkflows.filter((w) => !w.vercelProjectId)
+      : allWorkflows.filter((w) => w.vercelProjectId === selectedProjectFilter);
+
   const handleViewCode = async () => {
     if (!currentWorkflowId) {
       return;
@@ -354,10 +425,6 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
     toast.success("Code copied to clipboard");
   };
 
-  const handleBack = () => {
-    router.push("/");
-  };
-
   return (
     <>
       <Panel
@@ -365,22 +432,92 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
         position="top-left"
       >
         <ButtonGroup>
-          <Button
-            onClick={handleBack}
-            size="icon"
-            title="Back to workflows"
-            variant="outline"
-          >
-            <ArrowLeftIcon className="size-4" />
-          </Button>
-          <ButtonGroupText>
-            <p className="font-medium text-sm">{workflowName}</p>
-          </ButtonGroupText>
+          <DropdownMenu>
+            <ButtonGroupText asChild>
+              <DropdownMenuTrigger className="cursor-pointer">
+                <p className="font-medium text-sm">
+                  {selectedProjectFilter === null
+                    ? "No project"
+                    : vercelProjects.find((p) => p.id === selectedProjectFilter)
+                        ?.name || "No project"}
+                </p>
+                <ChevronDown className="size-3 opacity-50" />
+              </DropdownMenuTrigger>
+            </ButtonGroupText>
+            <DropdownMenuContent align="start" className="w-64">
+              <DropdownMenuItem
+                className="flex items-center justify-between"
+                onClick={() => handleProjectFilterChange(null)}
+              >
+                <span>No project</span>
+                {selectedProjectFilter === null && (
+                  <Check className="size-4 shrink-0" />
+                )}
+              </DropdownMenuItem>
+              {vercelProjects.map((project) => (
+                <DropdownMenuItem
+                  key={project.id}
+                  className="flex items-center justify-between"
+                  onClick={() => handleProjectFilterChange(project.id)}
+                >
+                  <span className="truncate">{project.name}</span>
+                  {project.id === selectedProjectFilter && (
+                    <Check className="size-4 shrink-0" />
+                  )}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <ButtonGroupText asChild>
+              <DropdownMenuTrigger className="cursor-pointer">
+                <p className="font-medium text-sm">{workflowName}</p>
+                <ChevronDown className="size-3 opacity-50" />
+              </DropdownMenuTrigger>
+            </ButtonGroupText>
+            <DropdownMenuContent align="start" className="w-64">
+              {filteredWorkflows.length === 0 ? (
+                <DropdownMenuItem disabled>No workflows found</DropdownMenuItem>
+              ) : (
+                filteredWorkflows.map((workflow) => (
+                  <DropdownMenuItem
+                    key={workflow.id}
+                    className="flex items-center justify-between"
+                    onClick={() => router.push(`/workflows/${workflow.id}`)}
+                  >
+                    <span className="truncate">{workflow.name}</span>
+                    {workflow.id === currentWorkflowId && (
+                      <Check className="size-4 shrink-0" />
+                    )}
+                  </DropdownMenuItem>
+                ))
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
           {currentWorkflowId && (
-            <WorkflowSettings
-              workflowId={currentWorkflowId}
-              workflowName={workflowName}
-            />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="icon" variant="outline">
+                  <MoreVertical className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setShowRenameDialog(true)}>
+                  Rename
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setShowChangeProjectDialog(true)}
+                >
+                  Move
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => setShowDeleteDialog(true)}
+                >
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </ButtonGroup>
         <NodeToolbar />
@@ -583,6 +720,41 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
       </Dialog>
 
       {/* Delete Workflow Dialog */}
+      <Dialog onOpenChange={setShowRenameDialog} open={showRenameDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Workflow</DialogTitle>
+            <DialogDescription>
+              Enter a new name for your workflow.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="workflow-name">Workflow Name</Label>
+            <Input
+              id="workflow-name"
+              value={newWorkflowName}
+              onChange={(e) => setNewWorkflowName(e.target.value)}
+              placeholder="Enter workflow name"
+              className="mt-2"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => setShowRenameDialog(false)}
+              variant="outline"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRenameWorkflow}
+              disabled={!newWorkflowName.trim()}
+            >
+              Rename
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog onOpenChange={setShowDeleteDialog} open={showDeleteDialog}>
         <DialogContent>
           <DialogHeader>
@@ -678,7 +850,9 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
             >
               Cancel
             </Button>
-            <Button onClick={handleChangeProject}>Change Project</Button>
+            <Button onClick={handleChangeProjectFromDialog}>
+              Change Project
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

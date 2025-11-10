@@ -49,8 +49,16 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   useEffect(() => {
     const loadWorkflowData = async () => {
       const isGeneratingParam = searchParams?.get("generating") === "true";
+      const skipLoadParam = searchParams?.get("skipLoad") === "true";
       const storedPrompt = sessionStorage.getItem("ai-prompt");
       const storedWorkflowId = sessionStorage.getItem("generating-workflow-id");
+
+      // Check if we should skip loading (coming from root page with state already set)
+      if (skipLoadParam && currentWorkflowId === workflowId) {
+        // State is already loaded, just ensure the workflow ID is set
+        setCurrentWorkflowId(workflowId);
+        return;
+      }
 
       // Check if we should generate
       if (
@@ -125,6 +133,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   }, [
     workflowId,
     searchParams,
+    currentWorkflowId,
     setCurrentWorkflowId,
     setCurrentWorkflowName,
     setCurrentVercelProjectName,

@@ -74,11 +74,24 @@ const Home = () => {
 
   // Watch for nodes being added and redirect
   useEffect(() => {
-    if (nodes.length > 0 && currentWorkflowId && !hasRedirectedRef.current) {
-      hasRedirectedRef.current = true;
-      router.push(`/workflows/${currentWorkflowId}`);
-    }
-  }, [nodes, currentWorkflowId, router]);
+    const saveAndRedirect = async () => {
+      if (nodes.length > 0 && currentWorkflowId && !hasRedirectedRef.current) {
+        hasRedirectedRef.current = true;
+        try {
+          // Save the workflow before redirecting
+          await workflowApi.update(currentWorkflowId, { nodes, edges });
+          // Use replace to avoid back button issues and add skipLoad param
+          router.replace(`/workflows/${currentWorkflowId}?skipLoad=true`);
+        } catch (error) {
+          console.error("Failed to save workflow before redirect:", error);
+          // Redirect anyway - the workflow page will handle the state
+          router.replace(`/workflows/${currentWorkflowId}?skipLoad=true`);
+        }
+      }
+    };
+
+    saveAndRedirect();
+  }, [nodes, currentWorkflowId, router, edges]);
 
   // Keyboard shortcuts
   const handleSave = useCallback(async () => {
