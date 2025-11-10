@@ -12,6 +12,7 @@ import { WorkflowToolbar } from "@/components/workflow/workflow-toolbar";
 import { Button } from "@/components/ui/button";
 import { workflowApi } from "@/lib/workflow-api";
 import {
+  currentVercelProjectIdAtom,
   currentVercelProjectNameAtom,
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
@@ -44,6 +45,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   const setEdges = useSetAtom(edgesAtom);
   const setCurrentWorkflowId = useSetAtom(currentWorkflowIdAtom);
   const setCurrentWorkflowName = useSetAtom(currentWorkflowNameAtom);
+  const setCurrentVercelProjectId = useSetAtom(currentVercelProjectIdAtom);
   const setCurrentVercelProjectName = useSetAtom(currentVercelProjectNameAtom);
   const updateNodeData = useSetAtom(updateNodeDataAtom);
   const setSelectedNodeId = useSetAtom(selectedNodeAtom);
@@ -123,6 +125,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
           setEdges(workflow.edges);
           setCurrentWorkflowId(workflow.id);
           setCurrentWorkflowName(workflow.name);
+          setCurrentVercelProjectId(workflow.vercelProjectId || null);
           setCurrentVercelProjectName(workflow.vercelProject?.name || null);
           
           // Reset unsaved changes flag after loading
@@ -151,6 +154,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
     currentWorkflowId,
     setCurrentWorkflowId,
     setCurrentWorkflowName,
+    setCurrentVercelProjectId,
     setCurrentVercelProjectName,
     setNodes,
     setEdges,

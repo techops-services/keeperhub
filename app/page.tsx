@@ -11,6 +11,7 @@ import { WorkflowToolbar } from "@/components/workflow/workflow-toolbar";
 import { authClient, useSession } from "@/lib/auth-client";
 import { workflowApi } from "@/lib/workflow-api";
 import {
+  currentVercelProjectIdAtom,
   currentVercelProjectNameAtom,
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
@@ -35,6 +36,7 @@ const Home = () => {
   const setNodes = useSetAtom(nodesAtom);
   const setEdges = useSetAtom(edgesAtom);
   const setCurrentWorkflowName = useSetAtom(currentWorkflowNameAtom);
+  const setCurrentVercelProjectId = useSetAtom(currentVercelProjectIdAtom);
   const setCurrentVercelProjectName = useSetAtom(currentVercelProjectNameAtom);
   const updateNodeData = useSetAtom(updateNodeDataAtom);
   const setSelectedNodeId = useSetAtom(selectedNodeAtom);
@@ -71,6 +73,7 @@ const Home = () => {
         if (newWorkflow.vercelProjectId) {
           const fullWorkflow = await workflowApi.getById(newWorkflow.id);
           if (fullWorkflow?.vercelProject) {
+            setCurrentVercelProjectId(fullWorkflow.vercelProject.id);
             setCurrentVercelProjectName(fullWorkflow.vercelProject.name);
           }
         }
@@ -91,6 +94,7 @@ const Home = () => {
     session,
     setCurrentWorkflowId,
     setCurrentWorkflowName,
+    setCurrentVercelProjectId,
     setCurrentVercelProjectName,
   ]);
 

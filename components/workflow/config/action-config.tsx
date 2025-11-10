@@ -1,7 +1,9 @@
 "use client";
 
 import Editor from "@monaco-editor/react";
+import { useAtom } from "jotai";
 import { Settings } from "lucide-react";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { IntegrationIcon } from "@/components/ui/integration-icon";
 import { Label } from "@/components/ui/label";
@@ -15,6 +17,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { ProjectIntegrationsDialog } from "@/components/settings/project-integrations-dialog";
+import { currentVercelProjectIdAtom, currentVercelProjectNameAtom } from "@/lib/workflow-store";
 import { SchemaBuilder, type SchemaField } from "./schema-builder";
 
 interface ActionConfigProps {
@@ -23,11 +27,26 @@ interface ActionConfigProps {
   disabled: boolean;
 }
 
+// Map action types to their required integrations
+const ACTION_INTEGRATION_MAP: Record<string, { name: string; label: string }> = {
+  "Send Email": { name: "resend", label: "Resend" },
+  "Send Slack Message": { name: "slack", label: "Slack" },
+  "Create Ticket": { name: "linear", label: "Linear" },
+  "Find Issues": { name: "linear", label: "Linear" },
+};
+
 export function ActionConfig({
   config,
   onUpdateConfig,
   disabled,
 }: ActionConfigProps) {
+  const [showIntegrationsDialog, setShowIntegrationsDialog] = useState(false);
+  const [projectId] = useAtom(currentVercelProjectIdAtom);
+  const [projectName] = useAtom(currentVercelProjectNameAtom);
+  
+  const actionType = (config?.actionType as string) || "HTTP Request";
+  const requiredIntegration = ACTION_INTEGRATION_MAP[actionType];
+
   return (
     <>
       <div className="space-y-2">
@@ -35,7 +54,7 @@ export function ActionConfig({
         <Select
           disabled={disabled}
           onValueChange={(value) => onUpdateConfig("actionType", value)}
-          value={(config?.actionType as string) || "HTTP Request"}
+          value={actionType}
         >
           <SelectTrigger className="w-full" id="actionType">
             <SelectValue placeholder="Select action type" />
@@ -83,7 +102,28 @@ export function ActionConfig({
             </SelectGroup>
           </SelectContent>
         </Select>
+        {requiredIntegration && (
+          <p className="text-muted-foreground text-xs">
+            This action requires{" "}
+            <button
+              className="text-foreground underline hover:text-foreground/80"
+              onClick={() => setShowIntegrationsDialog(true)}
+              type="button"
+            >
+              {requiredIntegration.label} integration
+            </button>
+            .
+          </p>
+        )}
       </div>
+
+      <ProjectIntegrationsDialog
+        onOpenChange={setShowIntegrationsDialog}
+        open={showIntegrationsDialog}
+        projectId={projectId}
+        projectName={projectName}
+      />
+
 
       {/* Send Email fields */}
       {config?.actionType === "Send Email" && (

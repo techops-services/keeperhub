@@ -7,7 +7,7 @@ import OpenAI from "openai";
 import { z } from "zod";
 import type { SchemaField } from "../components/workflow/config/schema-builder";
 import { db } from "./db";
-import { user, workflowExecutionLogs } from "./db/schema";
+import { projects, user, workflowExecutionLogs } from "./db/schema";
 import { callApi } from "./integrations/api";
 import { queryData } from "./integrations/database";
 import { createTicket, findIssues } from "./integrations/linear";
@@ -30,10 +30,11 @@ type ExecutionResult = {
 export interface WorkflowExecutionContext {
   executionId?: string;
   userId?: string;
+  projectId?: string;
   input?: Record<string, unknown>;
 }
 
-interface UserIntegrations {
+interface ProjectIntegrations {
   resendApiKey?: string | null;
   resendFromEmail?: string | null;
   linearApiKey?: string | null;
@@ -113,7 +114,7 @@ class ServerWorkflowExecutor {
   private results: Map<string, ExecutionResult>;
   private nodeOutputs: NodeOutputs = {};
   private context: WorkflowExecutionContext;
-  private userIntegrations: UserIntegrations = {};
+  private projectIntegrations: ProjectIntegrations = {};
   private executionLogs: Map<string, NodeExecutionLog> = new Map();
 
   constructor(
@@ -127,12 +128,12 @@ class ServerWorkflowExecutor {
     this.context = context;
   }
 
-  private async loadUserIntegrations(): Promise<void> {
-    if (!this.context.userId) return;
+  private async loadProjectIntegrations(): Promise<void> {
+    if (!this.context.projectId) return;
 
     try {
-      const userData = await db.query.user.findFirst({
-        where: eq(user.id, this.context.userId),
+      const projectData = await db.query.projects.findFirst({
+        where: eq(projects.id, this.context.projectId),
         columns: {
           resendApiKey: true,
           resendFromEmail: true,
@@ -141,16 +142,16 @@ class ServerWorkflowExecutor {
         },
       });
 
-      if (userData) {
-        this.userIntegrations = {
-          resendApiKey: userData.resendApiKey,
-          resendFromEmail: userData.resendFromEmail,
-          linearApiKey: userData.linearApiKey,
-          slackApiKey: userData.slackApiKey,
+      if (projectData) {
+        this.projectIntegrations = {
+          resendApiKey: projectData.resendApiKey,
+          resendFromEmail: projectData.resendFromEmail,
+          linearApiKey: projectData.linearApiKey,
+          slackApiKey: projectData.slackApiKey,
         };
       }
     } catch (error) {
-      console.error("Failed to load user integrations:", error);
+      console.error("Failed to load project integrations:", error);
     }
   }
 
@@ -325,14 +326,14 @@ class ServerWorkflowExecutor {
             actionType === "Send Email" ||
             node.data.label.toLowerCase().includes("email")
           ) {
-            if (this.userIntegrations.resendApiKey) {
+            if (this.projectIntegrations.resendApiKey) {
               const emailParams = {
                 to: (processedConfig?.emailTo as string) || "user@example.com",
                 subject:
                   (processedConfig?.emailSubject as string) || "Notification",
                 body: (processedConfig?.emailBody as string) || "No content",
-                apiKey: this.userIntegrations.resendApiKey,
-                fromEmail: this.userIntegrations.resendFromEmail || undefined,
+                apiKey: this.projectIntegrations.resendApiKey,
+                fromEmail: this.projectIntegrations.resendFromEmail || undefined,
               };
               const emailResult = await sendEmail(emailParams);
               result = {
@@ -353,12 +354,12 @@ class ServerWorkflowExecutor {
             actionType === "Send Slack Message" ||
             node.data.label.toLowerCase().includes("slack")
           ) {
-            if (this.userIntegrations.slackApiKey) {
+            if (this.projectIntegrations.slackApiKey) {
               const slackParams = {
                 channel:
                   (processedConfig?.slackChannel as string) || "#general",
                 text: (processedConfig?.slackMessage as string) || "No message",
-                apiKey: this.userIntegrations.slackApiKey,
+                apiKey: this.projectIntegrations.slackApiKey,
               };
               const slackResult = await sendSlackMessage(slackParams);
               result = {
@@ -379,7 +380,7 @@ class ServerWorkflowExecutor {
             actionType === "Create Ticket" ||
             node.data.label.toLowerCase().includes("ticket")
           ) {
-            if (this.userIntegrations.linearApiKey) {
+            if (this.projectIntegrations.linearApiKey) {
               const ticketParams = {
                 title: (processedConfig?.ticketTitle as string) || "New Ticket",
                 description:
@@ -387,7 +388,7 @@ class ServerWorkflowExecutor {
                 priority: processedConfig?.ticketPriority
                   ? Number.parseInt(processedConfig.ticketPriority as string)
                   : undefined,
-                apiKey: this.userIntegrations.linearApiKey,
+                apiKey: this.projectIntegrations.linearApiKey,
               };
               const ticketResult = await createTicket(ticketParams);
               result = {
@@ -405,7 +406,7 @@ class ServerWorkflowExecutor {
               };
             }
           } else if (actionType === "Find Issues") {
-            if (this.userIntegrations.linearApiKey) {
+            if (this.projectIntegrations.linearApiKey) {
               const findParams = {
                 assigneeId: processedConfig?.linearAssigneeId as
                   | string
@@ -413,7 +414,7 @@ class ServerWorkflowExecutor {
                 teamId: processedConfig?.linearTeamId as string | undefined,
                 status: processedConfig?.linearStatus as string | undefined,
                 label: processedConfig?.linearLabel as string | undefined,
-                apiKey: this.userIntegrations.linearApiKey,
+                apiKey: this.projectIntegrations.linearApiKey,
               };
               const findResult = await findIssues(findParams);
               result = {
@@ -789,8 +790,8 @@ class ServerWorkflowExecutor {
   }
 
   async execute(): Promise<Map<string, ExecutionResult>> {
-    // Load user integrations before executing
-    await this.loadUserIntegrations();
+    // Load project integrations before executing
+    await this.loadProjectIntegrations();
 
     const triggerNodes = this.getTriggerNodes();
 
