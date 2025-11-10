@@ -2,24 +2,28 @@
 
 import { ReactFlowProvider } from "@xyflow/react";
 import { useAtom, useSetAtom } from "jotai";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { use, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import { generate } from "@/app/actions/ai/generate";
 import { NodeConfigPanel } from "@/components/workflow/node-config-panel";
 import { WorkflowCanvas } from "@/components/workflow/workflow-canvas";
 import { WorkflowToolbar } from "@/components/workflow/workflow-toolbar";
+import { Button } from "@/components/ui/button";
 import { workflowApi } from "@/lib/workflow-api";
 import {
   currentVercelProjectNameAtom,
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
   edgesAtom,
+  hasUnsavedChangesAtom,
   isExecutingAtom,
   isGeneratingAtom,
+  isSavingAtom,
   nodesAtom,
   selectedNodeAtom,
   updateNodeDataAtom,
+  workflowNotFoundAtom,
 } from "@/lib/workflow-store";
 
 type WorkflowPageProps = {
@@ -29,8 +33,10 @@ type WorkflowPageProps = {
 const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   const { workflowId } = use(params);
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [isGenerating, setIsGenerating] = useAtom(isGeneratingAtom);
   const [isExecuting, setIsExecuting] = useAtom(isExecutingAtom);
+  const [isSaving, setIsSaving] = useAtom(isSavingAtom);
   const [nodes] = useAtom(nodesAtom);
   const [edges] = useAtom(edgesAtom);
   const [currentWorkflowId] = useAtom(currentWorkflowIdAtom);
@@ -41,6 +47,8 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   const setCurrentVercelProjectName = useSetAtom(currentVercelProjectNameAtom);
   const updateNodeData = useSetAtom(updateNodeDataAtom);
   const setSelectedNodeId = useSetAtom(selectedNodeAtom);
+  const setHasUnsavedChanges = useSetAtom(hasUnsavedChangesAtom);
+  const [workflowNotFound, setWorkflowNotFound] = useAtom(workflowNotFoundAtom);
 
   useEffect(() => {
     const loadWorkflowData = async () => {
@@ -104,11 +112,24 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
         // Normal workflow loading
         try {
           const workflow = await workflowApi.getById(workflowId);
+          
+          // Check if workflow was not found
+          if (!workflow) {
+            setWorkflowNotFound(true);
+            return;
+          }
+          
           setNodes(workflow.nodes);
           setEdges(workflow.edges);
           setCurrentWorkflowId(workflow.id);
           setCurrentWorkflowName(workflow.name);
           setCurrentVercelProjectName(workflow.vercelProject?.name || null);
+          
+          // Reset unsaved changes flag after loading
+          setHasUnsavedChanges(false);
+          
+          // Reset workflow not found state on successful load
+          setWorkflowNotFound(false);
 
           // Sync selected node if any node is selected
           const selectedNode = workflow.nodes.find((n) => n.selected);
@@ -117,6 +138,8 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
           }
         } catch (error) {
           console.error("Failed to load workflow:", error);
+          // For other errors, show a toast
+          toast.error("Failed to load workflow");
         }
       }
     };
@@ -133,19 +156,25 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
     setEdges,
     setIsGenerating,
     setSelectedNodeId,
+    setHasUnsavedChanges,
+    setWorkflowNotFound,
   ]);
 
   // Keyboard shortcuts
   const handleSave = useCallback(async () => {
     if (!currentWorkflowId || isGenerating) return;
+    setIsSaving(true);
     try {
       await workflowApi.update(currentWorkflowId, { nodes, edges });
+      setHasUnsavedChanges(false);
       toast.success("Workflow saved");
     } catch (error) {
       console.error("Failed to save workflow:", error);
       toast.error("Failed to save workflow");
+    } finally {
+      setIsSaving(false);
     }
-  }, [currentWorkflowId, nodes, edges, isGenerating]);
+  }, [currentWorkflowId, nodes, edges, isGenerating, setIsSaving, setHasUnsavedChanges]);
 
   const handleRun = useCallback(async () => {
     if (isExecuting || nodes.length === 0 || isGenerating || !currentWorkflowId)
@@ -233,13 +262,25 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden">
-      <WorkflowToolbar workflowId={workflowId} />
-      <main className="relative size-full overflow-hidden">
-        <ReactFlowProvider>
-          <WorkflowCanvas />
-        </ReactFlowProvider>
-      </main>
-      <NodeConfigPanel />
+          <WorkflowToolbar workflowId={workflowId} />
+          <main className="relative size-full overflow-hidden">
+            <ReactFlowProvider>
+              <WorkflowCanvas />
+            </ReactFlowProvider>
+        
+        {workflowNotFound && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="rounded-lg border bg-background p-8 text-center shadow-lg">
+              <h1 className="mb-2 font-semibold text-2xl">Workflow Not Found</h1>
+              <p className="mb-6 text-muted-foreground">
+                The workflow you're looking for doesn't exist or has been deleted.
+              </p>
+              <Button onClick={() => router.push("/")}>New Workflow</Button>
+            </div>
+          </div>
+        )}
+          </main>
+          <NodeConfigPanel />
     </div>
   );
 };

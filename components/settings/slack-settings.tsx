@@ -26,7 +26,7 @@ export const SlackSettings = ({
         Configure your Slack Bot Token to send messages from workflows
       </CardDescription>
     </CardHeader>
-    <CardContent className="space-y-4 rounded-md bg-secondary py-6">
+    <CardContent className="space-y-4 py-6">
       <div className="space-y-2">
         <Label htmlFor="slackApiKey">Bot Token</Label>
         <Input

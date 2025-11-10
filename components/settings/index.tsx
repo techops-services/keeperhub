@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import { create as createDataSource } from "@/app/actions/data-source/create";
 import { deleteDataSource } from "@/app/actions/data-source/delete";
 import { getAll as getAllDataSources } from "@/app/actions/data-source/get-all";
-import { get as getIntegrations } from "@/app/actions/integration/get";
-import { update as updateIntegrations } from "@/app/actions/integration/update";
 import { get as getUser } from "@/app/actions/user/get";
 import { update as updateUser } from "@/app/actions/user/update";
 import {
@@ -29,19 +27,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Spinner } from "../ui/spinner";
 import { AccountSettings } from "./account-settings";
 import { DataSourcesSettings } from "./data-sources-settings";
-import { LinearSettings } from "./linear-settings";
-import { ResendSettings } from "./resend-settings";
-import { SlackSettings } from "./slack-settings";
-
-interface Integrations {
-  resendApiKey: string | null;
-  resendFromEmail: string | null;
-  linearApiKey: string | null;
-  slackApiKey: string | null;
-  hasResendKey: boolean;
-  hasLinearKey: boolean;
-  hasSlackKey: boolean;
-}
 
 interface DataSource {
   id: string;
@@ -67,14 +52,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [accountEmail, setAccountEmail] = useState("");
   const [savingAccount, setSavingAccount] = useState(false);
 
-  // Integrations state
-  const [integrations, setIntegrations] = useState<Integrations | null>(null);
-  const [resendApiKey, setResendApiKey] = useState("");
-  const [resendFromEmail, setResendFromEmail] = useState("");
-  const [linearApiKey, setLinearApiKey] = useState("");
-  const [slackApiKey, setSlackApiKey] = useState("");
-  const [savingIntegrations, setSavingIntegrations] = useState(false);
-
   // Data sources state
   const [dataSources, setDataSources] = useState<DataSource[]>([]);
   const [showAddSource, setShowAddSource] = useState(false);
@@ -88,7 +65,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const loadAll = async () => {
     setLoading(true);
     try {
-      await Promise.all([loadAccount(), loadIntegrations(), loadDataSources()]);
+      await Promise.all([loadAccount(), loadDataSources()]);
     } finally {
       setLoading(false);
     }
@@ -111,16 +88,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     }
   };
 
-  const loadIntegrations = async () => {
-    try {
-      const data = await getIntegrations();
-      setIntegrations(data);
-      setResendFromEmail(data.resendFromEmail || "");
-    } catch (error) {
-      console.error("Failed to load integrations:", error);
-    }
-  };
-
   const loadDataSources = async () => {
     try {
       const data = await getAllDataSources();
@@ -139,33 +106,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       console.error("Failed to save account:", error);
     } finally {
       setSavingAccount(false);
-    }
-  };
-
-  const saveIntegrations = async () => {
-    setSavingIntegrations(true);
-    try {
-      const updates: {
-        resendApiKey?: string;
-        resendFromEmail?: string;
-        linearApiKey?: string;
-        slackApiKey?: string;
-      } = {};
-
-      if (resendApiKey) updates.resendApiKey = resendApiKey;
-      if (resendFromEmail) updates.resendFromEmail = resendFromEmail;
-      if (linearApiKey) updates.linearApiKey = linearApiKey;
-      if (slackApiKey) updates.slackApiKey = slackApiKey;
-
-      await updateIntegrations(updates);
-      await loadIntegrations();
-      setResendApiKey("");
-      setLinearApiKey("");
-      setSlackApiKey("");
-    } catch (error) {
-      console.error("Failed to save integrations:", error);
-    } finally {
-      setSavingIntegrations(false);
     }
   };
 
@@ -217,9 +157,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           ) : (
             <div className="mt-4">
               <Tabs onValueChange={setActiveTab} value={activeTab}>
-                <TabsList className="mb-6 grid w-full grid-cols-3">
+                <TabsList className="mb-6 grid w-full grid-cols-2">
                   <TabsTrigger value="account">Account</TabsTrigger>
-                  <TabsTrigger value="integrations">Integrations</TabsTrigger>
                   <TabsTrigger value="sources">Sources</TabsTrigger>
                 </TabsList>
 
@@ -231,36 +170,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     onNameChange={setAccountName}
                     onSave={saveAccount}
                   />
-                </TabsContent>
-
-                <TabsContent className="space-y-6" value="integrations">
-                  <ResendSettings
-                    apiKey={resendApiKey}
-                    fromEmail={resendFromEmail}
-                    hasKey={integrations?.hasResendKey}
-                    onApiKeyChange={setResendApiKey}
-                    onFromEmailChange={setResendFromEmail}
-                  />
-                  <LinearSettings
-                    apiKey={linearApiKey}
-                    hasKey={integrations?.hasLinearKey}
-                    onApiKeyChange={setLinearApiKey}
-                  />
-                  <SlackSettings
-                    apiKey={slackApiKey}
-                    hasKey={integrations?.hasSlackKey}
-                    onApiKeyChange={setSlackApiKey}
-                  />
-                  <div className="flex justify-end pt-4">
-                    <Button
-                      disabled={savingIntegrations}
-                      onClick={saveIntegrations}
-                    >
-                      {savingIntegrations
-                        ? "Saving..."
-                        : "Save All Integrations"}
-                    </Button>
-                  </div>
                 </TabsContent>
 
                 <TabsContent className="space-y-6" value="sources">

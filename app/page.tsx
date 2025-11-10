@@ -16,6 +16,7 @@ import {
   currentWorkflowNameAtom,
   edgesAtom,
   isExecutingAtom,
+  isSavingAtom,
   nodesAtom,
   selectedNodeAtom,
   updateNodeDataAtom,
@@ -25,6 +26,7 @@ const Home = () => {
   const router = useRouter();
   const { data: session } = useSession();
   const [isExecuting, setIsExecuting] = useAtom(isExecutingAtom);
+  const [isSaving, setIsSaving] = useAtom(isSavingAtom);
   const [nodes] = useAtom(nodesAtom);
   const [edges] = useAtom(edgesAtom);
   const [currentWorkflowId, setCurrentWorkflowId] = useAtom(
@@ -95,14 +97,17 @@ const Home = () => {
   // Keyboard shortcuts
   const handleSave = useCallback(async () => {
     if (!currentWorkflowId) return;
+    setIsSaving(true);
     try {
       await workflowApi.update(currentWorkflowId, { nodes, edges });
       toast.success("Workflow saved");
     } catch (error) {
       console.error("Failed to save workflow:", error);
       toast.error("Failed to save workflow");
+    } finally {
+      setIsSaving(false);
     }
-  }, [currentWorkflowId, nodes, edges]);
+  }, [currentWorkflowId, nodes, edges, setIsSaving]);
 
   const handleRun = useCallback(async () => {
     if (isExecuting || nodes.length === 0 || !currentWorkflowId) return;

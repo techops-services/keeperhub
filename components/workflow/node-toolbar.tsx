@@ -81,12 +81,13 @@ export function NodeToolbar() {
     <ButtonGroup>
       {nodeTemplates.map((template) => (
         <Button
+          className="border disabled:opacity-100 disabled:[&>svg]:text-muted-foreground"
           disabled={isGenerating}
           key={template.type}
           onClick={() => handleAddNode(template)}
           size="icon"
           title={template.label}
-          variant="outline"
+          variant="secondary"
         >
           <template.icon className="size-4" />
         </Button>

@@ -9,7 +9,7 @@ import { getSession } from "./utils";
 /**
  * Get a specific workflow by ID
  */
-export async function get(id: string): Promise<SavedWorkflow> {
+export async function get(id: string): Promise<SavedWorkflow | null> {
   const session = await getSession();
 
   const workflow = await db.query.workflows.findFirst({
@@ -19,9 +19,5 @@ export async function get(id: string): Promise<SavedWorkflow> {
     },
   });
 
-  if (!workflow) {
-    throw new Error("Workflow not found");
-  }
-
-  return workflow as SavedWorkflow;
+  return workflow ? (workflow as SavedWorkflow) : null;
 }

@@ -21,6 +21,7 @@ import {
   addNodeAtom,
   currentWorkflowIdAtom,
   edgesAtom,
+  hasUnsavedChangesAtom,
   isGeneratingAtom,
   nodesAtom,
   onEdgesChangeAtom,
@@ -84,6 +85,7 @@ export function WorkflowCanvas() {
   const onEdgesChange = useSetAtom(onEdgesChangeAtom);
   const setSelectedNode = useSetAtom(selectedNodeAtom);
   const addNode = useSetAtom(addNodeAtom);
+  const setHasUnsavedChanges = useSetAtom(hasUnsavedChangesAtom);
   const { screenToFlowPosition, setViewport } = useReactFlow();
 
   const [menu, setMenu] = useState<{
@@ -171,8 +173,9 @@ export function WorkflowCanvas() {
         type: "animated",
       };
       setEdges([...edges, newEdge]);
+      setHasUnsavedChanges(true);
     },
-    [edges, setEdges]
+    [edges, setEdges, setHasUnsavedChanges]
   );
 
   const onNodeClick = useCallback(
@@ -369,7 +372,7 @@ export function WorkflowCanvas() {
               return (
                 <div key={template.type}>
                   <div
-                    className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+                    className="relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
                     onClick={() => onAddNodeFromMenu(template)}
                   >
                     <Icon className="size-4" />

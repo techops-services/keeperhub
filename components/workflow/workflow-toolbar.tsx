@@ -4,18 +4,14 @@ import { useAtom, useSetAtom } from "jotai";
 import {
   Check,
   ChevronDown,
-  Code,
   ExternalLink,
   FlaskConical,
   FolderOpen,
   Loader2,
-  MoreVertical,
   Play,
   Redo2,
   Rocket,
-  RotateCwIcon,
   Save,
-  Trash2,
   Undo2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -70,6 +66,7 @@ import {
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
   edgesAtom,
+  hasUnsavedChangesAtom,
   isExecutingAtom,
   isGeneratingAtom,
   isSavingAtom,
@@ -108,6 +105,7 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
   const [showClearDialog, setShowClearDialog] = useAtom(showClearDialogAtom);
   const [showDeleteDialog, setShowDeleteDialog] = useAtom(showDeleteDialogAtom);
   const [isSaving, setIsSaving] = useAtom(isSavingAtom);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useAtom(hasUnsavedChangesAtom);
   const undo = useSetAtom(undoAtom);
   const redo = useSetAtom(redoAtom);
   const [canUndo] = useAtom(canUndoAtom);
@@ -153,8 +151,30 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
   const [projectWorkflowCount, setProjectWorkflowCount] = useState(0);
   const [showProjectIntegrationsDialog, setShowProjectIntegrationsDialog] =
     useState(false);
+  const [showUnsavedRunDialog, setShowUnsavedRunDialog] = useState(false);
 
   const handleExecute = async (mode: "test" | "production" = runMode) => {
+    // Check for unsaved changes only on test runs
+    if (mode === "test" && hasUnsavedChanges) {
+      setShowUnsavedRunDialog(true);
+      return;
+    }
+    
+    await executeWorkflow(mode);
+  };
+
+  const handleSaveAndRun = async () => {
+    await handleSave();
+    setShowUnsavedRunDialog(false);
+    await executeWorkflow(runMode);
+  };
+
+  const handleRunWithoutSaving = async () => {
+    setShowUnsavedRunDialog(false);
+    await executeWorkflow(runMode);
+  };
+
+  const executeWorkflow = async (mode: "test" | "production" = runMode) => {
     if (!currentWorkflowId) {
       toast.error("Please save the workflow before executing");
       return;
@@ -255,6 +275,7 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
     setIsSaving(true);
     try {
       await workflowApi.update(currentWorkflowId, { nodes, edges });
+      setHasUnsavedChanges(false);
       toast.success("Workflow saved successfully");
     } catch (error) {
       console.error("Failed to save workflow:", error);
@@ -626,7 +647,6 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
                   <span>Rename</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
                   disabled={!selectedProjectFilter}
                   onClick={async () => {
                     const currentProject = vercelProjects.find(
@@ -714,7 +734,12 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
                 <span>Move</span>
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
+                disabled={nodes.length === 0}
+                onClick={() => setShowClearDialog(true)}
+              >
+                <span>Clear</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
                 disabled={!currentWorkflowId}
                 onClick={() => setShowDeleteDialog(true)}
               >
@@ -750,175 +775,142 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
         className="flex flex-col-reverse items-end gap-2 border-none bg-transparent p-0 sm:flex-row sm:items-center"
         position="top-right"
       >
-        <ButtonGroup>
-          <Button
-            disabled={!canUndo || isGenerating}
-            onClick={() => undo()}
-            size="icon"
-            title="Undo"
-            variant="outline"
-          >
-            <Undo2 className="size-4" />
-          </Button>
-          <Button
-            disabled={!canRedo || isGenerating}
-            onClick={() => redo()}
-            size="icon"
-            title="Redo"
-            variant="outline"
-          >
-            <Redo2 className="size-4" />
-          </Button>
-        </ButtonGroup>
-        <ButtonGroup>
-          <Button
-            disabled={!currentWorkflowId || isGenerating || isSaving}
-            onClick={handleSave}
-            size="icon"
-            title={isSaving ? "Saving..." : "Save workflow"}
-            variant="outline"
-          >
-            {isSaving ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Save className="size-4" />
-            )}
-          </Button>
-          <Button
-            disabled={
-              isDeploying ||
-              nodes.length === 0 ||
-              isGenerating ||
-              !currentWorkflowId
-            }
-            onClick={handleDeploy}
-            size="icon"
-            title={
-              isDeploying
-                ? "Deploying to production..."
-                : "Deploy to production"
-            }
-            variant="outline"
-          >
-            {isDeploying ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Rocket className="size-4" />
-            )}
-          </Button>
-          {deploymentUrl && (
-            <Button
-              onClick={() => window.open(deploymentUrl, "_blank")}
-              size="icon"
-              title="Open deployment"
-              variant="outline"
-            >
-              <ExternalLink className="size-4" />
-            </Button>
-          )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+        {workflowId && (
+          <>
+            <ButtonGroup>
               <Button
-                disabled={isGenerating}
+                className="border disabled:opacity-100 disabled:[&>svg]:text-muted-foreground"
+                disabled={!canUndo || isGenerating}
+                onClick={() => undo()}
                 size="icon"
-                title="More options"
-                variant="outline"
+                title="Undo"
+                variant="secondary"
               >
-                <MoreVertical className="size-4" />
+                <Undo2 className="size-4" />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                disabled={!currentWorkflowId}
-                onClick={handleViewCode}
-              >
-                <Code className="size-4" />
-                <span>View Generated Code</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!currentWorkflowId}
-                onClick={() => setShowChangeProjectDialog(true)}
-              >
-                <FolderOpen className="size-4" />
-                <span>Change Project</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={nodes.length === 0}
-                onClick={() => setShowClearDialog(true)}
-              >
-                <RotateCwIcon className="size-4" />
-                <span>Clear Workflow</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                disabled={!currentWorkflowId}
-                onClick={() => setShowDeleteDialog(true)}
-              >
-                <Trash2 className="size-4 text-destructive" />
-                <span>Delete Workflow</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </ButtonGroup>
-
-        <ButtonGroup>
-          <Button
-            className="relative"
-            disabled={isExecuting || nodes.length === 0 || isGenerating}
-            onClick={() => handleExecute()}
-            size="icon"
-            variant="outline"
-          >
-            {isExecuting ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Play className="size-4" />
-            )}
-            {runMode === "test" && !isExecuting && (
-              <div className="absolute right-0.5 bottom-0.5">
-                <FlaskConical
-                  className="text-muted-foreground"
-                  strokeWidth={2.5}
-                  style={{ width: "12px", height: "12px" }}
-                />
-              </div>
-            )}
-          </Button>
-          <DropdownMenu modal={false}>
-            <DropdownMenuTrigger asChild>
               <Button
-                className="w-6 px-1"
-                disabled={isExecuting || nodes.length === 0 || isGenerating}
+                className="border disabled:opacity-100 disabled:[&>svg]:text-muted-foreground"
+                disabled={!canRedo || isGenerating}
+                onClick={() => redo()}
                 size="icon"
-                title="Select run mode"
-                variant="outline"
+                title="Redo"
+                variant="secondary"
               >
-                <ChevronDown className="h-3 w-3" />
+                <Redo2 className="size-4" />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" side="bottom" sideOffset={5}>
-              <DropdownMenuItem onClick={() => setRunMode("test")}>
-                <Play className="size-4" />
-                <span>Test Run (Local)</span>
-                {runMode === "test" && <Check className="ml-auto size-4" />}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!deploymentUrl}
-                onClick={() => setRunMode("production")}
+            </ButtonGroup>
+            <ButtonGroup>
+              <Button
+                className="relative border disabled:opacity-100 disabled:[&>svg]:text-muted-foreground"
+                disabled={!currentWorkflowId || isGenerating || isSaving}
+                onClick={handleSave}
+                size="icon"
+                title={isSaving ? "Saving..." : "Save workflow"}
+                variant="secondary"
               >
-                <Play className="size-4" />
-                <span>Production Run</span>
-                {runMode === "production" && (
-                  <Check className="ml-auto size-4" />
+                {isSaving ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Save className="size-4" />
                 )}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </ButtonGroup>
+                {hasUnsavedChanges && !isSaving && (
+                  <div className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-primary" />
+                )}
+              </Button>
+              <Button
+                className="border disabled:opacity-100 disabled:[&>svg]:text-muted-foreground"
+                disabled={
+                  isDeploying ||
+                  nodes.length === 0 ||
+                  isGenerating ||
+                  !currentWorkflowId
+                }
+                onClick={handleDeploy}
+                size="icon"
+                title={
+                  isDeploying
+                    ? "Deploying to production..."
+                    : "Deploy to production"
+                }
+                variant="secondary"
+              >
+                {isDeploying ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Rocket className="size-4" />
+                )}
+              </Button>
+              {deploymentUrl && (
+                <Button
+                  className="border disabled:opacity-100 disabled:[&>svg]:text-muted-foreground"
+                  onClick={() => window.open(deploymentUrl, "_blank")}
+                  size="icon"
+                  title="Open deployment"
+                  variant="secondary"
+                >
+                  <ExternalLink className="size-4" />
+                </Button>
+              )}
+            </ButtonGroup>
 
-        <div className="rounded-full border">
-          <UserMenu />
-        </div>
+            <ButtonGroup>
+              <Button
+                className="relative border disabled:opacity-100 disabled:[&>svg]:text-muted-foreground"
+                disabled={isExecuting || nodes.length === 0 || isGenerating}
+                onClick={() => handleExecute()}
+                size="icon"
+                variant="secondary"
+              >
+                {isExecuting ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Play className="size-4" />
+                )}
+                {runMode === "test" && !isExecuting && (
+                  <div className="absolute right-0.5 bottom-0.5">
+                    <FlaskConical
+                      className="text-muted-foreground"
+                      strokeWidth={2.5}
+                      style={{ width: "12px", height: "12px" }}
+                    />
+                  </div>
+                )}
+              </Button>
+              <DropdownMenu modal={false}>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    className="w-6 border px-1 disabled:opacity-100 disabled:[&>svg]:text-muted-foreground"
+                    disabled={isExecuting || nodes.length === 0 || isGenerating}
+                    size="icon"
+                    title="Select run mode"
+                    variant="secondary"
+                  >
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" side="bottom" sideOffset={5}>
+                  <DropdownMenuItem onClick={() => setRunMode("test")}>
+                    <Play className="size-4" />
+                    <span>Test Run (Local)</span>
+                    {runMode === "test" && <Check className="ml-auto size-4" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={!deploymentUrl}
+                    onClick={() => setRunMode("production")}
+                  >
+                    <Play className="size-4" />
+                    <span>Production Run</span>
+                    {runMode === "production" && (
+                      <Check className="ml-auto size-4" />
+                    )}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </ButtonGroup>
+          </>
+        )}
+
+        <UserMenu />
       </Panel>
 
       {/* Clear Workflow Dialog */}
@@ -1256,6 +1248,34 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
           null
         }
       />
+
+      {/* Unsaved Changes Run Confirmation Dialog */}
+      <Dialog
+        onOpenChange={setShowUnsavedRunDialog}
+        open={showUnsavedRunDialog}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Unsaved Changes</DialogTitle>
+            <DialogDescription>
+              You have unsaved changes. Would you like to save before running the
+              workflow?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              onClick={() => setShowUnsavedRunDialog(false)}
+              variant="outline"
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleRunWithoutSaving} variant="outline">
+              Run Without Saving
+            </Button>
+            <Button onClick={handleSaveAndRun}>Save and Run</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

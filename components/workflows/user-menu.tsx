@@ -58,12 +58,12 @@ export const UserMenu = () => {
     return (
       <div className="flex items-center gap-2">
         <AuthDialog defaultMode="signin">
-          <Button size="sm" variant="outline">
+          <Button className="h-9 border disabled:opacity-100 disabled:[&>*]:text-muted-foreground" size="sm" variant="secondary">
             Sign In
           </Button>
         </AuthDialog>
         <AuthDialog defaultMode="signup">
-          <Button size="sm" variant="default">
+          <Button className="h-9" size="sm" variant="default">
             Sign Up
           </Button>
         </AuthDialog>
@@ -72,6 +72,7 @@ export const UserMenu = () => {
   }
 
   return (
+    <div className="rounded-full border">
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button className="relative h-9 w-9 rounded-full" variant="ghost">
@@ -124,5 +125,6 @@ export const UserMenu = () => {
       </DropdownMenuContent>
       <SettingsDialog onOpenChange={setSettingsOpen} open={settingsOpen} />
     </DropdownMenu>
+    </div>
   );
 };
