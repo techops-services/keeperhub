@@ -2,14 +2,12 @@
 
 import { ReactFlowProvider } from "@xyflow/react";
 import { useAtom, useSetAtom } from "jotai";
-import { AnimatePresence, motion } from "motion/react";
 import { useSearchParams } from "next/navigation";
 import { use, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import { generate } from "@/app/actions/ai/generate";
 import { NodeConfigPanel } from "@/components/workflow/node-config-panel";
 import { WorkflowCanvas } from "@/components/workflow/workflow-canvas";
-import { WorkflowSkeleton } from "@/components/workflow/workflow-skeleton";
 import { WorkflowToolbar } from "@/components/workflow/workflow-toolbar";
 import { workflowApi } from "@/lib/workflow-api";
 import {
@@ -19,7 +17,6 @@ import {
   edgesAtom,
   isExecutingAtom,
   isGeneratingAtom,
-  isLoadingAtom,
   nodesAtom,
   selectedNodeAtom,
   updateNodeDataAtom,
@@ -32,7 +29,6 @@ type WorkflowPageProps = {
 const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   const { workflowId } = use(params);
   const searchParams = useSearchParams();
-  const [isLoading, setIsLoading] = useAtom(isLoadingAtom);
   const [isGenerating, setIsGenerating] = useAtom(isGeneratingAtom);
   const [isExecuting, setIsExecuting] = useAtom(isExecutingAtom);
   const [nodes] = useAtom(nodesAtom);
@@ -49,14 +45,13 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   useEffect(() => {
     const loadWorkflowData = async () => {
       const isGeneratingParam = searchParams?.get("generating") === "true";
-      const skipLoadParam = searchParams?.get("skipLoad") === "true";
       const storedPrompt = sessionStorage.getItem("ai-prompt");
       const storedWorkflowId = sessionStorage.getItem("generating-workflow-id");
 
-      // Check if we should skip loading (coming from root page with state already set)
-      if (skipLoadParam && currentWorkflowId === workflowId) {
-        // State is already loaded, just ensure the workflow ID is set
-        setCurrentWorkflowId(workflowId);
+      // Check if state is already loaded for this workflow (e.g., after creation)
+      // If currentWorkflowId matches and we have nodes, the state is fresh
+      if (currentWorkflowId === workflowId && nodes.length > 0) {
+        // State is already loaded, no need to fetch from server
         return;
       }
 
@@ -108,7 +103,6 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
       } else {
         // Normal workflow loading
         try {
-          setIsLoading(true);
           const workflow = await workflowApi.getById(workflowId);
           setNodes(workflow.nodes);
           setEdges(workflow.edges);
@@ -123,8 +117,6 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
           }
         } catch (error) {
           console.error("Failed to load workflow:", error);
-        } finally {
-          setIsLoading(false);
         }
       }
     };
@@ -139,7 +131,6 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
     setCurrentVercelProjectName,
     setNodes,
     setEdges,
-    setIsLoading,
     setIsGenerating,
     setSelectedNodeId,
   ]);
@@ -241,38 +232,15 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   }, [handleSave, handleRun]);
 
   return (
-    <AnimatePresence mode="wait">
-      {isLoading ? (
-        <AnimatePresence mode="popLayout">
-          <motion.div
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            initial={{ opacity: 1 }}
-            key="skeleton"
-            transition={{ duration: 0.15 }}
-          >
-            <WorkflowSkeleton />
-          </motion.div>
-        </AnimatePresence>
-      ) : (
-        <motion.div
-          animate={{ opacity: 1 }}
-          className="flex h-screen w-full flex-col overflow-hidden"
-          exit={{ opacity: 0 }}
-          initial={{ opacity: 0 }}
-          key="canvas"
-          transition={{ duration: 0.15 }}
-        >
-          <WorkflowToolbar workflowId={workflowId} />
-          <main className="relative size-full overflow-hidden">
-            <ReactFlowProvider>
-              <WorkflowCanvas />
-            </ReactFlowProvider>
-          </main>
-          <NodeConfigPanel />
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <div className="flex h-screen w-full flex-col overflow-hidden">
+      <WorkflowToolbar workflowId={workflowId} />
+      <main className="relative size-full overflow-hidden">
+        <ReactFlowProvider>
+          <WorkflowCanvas />
+        </ReactFlowProvider>
+      </main>
+      <NodeConfigPanel />
+    </div>
   );
 };
 

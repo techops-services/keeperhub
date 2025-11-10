@@ -32,7 +32,7 @@ export async function create(
     // If user has no projects, create a default one
     if (userProjects.length === 0) {
       const defaultProject = await createVercelProject({
-        name: "Untitled Project", // Display name (actual Vercel name will be workflow-builder-{projectId})
+        name: "My Project", // Display name (actual Vercel name will be workflow-builder-{projectId})
       });
 
       projectId = defaultProject.id;

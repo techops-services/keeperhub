@@ -16,7 +16,6 @@ import {
   currentWorkflowNameAtom,
   edgesAtom,
   isExecutingAtom,
-  isLoadingAtom,
   nodesAtom,
   selectedNodeAtom,
   updateNodeDataAtom,
@@ -26,7 +25,6 @@ const Home = () => {
   const router = useRouter();
   const { data: session } = useSession();
   const [isExecuting, setIsExecuting] = useAtom(isExecutingAtom);
-  const [isLoading, setIsLoading] = useAtom(isLoadingAtom);
   const [nodes] = useAtom(nodesAtom);
   const [edges] = useAtom(edgesAtom);
   const [currentWorkflowId, setCurrentWorkflowId] = useAtom(
@@ -39,15 +37,6 @@ const Home = () => {
   const updateNodeData = useSetAtom(updateNodeDataAtom);
   const setSelectedNodeId = useSetAtom(selectedNodeAtom);
   const hasRedirectedRef = useRef(false);
-  const hasInitialized = useRef(false);
-
-  // Initialize state on mount
-  useEffect(() => {
-    if (!hasInitialized.current) {
-      hasInitialized.current = true;
-      setIsLoading(false);
-    }
-  }, [setIsLoading]);
 
   // Create workflow and redirect when first node is added
   useEffect(() => {
@@ -57,8 +46,6 @@ const Home = () => {
       hasRedirectedRef.current = true;
 
       try {
-        setIsLoading(true);
-
         // If no session, create anonymous session first
         if (!session) {
           await authClient.signIn.anonymous();
@@ -87,16 +74,23 @@ const Home = () => {
         }
 
         // Redirect to the workflow page
-        router.replace(`/workflows/${newWorkflow.id}?skipLoad=true`);
+        router.replace(`/workflows/${newWorkflow.id}`);
       } catch (error) {
         console.error("Failed to create workflow:", error);
         toast.error("Failed to create workflow");
-        setIsLoading(false);
       }
     };
 
     createWorkflowAndRedirect();
-  }, [nodes, edges, router, session, setIsLoading]);
+  }, [
+    nodes,
+    edges,
+    router,
+    session,
+    setCurrentWorkflowId,
+    setCurrentWorkflowName,
+    setCurrentVercelProjectName,
+  ]);
 
   // Keyboard shortcuts
   const handleSave = useCallback(async () => {
