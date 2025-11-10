@@ -3,8 +3,8 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { workflows } from "@/lib/db/schema";
-import { getSession, verifyWorkflowOwnership } from "./utils";
 import type { SavedWorkflow, WorkflowData } from "./types";
+import { getSession, verifyWorkflowOwnership } from "./utils";
 
 /**
  * Update a workflow

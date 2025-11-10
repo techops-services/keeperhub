@@ -4,8 +4,8 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { workflowExecutions } from "@/lib/db/schema";
 import { executeWorkflowServer } from "@/lib/workflow-executor.server";
-import { getSession, verifyWorkflowOwnership } from "./utils";
 import type { WorkflowEdge, WorkflowNode } from "@/lib/workflow-store";
+import { getSession, verifyWorkflowOwnership } from "./utils";
 
 /**
  * Execute a workflow

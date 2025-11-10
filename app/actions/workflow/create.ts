@@ -2,8 +2,8 @@
 
 import { db } from "@/lib/db";
 import { workflows } from "@/lib/db/schema";
-import { getSession } from "./utils";
 import type { SavedWorkflow, WorkflowData } from "./types";
+import { getSession } from "./utils";
 
 /**
  * Create a new workflow

@@ -3,10 +3,10 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { workflows } from "@/lib/db/schema";
-import { CURRENT_WORKFLOW_NAME } from "./constants";
-import { getSession } from "./utils";
-import type { WorkflowData } from "./types";
 import type { WorkflowEdge, WorkflowNode } from "@/lib/workflow-store";
+import { CURRENT_WORKFLOW_NAME } from "./constants";
+import type { WorkflowData } from "./types";
+import { getSession } from "./utils";
 
 /**
  * Get the current workflow state

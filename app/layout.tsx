@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import type { ReactNode } from "react";
 import { Provider } from "jotai";
+import type { ReactNode } from "react";
 import { AuthProvider } from "@/components/auth/provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";

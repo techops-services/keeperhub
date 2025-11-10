@@ -3,8 +3,8 @@
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { workflows } from "@/lib/db/schema";
-import { getSession } from "./utils";
 import type { SavedWorkflow } from "./types";
+import { getSession } from "./utils";
 
 /**
  * Get all workflows for the current user

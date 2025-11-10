@@ -1,6 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { create as createDataSource } from "@/app/actions/data-source/create";
+import { deleteDataSource } from "@/app/actions/data-source/delete";
+import { getAll as getAllDataSources } from "@/app/actions/data-source/get-all";
+import { get as getIntegrations } from "@/app/actions/integration/get";
+import { update as updateIntegrations } from "@/app/actions/integration/update";
+import { get as getUser } from "@/app/actions/user/get";
+import { update as updateUser } from "@/app/actions/user/update";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,13 +33,6 @@ import { LinearSettings } from "./linear-settings";
 import { ResendSettings } from "./resend-settings";
 import { SlackSettings } from "./slack-settings";
 import { VercelSettings } from "./vercel-settings";
-import { get as getUser } from "@/app/actions/user/get";
-import { update as updateUser } from "@/app/actions/user/update";
-import { get as getIntegrations } from "@/app/actions/integration/get";
-import { update as updateIntegrations } from "@/app/actions/integration/update";
-import { getAll as getAllDataSources } from "@/app/actions/data-source/get-all";
-import { create as createDataSource } from "@/app/actions/data-source/create";
-import { deleteDataSource } from "@/app/actions/data-source/delete";
 
 interface Integrations {
   resendApiKey: string | null;
@@ -275,7 +275,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                       disabled={savingIntegrations}
                       onClick={saveIntegrations}
                     >
-                      {savingIntegrations ? "Saving..." : "Save All Integrations"}
+                      {savingIntegrations
+                        ? "Saving..."
+                        : "Save All Integrations"}
                     </Button>
                   </div>
                 </TabsContent>
@@ -320,7 +322,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deleteSourceId && handleDeleteDataSource(deleteSourceId)}
+              onClick={() =>
+                deleteSourceId && handleDeleteDataSource(deleteSourceId)
+              }
             >
               Delete
             </AlertDialogAction>

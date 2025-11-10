@@ -4,8 +4,8 @@ import { get } from "@/app/actions/workflow/get";
 import { getAll } from "@/app/actions/workflow/get-all";
 import { getCurrent } from "@/app/actions/workflow/get-current";
 import { saveCurrent } from "@/app/actions/workflow/save-current";
-import { update } from "@/app/actions/workflow/update";
 import type { SavedWorkflow, WorkflowData } from "@/app/actions/workflow/types";
+import { update } from "@/app/actions/workflow/update";
 import type { WorkflowEdge, WorkflowNode } from "./workflow-store";
 
 export type { SavedWorkflow, WorkflowData };

@@ -365,7 +365,7 @@ export function ActionConfig({
               />
             </div>
             {config?.httpMethod === "GET" && (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 Body is disabled for GET requests
               </p>
             )}

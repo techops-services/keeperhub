@@ -21,9 +21,6 @@ export async function deleteVercelProject(id: string): Promise<void> {
   await db
     .delete(vercelProjects)
     .where(
-      and(
-        eq(vercelProjects.id, id),
-        eq(vercelProjects.userId, session.user.id)
-      )
+      and(eq(vercelProjects.id, id), eq(vercelProjects.userId, session.user.id))
     );
 }
