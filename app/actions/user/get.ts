@@ -25,6 +25,7 @@ export async function get() {
       name: true,
       email: true,
       image: true,
+      isAnonymous: true,
     },
   });
 

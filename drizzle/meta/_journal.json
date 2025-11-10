@@ -22,6 +22,13 @@
       "when": 1762238873197,
       "tag": "0002_lovely_mathemanic",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1762799599860,
+      "tag": "0003_rapid_dexter_bennett",
+      "breakpoints": true
     }
   ]
 }

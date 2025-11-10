@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,13 +13,17 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { signIn, signUp } from "@/lib/auth-client";
+import { authClient, signIn, signUp, useSession } from "@/lib/auth-client";
 
 type AuthDialogProps = {
   defaultMode?: "signin" | "signup";
+  children?: ReactNode;
 };
 
-export const AuthDialog = ({ defaultMode = "signin" }: AuthDialogProps) => {
+export const AuthDialog = ({
+  defaultMode = "signin",
+  children,
+}: AuthDialogProps) => {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"signin" | "signup">(defaultMode);
   const [email, setEmail] = useState("");
@@ -27,7 +31,7 @@ export const AuthDialog = ({ defaultMode = "signin" }: AuthDialogProps) => {
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  const { data: session } = useSession();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,14 +45,15 @@ export const AuthDialog = ({ defaultMode = "signin" }: AuthDialogProps) => {
           password,
           name,
         });
+        toast.success("Account created successfully!");
       } else {
         await signIn.email({
           email,
           password,
         });
+        toast.success("Signed in successfully!");
       }
       setOpen(false);
-      router.push("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed");
     } finally {
@@ -64,9 +69,11 @@ export const AuthDialog = ({ defaultMode = "signin" }: AuthDialogProps) => {
   return (
     <Dialog onOpenChange={setOpen} open={open}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="default">
-          Sign In
-        </Button>
+        {children || (
+          <Button size="sm" variant="default">
+            Sign In
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -76,7 +83,9 @@ export const AuthDialog = ({ defaultMode = "signin" }: AuthDialogProps) => {
           <DialogDescription>
             {mode === "signin"
               ? "Sign in to your account to continue"
-              : "Create a new account to get started"}
+              : session?.user
+                ? "Create an account to save your work permanently"
+                : "Create a new account to get started"}
           </DialogDescription>
         </DialogHeader>
 

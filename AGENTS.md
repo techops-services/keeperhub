@@ -54,3 +54,12 @@ If any of the above commands fail or show errors:
 - **Add Components**: Use `pnpm dlx shadcn@latest add <component>` to add new shadcn components as needed
 - **No Native Dialogs**: Never use native `alert()` or `confirm()` dialogs. Always use shadcn AlertDialog, Dialog, or Sonner toast components instead
 
+## Database Migrations
+- **Generate Migrations**: Use `pnpm db:generate` to automatically generate database migrations from schema changes
+- **Never Write Manual Migrations**: Do not manually create SQL migration files in the `drizzle/` directory
+- **Workflow**: 
+  1. Update the schema in `lib/db/schema.ts`
+  2. Run `pnpm db:generate` to generate the migration
+  3. Run `pnpm db:push` to apply the migration to the database
+- The migration generator will create properly formatted SQL files based on your schema changes
+

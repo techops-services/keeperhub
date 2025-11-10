@@ -2,7 +2,8 @@
 
 import { LogOut, Moon, Settings, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { get as getUser } from "@/app/actions/user/get";
 import { AuthDialog } from "@/components/auth/dialog";
 import { SettingsDialog } from "@/components/settings";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -26,6 +27,23 @@ export const UserMenu = () => {
   const { data: session } = useSession();
   const { theme, setTheme } = useTheme();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [isAnonymous, setIsAnonymous] = useState(false);
+
+  useEffect(() => {
+    const checkAnonymousStatus = async () => {
+      if (session?.user) {
+        try {
+          const userData = await getUser();
+          setIsAnonymous(userData.isAnonymous ?? false);
+        } catch (error) {
+          console.error("Failed to check anonymous status:", error);
+          setIsAnonymous(false);
+        }
+      }
+    };
+
+    checkAnonymousStatus();
+  }, [session]);
 
   const handleLogout = async () => {
     await signOut();
@@ -43,12 +61,23 @@ export const UserMenu = () => {
     if (session?.user?.email) {
       return session.user.email.slice(0, 2).toUpperCase();
     }
-    return "U";
+    return "G";
   };
 
   // Show Sign In button if user is not logged in
   if (!session) {
     return <AuthDialog />;
+  }
+
+  // Show special UI for anonymous users
+  if (isAnonymous) {
+    return (
+      <AuthDialog defaultMode="signup">
+        <Button size="sm" variant="default">
+          Sign Up
+        </Button>
+      </AuthDialog>
+    );
   }
 
   return (

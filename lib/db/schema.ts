@@ -11,12 +11,14 @@ const nanoid = customAlphabet(
 // Better Auth tables
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  email: text("email").notNull().unique(),
-  emailVerified: boolean("emailVerified").notNull(),
+  name: text("name"),
+  email: text("email").unique(),
+  emailVerified: boolean("emailVerified").notNull().default(false),
   image: text("image"),
   createdAt: timestamp("createdAt").notNull(),
   updatedAt: timestamp("updatedAt").notNull(),
+  // Anonymous user tracking
+  isAnonymous: boolean("isAnonymous").default(false),
   // User-level integrations
   resendApiKey: text("resend_api_key"),
   resendFromEmail: text("resend_from_email"),

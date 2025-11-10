@@ -1,45 +1,39 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
-import { type ReactNode, useEffect } from "react";
-import { useSession } from "@/lib/auth-client";
+import { type ReactNode, useEffect, useState } from "react";
+import { authClient, useSession } from "@/lib/auth-client";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { data: session, isPending, error } = useSession();
-  const router = useRouter();
-  const pathname = usePathname();
+  const { data: session, isPending } = useSession();
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    // Add a timeout to prevent infinite loading
-    const timeout = setTimeout(() => {
-      if (isPending) {
-        console.warn("Session check timed out, redirecting to login");
+    const initializeAnonymousSession = async () => {
+      // Wait for session check to complete
+      if (isPending) return;
 
-        if (pathname !== "/") {
-          router.push("/");
+      // If no session exists, create an anonymous session
+      if (session) {
+        setIsInitialized(true);
+      } else {
+        try {
+          await authClient.signIn.anonymous();
+          setIsInitialized(true);
+        } catch (error) {
+          console.error("Failed to create anonymous session:", error);
+          // Continue anyway - the app should still work
+          setIsInitialized(true);
         }
       }
-    }, 5000);
+    };
 
-    return () => clearTimeout(timeout);
-  }, [isPending, router, pathname]);
+    initializeAnonymousSession();
+  }, [session, isPending]);
 
-  useEffect(() => {
-    if (!(isPending || session) && pathname !== "/") {
-      router.push("/");
-    }
-  }, [session, isPending, router, pathname]);
-
-  // Show error if session check failed
-  if (error) {
-    console.error("Auth error:", error);
-    if (pathname !== "/") {
-      router.push("/");
-    }
+  // Show loading state until initialized
+  if (!isInitialized) {
     return null;
   }
 
-  // Don't block rendering while checking auth
-  // The content will show immediately, and we'll redirect if needed
   return <>{children}</>;
 }

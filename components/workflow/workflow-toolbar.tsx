@@ -259,7 +259,7 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
   };
 
   const handleRenameWorkflow = async () => {
-    if (!currentWorkflowId || !newWorkflowName.trim()) {
+    if (!(currentWorkflowId && newWorkflowName.trim())) {
       return;
     }
 
@@ -456,8 +456,8 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
               </DropdownMenuItem>
               {vercelProjects.map((project) => (
                 <DropdownMenuItem
-                  key={project.id}
                   className="flex items-center justify-between"
+                  key={project.id}
                   onClick={() => handleProjectFilterChange(project.id)}
                 >
                   <span className="truncate">{project.name}</span>
@@ -481,8 +481,8 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
               ) : (
                 filteredWorkflows.map((workflow) => (
                   <DropdownMenuItem
-                    key={workflow.id}
                     className="flex items-center justify-between"
+                    key={workflow.id}
                     onClick={() => router.push(`/workflows/${workflow.id}`)}
                   >
                     <span className="truncate">{workflow.name}</span>
@@ -731,11 +731,11 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
           <div className="py-4">
             <Label htmlFor="workflow-name">Workflow Name</Label>
             <Input
+              className="mt-2"
               id="workflow-name"
-              value={newWorkflowName}
               onChange={(e) => setNewWorkflowName(e.target.value)}
               placeholder="Enter workflow name"
-              className="mt-2"
+              value={newWorkflowName}
             />
           </div>
           <DialogFooter>
@@ -746,8 +746,8 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
               Cancel
             </Button>
             <Button
-              onClick={handleRenameWorkflow}
               disabled={!newWorkflowName.trim()}
+              onClick={handleRenameWorkflow}
             >
               Rename
             </Button>
