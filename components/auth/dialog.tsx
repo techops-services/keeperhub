@@ -45,7 +45,12 @@ export const AuthDialog = ({
           password,
           name,
         });
-        toast.success("Account created successfully!");
+        // Automatically sign in after successful sign-up
+        await signIn.email({
+          email,
+          password,
+        });
+        toast.success("Account created and signed in successfully!");
       } else {
         await signIn.email({
           email,
