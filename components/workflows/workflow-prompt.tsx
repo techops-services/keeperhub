@@ -63,22 +63,18 @@ export function WorkflowPrompt() {
   const router = useRouter();
   const { data: session } = useSession();
 
-  // Load Vercel projects when component mounts
-  useEffect(() => {
+  // Load Vercel projects fresh when dropdown opens (no caching on mount)
+  const loadVercelProjects = async () => {
     if (!session) return;
-
-    const loadVercelProjects = async () => {
-      try {
-        const projects = await getAllVercelProjects();
-        console.log("Loaded Vercel projects:", projects);
-        setVercelProjects(projects || []);
-      } catch (error) {
-        console.error("Failed to load Vercel projects:", error);
-      }
-    };
-
-    loadVercelProjects();
-  }, [session, setVercelProjects]);
+    
+    try {
+      const projects = await getAllVercelProjects();
+      console.log("Loaded Vercel projects:", projects);
+      setVercelProjects(projects || []);
+    } catch (error) {
+      console.error("Failed to load Vercel projects:", error);
+    }
+  };
 
   const handleProjectChange = (value: string) => {
     if (value === "new") {
@@ -175,6 +171,7 @@ export function WorkflowPrompt() {
           <PromptInputFooter>
             <Select
               disabled={isGenerating}
+              onOpenChange={(open) => open && loadVercelProjects()}
               onValueChange={handleProjectChange}
               value={selectedProjectId}
             >

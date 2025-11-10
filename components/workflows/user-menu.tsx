@@ -2,7 +2,7 @@
 
 import { LogOut, Moon, Settings, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { get as getUser } from "@/app/actions/user/get";
 import { AuthDialog } from "@/components/auth/dialog";
 import { SettingsDialog } from "@/components/settings";
@@ -28,17 +28,20 @@ export const UserMenu = () => {
   const { theme, setTheme } = useTheme();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isAnonymous, setIsAnonymous] = useState(false);
+  const hasCheckedRef = useRef(false);
 
   useEffect(() => {
     const checkAnonymousStatus = async () => {
-      if (session?.user) {
-        try {
-          const userData = await getUser();
-          setIsAnonymous(userData.isAnonymous ?? false);
-        } catch (error) {
-          console.error("Failed to check anonymous status:", error);
-          setIsAnonymous(false);
-        }
+      // Only check once when session becomes available
+      if (!session?.user || hasCheckedRef.current) return;
+      hasCheckedRef.current = true;
+
+      try {
+        const userData = await getUser();
+        setIsAnonymous(userData.isAnonymous ?? false);
+      } catch (error) {
+        console.error("Failed to check anonymous status:", error);
+        setIsAnonymous(false);
       }
     };
 

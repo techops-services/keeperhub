@@ -51,6 +51,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { vercelProjectsAtom } from "@/lib/atoms/vercel-projects";
+import { getAll as getAllVercelProjects } from "@/app/actions/vercel-project/get-all";
 import { workflowApi } from "@/lib/workflow-api";
 import {
   canRedoAtom,
@@ -98,7 +99,7 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
   const redo = useSetAtom(redoAtom);
   const [canUndo] = useAtom(canUndoAtom);
   const [canRedo] = useAtom(canRedoAtom);
-  const [vercelProjects] = useAtom(vercelProjectsAtom);
+  const [vercelProjects, setVercelProjects] = useAtom(vercelProjectsAtom);
 
   // Component-local state for change project dialog (doesn't need to be shared)
   const [showChangeProjectDialog, setShowChangeProjectDialog] = useState(false);
@@ -370,19 +371,25 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
     }
   }, [currentWorkflowId]);
 
-  // Load all workflows for the dropdown
-  useEffect(() => {
-    const loadWorkflows = async () => {
-      try {
-        const workflows = await workflowApi.getAll();
-        setAllWorkflows(workflows);
-      } catch (error) {
-        console.error("Failed to load workflows:", error);
-      }
-    };
+  // Load workflows fresh when dropdown opens (no caching)
+  const loadWorkflows = async () => {
+    try {
+      const workflows = await workflowApi.getAll();
+      setAllWorkflows(workflows);
+    } catch (error) {
+      console.error("Failed to load workflows:", error);
+    }
+  };
 
-    loadWorkflows();
-  }, []);
+  // Load vercel projects fresh when dropdown opens (no caching)
+  const loadProjects = async () => {
+    try {
+      const projects = await getAllVercelProjects();
+      setVercelProjects(projects || []);
+    } catch (error) {
+      console.error("Failed to load Vercel projects:", error);
+    }
+  };
 
   // Sync newWorkflowName when workflowName changes
   useEffect(() => {
@@ -432,7 +439,7 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
         position="top-left"
       >
         <ButtonGroup>
-          <DropdownMenu>
+          <DropdownMenu onOpenChange={(open) => open && loadProjects()}>
             <ButtonGroupText asChild>
               <DropdownMenuTrigger className="cursor-pointer">
                 <p className="font-medium text-sm">
@@ -468,7 +475,7 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <DropdownMenu>
+          <DropdownMenu onOpenChange={(open) => open && loadWorkflows()}>
             <ButtonGroupText asChild>
               <DropdownMenuTrigger className="cursor-pointer">
                 <p className="font-medium text-sm">{workflowName}</p>
@@ -494,31 +501,34 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
               )}
             </DropdownMenuContent>
           </DropdownMenu>
-          {currentWorkflowId && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="icon" variant="outline">
-                  <MoreVertical className="size-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setShowRenameDialog(true)}>
-                  Rename
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setShowChangeProjectDialog(true)}
-                >
-                  Move
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
-                  onClick={() => setShowDeleteDialog(true)}
-                >
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon" variant="outline">
+                <MoreVertical className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem 
+                disabled={!currentWorkflowId}
+                onClick={() => setShowRenameDialog(true)}
+              >
+                Rename
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={!currentWorkflowId}
+                onClick={() => setShowChangeProjectDialog(true)}
+              >
+                Move
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                disabled={!currentWorkflowId}
+                onClick={() => setShowDeleteDialog(true)}
+              >
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </ButtonGroup>
         <NodeToolbar />
       </Panel>

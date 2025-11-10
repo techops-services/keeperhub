@@ -103,7 +103,9 @@ export function WorkflowCanvas() {
   // Load saved viewport when workflow changes
   useEffect(() => {
     if (!currentWorkflowId) {
-      setViewportReady(false);
+      setViewportReady(true);
+      setDefaultViewport(undefined);
+      viewportInitialized.current = true;
       return;
     }
 

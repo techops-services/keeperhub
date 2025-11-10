@@ -1,5 +1,4 @@
 import { atom } from "jotai";
-import { atomWithStorage } from "jotai/utils";
 
 export interface VercelProject {
   id: string;
@@ -8,15 +7,9 @@ export interface VercelProject {
 }
 
 // Atoms for Vercel project state
-// Using atomWithStorage to persist across page refreshes
-export const vercelProjectsAtom = atomWithStorage<VercelProject[]>(
-  "vercel-projects",
-  []
-);
-export const selectedProjectIdAtom = atomWithStorage<string>(
-  "selected-project-id",
-  "none"
-);
+// No caching - projects and workflows load fresh each time
+export const vercelProjectsAtom = atom<VercelProject[]>([]);
+export const selectedProjectIdAtom = atom<string>("none");
 
 // UI state atoms (don't need to persist)
 export const showNewProjectDialogAtom = atom<boolean>(false);

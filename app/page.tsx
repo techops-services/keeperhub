@@ -2,13 +2,11 @@
 
 import { ReactFlowProvider } from "@xyflow/react";
 import { useAtom, useSetAtom } from "jotai";
-import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { NodeConfigPanel } from "@/components/workflow/node-config-panel";
 import { WorkflowCanvas } from "@/components/workflow/workflow-canvas";
-import { WorkflowSkeleton } from "@/components/workflow/workflow-skeleton";
 import { WorkflowToolbar } from "@/components/workflow/workflow-toolbar";
 import { workflowApi } from "@/lib/workflow-api";
 import {
@@ -39,59 +37,43 @@ const Home = () => {
   const updateNodeData = useSetAtom(updateNodeDataAtom);
   const setSelectedNodeId = useSetAtom(selectedNodeAtom);
   const hasRedirectedRef = useRef(false);
+  const hasInitialized = useRef(false);
 
-  // Create a new workflow on mount
+  // Initialize state on mount
   useEffect(() => {
-    const createNewWorkflow = async () => {
+    if (!hasInitialized.current) {
+      hasInitialized.current = true;
+      setIsLoading(false);
+    }
+  }, [setIsLoading]);
+
+  // Create workflow and redirect when first node is added
+  useEffect(() => {
+    const createWorkflowAndRedirect = async () => {
+      // Only run when nodes are added and we haven't redirected yet
+      if (nodes.length === 0 || hasRedirectedRef.current) return;
+      hasRedirectedRef.current = true;
+
       try {
         setIsLoading(true);
+        // Create workflow with the first node
         const newWorkflow = await workflowApi.create({
           name: "Untitled",
           description: "",
-          nodes: [],
-          edges: [],
+          nodes,
+          edges,
         });
-        setCurrentWorkflowId(newWorkflow.id);
-        setCurrentWorkflowName(newWorkflow.name);
-        setNodes([]);
-        setEdges([]);
+        // Redirect to the workflow page
+        router.replace(`/workflows/${newWorkflow.id}?skipLoad=true`);
       } catch (error) {
         console.error("Failed to create workflow:", error);
         toast.error("Failed to create workflow");
-      } finally {
         setIsLoading(false);
       }
     };
 
-    createNewWorkflow();
-  }, [
-    setCurrentWorkflowId,
-    setCurrentWorkflowName,
-    setNodes,
-    setEdges,
-    setIsLoading,
-  ]);
-
-  // Watch for nodes being added and redirect
-  useEffect(() => {
-    const saveAndRedirect = async () => {
-      if (nodes.length > 0 && currentWorkflowId && !hasRedirectedRef.current) {
-        hasRedirectedRef.current = true;
-        try {
-          // Save the workflow before redirecting
-          await workflowApi.update(currentWorkflowId, { nodes, edges });
-          // Use replace to avoid back button issues and add skipLoad param
-          router.replace(`/workflows/${currentWorkflowId}?skipLoad=true`);
-        } catch (error) {
-          console.error("Failed to save workflow before redirect:", error);
-          // Redirect anyway - the workflow page will handle the state
-          router.replace(`/workflows/${currentWorkflowId}?skipLoad=true`);
-        }
-      }
-    };
-
-    saveAndRedirect();
-  }, [nodes, currentWorkflowId, router, edges]);
+    createWorkflowAndRedirect();
+  }, [nodes, edges, router, setIsLoading]);
 
   // Keyboard shortcuts
   const handleSave = useCallback(async () => {
@@ -182,38 +164,15 @@ const Home = () => {
   }, [handleSave, handleRun]);
 
   return (
-    <AnimatePresence mode="wait">
-      {isLoading ? (
-        <AnimatePresence mode="popLayout">
-          <motion.div
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            initial={{ opacity: 1 }}
-            key="skeleton"
-            transition={{ duration: 0.15 }}
-          >
-            <WorkflowSkeleton />
-          </motion.div>
-        </AnimatePresence>
-      ) : (
-        <motion.div
-          animate={{ opacity: 1 }}
-          className="flex h-screen w-full flex-col overflow-hidden"
-          exit={{ opacity: 0 }}
-          initial={{ opacity: 0 }}
-          key="canvas"
-          transition={{ duration: 0.15 }}
-        >
+    <div className="flex h-screen w-full flex-col overflow-hidden">
+      <main className="relative size-full overflow-hidden">
+        <ReactFlowProvider>
           <WorkflowToolbar workflowId={currentWorkflowId ?? undefined} />
-          <main className="relative size-full overflow-hidden">
-            <ReactFlowProvider>
-              <WorkflowCanvas />
-            </ReactFlowProvider>
-          </main>
-          <NodeConfigPanel />
-        </motion.div>
-      )}
-    </AnimatePresence>
+          <WorkflowCanvas />
+        </ReactFlowProvider>
+      </main>
+      <NodeConfigPanel />
+    </div>
   );
 };
 
