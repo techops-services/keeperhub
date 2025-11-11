@@ -45,7 +45,12 @@ export async function deleteVercelProject(id: string): Promise<void> {
   // Delete all workflows associated with this project first
   await db
     .delete(workflows)
-    .where(and(eq(workflows.vercelProjectId, id), eq(workflows.userId, session.user.id)));
+    .where(
+      and(
+        eq(workflows.vercelProjectId, id),
+        eq(workflows.userId, session.user.id)
+      )
+    );
 
   // Then delete the project
   await db

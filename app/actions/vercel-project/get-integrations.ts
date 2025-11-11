@@ -4,10 +4,10 @@ import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { projects, user } from "@/lib/db/schema";
+import { projects } from "@/lib/db/schema";
 import { getEnvironmentVariables } from "@/lib/integrations/vercel";
 
-export interface ProjectIntegrations {
+export type ProjectIntegrations = {
   resendApiKey: string | null;
   resendFromEmail: string | null;
   linearApiKey: string | null;
@@ -15,7 +15,7 @@ export interface ProjectIntegrations {
   hasResendKey: boolean;
   hasLinearKey: boolean;
   hasSlackKey: boolean;
-}
+};
 
 export async function getProjectIntegrations(
   projectId: string
@@ -29,23 +29,21 @@ export async function getProjectIntegrations(
   }
 
   const project = await db.query.projects.findFirst({
-    where: and(eq(projects.id, projectId), eq(projects.userId, session.user.id)),
+    where: and(
+      eq(projects.id, projectId),
+      eq(projects.userId, session.user.id)
+    ),
   });
 
   if (!project) {
     throw new Error("Project not found");
   }
 
-  // Get user's Vercel API token
-  const userData = await db.query.user.findFirst({
-    where: eq(user.id, session.user.id),
-    columns: {
-      vercelApiToken: true,
-      vercelTeamId: true,
-    },
-  });
+  // Get app-level Vercel credentials from env vars
+  const vercelApiToken = process.env.VERCEL_API_TOKEN;
+  const vercelTeamId = process.env.VERCEL_TEAM_ID;
 
-  if (!userData?.vercelApiToken) {
+  if (!vercelApiToken) {
     // Return empty integrations if no Vercel token
     return {
       resendApiKey: null,
@@ -61,8 +59,8 @@ export async function getProjectIntegrations(
   // Fetch environment variables from Vercel
   const envResult = await getEnvironmentVariables({
     projectId: project.vercelProjectId,
-    apiToken: userData.vercelApiToken,
-    teamId: userData.vercelTeamId || undefined,
+    apiToken: vercelApiToken,
+    teamId: vercelTeamId || undefined,
   });
 
   if (envResult.status === "error" || !envResult.envs) {
@@ -98,4 +96,3 @@ export async function getProjectIntegrations(
     hasSlackKey: !!slackApiKey,
   };
 }
-

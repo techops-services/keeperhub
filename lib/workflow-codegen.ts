@@ -1,16 +1,16 @@
 import type { WorkflowEdge, WorkflowNode } from "./workflow-store";
 
-interface CodeGenOptions {
+type CodeGenOptions = {
   functionName?: string;
   parameters?: Array<{ name: string; type: string }>;
   returnType?: string;
-}
+};
 
-interface GeneratedCode {
+type GeneratedCode = {
   code: string;
   functionName: string;
   imports: string[];
-}
+};
 
 /**
  * Generate TypeScript code from workflow JSON with "use workflow" directive
@@ -69,7 +69,9 @@ export function generateWorkflowCode(
 
     visited.add(nodeId);
     const node = nodeMap.get(nodeId);
-    if (!node) return [];
+    if (!node) {
+      return [];
+    }
 
     const lines: string[] = [];
     const varName = `${node.data.type}_${nodeId.replace(/-/g, "_")}`;
@@ -165,13 +167,13 @@ export function generateWorkflowCode(
 
           lines.push(`${indent}if (${condition || "true"}) {`);
           if (trueNode) {
-            const trueNodeCode = generateNodeCode(trueNode, indent + "  ");
+            const trueNodeCode = generateNodeCode(trueNode, `${indent}  `);
             lines.push(...trueNodeCode);
           }
 
           if (falseNode) {
             lines.push(`${indent}} else {`);
-            const falseNodeCode = generateNodeCode(falseNode, indent + "  ");
+            const falseNodeCode = generateNodeCode(falseNode, `${indent}  `);
             lines.push(...falseNodeCode);
           }
 
@@ -225,9 +227,11 @@ export function generateWorkflowCode(
     });
 
     // Return the last result
-    const lastNode = nodes[nodes.length - 1];
-    const lastVarName = `${lastNode.data.type}_${lastNode.id.replace(/-/g, "_")}`;
-    codeLines.push(`  return ${lastVarName};`);
+    const lastNode = nodes.at(-1);
+    if (lastNode) {
+      const lastVarName = `${lastNode.data.type}_${lastNode.id.replace(/-/g, "_")}`;
+      codeLines.push(`  return ${lastVarName};`);
+    }
   }
 
   codeLines.push("}");

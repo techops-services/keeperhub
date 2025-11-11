@@ -1,18 +1,18 @@
 import "server-only";
 import { WebClient } from "@slack/web-api";
 
-export interface SendSlackMessageParams {
+export type SendSlackMessageParams = {
   channel: string;
   text: string;
   apiKey: string;
   threadTs?: string;
-}
+};
 
-export interface SendSlackMessageResult {
+export type SendSlackMessageResult = {
   status: "success" | "error";
   ts?: string;
   error?: string;
-}
+};
 
 /**
  * Send a message to Slack

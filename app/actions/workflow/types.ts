@@ -1,13 +1,13 @@
 import type { WorkflowEdge, WorkflowNode } from "@/lib/workflow-store";
 
-export interface WorkflowData {
+export type WorkflowData = {
   id?: string;
   name?: string;
   description?: string;
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
   vercelProjectId?: string | null;
-}
+};
 
 export interface SavedWorkflow extends WorkflowData {
   id: string;

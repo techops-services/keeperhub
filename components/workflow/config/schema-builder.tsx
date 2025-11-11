@@ -12,20 +12,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export interface SchemaField {
+export type SchemaField = {
   name: string;
   type: "string" | "number" | "boolean" | "array" | "object";
   itemType?: "string" | "number" | "boolean" | "object";
   fields?: SchemaField[];
   description?: string;
-}
+};
 
-interface SchemaBuilderProps {
+type SchemaBuilderProps = {
   schema: SchemaField[];
   onChange: (schema: SchemaField[]) => void;
   disabled?: boolean;
   level?: number;
-}
+};
 
 export function SchemaBuilder({
   schema,
@@ -44,10 +44,10 @@ export function SchemaBuilder({
     // Reset dependent fields when type changes
     if (updates.type) {
       if (updates.type !== "array") {
-        delete newSchema[index].itemType;
+        newSchema[index].itemType = undefined;
       }
       if (updates.type !== "object") {
-        delete newSchema[index].fields;
+        newSchema[index].fields = undefined;
       }
       if (updates.type === "array" && !newSchema[index].itemType) {
         newSchema[index].itemType = "string";

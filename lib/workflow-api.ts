@@ -21,21 +21,21 @@ export const workflowApi = {
   },
 
   // Get a specific workflow
-  async getById(id: string): Promise<SavedWorkflow> {
+  async getById(id: string): Promise<SavedWorkflow | null> {
     return get(id);
   },
 
   // Create a new workflow
-  async create(workflow: Omit<WorkflowData, "id">): Promise<SavedWorkflow> {
-    return create(workflow);
+  async create(_workflow: Omit<WorkflowData, "id">): Promise<SavedWorkflow> {
+    return create(_workflow);
   },
 
   // Update a workflow
   async update(
-    id: string,
-    workflow: Partial<WorkflowData>
+    _id: string,
+    _workflow: Partial<WorkflowData>
   ): Promise<SavedWorkflow> {
-    return update(id, workflow);
+    return update(_id, _workflow);
   },
 
   // Delete a workflow
@@ -50,10 +50,10 @@ export const workflowApi = {
 
   // Save current workflow state
   async saveCurrent(
-    nodes: WorkflowNode[],
-    edges: WorkflowEdge[]
+    _nodes: WorkflowNode[],
+    _edges: WorkflowEdge[]
   ): Promise<void> {
-    await saveCurrent(nodes, edges);
+    await saveCurrent(_nodes, _edges);
   },
 
   // Auto-save current workflow with debouncing
@@ -74,7 +74,7 @@ export const workflowApi = {
     id: string,
     data: Partial<WorkflowData>,
     debounce = true
-  ): Promise<SavedWorkflow> | void {
+  ): Promise<SavedWorkflow> | undefined {
     if (!debounce) {
       return this.update(id, data);
     }

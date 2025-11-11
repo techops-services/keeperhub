@@ -79,7 +79,7 @@ export const addNodeAtom = atom(null, (get, set, node: WorkflowNode) => {
 
   // Auto-select the newly added node
   set(selectedNodeAtom, node.id);
-  
+
   // Mark as having unsaved changes
   set(hasUnsavedChangesAtom, true);
 });
@@ -92,7 +92,7 @@ export const updateNodeDataAtom = atom(
       node.id === id ? { ...node, data: { ...node.data, ...data } } : node
     );
     set(nodesAtom, newNodes);
-    
+
     // Mark as having unsaved changes (except for status updates during execution)
     if (!data.status) {
       set(hasUnsavedChangesAtom, true);
@@ -119,7 +119,7 @@ export const deleteNodeAtom = atom(null, (get, set, nodeId: string) => {
   if (get(selectedNodeAtom) === nodeId) {
     set(selectedNodeAtom, null);
   }
-  
+
   // Mark as having unsaved changes
   set(hasUnsavedChangesAtom, true);
 });
@@ -135,7 +135,7 @@ export const clearWorkflowAtom = atom(null, (get, set) => {
   set(nodesAtom, []);
   set(edgesAtom, []);
   set(selectedNodeAtom, null);
-  
+
   // Mark as having unsaved changes
   set(hasUnsavedChangesAtom, true);
 });
@@ -202,7 +202,9 @@ const futureAtom = atom<HistoryState[]>([]);
 // Undo atom
 export const undoAtom = atom(null, (get, set) => {
   const history = get(historyAtom);
-  if (history.length === 0) return;
+  if (history.length === 0) {
+    return;
+  }
 
   const currentNodes = get(nodesAtom);
   const currentEdges = get(edgesAtom);
@@ -217,7 +219,7 @@ export const undoAtom = atom(null, (get, set) => {
   set(historyAtom, newHistory);
   set(nodesAtom, previousState.nodes);
   set(edgesAtom, previousState.edges);
-  
+
   // Mark as having unsaved changes
   set(hasUnsavedChangesAtom, true);
 });
@@ -225,7 +227,9 @@ export const undoAtom = atom(null, (get, set) => {
 // Redo atom
 export const redoAtom = atom(null, (get, set) => {
   const future = get(futureAtom);
-  if (future.length === 0) return;
+  if (future.length === 0) {
+    return;
+  }
 
   const currentNodes = get(nodesAtom);
   const currentEdges = get(edgesAtom);
@@ -240,7 +244,7 @@ export const redoAtom = atom(null, (get, set) => {
   set(futureAtom, newFuture);
   set(nodesAtom, nextState.nodes);
   set(edgesAtom, nextState.edges);
-  
+
   // Mark as having unsaved changes
   set(hasUnsavedChangesAtom, true);
 });

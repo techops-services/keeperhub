@@ -145,7 +145,9 @@ export function WorkflowCanvas() {
   // Save viewport changes
   const onMoveEnd = useCallback(
     (_event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
-      if (!(currentWorkflowId && viewportInitialized.current)) return;
+      if (!(currentWorkflowId && viewportInitialized.current)) {
+        return;
+      }
       localStorage.setItem(
         `workflow-viewport-${currentWorkflowId}`,
         JSON.stringify(viewport)
@@ -194,64 +196,63 @@ export function WorkflowCanvas() {
     []
   );
 
-  const onConnectEnd = useCallback(
-    (event: MouseEvent | TouchEvent) => {
-      if (!connectingNodeId.current) {
-        return;
-      }
+  const onConnectEnd = useCallback((event: MouseEvent | TouchEvent) => {
+    if (!connectingNodeId.current) {
+      return;
+    }
 
-      const target = event.target as Element;
+    const target = event.target as Element;
 
-      // Check if we're not dropping on a node or handle
-      const isNode = target.closest(".react-flow__node");
-      const isHandle = target.closest(".react-flow__handle");
+    // Check if we're not dropping on a node or handle
+    const isNode = target.closest(".react-flow__node");
+    const isHandle = target.closest(".react-flow__handle");
 
-      if (!(isNode || isHandle)) {
-        // Get mouse position relative to the viewport
-        const clientX =
-          "changedTouches" in event
-            ? event.changedTouches[0].clientX
-            : event.clientX;
-        const clientY =
-          "changedTouches" in event
-            ? event.changedTouches[0].clientY
-            : event.clientY;
+    if (!(isNode || isHandle)) {
+      // Get mouse position relative to the viewport
+      const clientX =
+        "changedTouches" in event
+          ? event.changedTouches[0].clientX
+          : event.clientX;
+      const clientY =
+        "changedTouches" in event
+          ? event.changedTouches[0].clientY
+          : event.clientY;
 
-        // Get the ReactFlow wrapper element to calculate offset
-        const reactFlowBounds = (event.target as Element)
-          .closest(".react-flow")
-          ?.getBoundingClientRect();
+      // Get the ReactFlow wrapper element to calculate offset
+      const reactFlowBounds = (event.target as Element)
+        .closest(".react-flow")
+        ?.getBoundingClientRect();
 
-        // Adjust position relative to the ReactFlow container
-        const adjustedX = reactFlowBounds
-          ? clientX - reactFlowBounds.left
-          : clientX;
-        const adjustedY = reactFlowBounds
-          ? clientY - reactFlowBounds.top
-          : clientY;
+      // Adjust position relative to the ReactFlow container
+      const adjustedX = reactFlowBounds
+        ? clientX - reactFlowBounds.left
+        : clientX;
+      const adjustedY = reactFlowBounds
+        ? clientY - reactFlowBounds.top
+        : clientY;
 
-        menuJustOpened.current = true;
-        setMenu({
-          id: connectingNodeId.current,
-          top: adjustedY,
-          left: adjustedX,
-        });
+      menuJustOpened.current = true;
+      setMenu({
+        id: connectingNodeId.current,
+        top: adjustedY,
+        left: adjustedX,
+      });
 
-        // Reset the flag after a brief moment
-        setTimeout(() => {
-          menuJustOpened.current = false;
-        }, 100);
-      }
+      // Reset the flag after a brief moment
+      setTimeout(() => {
+        menuJustOpened.current = false;
+      }, 100);
+    }
 
-      // Reset the connecting node
-      connectingNodeId.current = null;
-    },
-    [setMenu]
-  );
+    // Reset the connecting node
+    connectingNodeId.current = null;
+  }, []);
 
   const onAddNodeFromMenu = useCallback(
     (template: (typeof nodeTemplates)[0]) => {
-      if (!menu) return;
+      if (!menu) {
+        return;
+      }
 
       // Get the position in the flow coordinate system
       const position = screenToFlowPosition({

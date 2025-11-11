@@ -47,113 +47,119 @@ const generateNodeCode = (node: {
   };
 }): string => {
   const lines: string[] = [];
-  
+
   // Convert label to camelCase function name
-  const functionName = node.data.label
-    .replace(/[^a-zA-Z0-9\s]/g, '')
+  const functionName = `${node.data.label
+    .replace(/[^a-zA-Z0-9\s]/g, "")
     .split(/\s+/)
     .map((word, i) => {
-      if (i === 0) return word.toLowerCase();
+      if (i === 0) {
+        return word.toLowerCase();
+      }
       return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
     })
-    .join('') + 'Step';
+    .join("")}Step`;
 
-  lines.push(`async function ${functionName}(input: Record<string, unknown> & { outputs?: Record<string, { label: string; data: unknown }> }) {`);
-  lines.push(``);
+  lines.push(
+    `async function ${functionName}(input: Record<string, unknown> & { outputs?: Record<string, { label: string; data: unknown }> }) {`
+  );
+  lines.push("");
   lines.push(`  "use step";`);
-  lines.push(``);
+  lines.push("");
 
   if (node.data.description) {
     lines.push(`  // ${node.data.description}`);
-    lines.push(``);
+    lines.push("");
   }
 
   switch (node.data.type) {
     case "trigger":
-      lines.push(`  // Trigger setup`);
+      lines.push("  // Trigger setup");
       lines.push(`  console.log('Workflow triggered with input:', input);`);
-      lines.push(`  return input;`);
+      lines.push("  return input;");
       break;
 
     case "action": {
       const actionType = node.data.config?.actionType as string;
-      const endpoint = (node.data.config?.endpoint as string) || 'https://api.example.com';
+      const endpoint =
+        (node.data.config?.endpoint as string) || "https://api.example.com";
 
       if (
         actionType === "Send Email" ||
         node.data.label.toLowerCase().includes("email")
       ) {
-        lines.push(`  const result = await sendEmail({`);
+        lines.push("  const result = await sendEmail({");
         lines.push(`    to: "user@example.com",`);
         lines.push(`    subject: "Subject",`);
         lines.push(`    body: "Email content",`);
-        lines.push(`  });`);
-        lines.push(``);
+        lines.push("  });");
+        lines.push("");
         lines.push(`  console.log('Email sent:', result);`);
-        lines.push(`  return result;`);
+        lines.push("  return result;");
       } else if (
         actionType === "Create Linear Issue" ||
         node.data.label.toLowerCase().includes("linear")
       ) {
-        lines.push(`  const issue = await createLinearIssue({`);
+        lines.push("  const issue = await createLinearIssue({");
         lines.push(`    title: "Issue title",`);
         lines.push(`    description: "Issue description",`);
-        lines.push(`  });`);
-        lines.push(``);
+        lines.push("  });");
+        lines.push("");
         lines.push(`  console.log('Linear issue created:', issue);`);
-        lines.push(`  return issue;`);
+        lines.push("  return issue;");
       } else if (
         actionType === "Send Slack Message" ||
         node.data.label.toLowerCase().includes("slack")
       ) {
-        lines.push(`  const result = await sendSlackMessage({`);
+        lines.push("  const result = await sendSlackMessage({");
         lines.push(`    channel: "#general",`);
         lines.push(`    text: "Message content",`);
-        lines.push(`  });`);
-        lines.push(``);
+        lines.push("  });");
+        lines.push("");
         lines.push(`  console.log('Slack message sent:', result);`);
-        lines.push(`  return result;`);
+        lines.push("  return result;");
       } else {
         lines.push(`  const response = await fetch('${endpoint}', {`);
         lines.push(`    method: 'POST',`);
-        lines.push(`    headers: {`);
+        lines.push("    headers: {");
         lines.push(`      'Content-Type': 'application/json'`);
-        lines.push(`    },`);
-        lines.push(`    body: JSON.stringify(input),`);
-        lines.push(`  });`);
-        lines.push(``);
-        lines.push(`  const data = await response.json();`);
+        lines.push("    },");
+        lines.push("    body: JSON.stringify(input),");
+        lines.push("  });");
+        lines.push("");
+        lines.push("  const data = await response.json();");
         lines.push(`  console.log('HTTP request completed:', data);`);
-        lines.push(`  return data;`);
+        lines.push("  return data;");
       }
       break;
     }
 
     case "condition": {
       const condition = (node.data.config?.condition as string) || "true";
-      lines.push(`  // Evaluate condition`);
+      lines.push("  // Evaluate condition");
       lines.push(`  const result = ${condition};`);
-      lines.push(``);
+      lines.push("");
       lines.push(`  console.log('Condition evaluated:', result);`);
-      lines.push(`  return { condition: result };`);
+      lines.push("  return { condition: result };");
       break;
     }
 
     case "transform": {
-      const transformType = (node.data.config?.transformType as string) || "Map Data";
+      const transformType =
+        (node.data.config?.transformType as string) || "Map Data";
       lines.push(`  // Transform: ${transformType}`);
-      lines.push(`  const transformed = {`);
-      lines.push(`    ...input,`);
-      lines.push(`    // Add your transformation logic here`);
-      lines.push(`  };`);
-      lines.push(``);
+      lines.push("  const transformed = {");
+      lines.push("    ...input,");
+      lines.push("    // Add your transformation logic here");
+      lines.push("  };");
+      lines.push("");
       lines.push(`  console.log('Data transformed:', transformed);`);
-      lines.push(`  return transformed;`);
+      lines.push("  return transformed;");
       break;
     }
   }
 
-  lines.push(`}`);
+  lines.push("}");
 
   return lines.join("\n");
 };
@@ -336,8 +342,6 @@ const PanelInner = () => {
             <Editor
               height="100%"
               language="typescript"
-              theme={theme === "dark" ? "vs-dark" : "light"}
-              value={generateNodeCode(selectedNode)}
               options={{
                 readOnly: true,
                 minimap: { enabled: false },
@@ -348,6 +352,8 @@ const PanelInner = () => {
                 wordWrap: "on",
                 padding: { top: 16, bottom: 16 },
               }}
+              theme={theme === "dark" ? "vs-dark" : "light"}
+              value={generateNodeCode(selectedNode)}
             />
           </div>
           <div className="shrink-0 border-t p-4">

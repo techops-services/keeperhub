@@ -105,7 +105,9 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
   const [showClearDialog, setShowClearDialog] = useAtom(showClearDialogAtom);
   const [showDeleteDialog, setShowDeleteDialog] = useAtom(showDeleteDialogAtom);
   const [isSaving, setIsSaving] = useAtom(isSavingAtom);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useAtom(hasUnsavedChangesAtom);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useAtom(
+    hasUnsavedChangesAtom
+  );
   const undo = useSetAtom(undoAtom);
   const redo = useSetAtom(redoAtom);
   const [canUndo] = useAtom(canUndoAtom);
@@ -143,7 +145,8 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
   const [showRenameProjectDialog, setShowRenameProjectDialog] = useState(false);
   const [newProjectNameForRename, setNewProjectNameForRename] = useState("");
   const [showDeleteProjectDialog, setShowDeleteProjectDialog] = useState(false);
-  const [deleteProjectConfirmation, setDeleteProjectConfirmation] = useState("");
+  const [deleteProjectConfirmation, setDeleteProjectConfirmation] =
+    useState("");
   const [projectToDelete, setProjectToDelete] = useState<{
     id: string;
     name: string;
@@ -159,7 +162,7 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
       setShowUnsavedRunDialog(true);
       return;
     }
-    
+
     await executeWorkflow(mode);
   };
 
@@ -344,7 +347,7 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
   };
 
   const handleRenameProject = async () => {
-    if (!selectedProjectFilter || !newProjectNameForRename.trim()) {
+    if (!(selectedProjectFilter && newProjectNameForRename.trim())) {
       return;
     }
 
@@ -374,7 +377,10 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
   };
 
   const handleDeleteProject = async () => {
-    if (!projectToDelete || deleteProjectConfirmation !== projectToDelete.name) {
+    if (
+      !projectToDelete ||
+      deleteProjectConfirmation !== projectToDelete.name
+    ) {
       return;
     }
 
@@ -547,7 +553,7 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
     loadProjects();
     loadWorkflows();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadProjects, loadWorkflows]);
 
   // Sync newWorkflowName when workflowName changes
   useEffect(() => {
@@ -556,7 +562,9 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
 
   // Set initial project filter based on current workflow's project, or auto-select first project
   useEffect(() => {
-    if (vercelProjects.length === 0) return;
+    if (vercelProjects.length === 0) {
+      return;
+    }
 
     // If current workflow has a project, select that
     if (vercelProjectName) {
@@ -576,7 +584,7 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
     ? allWorkflows.filter((w) => w.vercelProjectId === selectedProjectFilter)
     : allWorkflows;
 
-  const handleViewCode = async () => {
+  const _handleViewCode = async () => {
     if (!currentWorkflowId) {
       return;
     }
@@ -655,19 +663,21 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
                     if (currentProject) {
                       setProjectToDelete(currentProject);
                       setDeleteProjectConfirmation("");
-                      
+
                       // Fetch workflow count for this project
                       try {
                         const { getProjectWorkflowCount } = await import(
                           "@/app/actions/vercel-project/delete"
                         );
-                        const count = await getProjectWorkflowCount(currentProject.id);
+                        const count = await getProjectWorkflowCount(
+                          currentProject.id
+                        );
                         setProjectWorkflowCount(count);
                       } catch (error) {
                         console.error("Failed to get workflow count:", error);
                         setProjectWorkflowCount(0);
                       }
-                      
+
                       setShowDeleteProjectDialog(true);
                     }
                   }}
@@ -679,7 +689,9 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
                   Recent Projects
                 </DropdownMenuLabel>
                 {vercelProjects.length === 0 ? (
-                  <DropdownMenuItem disabled>No projects found</DropdownMenuItem>
+                  <DropdownMenuItem disabled>
+                    No projects found
+                  </DropdownMenuItem>
                 ) : (
                   vercelProjects.map((project) => (
                     <DropdownMenuItem
@@ -814,7 +826,7 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
                   <Save className="size-4" />
                 )}
                 {hasUnsavedChanges && !isSaving && (
-                  <div className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-primary" />
+                  <div className="-top-0.5 -right-0.5 absolute size-2 rounded-full bg-primary" />
                 )}
               </Button>
               <Button
@@ -1240,8 +1252,8 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
 
       {/* Project Integrations Dialog */}
       <ProjectIntegrationsDialog
-        open={showProjectIntegrationsDialog}
         onOpenChange={setShowProjectIntegrationsDialog}
+        open={showProjectIntegrationsDialog}
         projectId={selectedProjectFilter}
         projectName={
           vercelProjects.find((p) => p.id === selectedProjectFilter)?.name ||
@@ -1258,8 +1270,8 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
           <DialogHeader>
             <DialogTitle>Unsaved Changes</DialogTitle>
             <DialogDescription>
-              You have unsaved changes. Would you like to save before running the
-              workflow?
+              You have unsaved changes. Would you like to save before running
+              the workflow?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

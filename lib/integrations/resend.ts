@@ -1,7 +1,7 @@
 import "server-only";
 import { Resend } from "resend";
 
-export interface SendEmailParams {
+export type SendEmailParams = {
   to: string | string[];
   subject: string;
   body: string;
@@ -9,13 +9,13 @@ export interface SendEmailParams {
   html?: string;
   apiKey: string;
   fromEmail?: string;
-}
+};
 
-export interface SendEmailResult {
+export type SendEmailResult = {
   status: "success" | "error";
   id?: string;
   error?: string;
-}
+};
 
 /**
  * Send an email using Resend

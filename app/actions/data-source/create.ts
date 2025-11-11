@@ -12,7 +12,7 @@ import { maskConnectionString } from "./utils";
  */
 export async function create(data: {
   name: string;
-  type: string;
+  type: "postgresql" | "mysql" | "mongodb";
   connectionString: string;
   isDefault?: boolean;
 }) {

@@ -6,14 +6,14 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/workflows/user-menu";
 
-interface AppHeaderProps {
+type AppHeaderProps = {
   title?: React.ReactNode;
   showBackButton?: boolean;
   onBack?: () => void;
   actions?: React.ReactNode;
   disableTitleLink?: boolean;
   useMobileTwoLineLayout?: boolean;
-}
+};
 
 export function AppHeader({
   title = "Workflow Builder",

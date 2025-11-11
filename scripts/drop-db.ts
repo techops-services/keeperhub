@@ -1,6 +1,6 @@
 import "dotenv/config";
+import * as readline from "node:readline";
 import { sql } from "drizzle-orm";
-import * as readline from "readline";
 import { db } from "../lib/db";
 
 async function dropAllTables() {

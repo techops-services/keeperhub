@@ -22,12 +22,21 @@ export async function update(
     updatedAt: new Date(),
   };
 
-  if (data.name !== undefined) updateData.name = data.name;
-  if (data.description !== undefined) updateData.description = data.description;
-  if (data.nodes !== undefined) updateData.nodes = data.nodes;
-  if (data.edges !== undefined) updateData.edges = data.edges;
-  if (data.vercelProjectId !== undefined)
+  if (data.name !== undefined) {
+    updateData.name = data.name;
+  }
+  if (data.description !== undefined) {
+    updateData.description = data.description;
+  }
+  if (data.nodes !== undefined) {
+    updateData.nodes = data.nodes;
+  }
+  if (data.edges !== undefined) {
+    updateData.edges = data.edges;
+  }
+  if (data.vercelProjectId !== undefined) {
     updateData.vercelProjectId = data.vercelProjectId;
+  }
 
   const [updatedWorkflow] = await db
     .update(workflows)
@@ -39,5 +48,10 @@ export async function update(
     throw new Error("Workflow not found");
   }
 
-  return updatedWorkflow as SavedWorkflow;
+  return {
+    ...updatedWorkflow,
+    createdAt: updatedWorkflow.createdAt.toISOString(),
+    updatedAt: updatedWorkflow.updatedAt.toISOString(),
+    lastDeployedAt: updatedWorkflow.lastDeployedAt?.toISOString() || null,
+  } as SavedWorkflow;
 }

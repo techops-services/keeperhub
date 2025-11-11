@@ -4,6 +4,7 @@ import Editor from "@monaco-editor/react";
 import { useAtom } from "jotai";
 import { Settings } from "lucide-react";
 import { useState } from "react";
+import { ProjectIntegrationsDialog } from "@/components/settings/project-integrations-dialog";
 import { Input } from "@/components/ui/input";
 import { IntegrationIcon } from "@/components/ui/integration-icon";
 import { Label } from "@/components/ui/label";
@@ -17,23 +18,26 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ProjectIntegrationsDialog } from "@/components/settings/project-integrations-dialog";
-import { currentVercelProjectIdAtom, currentVercelProjectNameAtom } from "@/lib/workflow-store";
+import {
+  currentVercelProjectIdAtom,
+  currentVercelProjectNameAtom,
+} from "@/lib/workflow-store";
 import { SchemaBuilder, type SchemaField } from "./schema-builder";
 
-interface ActionConfigProps {
+type ActionConfigProps = {
   config: Record<string, unknown>;
   onUpdateConfig: (key: string, value: string) => void;
   disabled: boolean;
-}
+};
 
 // Map action types to their required integrations
-const ACTION_INTEGRATION_MAP: Record<string, { name: string; label: string }> = {
-  "Send Email": { name: "resend", label: "Resend" },
-  "Send Slack Message": { name: "slack", label: "Slack" },
-  "Create Ticket": { name: "linear", label: "Linear" },
-  "Find Issues": { name: "linear", label: "Linear" },
-};
+const ACTION_INTEGRATION_MAP: Record<string, { name: string; label: string }> =
+  {
+    "Send Email": { name: "resend", label: "Resend" },
+    "Send Slack Message": { name: "slack", label: "Slack" },
+    "Create Ticket": { name: "linear", label: "Linear" },
+    "Find Issues": { name: "linear", label: "Linear" },
+  };
 
 export function ActionConfig({
   config,
@@ -43,7 +47,7 @@ export function ActionConfig({
   const [showIntegrationsDialog, setShowIntegrationsDialog] = useState(false);
   const [projectId] = useAtom(currentVercelProjectIdAtom);
   const [projectName] = useAtom(currentVercelProjectNameAtom);
-  
+
   const actionType = (config?.actionType as string) || "HTTP Request";
   const requiredIntegration = ACTION_INTEGRATION_MAP[actionType];
 
@@ -123,7 +127,6 @@ export function ActionConfig({
         projectId={projectId}
         projectName={projectName}
       />
-
 
       {/* Send Email fields */}
       {config?.actionType === "Send Email" && (

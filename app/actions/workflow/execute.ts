@@ -53,7 +53,7 @@ export async function execute(
 
     // Get the last result
     const resultsArray = Array.from(results.values());
-    const lastResult = resultsArray[resultsArray.length - 1];
+    const lastResult = resultsArray.at(-1);
 
     // Update execution record
     await db

@@ -14,11 +14,11 @@ import {
 } from "@/components/ui/select";
 import { TimezoneSelect } from "@/components/ui/timezone-select";
 
-interface TriggerConfigProps {
+type TriggerConfigProps = {
   config: Record<string, unknown>;
   onUpdateConfig: (key: string, value: string) => void;
   disabled: boolean;
-}
+};
 
 export function TriggerConfig({
   config,

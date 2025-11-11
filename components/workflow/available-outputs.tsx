@@ -8,9 +8,9 @@ import { Button } from "@/components/ui/button";
 import { edgesAtom, nodesAtom, selectedNodeAtom } from "@/lib/workflow-store";
 import type { SchemaField } from "./config/schema-builder";
 
-interface AvailableOutputsProps {
+type AvailableOutputsProps = {
   onInsertTemplate?: (template: string) => void;
-}
+};
 
 // Helper to get a display name for a node
 const getNodeDisplayName = (node: {
@@ -56,13 +56,17 @@ export function AvailableOutputs({ onInsertTemplate }: AvailableOutputsProps) {
 
   // Find all nodes that come before the selected node
   const getUpstreamNodes = () => {
-    if (!selectedNodeId) return [];
+    if (!selectedNodeId) {
+      return [];
+    }
 
     const visited = new Set<string>();
     const upstream: string[] = [];
 
     const traverse = (nodeId: string) => {
-      if (visited.has(nodeId)) return;
+      if (visited.has(nodeId)) {
+        return;
+      }
       visited.add(nodeId);
 
       const incomingEdges = edges.filter((edge) => edge.target === nodeId);

@@ -2,17 +2,17 @@ import "server-only";
 import { sql } from "drizzle-orm";
 import { db } from "../db";
 
-export interface DatabaseQueryParams {
+export type DatabaseQueryParams = {
   query: string;
   params?: unknown[];
-}
+};
 
-export interface DatabaseQueryResult {
+export type DatabaseQueryResult = {
   status: "success" | "error";
   data?: unknown;
   rowCount?: number;
   error?: string;
-}
+};
 
 /**
  * Execute a raw SQL query

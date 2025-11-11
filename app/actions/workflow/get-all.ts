@@ -25,5 +25,10 @@ export async function getAll(): Promise<SavedWorkflow[]> {
     .where(eq(workflows.userId, session.user.id))
     .orderBy(desc(workflows.updatedAt));
 
-  return userWorkflows as SavedWorkflow[];
+  return userWorkflows.map((workflow) => ({
+    ...workflow,
+    createdAt: workflow.createdAt.toISOString(),
+    updatedAt: workflow.updatedAt.toISOString(),
+    lastDeployedAt: workflow.lastDeployedAt?.toISOString() || null,
+  })) as SavedWorkflow[];
 }

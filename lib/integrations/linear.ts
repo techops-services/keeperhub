@@ -1,7 +1,7 @@
 import "server-only";
 import { type Issue, LinearClient } from "@linear/sdk";
 
-export interface CreateTicketParams {
+export type CreateTicketParams = {
   title: string;
   description: string;
   teamId?: string;
@@ -9,14 +9,14 @@ export interface CreateTicketParams {
   labels?: string[];
   assigneeId?: string;
   apiKey: string;
-}
+};
 
-export interface CreateTicketResult {
+export type CreateTicketResult = {
   status: "success" | "error";
   id?: string;
   url?: string;
   error?: string;
-}
+};
 
 /**
  * Create a ticket in Linear
@@ -156,15 +156,15 @@ export async function updateTicket(
   }
 }
 
-export interface FindIssuesParams {
+export type FindIssuesParams = {
   assigneeId?: string;
   teamId?: string;
   status?: string;
   label?: string;
   apiKey: string;
-}
+};
 
-export interface FindIssuesResult {
+export type FindIssuesResult = {
   status: "success" | "error";
   issues?: Array<{
     id: string;
@@ -175,7 +175,7 @@ export interface FindIssuesResult {
   }>;
   count?: number;
   error?: string;
-}
+};
 
 /**
  * Find issues in Linear

@@ -172,9 +172,9 @@ export function WorkflowRuns({ isActive = false }: WorkflowRunsProps) {
                   </span>
                   {execution.duration && (
                     <span className="text-muted-foreground text-xs">
-                      {Number.parseInt(execution.duration) < 1000
+                      {Number.parseInt(execution.duration, 10) < 1000
                         ? `${execution.duration}ms`
-                        : `${(Number.parseInt(execution.duration) / 1000).toFixed(2)}s`}
+                        : `${(Number.parseInt(execution.duration, 10) / 1000).toFixed(2)}s`}
                     </span>
                   )}
                 </div>
@@ -208,9 +208,9 @@ export function WorkflowRuns({ isActive = false }: WorkflowRunsProps) {
                               </span>
                               {log.duration && (
                                 <span className="text-muted-foreground text-xs">
-                                  {Number.parseInt(log.duration) < 1000
+                                  {Number.parseInt(log.duration, 10) < 1000
                                     ? `${log.duration}ms`
-                                    : `${(Number.parseInt(log.duration) / 1000).toFixed(2)}s`}
+                                    : `${(Number.parseInt(log.duration, 10) / 1000).toFixed(2)}s`}
                                 </span>
                               )}
                             </div>

@@ -38,4 +38,3 @@ export async function update(projectId: string, data: { name: string }) {
 
   return updatedProject;
 }
-

@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "../ui/checkbox";
 
-interface DataSource {
+type DataSource = {
   id: string;
   name: string;
   type: "postgresql" | "mysql" | "mongodb";
@@ -19,9 +19,9 @@ interface DataSource {
   isDefault: boolean;
   createdAt: string;
   updatedAt: string;
-}
+};
 
-interface DataSourcesSettingsProps {
+type DataSourcesSettingsProps = {
   dataSources: DataSource[];
   showAddSource: boolean;
   newSourceName: string;
@@ -34,7 +34,7 @@ interface DataSourcesSettingsProps {
   onNewSourceIsDefaultChange: (isDefault: boolean) => void;
   onAddSource: () => Promise<void>;
   onDeleteSource: (id: string) => void;
-}
+};
 
 export function DataSourcesSettings({
   dataSources,

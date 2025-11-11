@@ -64,5 +64,10 @@ export async function create(
     })
     .returning();
 
-  return newWorkflow as SavedWorkflow;
+  return {
+    ...newWorkflow,
+    createdAt: newWorkflow.createdAt.toISOString(),
+    updatedAt: newWorkflow.updatedAt.toISOString(),
+    lastDeployedAt: newWorkflow.lastDeployedAt?.toISOString() || null,
+  } as SavedWorkflow;
 }

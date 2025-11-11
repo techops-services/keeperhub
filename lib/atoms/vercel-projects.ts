@@ -1,10 +1,10 @@
 import { atom } from "jotai";
 
-export interface VercelProject {
+export type VercelProject = {
   id: string;
   name: string;
   vercelProjectId: string;
-}
+};
 
 // Atoms for project state
 // No caching - projects and workflows load fresh each time

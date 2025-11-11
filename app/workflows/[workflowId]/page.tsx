@@ -6,10 +6,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { use, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import { generate } from "@/app/actions/ai/generate";
+import { Button } from "@/components/ui/button";
 import { NodeConfigPanel } from "@/components/workflow/node-config-panel";
 import { WorkflowCanvas } from "@/components/workflow/workflow-canvas";
 import { WorkflowToolbar } from "@/components/workflow/workflow-toolbar";
-import { Button } from "@/components/ui/button";
 import { workflowApi } from "@/lib/workflow-api";
 import {
   currentVercelProjectIdAtom,
@@ -37,7 +37,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   const router = useRouter();
   const [isGenerating, setIsGenerating] = useAtom(isGeneratingAtom);
   const [isExecuting, setIsExecuting] = useAtom(isExecutingAtom);
-  const [isSaving, setIsSaving] = useAtom(isSavingAtom);
+  const [_isSaving, setIsSaving] = useAtom(isSavingAtom);
   const [nodes] = useAtom(nodesAtom);
   const [edges] = useAtom(edgesAtom);
   const [currentWorkflowId] = useAtom(currentWorkflowIdAtom);
@@ -114,23 +114,23 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
         // Normal workflow loading
         try {
           const workflow = await workflowApi.getById(workflowId);
-          
+
           // Check if workflow was not found
           if (!workflow) {
             setWorkflowNotFound(true);
             return;
           }
-          
+
           setNodes(workflow.nodes);
           setEdges(workflow.edges);
           setCurrentWorkflowId(workflow.id);
           setCurrentWorkflowName(workflow.name);
           setCurrentVercelProjectId(workflow.vercelProjectId || null);
           setCurrentVercelProjectName(workflow.vercelProject?.name || null);
-          
+
           // Reset unsaved changes flag after loading
           setHasUnsavedChanges(false);
-          
+
           // Reset workflow not found state on successful load
           setWorkflowNotFound(false);
 
@@ -162,11 +162,14 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
     setSelectedNodeId,
     setHasUnsavedChanges,
     setWorkflowNotFound,
+    nodes.length,
   ]);
 
   // Keyboard shortcuts
   const handleSave = useCallback(async () => {
-    if (!currentWorkflowId || isGenerating) return;
+    if (!currentWorkflowId || isGenerating) {
+      return;
+    }
     setIsSaving(true);
     try {
       await workflowApi.update(currentWorkflowId, { nodes, edges });
@@ -178,11 +181,24 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
     } finally {
       setIsSaving(false);
     }
-  }, [currentWorkflowId, nodes, edges, isGenerating, setIsSaving, setHasUnsavedChanges]);
+  }, [
+    currentWorkflowId,
+    nodes,
+    edges,
+    isGenerating,
+    setIsSaving,
+    setHasUnsavedChanges,
+  ]);
 
   const handleRun = useCallback(async () => {
-    if (isExecuting || nodes.length === 0 || isGenerating || !currentWorkflowId)
+    if (
+      isExecuting ||
+      nodes.length === 0 ||
+      isGenerating ||
+      !currentWorkflowId
+    ) {
       return;
+    }
 
     setIsExecuting(true);
 
@@ -266,25 +282,28 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden">
-          <WorkflowToolbar workflowId={workflowId} />
-          <main className="relative size-full overflow-hidden">
-            <ReactFlowProvider>
-              <WorkflowCanvas />
-            </ReactFlowProvider>
-        
+      <WorkflowToolbar workflowId={workflowId} />
+      <main className="relative size-full overflow-hidden">
+        <ReactFlowProvider>
+          <WorkflowCanvas />
+        </ReactFlowProvider>
+
         {workflowNotFound && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="rounded-lg border bg-background p-8 text-center shadow-lg">
-              <h1 className="mb-2 font-semibold text-2xl">Workflow Not Found</h1>
+              <h1 className="mb-2 font-semibold text-2xl">
+                Workflow Not Found
+              </h1>
               <p className="mb-6 text-muted-foreground">
-                The workflow you're looking for doesn't exist or has been deleted.
+                The workflow you're looking for doesn't exist or has been
+                deleted.
               </p>
               <Button onClick={() => router.push("/")}>New Workflow</Button>
             </div>
           </div>
         )}
-          </main>
-          <NodeConfigPanel />
+      </main>
+      <NodeConfigPanel />
     </div>
   );
 };

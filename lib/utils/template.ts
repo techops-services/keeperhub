@@ -3,12 +3,12 @@
  * Supports syntax like {{nodeName.field}} or {{nodeName.nested.field}}
  */
 
-export interface NodeOutputs {
+export type NodeOutputs = {
   [nodeId: string]: {
     label: string;
     data: unknown;
   };
-}
+};
 
 /**
  * Replace template variables in a string with actual values from node outputs
@@ -273,10 +273,18 @@ function formatValue(value: unknown): string {
     const obj = value as any;
 
     // Common fields to check for meaningful representation
-    if (obj.title) return String(obj.title);
-    if (obj.name) return String(obj.name);
-    if (obj.id) return String(obj.id);
-    if (obj.message) return String(obj.message);
+    if (obj.title) {
+      return String(obj.title);
+    }
+    if (obj.name) {
+      return String(obj.name);
+    }
+    if (obj.id) {
+      return String(obj.id);
+    }
+    if (obj.message) {
+      return String(obj.message);
+    }
 
     // Otherwise return JSON
     return JSON.stringify(value, null, 2);

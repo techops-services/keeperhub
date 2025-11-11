@@ -4,15 +4,15 @@ import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { projects, user } from "@/lib/db/schema";
+import { projects } from "@/lib/db/schema";
 import { setEnvironmentVariable } from "@/lib/integrations/vercel";
 
-export interface UpdateProjectIntegrationsInput {
+export type UpdateProjectIntegrationsInput = {
   resendApiKey?: string | null;
   resendFromEmail?: string | null;
   linearApiKey?: string | null;
   slackApiKey?: string | null;
-}
+};
 
 export async function updateProjectIntegrations(
   projectId: string,
@@ -27,23 +27,21 @@ export async function updateProjectIntegrations(
   }
 
   const project = await db.query.projects.findFirst({
-    where: and(eq(projects.id, projectId), eq(projects.userId, session.user.id)),
+    where: and(
+      eq(projects.id, projectId),
+      eq(projects.userId, session.user.id)
+    ),
   });
 
   if (!project) {
     throw new Error("Project not found");
   }
 
-  // Get user's Vercel API token
-  const userData = await db.query.user.findFirst({
-    where: eq(user.id, session.user.id),
-    columns: {
-      vercelApiToken: true,
-      vercelTeamId: true,
-    },
-  });
+  // Get app-level Vercel credentials from env vars
+  const vercelApiToken = process.env.VERCEL_API_TOKEN;
+  const vercelTeamId = process.env.VERCEL_TEAM_ID;
 
-  if (!userData?.vercelApiToken) {
+  if (!vercelApiToken) {
     throw new Error("Vercel API token not configured");
   }
 
@@ -67,8 +65,8 @@ export async function updateProjectIntegrations(
   for (const { key, value } of envUpdates) {
     const result = await setEnvironmentVariable({
       projectId: project.vercelProjectId,
-      apiToken: userData.vercelApiToken,
-      teamId: userData.vercelTeamId || undefined,
+      apiToken: vercelApiToken,
+      teamId: vercelTeamId || undefined,
       key,
       value,
       type: "encrypted",
@@ -83,6 +81,7 @@ export async function updateProjectIntegrations(
   await db
     .update(projects)
     .set({ updatedAt: new Date() })
-    .where(and(eq(projects.id, projectId), eq(projects.userId, session.user.id)));
+    .where(
+      and(eq(projects.id, projectId), eq(projects.userId, session.user.id))
+    );
 }
-

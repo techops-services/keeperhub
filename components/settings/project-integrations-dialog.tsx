@@ -17,7 +17,7 @@ import { LinearSettings } from "./linear-settings";
 import { ResendSettings } from "./resend-settings";
 import { SlackSettings } from "./slack-settings";
 
-interface ProjectIntegrations {
+type ProjectIntegrations = {
   resendApiKey: string | null;
   resendFromEmail: string | null;
   linearApiKey: string | null;
@@ -25,14 +25,14 @@ interface ProjectIntegrations {
   hasResendKey: boolean;
   hasLinearKey: boolean;
   hasSlackKey: boolean;
-}
+};
 
-interface ProjectIntegrationsDialogProps {
+type ProjectIntegrationsDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: string | null;
   projectName: string | null;
-}
+};
 
 export function ProjectIntegrationsDialog({
   open,
@@ -54,7 +54,9 @@ export function ProjectIntegrationsDialog({
   const [savingIntegrations, setSavingIntegrations] = useState(false);
 
   const loadIntegrations = async () => {
-    if (!projectId) return;
+    if (!projectId) {
+      return;
+    }
 
     try {
       const data = await getProjectIntegrations(projectId);
@@ -76,10 +78,12 @@ export function ProjectIntegrationsDialog({
       setLoading(true);
       loadIntegrations().finally(() => setLoading(false));
     }
-  }, [open, projectId]);
+  }, [open, projectId, loadIntegrations]);
 
   const handleSaveIntegrations = async (type: string) => {
-    if (!projectId) return;
+    if (!projectId) {
+      return;
+    }
 
     setSavingIntegrations(true);
     try {
@@ -96,10 +100,12 @@ export function ProjectIntegrationsDialog({
         if (linearApiKey && linearApiKey !== "••••••••") {
           updates.linearApiKey = linearApiKey;
         }
-      } else if (type === "slack") {
-        if (slackApiKey && slackApiKey !== "••••••••") {
-          updates.slackApiKey = slackApiKey;
-        }
+      } else if (
+        type === "slack" &&
+        slackApiKey &&
+        slackApiKey !== "••••••••"
+      ) {
+        updates.slackApiKey = slackApiKey;
       }
 
       await updateProjectIntegrations(projectId, updates);
@@ -114,7 +120,9 @@ export function ProjectIntegrationsDialog({
   };
 
   const handleRemoveIntegration = async (type: string) => {
-    if (!projectId) return;
+    if (!projectId) {
+      return;
+    }
 
     setSavingIntegrations(true);
     try {
@@ -152,11 +160,13 @@ export function ProjectIntegrationsDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>
-            {projectName ? `${projectName} - Integrations` : "Project Integrations"}
+            {projectName
+              ? `${projectName} - Integrations`
+              : "Project Integrations"}
           </DialogTitle>
         </DialogHeader>
 
@@ -165,7 +175,7 @@ export function ProjectIntegrationsDialog({
             <Spinner />
           </div>
         ) : (
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <Tabs onValueChange={setActiveTab} value={activeTab}>
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="resend">Resend</TabsTrigger>
               <TabsTrigger value="linear">Linear</TabsTrigger>
@@ -183,16 +193,16 @@ export function ProjectIntegrationsDialog({
               <div className="mt-4 flex justify-end gap-2">
                 {integrations?.hasResendKey && (
                   <Button
-                    onClick={() => handleRemoveIntegration("resend")}
                     disabled={savingIntegrations}
+                    onClick={() => handleRemoveIntegration("resend")}
                     variant="outline"
                   >
                     Remove
                   </Button>
                 )}
                 <Button
-                  onClick={() => handleSaveIntegrations("resend")}
                   disabled={savingIntegrations}
+                  onClick={() => handleSaveIntegrations("resend")}
                 >
                   {savingIntegrations ? "Saving..." : "Save"}
                 </Button>
@@ -208,16 +218,16 @@ export function ProjectIntegrationsDialog({
               <div className="mt-4 flex justify-end gap-2">
                 {integrations?.hasLinearKey && (
                   <Button
-                    onClick={() => handleRemoveIntegration("linear")}
                     disabled={savingIntegrations}
+                    onClick={() => handleRemoveIntegration("linear")}
                     variant="outline"
                   >
                     Remove
                   </Button>
                 )}
                 <Button
-                  onClick={() => handleSaveIntegrations("linear")}
                   disabled={savingIntegrations}
+                  onClick={() => handleSaveIntegrations("linear")}
                 >
                   {savingIntegrations ? "Saving..." : "Save"}
                 </Button>
@@ -233,16 +243,16 @@ export function ProjectIntegrationsDialog({
               <div className="mt-4 flex justify-end gap-2">
                 {integrations?.hasSlackKey && (
                   <Button
-                    onClick={() => handleRemoveIntegration("slack")}
                     disabled={savingIntegrations}
+                    onClick={() => handleRemoveIntegration("slack")}
                     variant="outline"
                   >
                     Remove
                   </Button>
                 )}
                 <Button
-                  onClick={() => handleSaveIntegrations("slack")}
                   disabled={savingIntegrations}
+                  onClick={() => handleSaveIntegrations("slack")}
                 >
                   {savingIntegrations ? "Saving..." : "Save"}
                 </Button>
@@ -254,4 +264,3 @@ export function ProjectIntegrationsDialog({
     </Dialog>
   );
 }
-

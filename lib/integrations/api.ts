@@ -1,17 +1,17 @@
-export interface ApiCallParams {
+export type ApiCallParams = {
   url: string;
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   headers?: Record<string, string>;
   body?: unknown;
   timeout?: number;
-}
+};
 
-export interface ApiCallResult {
+export type ApiCallResult = {
   status: "success" | "error";
   statusCode?: number;
   data?: unknown;
   error?: string;
-}
+};
 
 /**
  * Make an HTTP API call

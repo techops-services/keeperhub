@@ -6,17 +6,17 @@ type ExecutionResult = {
   error?: string;
 };
 
-export interface WorkflowExecutionContext {
+export type WorkflowExecutionContext = {
   executionId?: string;
   userId?: string;
   input?: Record<string, unknown>;
-}
+};
 
 class WorkflowExecutor {
-  private nodes: Map<string, WorkflowNode>;
-  private edges: WorkflowEdge[];
-  private results: Map<string, ExecutionResult>;
-  private onNodeUpdate?: (
+  private readonly nodes: Map<string, WorkflowNode>;
+  private readonly edges: WorkflowEdge[];
+  private readonly results: Map<string, ExecutionResult>;
+  private readonly onNodeUpdate?: (
     nodeId: string,
     status: "running" | "success" | "error"
   ) => void;
@@ -130,7 +130,9 @@ class WorkflowExecutor {
 
     visited.add(nodeId);
     const node = this.nodes.get(nodeId);
-    if (!node) return;
+    if (!node) {
+      return;
+    }
 
     // Execute current node
     const result = await this.executeNode(node);

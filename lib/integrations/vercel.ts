@@ -1,6 +1,6 @@
 import "server-only";
 
-export interface VercelProject {
+export type VercelProject = {
   id: string;
   name: string;
   framework: string | null;
@@ -14,9 +14,9 @@ export interface VercelProject {
   };
   createdAt: number;
   updatedAt: number;
-}
+};
 
-export interface VercelDeployment {
+export type VercelDeployment = {
   uid: string;
   name: string;
   url: string;
@@ -35,58 +35,58 @@ export interface VercelDeployment {
     username?: string;
   };
   target: "production" | "staging" | null;
-}
+};
 
-export interface ListProjectsParams {
+export type ListProjectsParams = {
   apiToken: string;
   teamId?: string;
-}
+};
 
-export interface ListProjectsResult {
+export type ListProjectsResult = {
   status: "success" | "error";
   projects?: VercelProject[];
   error?: string;
-}
+};
 
-export interface GetProjectParams {
+export type GetProjectParams = {
   projectId: string;
   apiToken: string;
   teamId?: string;
-}
+};
 
-export interface GetProjectResult {
+export type GetProjectResult = {
   status: "success" | "error";
   project?: VercelProject;
   error?: string;
-}
+};
 
-export interface ListDeploymentsParams {
+export type ListDeploymentsParams = {
   projectId: string;
   apiToken: string;
   teamId?: string;
   limit?: number;
-}
+};
 
-export interface ListDeploymentsResult {
+export type ListDeploymentsResult = {
   status: "success" | "error";
   deployments?: VercelDeployment[];
   error?: string;
-}
+};
 
-export interface TriggerDeploymentParams {
+export type TriggerDeploymentParams = {
   projectId: string;
   apiToken: string;
   teamId?: string;
   target?: "production" | "staging";
-}
+};
 
-export interface TriggerDeploymentResult {
+export type TriggerDeploymentResult = {
   status: "success" | "error";
   deployment?: VercelDeployment;
   error?: string;
-}
+};
 
-export interface CreateProjectParams {
+export type CreateProjectParams = {
   name: string;
   apiToken: string;
   teamId?: string;
@@ -95,13 +95,13 @@ export interface CreateProjectParams {
     type: "github" | "gitlab" | "bitbucket";
     repo: string;
   };
-}
+};
 
-export interface CreateProjectResult {
+export type CreateProjectResult = {
   status: "success" | "error";
   project?: VercelProject;
   error?: string;
-}
+};
 
 /**
  * Base Vercel API URL
@@ -410,7 +410,7 @@ export async function getEnvironmentVariables(
   }
 }
 
-export interface CreateEnvironmentVariableParams {
+export type CreateEnvironmentVariableParams = {
   projectId: string;
   apiToken: string;
   teamId?: string;
@@ -418,7 +418,7 @@ export interface CreateEnvironmentVariableParams {
   value: string;
   target?: Array<"production" | "preview" | "development">;
   type?: "plain" | "secret" | "encrypted";
-}
+};
 
 /**
  * Create or update an environment variable for a project
@@ -453,7 +453,7 @@ export async function setEnvironmentVariable(
 
     if (existingEnvs.status === "success" && existingEnvs.envs) {
       const existing = existingEnvs.envs.find((env) => env.key === params.key);
-      
+
       // If it exists, delete it first
       if (existing) {
         await vercelRequest(
@@ -501,12 +501,12 @@ export async function setEnvironmentVariable(
   }
 }
 
-export interface DeleteEnvironmentVariableParams {
+export type DeleteEnvironmentVariableParams = {
   projectId: string;
   apiToken: string;
   teamId?: string;
   envId: string;
-}
+};
 
 /**
  * Delete an environment variable from a project

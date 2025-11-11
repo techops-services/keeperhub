@@ -27,26 +27,28 @@ const Home = () => {
   const router = useRouter();
   const { data: session } = useSession();
   const [isExecuting, setIsExecuting] = useAtom(isExecutingAtom);
-  const [isSaving, setIsSaving] = useAtom(isSavingAtom);
+  const [_isSaving, setIsSaving] = useAtom(isSavingAtom);
   const [nodes] = useAtom(nodesAtom);
   const [edges] = useAtom(edgesAtom);
   const [currentWorkflowId, setCurrentWorkflowId] = useAtom(
     currentWorkflowIdAtom
   );
-  const setNodes = useSetAtom(nodesAtom);
-  const setEdges = useSetAtom(edgesAtom);
+  const _setNodes = useSetAtom(nodesAtom);
+  const _setEdges = useSetAtom(edgesAtom);
   const setCurrentWorkflowName = useSetAtom(currentWorkflowNameAtom);
   const setCurrentVercelProjectId = useSetAtom(currentVercelProjectIdAtom);
   const setCurrentVercelProjectName = useSetAtom(currentVercelProjectNameAtom);
   const updateNodeData = useSetAtom(updateNodeDataAtom);
-  const setSelectedNodeId = useSetAtom(selectedNodeAtom);
+  const _setSelectedNodeId = useSetAtom(selectedNodeAtom);
   const hasRedirectedRef = useRef(false);
 
   // Create workflow and redirect when first node is added
   useEffect(() => {
     const createWorkflowAndRedirect = async () => {
       // Only run when nodes are added and we haven't redirected yet
-      if (nodes.length === 0 || hasRedirectedRef.current) return;
+      if (nodes.length === 0 || hasRedirectedRef.current) {
+        return;
+      }
       hasRedirectedRef.current = true;
 
       try {
@@ -100,7 +102,9 @@ const Home = () => {
 
   // Keyboard shortcuts
   const handleSave = useCallback(async () => {
-    if (!currentWorkflowId) return;
+    if (!currentWorkflowId) {
+      return;
+    }
     setIsSaving(true);
     try {
       await workflowApi.update(currentWorkflowId, { nodes, edges });
@@ -114,7 +118,9 @@ const Home = () => {
   }, [currentWorkflowId, nodes, edges, setIsSaving]);
 
   const handleRun = useCallback(async () => {
-    if (isExecuting || nodes.length === 0 || !currentWorkflowId) return;
+    if (isExecuting || nodes.length === 0 || !currentWorkflowId) {
+      return;
+    }
 
     setIsExecuting(true);
 

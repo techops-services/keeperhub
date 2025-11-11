@@ -8,6 +8,13 @@
       "when": 1762816441405,
       "tag": "0000_pink_zaran",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1762819223685,
+      "tag": "0001_workable_rocket_raccoon",
+      "breakpoints": true
     }
   ]
 }

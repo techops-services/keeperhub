@@ -87,9 +87,9 @@ export const workflows = pgTable("workflows", {
     .references(() => user.id),
   vercelProjectId: text("vercel_project_id").references(() => projects.id),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  nodes: jsonb("nodes").notNull().$type<Array<any>>(),
+  nodes: jsonb("nodes").notNull().$type<any[]>(),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  edges: jsonb("edges").notNull().$type<Array<any>>(),
+  edges: jsonb("edges").notNull().$type<any[]>(),
   deploymentStatus: text("deployment_status")
     .$type<"none" | "pending" | "deploying" | "deployed" | "failed">()
     .default("none"),
@@ -145,6 +145,7 @@ export const workflowExecutionLogs = pgTable("workflow_execution_logs", {
   startedAt: timestamp("started_at").notNull().defaultNow(),
   completedAt: timestamp("completed_at"),
   duration: text("duration"), // Duration in milliseconds
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
 });
 
 // Data sources table for user-configured database connections
@@ -174,6 +175,16 @@ export const workflowsRelations = relations(workflows, ({ one }) => ({
 export const projectsRelations = relations(projects, ({ many }) => ({
   workflows: many(workflows),
 }));
+
+export const workflowExecutionsRelations = relations(
+  workflowExecutions,
+  ({ one }) => ({
+    workflow: one(workflows, {
+      fields: [workflowExecutions.workflowId],
+      references: [workflows.id],
+    }),
+  })
+);
 
 export type User = typeof user.$inferSelect;
 export type Session = typeof session.$inferSelect;

@@ -5,7 +5,7 @@ import ms from "ms";
 import { generateWorkflowSDKCode } from "./workflow-codegen-sdk";
 import type { WorkflowEdge, WorkflowNode } from "./workflow-store";
 
-export interface DeploymentOptions {
+export type DeploymentOptions = {
   workflows: Array<{
     id: string;
     name: string;
@@ -15,14 +15,14 @@ export interface DeploymentOptions {
   vercelToken: string;
   vercelTeamId?: string;
   vercelProjectId?: string;
-}
+};
 
-export interface DeploymentResult {
+export type DeploymentResult = {
   success: boolean;
   deploymentUrl?: string;
   error?: string;
   logs?: string[];
-}
+};
 
 /**
  * Deploy a workflow to Vercel using Sandbox
@@ -424,7 +424,7 @@ function getIntegrationDependencies(
     const actionType = node.data.config?.actionType as string;
 
     if (actionType === "Send Email") {
-      deps["resend"] = "^6.4.0";
+      deps.resend = "^6.4.0";
     } else if (actionType === "Create Ticket" || actionType === "Find Issues") {
       deps["@linear/sdk"] = "^63.2.0";
     } else if (actionType === "Send Slack Message") {
@@ -433,10 +433,10 @@ function getIntegrationDependencies(
       actionType === "Generate Text" ||
       actionType === "Generate Image"
     ) {
-      deps["ai"] = "^5.0.86";
-      deps["openai"] = "^6.8.0";
+      deps.ai = "^5.0.86";
+      deps.openai = "^6.8.0";
       deps["@google/genai"] = "^1.28.0";
-      deps["zod"] = "^4.1.12";
+      deps.zod = "^4.1.12";
     }
   }
 

@@ -19,5 +19,21 @@ export async function get(id: string): Promise<SavedWorkflow | null> {
     },
   });
 
-  return workflow ? (workflow as SavedWorkflow) : null;
+  if (!workflow) {
+    return null;
+  }
+
+  return {
+    ...workflow,
+    createdAt: workflow.createdAt.toISOString(),
+    updatedAt: workflow.updatedAt.toISOString(),
+    lastDeployedAt: workflow.lastDeployedAt?.toISOString() || null,
+    vercelProject: workflow.vercelProject
+      ? {
+          ...workflow.vercelProject,
+          createdAt: workflow.vercelProject.createdAt.toISOString(),
+          updatedAt: workflow.vercelProject.updatedAt.toISOString(),
+        }
+      : null,
+  } as SavedWorkflow;
 }

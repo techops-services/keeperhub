@@ -7,7 +7,9 @@ import type { WorkflowEdge, WorkflowNode } from "./workflow-store";
  * Handles newlines, quotes, backticks, and other special characters
  */
 function escapeString(str: string): string {
-  if (!str) return "";
+  if (!str) {
+    return "";
+  }
   return str
     .replace(/\\/g, "\\\\") // Escape backslashes first
     .replace(/`/g, "\\`") // Escape backticks
@@ -264,7 +266,9 @@ ${stepBody}
 
     visitedLocal.add(nodeId);
     const node = nodeMap.get(nodeId);
-    if (!node) return [];
+    if (!node) {
+      return [];
+    }
 
     const lines: string[] = [];
     const varName = `result_${sanitizeVarName(node.id)}`;
@@ -305,14 +309,14 @@ ${stepBody}
 
           if (nextNodes[0]) {
             lines.push(
-              ...generateWorkflowBody(nextNodes[0], indent + "  ", visitedLocal)
+              ...generateWorkflowBody(nextNodes[0], `${indent}  `, visitedLocal)
             );
           }
 
           if (nextNodes[1]) {
             lines.push(`${indent}} else {`);
             lines.push(
-              ...generateWorkflowBody(nextNodes[1], indent + "  ", visitedLocal)
+              ...generateWorkflowBody(nextNodes[1], `${indent}  `, visitedLocal)
             );
           }
 
@@ -354,10 +358,12 @@ ${stepBody}
     }
 
     // Find the last node to return its result
-    const lastNode = nodes[nodes.length - 1];
-    const lastVarName = `result_${sanitizeVarName(lastNode.id)}`;
-    workflowBody.push("");
-    workflowBody.push(`  return ${lastVarName};`);
+    const lastNode = nodes.at(-1);
+    if (lastNode) {
+      const lastVarName = `result_${sanitizeVarName(lastNode.id)}`;
+      workflowBody.push("");
+      workflowBody.push(`  return ${lastVarName};`);
+    }
   }
 
   const functionName = sanitizeFunctionName(workflowName);
@@ -456,7 +462,9 @@ function sanitizeStepName(name: string): string {
     .map((word, index) => {
       // Remove non-alphanumeric characters
       const cleaned = word.replace(/[^a-zA-Z0-9]/g, "");
-      if (!cleaned) return "";
+      if (!cleaned) {
+        return "";
+      }
 
       // Capitalize first letter of each word except the first
       if (index === 0) {

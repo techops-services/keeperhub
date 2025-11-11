@@ -7,7 +7,7 @@ import OpenAI from "openai";
 import { z } from "zod";
 import type { SchemaField } from "../components/workflow/config/schema-builder";
 import { db } from "./db";
-import { projects, user, workflowExecutionLogs } from "./db/schema";
+import { projects, workflowExecutionLogs } from "./db/schema";
 import { callApi } from "./integrations/api";
 import { queryData } from "./integrations/database";
 import { createTicket, findIssues } from "./integrations/linear";
@@ -16,10 +16,10 @@ import { sendSlackMessage } from "./integrations/slack";
 import { type NodeOutputs, processConfigTemplates } from "./utils/template";
 import type { WorkflowEdge, WorkflowNode } from "./workflow-store";
 
-interface NodeExecutionLog {
+type NodeExecutionLog = {
   logId?: string;
   startTime: number;
-}
+};
 
 type ExecutionResult = {
   success: boolean;
@@ -27,19 +27,19 @@ type ExecutionResult = {
   error?: string;
 };
 
-export interface WorkflowExecutionContext {
+export type WorkflowExecutionContext = {
   executionId?: string;
   userId?: string;
   projectId?: string;
   input?: Record<string, unknown>;
-}
+};
 
-interface ProjectIntegrations {
+type ProjectIntegrations = {
   resendApiKey?: string | null;
   resendFromEmail?: string | null;
   linearApiKey?: string | null;
   slackApiKey?: string | null;
-}
+};
 
 /**
  * Convert SchemaField[] to Zod schema
@@ -109,13 +109,13 @@ function schemaFieldsToZod(
 }
 
 class ServerWorkflowExecutor {
-  private nodes: Map<string, WorkflowNode>;
-  private edges: WorkflowEdge[];
-  private results: Map<string, ExecutionResult>;
-  private nodeOutputs: NodeOutputs = {};
-  private context: WorkflowExecutionContext;
+  private readonly nodes: Map<string, WorkflowNode>;
+  private readonly edges: WorkflowEdge[];
+  private readonly results: Map<string, ExecutionResult>;
+  private readonly nodeOutputs: NodeOutputs = {};
+  private readonly context: WorkflowExecutionContext;
   private projectIntegrations: ProjectIntegrations = {};
-  private executionLogs: Map<string, NodeExecutionLog> = new Map();
+  private readonly executionLogs: Map<string, NodeExecutionLog> = new Map();
 
   constructor(
     nodes: WorkflowNode[],
@@ -129,7 +129,9 @@ class ServerWorkflowExecutor {
   }
 
   private async loadProjectIntegrations(): Promise<void> {
-    if (!this.context.projectId) return;
+    if (!this.context.projectId) {
+      return;
+    }
 
     try {
       const projectData = await db.query.projects.findFirst({
@@ -145,16 +147,11 @@ class ServerWorkflowExecutor {
         return;
       }
 
-      // Get user's Vercel API token
-      const userData = await db.query.user.findFirst({
-        where: eq(user.id, projectData.userId),
-        columns: {
-          vercelApiToken: true,
-          vercelTeamId: true,
-        },
-      });
+      // Get app-level Vercel credentials from env vars
+      const vercelApiToken = process.env.VERCEL_API_TOKEN;
+      const vercelTeamId = process.env.VERCEL_TEAM_ID;
 
-      if (!userData?.vercelApiToken) {
+      if (!vercelApiToken) {
         console.error("Vercel API token not configured");
         return;
       }
@@ -163,8 +160,8 @@ class ServerWorkflowExecutor {
       const { getEnvironmentVariables } = await import("./integrations/vercel");
       const envResult = await getEnvironmentVariables({
         projectId: projectData.vercelProjectId,
-        apiToken: userData.vercelApiToken,
-        teamId: userData.vercelTeamId || undefined,
+        apiToken: vercelApiToken,
+        teamId: vercelTeamId || undefined,
       });
 
       if (envResult.status === "success" && envResult.envs) {
@@ -173,8 +170,8 @@ class ServerWorkflowExecutor {
           envResult.envs.find((env) => env.key === "RESEND_API_KEY")?.value ||
           null;
         const resendFromEmail =
-          envResult.envs.find((env) => env.key === "RESEND_FROM_EMAIL")?.value ||
-          null;
+          envResult.envs.find((env) => env.key === "RESEND_FROM_EMAIL")
+            ?.value || null;
         const linearApiKey =
           envResult.envs.find((env) => env.key === "LINEAR_API_KEY")?.value ||
           null;
@@ -315,9 +312,9 @@ class ServerWorkflowExecutor {
       // Process templates in node configuration using outputs from previous nodes
       // But exclude actionType, aiModel, and imageModel from processing
       const configToProcess = { ...nodeConfig };
-      delete configToProcess.actionType;
-      delete configToProcess.aiModel;
-      delete configToProcess.imageModel;
+      configToProcess.actionType = undefined;
+      configToProcess.aiModel = undefined;
+      configToProcess.imageModel = undefined;
 
       console.log(
         "[Executor] Config to process (excluding model fields):",
@@ -372,7 +369,8 @@ class ServerWorkflowExecutor {
                   (processedConfig?.emailSubject as string) || "Notification",
                 body: (processedConfig?.emailBody as string) || "No content",
                 apiKey: this.projectIntegrations.resendApiKey,
-                fromEmail: this.projectIntegrations.resendFromEmail || undefined,
+                fromEmail:
+                  this.projectIntegrations.resendFromEmail || undefined,
               };
               const emailResult = await sendEmail(emailParams);
               result = {
@@ -425,7 +423,10 @@ class ServerWorkflowExecutor {
                 description:
                   (processedConfig?.ticketDescription as string) || "",
                 priority: processedConfig?.ticketPriority
-                  ? Number.parseInt(processedConfig.ticketPriority as string)
+                  ? Number.parseInt(
+                      processedConfig.ticketPriority as string,
+                      10
+                    )
                   : undefined,
                 apiKey: this.projectIntegrations.linearApiKey,
               };
@@ -814,7 +815,9 @@ class ServerWorkflowExecutor {
 
     visited.add(nodeId);
     const node = this.nodes.get(nodeId);
-    if (!node) return;
+    if (!node) {
+      return;
+    }
 
     // Execute current node
     const result = await this.executeNode(node);

@@ -65,7 +65,9 @@ export function WorkflowPrompt() {
 
   // Load Vercel projects fresh when dropdown opens (no caching on mount)
   const loadVercelProjects = async () => {
-    if (!session) return;
+    if (!session) {
+      return;
+    }
 
     try {
       const projects = await getAllVercelProjects();
@@ -117,7 +119,9 @@ export function WorkflowPrompt() {
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!prompt.trim() || isGenerating) return;
+    if (!prompt.trim() || isGenerating) {
+      return;
+    }
 
     // Check if user is logged in
     if (!session) {
@@ -158,7 +162,7 @@ export function WorkflowPrompt() {
           className="rounded-lg bg-background"
           globalDrop
           multiple
-          onSubmit={(message, event) => handleGenerate(event)}
+          onSubmit={(_message, event) => handleGenerate(event)}
         >
           <PromptInputBody>
             <PromptInputTextarea

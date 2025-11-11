@@ -16,7 +16,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -28,7 +27,7 @@ import { Spinner } from "../ui/spinner";
 import { AccountSettings } from "./account-settings";
 import { DataSourcesSettings } from "./data-sources-settings";
 
-interface DataSource {
+type DataSource = {
   id: string;
   name: string;
   type: "postgresql" | "mysql" | "mongodb";
@@ -36,12 +35,12 @@ interface DataSource {
   isDefault: boolean;
   createdAt: string;
   updatedAt: string;
-}
+};
 
-interface SettingsDialogProps {
+type SettingsDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
+};
 
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [loading, setLoading] = useState(true);
@@ -50,7 +49,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   // Account state
   const [accountName, setAccountName] = useState("");
   const [accountEmail, setAccountEmail] = useState("");
-  const [savingAccount, setSavingAccount] = useState(false);
+  const [_savingAccount, setSavingAccount] = useState(false);
 
   // Data sources state
   const [dataSources, setDataSources] = useState<DataSource[]>([]);
@@ -76,7 +75,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       loadAll();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, loadAll]);
 
   const loadAccount = async () => {
     try {
@@ -91,7 +90,14 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const loadDataSources = async () => {
     try {
       const data = await getAllDataSources();
-      setDataSources(data || []);
+      // Convert Date objects to ISO strings
+      setDataSources(
+        (data || []).map((source) => ({
+          ...source,
+          createdAt: source.createdAt.toISOString(),
+          updatedAt: source.updatedAt.toISOString(),
+        }))
+      );
     } catch (error) {
       console.error("Failed to load data sources:", error);
     }
@@ -110,7 +116,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   };
 
   const addDataSource = async () => {
-    if (!(newSourceName && newSourceConnectionString)) return;
+    if (!(newSourceName && newSourceConnectionString)) {
+      return;
+    }
 
     setSavingSource(true);
     try {
