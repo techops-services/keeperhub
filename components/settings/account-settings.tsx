@@ -63,9 +63,8 @@ export function AccountSettings({
             value={accountEmail}
           />
         </div>
-
-        <div className="flex gap-4 pt-4">
-          <Button disabled={saving} onClick={handleSave}>
+        <div className="pt-2">
+          <Button disabled={saving} onClick={handleSave} size="sm">
             {saving ? "Saving..." : "Save Changes"}
           </Button>
         </div>

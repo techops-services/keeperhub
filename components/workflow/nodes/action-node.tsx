@@ -52,18 +52,23 @@ export const ActionNode = memo(({ data, selected }: ActionNodeProps) => {
     <Node
       className={cn(
         "shadow-none",
-        selected && "rounded-md ring-2 ring-primary"
+        selected &&
+          "rounded-md ring ring-primary/50 transition-all duration-150 ease-out"
       )}
       handles={{ target: true, source: true }}
     >
       <NodeHeader>
-        <div className="flex items-center gap-2">
-          <Zap className="size-4" />
-          <NodeTitle>{displayTitle}</NodeTitle>
+        <div className="flex items-center gap-2.5">
+          <span className="flex size-9 items-center justify-center rounded-md bg-amber-600/25">
+            <Zap className="size-4 text-amber-300" />
+          </span>
+          <div className="flex flex-col gap-0.5">
+            <NodeTitle>{displayTitle}</NodeTitle>
+            {displayDescription && (
+              <NodeDescription>{displayDescription}</NodeDescription>
+            )}
+          </div>
         </div>
-        {displayDescription && (
-          <NodeDescription>{displayDescription}</NodeDescription>
-        )}
       </NodeHeader>
       {hasContent && (
         <NodeContent>

@@ -31,22 +31,29 @@ export const ConditionNode = memo(({ data, selected }: ConditionNodeProps) => {
     <Node
       className={cn(
         "shadow-none",
-        selected && "rounded-md ring-2 ring-primary"
+        selected &&
+          "rounded-md ring ring-primary/50 transition-all duration-150 ease-out"
       )}
       handles={{ target: true, source: true }}
     >
       <NodeHeader>
-        <div className="flex items-center gap-2">
-          <GitBranch className="size-4" />
-          <NodeTitle>{displayTitle}</NodeTitle>
+        <div className="flex items-center gap-2.5">
+          <span className="flex size-9 items-center justify-center rounded-md bg-pink-500/25">
+            <GitBranch className="size-4.5 text-pink-400" />
+          </span>
+          <div className="flex flex-col gap-0.5">
+            <NodeTitle>{displayTitle}</NodeTitle>
+            {displayDescription && (
+              <NodeDescription>{displayDescription}</NodeDescription>
+            )}
+          </div>
         </div>
-        {displayDescription && (
-          <NodeDescription>{displayDescription}</NodeDescription>
-        )}
       </NodeHeader>
       {hasContent && (
         <NodeContent>
-          <div className="text-muted-foreground text-xs">{condition}</div>
+          <div className="truncate text-muted-foreground text-xs">
+            {condition}
+          </div>
         </NodeContent>
       )}
     </Node>

@@ -170,7 +170,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   <TabsTrigger value="sources">Sources</TabsTrigger>
                 </TabsList>
 
-                <TabsContent className="space-y-6" value="account">
+                <TabsContent value="account">
                   <AccountSettings
                     accountEmail={accountEmail}
                     accountName={accountName}
@@ -180,7 +180,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   />
                 </TabsContent>
 
-                <TabsContent className="space-y-6" value="sources">
+                <TabsContent value="sources">
                   <DataSourcesSettings
                     dataSources={dataSources}
                     newSourceConnectionString={newSourceConnectionString}
