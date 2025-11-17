@@ -1,6 +1,7 @@
 /**
  * Template processing utilities for workflow node outputs
  * Supports syntax like {{nodeName.field}} or {{nodeName.nested.field}}
+ * New format: {{@nodeId:DisplayName.field}} for ID-based references with display names
  */
 
 export type NodeOutputs = {
@@ -13,8 +14,9 @@ export type NodeOutputs = {
 /**
  * Replace template variables in a string with actual values from node outputs
  * Supports:
- * - Node ID references: {{$nodeId.field}} or {{$nodeId}}
- * - Label references: {{nodeName.field}} or {{nodeName}}
+ * - Node ID references with display: {{@nodeId:DisplayName.field}} or {{@nodeId:DisplayName}}
+ * - Node ID references: {{$nodeId.field}} or {{$nodeId}} (legacy)
+ * - Label references: {{nodeName.field}} or {{nodeName}} (legacy)
  * - Nested fields: {{$nodeId.nested.field}}
  * - Array access: {{$nodeId.items[0]}}
  */
@@ -32,10 +34,44 @@ export function processTemplate(
   return template.replace(pattern, (match, expression) => {
     const trimmed = expression.trim();
 
-    // Check if this is a node ID reference (starts with $)
-    const isNodeIdRef = trimmed.startsWith("$");
+    // Check if this is a new format ID reference (starts with @)
+    const isNewFormat = trimmed.startsWith("@");
 
-    if (isNodeIdRef) {
+    if (isNewFormat) {
+      // Format: @nodeId:DisplayName or @nodeId:DisplayName.field
+      const withoutAt = trimmed.substring(1);
+      const colonIndex = withoutAt.indexOf(":");
+
+      if (colonIndex === -1) {
+        console.warn(`[Template] Invalid format: "${trimmed}". Expected @nodeId:DisplayName`);
+        return match;
+      }
+
+      const nodeId = withoutAt.substring(0, colonIndex);
+      const rest = withoutAt.substring(colonIndex + 1);
+
+      // Check if there's a field accessor after the display name
+      const dotIndex = rest.indexOf(".");
+      const fieldPath = dotIndex !== -1 ? rest.substring(dotIndex + 1) : "";
+
+      // Handle special case: {{@nodeId:DisplayName}} (entire output)
+      if (!fieldPath) {
+        const nodeOutput = nodeOutputs[nodeId];
+        if (nodeOutput) {
+          return formatValue(nodeOutput.data);
+        }
+        console.warn(`[Template] Node with ID "${nodeId}" not found in outputs`);
+        return match;
+      }
+
+      // Parse field expression like "field.nested" or "items[0]"
+      const value = resolveFieldPath(nodeOutputs[nodeId]?.data, fieldPath);
+      if (value !== undefined && value !== null) {
+        return formatValue(value);
+      }
+    }
+    // Check if this is a legacy node ID reference (starts with $)
+    else if (trimmed.startsWith("$")) {
       const withoutDollar = trimmed.substring(1);
 
       // Handle special case: {{$nodeId}} (entire output)
@@ -109,6 +145,42 @@ export function processConfigTemplates(
   }
 
   return processed;
+}
+
+/**
+ * Resolve a field path in data like "field.nested" or "items[0]"
+ */
+function resolveFieldPath(data: unknown, fieldPath: string): unknown {
+  if (!data) {
+    return;
+  }
+
+  const parts = fieldPath.split(".");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let current: any = data;
+
+  for (const part of parts) {
+    const trimmedPart = part.trim();
+
+    if (!trimmedPart) {
+      continue;
+    }
+
+    // Handle array access like "items[0]"
+    const arrayMatch = trimmedPart.match(/^([^[]+)\[(\d+)\]$/);
+    if (arrayMatch) {
+      const [, field, index] = arrayMatch;
+      current = current?.[field]?.[Number.parseInt(index, 10)];
+    } else {
+      current = current?.[trimmedPart];
+    }
+
+    if (current === undefined || current === null) {
+      return;
+    }
+  }
+
+  return current;
 }
 
 /**
@@ -294,9 +366,26 @@ function formatValue(value: unknown): string {
 }
 
 /**
- * Extract template variables from a string
- * Returns array of expressions found in {{...}}
+ * Format templates for display in inputs
+ * Converts {{@nodeId:DisplayName.field}} to just show DisplayName.field
  */
+export function formatTemplateForDisplay(template: string): string {
+  if (!template || typeof template !== "string") {
+    return template;
+  }
+
+  // Match {{@nodeId:DisplayName...}} patterns and show only DisplayName part
+  return template.replace(/\{\{@[^:]+:([^}]+)\}\}/g, (match, rest) => {
+    return `{{${rest}}}`;
+  });
+}
+
+/**
+ * Check if a string contains template variables
+ */
+export function hasTemplateVariables(str: string): boolean {
+  return /\{\{[^}]+\}\}/g.test(str);
+}
 export function extractTemplateVariables(template: string): string[] {
   if (!template || typeof template !== "string") {
     return [];

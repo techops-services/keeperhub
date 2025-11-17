@@ -261,7 +261,7 @@ export function AvailableOutputs({ onInsertTemplate }: AvailableOutputsProps) {
                   className="h-6 px-2"
                   onClick={(e) => {
                     e.stopPropagation();
-                    insertTemplate(`{{$${node.id}}}`);
+                    insertTemplate(`{{@${node.id}:${getNodeDisplayName(node)}}}`);
                   }}
                   size="sm"
                   variant="ghost"
@@ -288,7 +288,7 @@ export function AvailableOutputs({ onInsertTemplate }: AvailableOutputsProps) {
                       <Button
                         className="ml-2 h-6 px-2"
                         onClick={() =>
-                          insertTemplate(`{{$${node.id}.${field.field}}}`)
+                          insertTemplate(`{{@${node.id}:${getNodeDisplayName(node)}.${field.field}}}`)
                         }
                         size="sm"
                         variant="ghost"

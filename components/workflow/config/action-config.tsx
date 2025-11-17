@@ -20,6 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { TemplateBadgeInput } from "@/components/ui/template-badge-input";
+import { TemplateBadgeTextarea } from "@/components/ui/template-badge-textarea";
 import { Textarea } from "@/components/ui/textarea";
 import {
   currentVercelProjectIdAtom,
@@ -164,30 +166,30 @@ export function ActionConfig({
         <>
           <div className="space-y-2">
             <Label htmlFor="emailTo">To (Email Address)</Label>
-            <Input
+            <TemplateBadgeInput
               disabled={disabled}
               id="emailTo"
-              onChange={(e) => onUpdateConfig("emailTo", e.target.value)}
+              onChange={(value) => onUpdateConfig("emailTo", value)}
               placeholder="user@example.com or {{NodeName.email}}"
               value={(config?.emailTo as string) || ""}
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="emailSubject">Subject</Label>
-            <Input
+            <TemplateBadgeInput
               disabled={disabled}
               id="emailSubject"
-              onChange={(e) => onUpdateConfig("emailSubject", e.target.value)}
+              onChange={(value) => onUpdateConfig("emailSubject", value)}
               placeholder="Subject or {{NodeName.title}}"
               value={(config?.emailSubject as string) || ""}
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="emailBody">Body</Label>
-            <Textarea
+            <TemplateBadgeTextarea
               disabled={disabled}
               id="emailBody"
-              onChange={(e) => onUpdateConfig("emailBody", e.target.value)}
+              onChange={(value) => onUpdateConfig("emailBody", value)}
               placeholder="Email body. Use {{NodeName.field}} to insert data from previous nodes."
               rows={4}
               value={(config?.emailBody as string) || ""}
@@ -211,10 +213,10 @@ export function ActionConfig({
           </div>
           <div className="space-y-2">
             <Label htmlFor="slackMessage">Message</Label>
-            <Textarea
+            <TemplateBadgeTextarea
               disabled={disabled}
               id="slackMessage"
-              onChange={(e) => onUpdateConfig("slackMessage", e.target.value)}
+              onChange={(value) => onUpdateConfig("slackMessage", value)}
               placeholder="Your message. Use {{NodeName.field}} to insert data from previous nodes."
               rows={4}
               value={(config?.slackMessage as string) || ""}
@@ -228,22 +230,20 @@ export function ActionConfig({
         <>
           <div className="space-y-2">
             <Label htmlFor="ticketTitle">Ticket Title</Label>
-            <Input
+            <TemplateBadgeInput
               disabled={disabled}
               id="ticketTitle"
-              onChange={(e) => onUpdateConfig("ticketTitle", e.target.value)}
+              onChange={(value) => onUpdateConfig("ticketTitle", value)}
               placeholder="Bug report or {{NodeName.title}}"
               value={(config?.ticketTitle as string) || ""}
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="ticketDescription">Description</Label>
-            <Textarea
+            <TemplateBadgeTextarea
               disabled={disabled}
               id="ticketDescription"
-              onChange={(e) =>
-                onUpdateConfig("ticketDescription", e.target.value)
-              }
+              onChange={(value) => onUpdateConfig("ticketDescription", value)}
               placeholder="Description. Use {{NodeName.field}} to insert data from previous nodes."
               rows={4}
               value={(config?.ticketDescription as string) || ""}
@@ -513,11 +513,11 @@ export function ActionConfig({
           </div>
           <div className="space-y-2">
             <Label htmlFor="aiPrompt">Prompt</Label>
-            <Textarea
+            <TemplateBadgeTextarea
               disabled={disabled}
               id="aiPrompt"
-              onChange={(e) => onUpdateConfig("aiPrompt", e.target.value)}
-              placeholder="Enter your prompt here. Use {{$nodeId.field}} to reference previous outputs."
+              onChange={(value) => onUpdateConfig("aiPrompt", value)}
+              placeholder="Enter your prompt here. Use {{NodeName.field}} to reference previous outputs."
               rows={4}
               value={(config?.aiPrompt as string) || ""}
             />
@@ -568,11 +568,11 @@ export function ActionConfig({
           </div>
           <div className="space-y-2">
             <Label htmlFor="imagePrompt">Prompt</Label>
-            <Textarea
+            <TemplateBadgeTextarea
               disabled={disabled}
               id="imagePrompt"
-              onChange={(e) => onUpdateConfig("imagePrompt", e.target.value)}
-              placeholder="Describe the image you want to generate. Use {{$nodeId.field}} to reference previous outputs."
+              onChange={(value) => onUpdateConfig("imagePrompt", value)}
+              placeholder="Describe the image you want to generate. Use {{NodeName.field}} to reference previous outputs."
               rows={4}
               value={(config?.imagePrompt as string) || ""}
             />
