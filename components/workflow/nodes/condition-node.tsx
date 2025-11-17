@@ -13,6 +13,75 @@ import {
 import { cn } from "@/lib/utils";
 import type { WorkflowNodeData } from "@/lib/workflow-store";
 
+// Helper to parse template variables and render them as badges
+const parseTemplateContent = (text: string) => {
+  if (!text) return null;
+
+  // Match template patterns: {{@nodeId:DisplayName.field}} or {{@nodeId:DisplayName}}
+  const pattern = /\{\{@([^:]+):([^}]+)\}\}/g;
+  const parts: Array<{ type: "text" | "badge"; content: string }> = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = pattern.exec(text)) !== null) {
+    const [fullMatch, , displayPart] = match;
+    const matchStart = match.index;
+
+    // Add text before the template
+    if (matchStart > lastIndex) {
+      parts.push({
+        type: "text",
+        content: text.slice(lastIndex, matchStart),
+      });
+    }
+
+    // Add badge for template
+    parts.push({
+      type: "badge",
+      content: displayPart,
+    });
+
+    lastIndex = pattern.lastIndex;
+  }
+
+  // Add remaining text
+  if (lastIndex < text.length) {
+    parts.push({
+      type: "text",
+      content: text.slice(lastIndex),
+    });
+  }
+
+  // If no templates found, return plain text
+  if (parts.length === 0) {
+    return (
+      <span className="truncate text-muted-foreground text-xs">{text}</span>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1 text-muted-foreground text-xs">
+      {parts.map((part, index) => {
+        if (part.type === "badge") {
+          return (
+            <span
+              className="inline-flex items-center gap-1 rounded bg-blue-500/10 px-1.5 py-0.5 text-blue-600 dark:text-blue-400 font-mono text-xs border border-blue-500/20"
+              key={index}
+            >
+              {part.content}
+            </span>
+          );
+        }
+        return (
+          <span className="truncate" key={index}>
+            {part.content}
+          </span>
+        );
+      })}
+    </div>
+  );
+};
+
 type ConditionNodeProps = NodeProps & {
   data?: WorkflowNodeData;
 };
@@ -51,9 +120,7 @@ export const ConditionNode = memo(({ data, selected }: ConditionNodeProps) => {
       </NodeHeader>
       {hasContent && (
         <NodeContent>
-          <div className="truncate text-muted-foreground text-xs">
-            {condition}
-          </div>
+          {parseTemplateContent(condition)}
         </NodeContent>
       )}
     </Node>

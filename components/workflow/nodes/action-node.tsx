@@ -13,6 +13,75 @@ import {
 import { cn } from "@/lib/utils";
 import type { WorkflowNodeData } from "@/lib/workflow-store";
 
+// Helper to parse template variables and render them as badges
+const parseTemplateContent = (text: string) => {
+  if (!text) return null;
+
+  // Match template patterns: {{@nodeId:DisplayName.field}} or {{@nodeId:DisplayName}}
+  const pattern = /\{\{@([^:]+):([^}]+)\}\}/g;
+  const parts: Array<{ type: "text" | "badge"; content: string }> = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = pattern.exec(text)) !== null) {
+    const [fullMatch, , displayPart] = match;
+    const matchStart = match.index;
+
+    // Add text before the template
+    if (matchStart > lastIndex) {
+      parts.push({
+        type: "text",
+        content: text.slice(lastIndex, matchStart),
+      });
+    }
+
+    // Add badge for template
+    parts.push({
+      type: "badge",
+      content: displayPart,
+    });
+
+    lastIndex = pattern.lastIndex;
+  }
+
+  // Add remaining text
+  if (lastIndex < text.length) {
+    parts.push({
+      type: "text",
+      content: text.slice(lastIndex),
+    });
+  }
+
+  // If no templates found, return plain text
+  if (parts.length === 0) {
+    return (
+      <span className="truncate text-muted-foreground text-xs">{text}</span>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1 text-muted-foreground text-xs">
+      {parts.map((part, index) => {
+        if (part.type === "badge") {
+          return (
+            <span
+              className="inline-flex items-center gap-1 rounded bg-blue-500/10 px-1.5 py-0.5 text-blue-600 dark:text-blue-400 font-mono text-xs border border-blue-500/20"
+              key={index}
+            >
+              {part.content}
+            </span>
+          );
+        }
+        return (
+          <span className="truncate" key={index}>
+            {part.content}
+          </span>
+        );
+      })}
+    </div>
+  );
+};
+
 // Helper to get integration name from action type
 const getIntegrationFromActionType = (actionType: string): string => {
   const integrationMap: Record<string, string> = {
@@ -42,11 +111,35 @@ export const ActionNode = memo(({ data, selected }: ActionNodeProps) => {
   const displayDescription =
     data.description || getIntegrationFromActionType(actionType);
 
-  // Only show URL for action types that actually use endpoints
-  const shouldShowUrl =
-    actionType === "HTTP Request" || actionType === "Database Query";
-  const endpoint = data.config?.endpoint as string | undefined;
-  const hasContent = shouldShowUrl && endpoint;
+  // Determine what content to show based on action type
+  const getContentField = () => {
+    const config = data.config || {};
+    
+    switch (actionType) {
+      case "HTTP Request":
+        return config.endpoint ? `URL: ${config.endpoint}` : null;
+      case "Database Query":
+        return config.dbQuery ? `Query: ${config.dbQuery}` : null;
+      case "Send Email":
+        return config.emailTo ? `To: ${config.emailTo}` : null;
+      case "Send Slack Message":
+        return config.slackChannel ? `Channel: ${config.slackChannel}` : null;
+      case "Create Ticket":
+        return config.ticketTitle ? `Title: ${config.ticketTitle}` : null;
+      case "Find Issues":
+        return config.linearAssigneeId ? `Assignee: ${config.linearAssigneeId}` : null;
+      case "Generate Text":
+      case "Generate Image":
+        return config.aiPrompt ? `Prompt: ${config.aiPrompt}` : config.imagePrompt ? `Prompt: ${config.imagePrompt}` : null;
+      case "Execute Code":
+        return config.code ? `Code: ${config.code}` : null;
+      default:
+        return null;
+    }
+  };
+
+  const contentField = getContentField();
+  const hasContent = !!contentField;
 
   return (
     <Node
@@ -72,9 +165,7 @@ export const ActionNode = memo(({ data, selected }: ActionNodeProps) => {
       </NodeHeader>
       {hasContent && (
         <NodeContent>
-          <div className="truncate text-muted-foreground text-xs">
-            URL: {endpoint}
-          </div>
+          {parseTemplateContent(contentField)}
         </NodeContent>
       )}
     </Node>

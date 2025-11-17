@@ -21,7 +21,7 @@ export type NodeProps = ComponentProps<typeof Card> & {
 export const Node = ({ handles, className, ...props }: NodeProps) => (
   <Card
     className={cn(
-      "node-container relative size-full h-auto w-sm gap-0 rounded-md p-0",
+      "node-container relative size-full h-auto w-sm gap-0 rounded-md bg-card p-0",
       className
     )}
     {...props}
@@ -58,7 +58,7 @@ export const NodeAction = (props: NodeActionProps) => <CardAction {...props} />;
 export type NodeContentProps = ComponentProps<typeof CardContent>;
 
 export const NodeContent = ({ className, ...props }: NodeContentProps) => (
-  <CardContent className={cn("p-3", className)} {...props} />
+  <CardContent className={cn("rounded-b-md bg-card p-3", className)} {...props} />
 );
 
 export type NodeFooterProps = ComponentProps<typeof CardFooter>;
