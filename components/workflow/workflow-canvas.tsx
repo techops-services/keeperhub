@@ -176,20 +176,20 @@ export function WorkflowCanvas() {
 
   const isValidConnection = useCallback(
     (connection: XYFlowConnection | XYFlowEdge) => {
-      // Ensure we have both source and target
+    // Ensure we have both source and target
       if (!(connection.source && connection.target)) {
-        return false;
-      }
+      return false;
+    }
 
-      // Prevent self-connections
-      if (connection.source === connection.target) {
-        return false;
-      }
+    // Prevent self-connections
+    if (connection.source === connection.target) {
+      return false;
+    }
 
-      // Ensure connection is from source handle to target handle
-      // sourceHandle should be defined if connecting from a specific handle
-      // targetHandle should be defined if connecting to a specific handle
-      return true;
+    // Ensure connection is from source handle to target handle
+    // sourceHandle should be defined if connecting from a specific handle
+    // targetHandle should be defined if connecting to a specific handle
+    return true;
     },
     []
   );

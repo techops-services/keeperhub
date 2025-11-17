@@ -387,13 +387,13 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
   return (
     <>
       <Panel
-        className="flex flex-col-reverse gap-2 rounded-none border-none bg-transparent p-0.5 pr-3 sm:flex-row sm:items-center"
+        className="flex flex-col gap-2 rounded-none border-none bg-transparent p-0 lg:flex-row lg:items-center"
         position="top-left"
       >
         <ButtonGroup className="h-9">
           {session && (
             <DropdownMenu onOpenChange={(open) => open && loadWorkflows()}>
-              <DropdownMenuTrigger className="flex h-full cursor-pointer items-center gap-2 rounded-l-md border px-3 hover:bg-accent">
+              <DropdownMenuTrigger className="flex h-full cursor-pointer items-center gap-2 rounded-md border bg-secondary px-3 hover:bg-accent">
                 <WorkflowIcon className="size-4" />
                 <p className="font-medium text-sm">
                   {workflowId ? workflowName : "New Workflow"}
@@ -464,12 +464,13 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
       </Panel>
 
       <Panel
-        className="flex flex-col-reverse items-end gap-2 border-none bg-transparent p-0 sm:flex-row sm:items-center"
+        className="flex flex-col-reverse items-end gap-2 border-none bg-transparent p-0 lg:flex-row lg:items-center"
         position="top-right"
       >
         {workflowId && (
           <>
-            <ButtonGroup>
+            {/* Undo/Redo - Mobile Vertical */}
+            <ButtonGroup className="flex lg:hidden" orientation="vertical">
               <Button
                 className="border disabled:opacity-100 disabled:[&>svg]:text-muted-foreground"
                 disabled={!canUndo || isGenerating}
@@ -491,7 +492,88 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
                 <Redo2 className="size-4" />
               </Button>
             </ButtonGroup>
-            <ButtonGroup>
+            
+            {/* Undo/Redo - Desktop Horizontal */}
+            <ButtonGroup className="hidden lg:flex" orientation="horizontal">
+              <Button
+                className="border disabled:opacity-100 disabled:[&>svg]:text-muted-foreground"
+                disabled={!canUndo || isGenerating}
+                onClick={() => undo()}
+                size="icon"
+                title="Undo"
+                variant="secondary"
+              >
+                <Undo2 className="size-4" />
+              </Button>
+              <Button
+                className="border disabled:opacity-100 disabled:[&>svg]:text-muted-foreground"
+                disabled={!canRedo || isGenerating}
+                onClick={() => redo()}
+                size="icon"
+                title="Redo"
+                variant="secondary"
+              >
+                <Redo2 className="size-4" />
+              </Button>
+            </ButtonGroup>
+            
+            {/* Save/Deploy - Mobile Vertical */}
+            <ButtonGroup className="flex lg:hidden" orientation="vertical">
+              <Button
+                className="relative border disabled:opacity-100 disabled:[&>svg]:text-muted-foreground"
+                disabled={!currentWorkflowId || isGenerating || isSaving}
+                onClick={handleSave}
+                size="icon"
+                title={isSaving ? "Saving..." : "Save workflow"}
+                variant="secondary"
+              >
+                {isSaving ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Save className="size-4" />
+                )}
+                {hasUnsavedChanges && !isSaving && (
+                  <div className="-top-0.5 -right-0.5 absolute size-2 rounded-full bg-primary" />
+                )}
+              </Button>
+              <Button
+                className="border disabled:opacity-100 disabled:[&>svg]:text-muted-foreground"
+                disabled={
+                  isDeploying ||
+                  nodes.length === 0 ||
+                  isGenerating ||
+                  !currentWorkflowId
+                }
+                onClick={handleDeploy}
+                size="icon"
+                title={
+                  isDeploying
+                    ? "Deploying to production..."
+                    : "Deploy to production"
+                }
+                variant="secondary"
+              >
+                {isDeploying ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Rocket className="size-4" />
+                )}
+              </Button>
+              {deploymentUrl && (
+                <Button
+                  className="border disabled:opacity-100 disabled:[&>svg]:text-muted-foreground"
+                  onClick={() => window.open(deploymentUrl, "_blank")}
+                  size="icon"
+                  title="Open deployment"
+                  variant="secondary"
+                >
+                  <ExternalLink className="size-4" />
+                </Button>
+              )}
+            </ButtonGroup>
+            
+            {/* Save/Deploy - Desktop Horizontal */}
+            <ButtonGroup className="hidden lg:flex" orientation="horizontal">
               <Button
                 className="relative border disabled:opacity-100 disabled:[&>svg]:text-muted-foreground"
                 disabled={!currentWorkflowId || isGenerating || isSaving}

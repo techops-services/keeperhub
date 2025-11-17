@@ -78,20 +78,40 @@ export function NodeToolbar() {
   };
 
   return (
-    <ButtonGroup>
-      {nodeTemplates.map((template) => (
-        <Button
-          className="border disabled:opacity-100 disabled:[&>svg]:text-muted-foreground"
-          disabled={isGenerating}
-          key={template.type}
-          onClick={() => handleAddNode(template)}
-          size="icon"
-          title={template.label}
-          variant="secondary"
-        >
-          <template.icon className="size-4" />
-        </Button>
-      ))}
-    </ButtonGroup>
+    <>
+      {/* Mobile: Vertical ButtonGroup */}
+      <ButtonGroup className="flex lg:hidden" orientation="vertical">
+        {nodeTemplates.map((template) => (
+          <Button
+            className="border disabled:opacity-100 disabled:[&>svg]:text-muted-foreground"
+            disabled={isGenerating}
+            key={template.type}
+            onClick={() => handleAddNode(template)}
+            size="icon"
+            title={template.label}
+            variant="secondary"
+          >
+            <template.icon className="size-4" />
+          </Button>
+        ))}
+      </ButtonGroup>
+      
+      {/* Desktop: Horizontal ButtonGroup */}
+      <ButtonGroup className="hidden lg:flex" orientation="horizontal">
+        {nodeTemplates.map((template) => (
+          <Button
+            className="border disabled:opacity-100 disabled:[&>svg]:text-muted-foreground"
+            disabled={isGenerating}
+            key={template.type}
+            onClick={() => handleAddNode(template)}
+            size="icon"
+            title={template.label}
+            variant="secondary"
+          >
+            <template.icon className="size-4" />
+          </Button>
+        ))}
+      </ButtonGroup>
+    </>
   );
 }
