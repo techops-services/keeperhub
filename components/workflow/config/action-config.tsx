@@ -276,9 +276,7 @@ export function ActionConfig({
             <TemplateBadgeInput
               disabled={disabled}
               id="linearAssigneeId"
-              onChange={(value) =>
-                onUpdateConfig("linearAssigneeId", value)
-              }
+              onChange={(value) => onUpdateConfig("linearAssigneeId", value)}
               placeholder="user-id-123 or {{NodeName.userId}}"
               value={(config?.linearAssigneeId as string) || ""}
             />

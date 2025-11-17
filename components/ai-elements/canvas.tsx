@@ -10,6 +10,7 @@ export const Canvas = ({ children, ...props }: CanvasProps) => (
   <ReactFlow
     deleteKeyCode={["Backspace", "Delete"]}
     fitView
+    panActivationKeyCode={null}
     panOnDrag={false}
     panOnScroll
     selectionOnDrag={true}

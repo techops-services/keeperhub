@@ -257,6 +257,10 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
       const isInput =
         target.tagName === "INPUT" || target.tagName === "TEXTAREA";
 
+      // Check if we're inside Monaco Editor
+      const isMonacoEditor = target.closest(".monaco-editor") !== null;
+
+      // Only intercept our specific shortcuts
       // Cmd+S or Ctrl+S to save (works everywhere, including inputs)
       if ((e.metaKey || e.ctrlKey) && e.key === "s") {
         e.preventDefault();
@@ -265,17 +269,20 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
         return;
       }
 
-      // Cmd+Enter or Ctrl+Enter to run (skip if typing in input/textarea)
+      // Cmd+Enter or Ctrl+Enter to run (skip if typing in input/textarea/monaco)
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-        if (!isInput) {
+        if (!(isInput || isMonacoEditor)) {
           e.preventDefault();
           e.stopPropagation();
           handleRun();
         }
         return;
       }
+
+      // Don't interfere with other keys - let them through
     };
 
+    // Use capture phase only to ensure we can intercept before other handlers
     document.addEventListener("keydown", handleKeyDown, true);
     return () => document.removeEventListener("keydown", handleKeyDown, true);
   }, [handleSave, handleRun]);

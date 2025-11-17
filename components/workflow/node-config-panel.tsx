@@ -275,9 +275,7 @@ const PanelInner = () => {
                   <TemplateBadgeInput
                     disabled={isGenerating}
                     id="condition"
-                    onChange={(value) =>
-                      handleUpdateConfig("condition", value)
-                    }
+                    onChange={(value) => handleUpdateConfig("condition", value)}
                     placeholder="e.g., 5 > 3, status === 200, {{PreviousNode.value}} > 100"
                     value={
                       (selectedNode.data.config?.condition as string) || ""
