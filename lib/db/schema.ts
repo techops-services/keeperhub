@@ -61,21 +61,7 @@ export const verification = pgTable("verification", {
   updatedAt: timestamp("updatedAt"),
 });
 
-// Projects table
-export const projects = pgTable("projects", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => nanoid()),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id),
-  vercelProjectId: text("vercel_project_id").notNull(),
-  name: text("name").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
-
-// Workflows table with user association
+// Workflows table with user association (1-to-1 with project)
 export const workflows = pgTable("workflows", {
   id: text("id")
     .primaryKey()
@@ -85,7 +71,7 @@ export const workflows = pgTable("workflows", {
   userId: text("userId")
     .notNull()
     .references(() => user.id),
-  vercelProjectId: text("vercel_project_id").references(() => projects.id),
+  vercelProjectId: text("vercel_project_id").notNull().unique(), // 1-to-1 enforced with unique constraint
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   nodes: jsonb("nodes").notNull().$type<any[]>(),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -95,6 +81,20 @@ export const workflows = pgTable("workflows", {
     .default("none"),
   deploymentUrl: text("deployment_url"),
   lastDeployedAt: timestamp("last_deployed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Projects table (simplified, now created alongside workflows)
+export const projects = pgTable("projects", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => nanoid()),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id),
+  vercelProjectId: text("vercel_project_id").notNull(),
+  name: text("name").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -164,7 +164,7 @@ export const dataSources = pgTable("data_sources", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-// Relations
+// Relations (1-to-1 between workflow and project)
 export const workflowsRelations = relations(workflows, ({ one }) => ({
   vercelProject: one(projects, {
     fields: [workflows.vercelProjectId],
@@ -172,8 +172,11 @@ export const workflowsRelations = relations(workflows, ({ one }) => ({
   }),
 }));
 
-export const projectsRelations = relations(projects, ({ many }) => ({
-  workflows: many(workflows),
+export const projectsRelations = relations(projects, ({ one }) => ({
+  workflow: one(workflows, {
+    fields: [projects.id],
+    references: [workflows.vercelProjectId],
+  }),
 }));
 
 export const workflowExecutionsRelations = relations(

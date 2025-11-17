@@ -65,7 +65,7 @@ const parseTemplateContent = (text: string) => {
         if (part.type === "badge") {
           return (
             <span
-              className="inline-flex items-center gap-1 rounded bg-blue-500/10 px-1.5 py-0.5 text-blue-600 dark:text-blue-400 font-mono text-xs border border-blue-500/20"
+              className="inline-flex items-center gap-1 rounded border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 font-mono text-blue-600 text-xs dark:text-blue-400"
               key={index}
             >
               {part.content}
@@ -114,7 +114,7 @@ export const ActionNode = memo(({ data, selected }: ActionNodeProps) => {
   // Determine what content to show based on action type
   const getContentField = () => {
     const config = data.config || {};
-    
+
     switch (actionType) {
       case "HTTP Request":
         return config.endpoint ? `URL: ${config.endpoint}` : null;
@@ -127,10 +127,16 @@ export const ActionNode = memo(({ data, selected }: ActionNodeProps) => {
       case "Create Ticket":
         return config.ticketTitle ? `Title: ${config.ticketTitle}` : null;
       case "Find Issues":
-        return config.linearAssigneeId ? `Assignee: ${config.linearAssigneeId}` : null;
+        return config.linearAssigneeId
+          ? `Assignee: ${config.linearAssigneeId}`
+          : null;
       case "Generate Text":
       case "Generate Image":
-        return config.aiPrompt ? `Prompt: ${config.aiPrompt}` : config.imagePrompt ? `Prompt: ${config.imagePrompt}` : null;
+        return config.aiPrompt
+          ? `Prompt: ${config.aiPrompt}`
+          : config.imagePrompt
+            ? `Prompt: ${config.imagePrompt}`
+            : null;
       case "Execute Code":
         return config.code ? `Code: ${config.code}` : null;
       default:
@@ -164,9 +170,7 @@ export const ActionNode = memo(({ data, selected }: ActionNodeProps) => {
         </div>
       </NodeHeader>
       {hasContent && (
-        <NodeContent>
-          {parseTemplateContent(contentField)}
-        </NodeContent>
+        <NodeContent>{parseTemplateContent(contentField)}</NodeContent>
       )}
     </Node>
   );

@@ -514,7 +514,7 @@ class ServerWorkflowExecutor {
                   const schemaFields = JSON.parse(dbSchema) as SchemaField[];
                   if (schemaFields.length > 0) {
                     const zodSchema = schemaFieldsToZod(schemaFields);
-                    
+
                     // Validate the result against the schema
                     // If data is an array, validate each item
                     if (Array.isArray(dbResult.data)) {

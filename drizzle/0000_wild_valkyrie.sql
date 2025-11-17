@@ -79,7 +79,8 @@ CREATE TABLE "workflow_execution_logs" (
 	"error" text,
 	"started_at" timestamp DEFAULT now() NOT NULL,
 	"completed_at" timestamp,
-	"duration" text
+	"duration" text,
+	"timestamp" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "workflow_executions" (
@@ -100,14 +101,15 @@ CREATE TABLE "workflows" (
 	"name" text NOT NULL,
 	"description" text,
 	"userId" text NOT NULL,
-	"vercel_project_id" text,
+	"vercel_project_id" text NOT NULL,
 	"nodes" jsonb NOT NULL,
 	"edges" jsonb NOT NULL,
 	"deployment_status" text DEFAULT 'none',
 	"deployment_url" text,
 	"last_deployed_at" timestamp,
 	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp DEFAULT now() NOT NULL
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "workflows_vercel_project_id_unique" UNIQUE("vercel_project_id")
 );
 --> statement-breakpoint
 ALTER TABLE "account" ADD CONSTRAINT "account_userId_user_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -117,5 +119,4 @@ ALTER TABLE "session" ADD CONSTRAINT "session_userId_user_id_fk" FOREIGN KEY ("u
 ALTER TABLE "workflow_execution_logs" ADD CONSTRAINT "workflow_execution_logs_execution_id_workflow_executions_id_fk" FOREIGN KEY ("execution_id") REFERENCES "public"."workflow_executions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "workflow_executions" ADD CONSTRAINT "workflow_executions_workflow_id_workflows_id_fk" FOREIGN KEY ("workflow_id") REFERENCES "public"."workflows"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "workflow_executions" ADD CONSTRAINT "workflow_executions_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "workflows" ADD CONSTRAINT "workflows_userId_user_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "workflows" ADD CONSTRAINT "workflows_vercel_project_id_projects_id_fk" FOREIGN KEY ("vercel_project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "workflows" ADD CONSTRAINT "workflows_userId_user_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;

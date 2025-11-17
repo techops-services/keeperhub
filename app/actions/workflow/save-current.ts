@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { workflows } from "@/lib/db/schema";
 import type { WorkflowEdge, WorkflowNode } from "@/lib/workflow-store";
+import { create as createVercelProject } from "../vercel-project/create";
 import { CURRENT_WORKFLOW_NAME } from "./constants";
 import type { WorkflowData } from "./types";
 import { getSession } from "./utils";
@@ -47,7 +48,11 @@ export async function saveCurrent(
       .where(eq(workflows.id, existingWorkflow.id))
       .returning();
   } else {
-    // Create new current workflow
+    // Create new current workflow with a dedicated project
+    const project = await createVercelProject({
+      name: CURRENT_WORKFLOW_NAME,
+    });
+
     [savedWorkflow] = await db
       .insert(workflows)
       .values({
@@ -56,6 +61,7 @@ export async function saveCurrent(
         nodes,
         edges,
         userId: session.user.id,
+        vercelProjectId: project.id,
       })
       .returning();
   }

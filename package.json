@@ -12,8 +12,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio",
-    "db:drop": "tsx scripts/drop-db.ts"
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@google/genai": "^1.28.0",

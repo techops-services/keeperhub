@@ -1,5 +1,5 @@
 {
-  "id": "41084618-6d3a-49de-8af9-c8d12a06028d",
+  "id": "d49dc285-8257-4d6a-bd01-0b171e949a7b",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -511,6 +511,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "timestamp": {
+          "name": "timestamp",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
         }
       },
       "indexes": {},
@@ -656,7 +663,7 @@
           "name": "vercel_project_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "nodes": {
           "name": "nodes",
@@ -714,19 +721,16 @@
           "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
-        },
-        "workflows_vercel_project_id_projects_id_fk": {
-          "name": "workflows_vercel_project_id_projects_id_fk",
-          "tableFrom": "workflows",
-          "tableTo": "projects",
-          "columnsFrom": ["vercel_project_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "workflows_vercel_project_id_unique": {
+          "name": "workflows_vercel_project_id_unique",
+          "nullsNotDistinct": false,
+          "columns": ["vercel_project_id"]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

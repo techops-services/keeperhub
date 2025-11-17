@@ -1,1 +1,0 @@
-ALTER TABLE "workflow_execution_logs" ADD COLUMN "timestamp" timestamp DEFAULT now() NOT NULL;

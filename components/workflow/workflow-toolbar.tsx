@@ -6,7 +6,6 @@ import {
   ChevronDown,
   ExternalLink,
   FlaskConical,
-  FolderOpen,
   Loader2,
   Play,
   Redo2,
@@ -17,14 +16,20 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { create as createVercelProject } from "@/app/actions/vercel-project/create";
-import { getAll as getAllVercelProjects } from "@/app/actions/vercel-project/get-all";
 import { deploy } from "@/app/actions/workflow/deploy";
 import { execute } from "@/app/actions/workflow/execute";
-import { getCode } from "@/app/actions/workflow/get-code";
 import { getDeploymentStatus } from "@/app/actions/workflow/get-deployment-status";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { ButtonGroup, ButtonGroupText } from "@/components/ui/button-group";
+import { ButtonGroup } from "@/components/ui/button-group";
 import {
   Dialog,
   DialogContent,
@@ -43,26 +48,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  creatingProjectAtom,
-  newProjectNameAtom,
-  showNewProjectDialogAtom,
-  vercelProjectsAtom,
-} from "@/lib/atoms/vercel-projects";
 import { useSession } from "@/lib/auth-client";
 import { workflowApi } from "@/lib/workflow-api";
 import {
   canRedoAtom,
   canUndoAtom,
   clearWorkflowAtom,
-  currentVercelProjectNameAtom,
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
   edgesAtom,
@@ -78,7 +69,6 @@ import {
   updateNodeDataAtom,
 } from "@/lib/workflow-store";
 import { Panel } from "../ai-elements/panel";
-import { ProjectIntegrationsDialog } from "../settings/project-integrations-dialog";
 import { WorkflowIcon } from "../ui/workflow-icon";
 import { UserMenu } from "../workflows/user-menu";
 import { NodeToolbar } from "./node-toolbar";
@@ -98,9 +88,6 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
   const [workflowName, setCurrentWorkflowName] = useAtom(
     currentWorkflowNameAtom
   );
-  const [vercelProjectName, setVercelProjectName] = useAtom(
-    currentVercelProjectNameAtom
-  );
   const router = useRouter();
   const [showClearDialog, setShowClearDialog] = useAtom(showClearDialogAtom);
   const [showDeleteDialog, setShowDeleteDialog] = useAtom(showDeleteDialogAtom);
@@ -112,18 +99,8 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
   const redo = useSetAtom(redoAtom);
   const [canUndo] = useAtom(canUndoAtom);
   const [canRedo] = useAtom(canRedoAtom);
-  const [vercelProjects, setVercelProjects] = useAtom(vercelProjectsAtom);
-  const [showNewProjectDialog, setShowNewProjectDialog] = useAtom(
-    showNewProjectDialogAtom
-  );
-  const [newProjectName, setNewProjectName] = useAtom(newProjectNameAtom);
-  const [creatingProject, setCreatingProject] = useAtom(creatingProjectAtom);
   const { data: session } = useSession();
 
-  // Component-local state for change project dialog (doesn't need to be shared)
-  const [showChangeProjectDialog, setShowChangeProjectDialog] = useState(false);
-  const [selectedNewProjectId, setSelectedNewProjectId] =
-    useState<string>("none");
   const [isDeploying, setIsDeploying] = useState(false);
   const [deploymentUrl, setDeploymentUrl] = useState<string | null>(null);
   const [showCodeDialog, setShowCodeDialog] = useState(false);
@@ -134,26 +111,10 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
       id: string;
       name: string;
       updatedAt: string;
-      vercelProjectId?: string | null;
     }>
   >([]);
-  const [selectedProjectFilter, setSelectedProjectFilter] = useState<
-    string | null
-  >(null);
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [newWorkflowName, setNewWorkflowName] = useState(workflowName);
-  const [showRenameProjectDialog, setShowRenameProjectDialog] = useState(false);
-  const [newProjectNameForRename, setNewProjectNameForRename] = useState("");
-  const [showDeleteProjectDialog, setShowDeleteProjectDialog] = useState(false);
-  const [deleteProjectConfirmation, setDeleteProjectConfirmation] =
-    useState("");
-  const [projectToDelete, setProjectToDelete] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
-  const [projectWorkflowCount, setProjectWorkflowCount] = useState(0);
-  const [showProjectIntegrationsDialog, setShowProjectIntegrationsDialog] =
-    useState(false);
   const [showUnsavedRunDialog, setShowUnsavedRunDialog] = useState(false);
 
   const handleExecute = async (mode: "test" | "production" = runMode) => {
@@ -309,109 +270,9 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
     }
   };
 
-  const handleProjectFilterChange = (projectId: string | null) => {
-    setSelectedProjectFilter(projectId);
-  };
-
   const handleNewWorkflow = () => {
     clearWorkflow();
     router.push("/");
-  };
-
-  const handleCreateProject = async () => {
-    if (!newProjectName.trim()) {
-      toast.error("Please enter a project name");
-      return;
-    }
-
-    setCreatingProject(true);
-    try {
-      const project = await createVercelProject({ name: newProjectName });
-
-      // Update the projects list
-      setVercelProjects((prev) => [...prev, project]);
-
-      // Select the newly created project
-      setSelectedProjectFilter(project.id);
-
-      // Close dialog and clear form
-      setShowNewProjectDialog(false);
-      setNewProjectName("");
-      toast.success("Project created successfully");
-    } catch (error) {
-      console.error("Failed to create project:", error);
-      toast.error("Failed to create project");
-    } finally {
-      setCreatingProject(false);
-    }
-  };
-
-  const handleRenameProject = async () => {
-    if (!(selectedProjectFilter && newProjectNameForRename.trim())) {
-      return;
-    }
-
-    try {
-      const { update: updateVercelProject } = await import(
-        "@/app/actions/vercel-project/update"
-      );
-      await updateVercelProject(selectedProjectFilter, {
-        name: newProjectNameForRename,
-      });
-
-      // Update the projects list
-      setVercelProjects((prev) =>
-        prev.map((p) =>
-          p.id === selectedProjectFilter
-            ? { ...p, name: newProjectNameForRename }
-            : p
-        )
-      );
-
-      setShowRenameProjectDialog(false);
-      toast.success("Project renamed successfully");
-    } catch (error) {
-      console.error("Failed to rename project:", error);
-      toast.error("Failed to rename project. Please try again.");
-    }
-  };
-
-  const handleDeleteProject = async () => {
-    if (
-      !projectToDelete ||
-      deleteProjectConfirmation !== projectToDelete.name
-    ) {
-      return;
-    }
-
-    try {
-      const { deleteVercelProject } = await import(
-        "@/app/actions/vercel-project/delete"
-      );
-      await deleteVercelProject(projectToDelete.id);
-
-      // Remove from projects list
-      setVercelProjects((prev) =>
-        prev.filter((p) => p.id !== projectToDelete.id)
-      );
-
-      // If the deleted project was selected, clear the selection
-      if (selectedProjectFilter === projectToDelete.id) {
-        setSelectedProjectFilter(null);
-      }
-
-      setShowDeleteProjectDialog(false);
-      setDeleteProjectConfirmation("");
-      setProjectToDelete(null);
-      toast.success("Project deleted successfully");
-
-      // Reload workflows as they may have been affected
-      const workflows = await workflowApi.getAll();
-      setAllWorkflows(workflows);
-    } catch (error) {
-      console.error("Failed to delete project:", error);
-      toast.error("Failed to delete project. Please try again.");
-    }
   };
 
   const handleRenameWorkflow = async () => {
@@ -433,31 +294,6 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
     } catch (error) {
       console.error("Failed to rename workflow:", error);
       toast.error("Failed to rename workflow. Please try again.");
-    }
-  };
-
-  const handleChangeProjectFromDialog = async () => {
-    if (!currentWorkflowId) {
-      return;
-    }
-
-    try {
-      const newProjectId =
-        selectedNewProjectId === "none" ? null : selectedNewProjectId;
-
-      await workflowApi.update(currentWorkflowId, {
-        vercelProjectId: newProjectId,
-      });
-
-      // Update the local state
-      const selectedProject = vercelProjects.find((p) => p.id === newProjectId);
-      setVercelProjectName(selectedProject?.name || null);
-
-      setShowChangeProjectDialog(false);
-      toast.success("Project changed successfully");
-    } catch (error) {
-      console.error("Failed to change project:", error);
-      toast.error("Failed to change project. Please try again.");
     }
   };
 
@@ -538,65 +374,10 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
     }
   };
 
-  // Load vercel projects
-  const loadProjects = async () => {
-    try {
-      const projects = await getAllVercelProjects();
-      setVercelProjects(projects || []);
-    } catch (error) {
-      console.error("Failed to load Vercel projects:", error);
-    }
-  };
-
-  // Load projects and workflows on mount
-  useEffect(() => {
-    loadProjects();
-    loadWorkflows();
-  }, []);
-
   // Sync newWorkflowName when workflowName changes
   useEffect(() => {
     setNewWorkflowName(workflowName);
   }, [workflowName]);
-
-  // Set initial project filter based on current workflow's project, or auto-select first project
-  useEffect(() => {
-    if (vercelProjects.length === 0) {
-      return;
-    }
-
-    // If current workflow has a project, select that
-    if (vercelProjectName) {
-      const project = vercelProjects.find((p) => p.name === vercelProjectName);
-      if (project) {
-        setSelectedProjectFilter(project.id);
-        return;
-      }
-    }
-
-    // Auto-select first project
-    setSelectedProjectFilter(vercelProjects[0].id);
-  }, [vercelProjectName, vercelProjects]);
-
-  // Filter workflows based on selected project
-  const filteredWorkflows = selectedProjectFilter
-    ? allWorkflows.filter((w) => w.vercelProjectId === selectedProjectFilter)
-    : allWorkflows;
-
-  const _handleViewCode = async () => {
-    if (!currentWorkflowId) {
-      return;
-    }
-
-    try {
-      const data = await getCode(currentWorkflowId);
-      setGeneratedCode(data.code);
-      setShowCodeDialog(true);
-    } catch (error) {
-      console.error("Failed to generate code:", error);
-      toast.error("Failed to generate code");
-    }
-  };
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(generatedCode);
@@ -611,173 +392,73 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
       >
         <ButtonGroup className="h-9">
           {session && (
-            <DropdownMenu onOpenChange={(open) => open && loadProjects()}>
-              <ButtonGroupText asChild>
-                <DropdownMenuTrigger className="cursor-pointer">
-                  <FolderOpen className="size-4" />
-                  <p className="font-medium text-sm">
-                    {vercelProjects.find((p) => p.id === selectedProjectFilter)
-                      ?.name || "Select project"}
-                  </p>
-                  <ChevronDown className="size-3 opacity-50" />
-                </DropdownMenuTrigger>
-              </ButtonGroupText>
-              <DropdownMenuContent align="start" className="w-64">
-                <DropdownMenuItem onClick={() => setShowNewProjectDialog(true)}>
-                  <span>New Project</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {selectedProjectFilter && (
-                  <DropdownMenuLabel className="text-muted-foreground text-xs uppercase">
-                    {vercelProjects.find((p) => p.id === selectedProjectFilter)
-                      ?.name || "Project"}
-                  </DropdownMenuLabel>
-                )}
-                <DropdownMenuItem
-                  disabled={!selectedProjectFilter}
-                  onClick={() => setShowProjectIntegrationsDialog(true)}
-                >
-                  <span>Integrations</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={!selectedProjectFilter}
-                  onClick={() => {
-                    const currentProject = vercelProjects.find(
-                      (p) => p.id === selectedProjectFilter
-                    );
-                    if (currentProject) {
-                      setNewProjectNameForRename(currentProject.name);
-                      setShowRenameProjectDialog(true);
-                    }
-                  }}
-                >
-                  <span>Rename</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={!selectedProjectFilter}
-                  onClick={async () => {
-                    const currentProject = vercelProjects.find(
-                      (p) => p.id === selectedProjectFilter
-                    );
-                    if (currentProject) {
-                      setProjectToDelete(currentProject);
-                      setDeleteProjectConfirmation("");
-
-                      // Fetch workflow count for this project
-                      try {
-                        const { getProjectWorkflowCount } = await import(
-                          "@/app/actions/vercel-project/delete"
-                        );
-                        const count = await getProjectWorkflowCount(
-                          currentProject.id
-                        );
-                        setProjectWorkflowCount(count);
-                      } catch (error) {
-                        console.error("Failed to get workflow count:", error);
-                        setProjectWorkflowCount(0);
-                      }
-
-                      setShowDeleteProjectDialog(true);
-                    }
-                  }}
-                >
-                  <span>Delete</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel className="text-muted-foreground text-xs uppercase">
-                  Recent Projects
-                </DropdownMenuLabel>
-                {vercelProjects.length === 0 ? (
-                  <DropdownMenuItem disabled>
-                    No projects found
-                  </DropdownMenuItem>
-                ) : (
-                  vercelProjects.map((project) => (
-                    <DropdownMenuItem
-                      className="flex items-center justify-between"
-                      key={project.id}
-                      onClick={() => handleProjectFilterChange(project.id)}
-                    >
-                      <span className="truncate">{project.name}</span>
-                      {project.id === selectedProjectFilter && (
-                        <Check className="size-4 shrink-0" />
-                      )}
-                    </DropdownMenuItem>
-                  ))
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          <DropdownMenu onOpenChange={(open) => open && loadWorkflows()}>
-            <ButtonGroupText asChild>
-              <DropdownMenuTrigger className="cursor-pointer">
+            <DropdownMenu onOpenChange={(open) => open && loadWorkflows()}>
+              <DropdownMenuTrigger className="flex h-full cursor-pointer items-center gap-2 rounded-l-md border px-3 hover:bg-accent">
                 <WorkflowIcon className="size-4" />
                 <p className="font-medium text-sm">
                   {workflowId ? workflowName : "New Workflow"}
                 </p>
                 <ChevronDown className="size-3 opacity-50" />
               </DropdownMenuTrigger>
-            </ButtonGroupText>
-            <DropdownMenuContent align="start" className="w-64">
-              <DropdownMenuItem
-                className="flex items-center justify-between"
-                onClick={handleNewWorkflow}
-              >
-                <span>New Workflow</span>
-                {!workflowId && <Check className="size-4 shrink-0" />}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              {currentWorkflowId && (
+              <DropdownMenuContent align="start" className="w-64">
+                <DropdownMenuItem
+                  className="flex items-center justify-between"
+                  onClick={handleNewWorkflow}
+                >
+                  <span>New Workflow</span>
+                  {!workflowId && <Check className="size-4 shrink-0" />}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {currentWorkflowId && (
+                  <DropdownMenuLabel className="text-muted-foreground text-xs uppercase">
+                    {workflowName}
+                  </DropdownMenuLabel>
+                )}
+                <DropdownMenuItem
+                  disabled={!currentWorkflowId}
+                  onClick={() => setShowRenameDialog(true)}
+                >
+                  <span>Rename</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={nodes.length === 0}
+                  onClick={() => setShowClearDialog(true)}
+                >
+                  <span>Clear</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!currentWorkflowId}
+                  onClick={() => setShowDeleteDialog(true)}
+                >
+                  <span>Delete</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuLabel className="text-muted-foreground text-xs uppercase">
-                  {workflowName}
+                  Recent Workflows
                 </DropdownMenuLabel>
-              )}
-              <DropdownMenuItem
-                disabled={!currentWorkflowId}
-                onClick={() => setShowRenameDialog(true)}
-              >
-                <span>Rename</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!currentWorkflowId}
-                onClick={() => setShowChangeProjectDialog(true)}
-              >
-                <span>Move</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={nodes.length === 0}
-                onClick={() => setShowClearDialog(true)}
-              >
-                <span>Clear</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!currentWorkflowId}
-                onClick={() => setShowDeleteDialog(true)}
-              >
-                <span>Delete</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel className="text-muted-foreground text-xs uppercase">
-                Recent Workflows
-              </DropdownMenuLabel>
-              {filteredWorkflows.length === 0 ? (
-                <DropdownMenuItem disabled>No workflows found</DropdownMenuItem>
-              ) : (
-                filteredWorkflows.map((workflow) => (
-                  <DropdownMenuItem
-                    className="flex items-center justify-between"
-                    key={workflow.id}
-                    onClick={() => router.push(`/workflows/${workflow.id}`)}
-                  >
-                    <span className="truncate">{workflow.name}</span>
-                    {workflow.id === currentWorkflowId && (
-                      <Check className="size-4 shrink-0" />
-                    )}
+                {allWorkflows.length === 0 ? (
+                  <DropdownMenuItem disabled>
+                    No workflows found
                   </DropdownMenuItem>
-                ))
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                ) : (
+                  allWorkflows
+                    .filter((w) => w.name !== "__current__")
+                    .map((workflow) => (
+                      <DropdownMenuItem
+                        className="flex items-center justify-between"
+                        key={workflow.id}
+                        onClick={() => router.push(`/workflows/${workflow.id}`)}
+                      >
+                        <span className="truncate">{workflow.name}</span>
+                        {workflow.id === currentWorkflowId && (
+                          <Check className="size-4 shrink-0" />
+                        )}
+                      </DropdownMenuItem>
+                    ))
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </ButtonGroup>
         <NodeToolbar />
       </Panel>
@@ -945,7 +626,7 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Workflow Dialog */}
+      {/* Rename Workflow Dialog */}
       <Dialog onOpenChange={setShowRenameDialog} open={showRenameDialog}>
         <DialogContent>
           <DialogHeader>
@@ -981,13 +662,15 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
         </DialogContent>
       </Dialog>
 
+      {/* Delete Workflow Dialog */}
       <Dialog onOpenChange={setShowDeleteDialog} open={showDeleteDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Workflow</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete &ldquo;{workflowName}&rdquo;? This
-              will permanently delete the workflow and cannot be undone.
+              will permanently delete the workflow and its associated project.
+              This cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -1030,263 +713,28 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
         </DialogContent>
       </Dialog>
 
-      {/* Change Project Dialog */}
-      <Dialog
-        onOpenChange={setShowChangeProjectDialog}
-        open={showChangeProjectDialog}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Change Project</DialogTitle>
-            <DialogDescription>
-              Move this workflow to a different Vercel project or remove it from
-              its current project.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="projectSelect">Select Project</Label>
-              <Select
-                onValueChange={setSelectedNewProjectId}
-                value={selectedNewProjectId}
-              >
-                <SelectTrigger id="projectSelect">
-                  <SelectValue placeholder="Select a project" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No project</SelectItem>
-                  {vercelProjects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-muted-foreground text-xs">
-                Current project: {vercelProjectName || "None"}
-              </p>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              onClick={() => setShowChangeProjectDialog(false)}
-              variant="outline"
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleChangeProjectFromDialog}>
-              Change Project
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* New Project Dialog */}
-      <Dialog
-        onOpenChange={setShowNewProjectDialog}
-        open={showNewProjectDialog}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create New Project</DialogTitle>
-            <DialogDescription>
-              Create a new Vercel project for deploying your workflows
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="newProjectName">Project Name</Label>
-              <Input
-                id="newProjectName"
-                onChange={(e) => setNewProjectName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !creatingProject) {
-                    handleCreateProject();
-                  }
-                }}
-                placeholder="My Workflows"
-                value={newProjectName}
-              />
-              <p className="text-muted-foreground text-xs">
-                Enter a descriptive name for your project
-              </p>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              onClick={() => setShowNewProjectDialog(false)}
-              variant="outline"
-            >
-              Cancel
-            </Button>
-            <Button
-              disabled={creatingProject || !newProjectName.trim()}
-              onClick={handleCreateProject}
-            >
-              {creatingProject ? "Creating..." : "Create Project"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Rename Project Dialog */}
-      <Dialog
-        onOpenChange={setShowRenameProjectDialog}
-        open={showRenameProjectDialog}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Rename Project</DialogTitle>
-            <DialogDescription>
-              Enter a new name for your project
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="renameProjectName">Project Name</Label>
-              <Input
-                id="renameProjectName"
-                onChange={(e) => setNewProjectNameForRename(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    handleRenameProject();
-                  }
-                }}
-                placeholder="My Project"
-                value={newProjectNameForRename}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              onClick={() => setShowRenameProjectDialog(false)}
-              variant="outline"
-            >
-              Cancel
-            </Button>
-            <Button
-              disabled={!newProjectNameForRename.trim()}
-              onClick={handleRenameProject}
-            >
-              Rename
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Project Dialog */}
-      <Dialog
-        onOpenChange={(open) => {
-          setShowDeleteProjectDialog(open);
-          if (!open) {
-            setDeleteProjectConfirmation("");
-            setProjectToDelete(null);
-            setProjectWorkflowCount(0);
-          }
-        }}
-        open={showDeleteProjectDialog}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Project</DialogTitle>
-            <DialogDescription>
-              This action cannot be undone. This will permanently delete the
-              project &ldquo;{projectToDelete?.name}&rdquo;
-              {projectWorkflowCount > 0 && (
-                <>
-                  {" "}
-                  and <strong>{projectWorkflowCount}</strong> workflow
-                  {projectWorkflowCount === 1 ? "" : "s"} associated with it
-                </>
-              )}
-              .
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="deleteProjectConfirmation">
-                Type <strong>{projectToDelete?.name}</strong> to confirm
-              </Label>
-              <Input
-                id="deleteProjectConfirmation"
-                onChange={(e) => setDeleteProjectConfirmation(e.target.value)}
-                onKeyDown={(e) => {
-                  if (
-                    e.key === "Enter" &&
-                    deleteProjectConfirmation === projectToDelete?.name
-                  ) {
-                    handleDeleteProject();
-                  }
-                }}
-                placeholder={projectToDelete?.name || ""}
-                value={deleteProjectConfirmation}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              onClick={() => setShowDeleteProjectDialog(false)}
-              variant="outline"
-            >
-              Cancel
-            </Button>
-            <Button
-              disabled={deleteProjectConfirmation !== projectToDelete?.name}
-              onClick={handleDeleteProject}
-              variant="destructive"
-            >
-              Delete Project
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Project Integrations Dialog */}
-      <ProjectIntegrationsDialog
-        onOpenChange={setShowProjectIntegrationsDialog}
-        open={showProjectIntegrationsDialog}
-        projectId={selectedProjectFilter}
-        projectName={
-          vercelProjects.find((p) => p.id === selectedProjectFilter)?.name ||
-          null
-        }
-      />
-
       {/* Unsaved Changes Run Confirmation Dialog */}
-      <Dialog
+      <AlertDialog
         onOpenChange={setShowUnsavedRunDialog}
         open={showUnsavedRunDialog}
       >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Unsaved Changes</DialogTitle>
-            <DialogDescription>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+            <AlertDialogDescription>
               You have unsaved changes. Would you like to save before running
               the workflow?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              onClick={() => setShowUnsavedRunDialog(false)}
-              variant="outline"
-            >
-              Cancel
-            </Button>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <Button onClick={handleRunWithoutSaving} variant="outline">
               Run Without Saving
             </Button>
             <Button onClick={handleSaveAndRun}>Save and Run</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

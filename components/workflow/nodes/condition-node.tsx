@@ -65,7 +65,7 @@ const parseTemplateContent = (text: string) => {
         if (part.type === "badge") {
           return (
             <span
-              className="inline-flex items-center gap-1 rounded bg-blue-500/10 px-1.5 py-0.5 text-blue-600 dark:text-blue-400 font-mono text-xs border border-blue-500/20"
+              className="inline-flex items-center gap-1 rounded border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 font-mono text-blue-600 text-xs dark:text-blue-400"
               key={index}
             >
               {part.content}
@@ -119,9 +119,7 @@ export const ConditionNode = memo(({ data, selected }: ConditionNodeProps) => {
         </div>
       </NodeHeader>
       {hasContent && (
-        <NodeContent>
-          {parseTemplateContent(condition)}
-        </NodeContent>
+        <NodeContent>{parseTemplateContent(condition)}</NodeContent>
       )}
     </Node>
   );

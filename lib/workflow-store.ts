@@ -88,19 +88,19 @@ export const updateNodeDataAtom = atom(
   null,
   (get, set, { id, data }: { id: string; data: Partial<WorkflowNodeData> }) => {
     const currentNodes = get(nodesAtom);
-    
+
     // Check if label is being updated
     const oldNode = currentNodes.find((node) => node.id === id);
     const oldLabel = oldNode?.data.label;
     const newLabel = data.label;
     const isLabelChange = newLabel !== undefined && oldLabel !== newLabel;
-    
+
     const newNodes = currentNodes.map((node) => {
       if (node.id === id) {
         // Update the node itself
         return { ...node, data: { ...node.data, ...data } };
       }
-      
+
       // If label changed, update all templates in other nodes that reference this node
       if (isLabelChange && oldLabel) {
         const updatedConfig = updateTemplatesInConfig(
@@ -109,7 +109,7 @@ export const updateNodeDataAtom = atom(
           oldLabel,
           newLabel
         );
-        
+
         if (updatedConfig !== node.data.config) {
           return {
             ...node,
@@ -120,10 +120,10 @@ export const updateNodeDataAtom = atom(
           };
         }
       }
-      
+
       return node;
     });
-    
+
     set(nodesAtom, newNodes);
 
     // Mark as having unsaved changes (except for status updates during execution)

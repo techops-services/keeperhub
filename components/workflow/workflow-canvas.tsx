@@ -7,6 +7,7 @@ import {
   useReactFlow,
   type Viewport,
   type Connection as XYFlowConnection,
+  type Edge as XYFlowEdge,
 } from "@xyflow/react";
 import { useAtom, useSetAtom } from "jotai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -100,6 +101,7 @@ export function WorkflowCanvas() {
     undefined
   );
   const [viewportReady, setViewportReady] = useState(false);
+  const [shouldFitView, setShouldFitView] = useState(false);
   const viewportInitialized = useRef(false);
 
   // Load saved viewport when workflow changes
@@ -107,6 +109,7 @@ export function WorkflowCanvas() {
     if (!currentWorkflowId) {
       setViewportReady(true);
       setDefaultViewport(undefined);
+      setShouldFitView(false);
       viewportInitialized.current = true;
       return;
     }
@@ -119,6 +122,7 @@ export function WorkflowCanvas() {
       try {
         const viewport = JSON.parse(saved) as Viewport;
         setDefaultViewport(viewport);
+        setShouldFitView(false);
         // Mark viewport as ready immediately to prevent flash
         setViewportReady(true);
         // Set viewport after a brief delay to ensure ReactFlow is ready
@@ -129,15 +133,18 @@ export function WorkflowCanvas() {
       } catch (error) {
         console.error("Failed to load viewport:", error);
         setDefaultViewport(undefined);
+        setShouldFitView(true);
         setViewportReady(true);
         viewportInitialized.current = true;
       }
     } else {
       setDefaultViewport(undefined);
+      setShouldFitView(true);
       setViewportReady(true);
       // Allow saving viewport after fitView completes
       setTimeout(() => {
         viewportInitialized.current = true;
+        setShouldFitView(false);
       }, 500);
     }
   }, [currentWorkflowId, setViewport]);
@@ -167,22 +174,25 @@ export function WorkflowCanvas() {
     []
   );
 
-  const isValidConnection = useCallback((connection: XYFlowConnection) => {
-    // Ensure we have both source and target
-    if (!connection.source || !connection.target) {
-      return false;
-    }
+  const isValidConnection = useCallback(
+    (connection: XYFlowConnection | XYFlowEdge) => {
+      // Ensure we have both source and target
+      if (!(connection.source && connection.target)) {
+        return false;
+      }
 
-    // Prevent self-connections
-    if (connection.source === connection.target) {
-      return false;
-    }
+      // Prevent self-connections
+      if (connection.source === connection.target) {
+        return false;
+      }
 
-    // Ensure connection is from source handle to target handle
-    // sourceHandle should be defined if connecting from a specific handle
-    // targetHandle should be defined if connecting to a specific handle
-    return true;
-  }, []);
+      // Ensure connection is from source handle to target handle
+      // sourceHandle should be defined if connecting from a specific handle
+      // targetHandle should be defined if connecting to a specific handle
+      return true;
+    },
+    []
+  );
 
   const onConnect: OnConnect = useCallback(
     (connection: XYFlowConnection) => {
@@ -350,7 +360,7 @@ export function WorkflowCanvas() {
         edges={edges}
         edgeTypes={edgeTypes}
         elementsSelectable={!isGenerating}
-        fitView={!defaultViewport}
+        fitView={shouldFitView}
         isValidConnection={isValidConnection}
         nodes={nodes}
         nodesConnectable={!isGenerating}
@@ -370,17 +380,17 @@ export function WorkflowCanvas() {
           <defs>
             <marker
               id="edge-arrow"
-              markerWidth="20"
               markerHeight="20"
+              markerUnits="strokeWidth"
+              markerWidth="20"
+              orient="auto"
               refX="10"
               refY="6"
-              orient="auto"
-              markerUnits="strokeWidth"
             >
               <path
+                className="text-foreground"
                 d="M 0 0 L 12 6 L 0 12 z"
                 fill="currentColor"
-                className="text-foreground"
               />
             </marker>
           </defs>
