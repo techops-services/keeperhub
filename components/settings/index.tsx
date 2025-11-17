@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { create as createDataSource } from "@/app/actions/data-source/create";
 import { deleteDataSource } from "@/app/actions/data-source/delete";
 import { getAll as getAllDataSources } from "@/app/actions/data-source/get-all";
@@ -61,22 +61,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [savingSource, setSavingSource] = useState(false);
   const [deleteSourceId, setDeleteSourceId] = useState<string | null>(null);
 
-  const loadAll = async () => {
-    setLoading(true);
-    try {
-      await Promise.all([loadAccount(), loadDataSources()]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (open) {
-      loadAll();
-    }
-  }, [open, loadAll]);
-
-  const loadAccount = async () => {
+  const loadAccount = useCallback(async () => {
     try {
       const data = await getUser();
       setAccountName(data.name || "");
@@ -84,9 +69,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     } catch (error) {
       console.error("Failed to load account:", error);
     }
-  };
+  }, []);
 
-  const loadDataSources = async () => {
+  const loadDataSources = useCallback(async () => {
     try {
       const data = await getAllDataSources();
       // Convert Date objects to ISO strings
@@ -100,7 +85,22 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     } catch (error) {
       console.error("Failed to load data sources:", error);
     }
-  };
+  }, []);
+
+  const loadAll = useCallback(async () => {
+    setLoading(true);
+    try {
+      await Promise.all([loadAccount(), loadDataSources()]);
+    } finally {
+      setLoading(false);
+    }
+  }, [loadAccount, loadDataSources]);
+
+  useEffect(() => {
+    if (open) {
+      loadAll();
+    }
+  }, [open, loadAll]);
 
   const saveAccount = async () => {
     setSavingAccount(true);
