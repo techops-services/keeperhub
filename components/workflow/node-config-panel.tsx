@@ -36,6 +36,95 @@ import { ActionConfig } from "./config/action-config";
 import { TriggerConfig } from "./config/trigger-config";
 import { WorkflowRuns } from "./workflow-runs";
 
+// Helper function to convert template variables to JavaScript expressions
+const convertTemplateToJS = (template: string): { 
+  convertedString: string; 
+  hasTemplates: boolean 
+} => {
+  if (!template || typeof template !== "string") {
+    return { convertedString: template, hasTemplates: false };
+  }
+
+  let hasTemplates = false;
+  
+  // Match {{...}} patterns
+  const pattern = /\{\{([^}]+)\}\}/g;
+  
+  const convertedString = template.replace(pattern, (match, expression) => {
+    hasTemplates = true;
+    const trimmed = expression.trim();
+
+    // Check if this is a new format ID reference (starts with @)
+    if (trimmed.startsWith("@")) {
+      // Format: @nodeId:DisplayName or @nodeId:DisplayName.field
+      const withoutAt = trimmed.substring(1);
+      const colonIndex = withoutAt.indexOf(":");
+
+      if (colonIndex === -1) {
+        return match; // Invalid format, keep original
+      }
+
+      const nodeId = withoutAt.substring(0, colonIndex);
+      const rest = withoutAt.substring(colonIndex + 1);
+
+      // Check if there's a field accessor after the display name
+      const dotIndex = rest.indexOf(".");
+      const fieldPath = dotIndex !== -1 ? rest.substring(dotIndex + 1) : "";
+
+      // Handle special case: {{@nodeId:DisplayName}} (entire output)
+      if (!fieldPath) {
+        return `\${input.outputs?.['${nodeId}']?.data}`;
+      }
+
+      // Parse field path like "field.nested" or "items[0]"
+      const accessPath = fieldPath.split('.').map((part: string) => {
+        // Handle array access
+        const arrayMatch = part.match(/^([^[]+)\[(\d+)\]$/);
+        if (arrayMatch) {
+          return `?.${arrayMatch[1]}?.[${arrayMatch[2]}]`;
+        }
+        return `?.${part}`;
+      }).join('');
+
+      return `\${input.outputs?.['${nodeId}']?.data${accessPath}}`;
+    }
+    // Check if this is a legacy node ID reference (starts with $)
+    else if (trimmed.startsWith("$")) {
+      const withoutDollar = trimmed.substring(1);
+
+      // Handle special case: {{$nodeId}} (entire output)
+      if (!(withoutDollar.includes(".") || withoutDollar.includes("["))) {
+        return `\${input.outputs?.['${withoutDollar}']?.data}`;
+      }
+
+      // Parse expression like "$nodeId.field.nested"
+      const parts = withoutDollar.split(".");
+      const nodeId = parts[0];
+      const fieldPath = parts.slice(1).join(".");
+      
+      if (!fieldPath) {
+        return `\${input.outputs?.['${nodeId}']?.data}`;
+      }
+
+      const accessPath = fieldPath.split('.').map((part: string) => {
+        const arrayMatch = part.match(/^([^[]+)\[(\d+)\]$/);
+        if (arrayMatch) {
+          return `?.${arrayMatch[1]}?.[${arrayMatch[2]}]`;
+        }
+        return `?.${part}`;
+      }).join('');
+
+      return `\${input.outputs?.['${nodeId}']?.data${accessPath}}`;
+    } else {
+      // Legacy label-based references - not ideal but keep for compatibility
+      // Just wrap in a generic access pattern
+      return `\${input.outputs?.['${trimmed.replace(/\./g, "']?.data?.")}']}`; 
+    }
+  });
+
+  return { convertedString, hasTemplates };
+};
+
 // Generate code snippet for a single node
 const generateNodeCode = (node: {
   id: string;
@@ -88,10 +177,28 @@ const generateNodeCode = (node: {
         actionType === "Send Email" ||
         node.data.label.toLowerCase().includes("email")
       ) {
-        lines.push("  const result = await sendEmail({");
-        lines.push(`    to: "user@example.com",`);
-        lines.push(`    subject: "Subject",`);
-        lines.push(`    body: "Email content",`);
+        const emailTo = (node.data.config?.emailTo as string) || "user@example.com";
+        const emailSubject = (node.data.config?.emailSubject as string) || "Subject";
+        const emailBody = (node.data.config?.emailBody as string) || "Email content";
+        const { convertedString: convertedTo, hasTemplates: hasToTemplates } = convertTemplateToJS(emailTo);
+        const { convertedString: convertedSubject, hasTemplates: hasSubjectTemplates } = convertTemplateToJS(emailSubject);
+        const { convertedString: convertedBody, hasTemplates: hasBodyTemplates } = convertTemplateToJS(emailBody);
+        
+        if (hasToTemplates || hasSubjectTemplates || hasBodyTemplates) {
+          lines.push("  // Send email with dynamic values");
+          if (hasToTemplates) lines.push(`  const to = \`${convertedTo}\`;`);
+          if (hasSubjectTemplates) lines.push(`  const subject = \`${convertedSubject}\`;`);
+          if (hasBodyTemplates) lines.push(`  const body = \`${convertedBody}\`;`);
+          lines.push("  const result = await sendEmail({");
+          lines.push(hasToTemplates ? "    to," : `    to: "${emailTo}",`);
+          lines.push(hasSubjectTemplates ? "    subject," : `    subject: "${emailSubject}",`);
+          lines.push(hasBodyTemplates ? "    body," : `    body: "${emailBody}",`);
+        } else {
+          lines.push("  const result = await sendEmail({");
+          lines.push(`    to: "${emailTo}",`);
+          lines.push(`    subject: "${emailSubject}",`);
+          lines.push(`    body: "${emailBody}",`);
+        }
         lines.push("  });");
         lines.push("");
         lines.push(`  console.log('Email sent:', result);`);
@@ -111,12 +218,150 @@ const generateNodeCode = (node: {
         actionType === "Send Slack Message" ||
         node.data.label.toLowerCase().includes("slack")
       ) {
-        lines.push("  const result = await sendSlackMessage({");
-        lines.push(`    channel: "#general",`);
-        lines.push(`    text: "Message content",`);
+        const slackChannel = (node.data.config?.slackChannel as string) || "#general";
+        const slackMessage = (node.data.config?.slackMessage as string) || "Message content";
+        const { convertedString: convertedChannel, hasTemplates: hasChannelTemplates } = convertTemplateToJS(slackChannel);
+        const { convertedString: convertedMessage, hasTemplates: hasMessageTemplates } = convertTemplateToJS(slackMessage);
+        
+        if (hasChannelTemplates || hasMessageTemplates) {
+          lines.push("  // Send Slack message with dynamic values");
+          if (hasChannelTemplates) lines.push(`  const channel = \`${convertedChannel}\`;`);
+          if (hasMessageTemplates) lines.push(`  const text = \`${convertedMessage}\`;`);
+          lines.push("  const result = await sendSlackMessage({");
+          lines.push(hasChannelTemplates ? "    channel," : `    channel: "${slackChannel}",`);
+          lines.push(hasMessageTemplates ? "    text," : `    text: "${slackMessage}",`);
+        } else {
+          lines.push("  const result = await sendSlackMessage({");
+          lines.push(`    channel: "${slackChannel}",`);
+          lines.push(`    text: "${slackMessage}",`);
+        }
         lines.push("  });");
         lines.push("");
         lines.push(`  console.log('Slack message sent:', result);`);
+        lines.push("  return result;");
+      } else if (
+        actionType === "Database Query" ||
+        node.data.label.toLowerCase().includes("database")
+      ) {
+        const dbQuery = (node.data.config?.dbQuery as string) || "SELECT * FROM users";
+        const { convertedString: convertedQuery, hasTemplates } = convertTemplateToJS(dbQuery);
+        
+        if (hasTemplates) {
+          lines.push("  // Execute database query with dynamic values");
+          lines.push(`  const query = \`${convertedQuery}\`;`);
+          lines.push("  const result = await executeQuery({");
+          lines.push("    query,");
+          lines.push("  });");
+        } else {
+          lines.push("  // Execute database query");
+          lines.push("  const result = await executeQuery({");
+          lines.push(`    query: \`${dbQuery}\`,`);
+          lines.push("  });");
+        }
+        lines.push("");
+        lines.push(`  console.log('Database query completed:', result);`);
+        lines.push("  return result;");
+      } else if (
+        actionType === "Generate Text" ||
+        node.data.label.toLowerCase().includes("generate text")
+      ) {
+        const aiPrompt = (node.data.config?.aiPrompt as string) || "Generate a summary";
+        const aiModel = (node.data.config?.aiModel as string) || "gpt-4o-mini";
+        const aiFormat = (node.data.config?.aiFormat as string) || "text";
+        const { convertedString: convertedPrompt, hasTemplates } = convertTemplateToJS(aiPrompt);
+        
+        lines.push("  // Generate text using AI");
+        if (hasTemplates) {
+          lines.push(`  const prompt = \`${convertedPrompt}\`;`);
+          lines.push("  const result = await generateText({");
+          lines.push(`    model: "${aiModel}",`);
+          lines.push("    prompt,");
+        } else {
+          lines.push("  const result = await generateText({");
+          lines.push(`    model: "${aiModel}",`);
+          lines.push(`    prompt: \`${aiPrompt}\`,`);
+        }
+        if (aiFormat === "object") {
+          lines.push(`    format: "object",`);
+        }
+        lines.push("  });");
+        lines.push("");
+        lines.push(`  console.log('Text generated:', result);`);
+        lines.push("  return result;");
+      } else if (
+        actionType === "Generate Image" ||
+        node.data.label.toLowerCase().includes("generate image")
+      ) {
+        const imagePrompt = (node.data.config?.imagePrompt as string) || "A beautiful landscape";
+        const imageModel = (node.data.config?.imageModel as string) || "openai/dall-e-3";
+        const { convertedString: convertedPrompt, hasTemplates } = convertTemplateToJS(imagePrompt);
+        
+        lines.push("  // Generate image using AI");
+        if (hasTemplates) {
+          lines.push(`  const prompt = \`${convertedPrompt}\`;`);
+          lines.push("  const result = await generateImage({");
+          lines.push(`    model: "${imageModel}",`);
+          lines.push("    prompt,");
+        } else {
+          lines.push("  const result = await generateImage({");
+          lines.push(`    model: "${imageModel}",`);
+          lines.push(`    prompt: \`${imagePrompt}\`,`);
+        }
+        lines.push("  });");
+        lines.push("");
+        lines.push(`  console.log('Image generated:', result);`);
+        lines.push("  return result;");
+      } else if (
+        actionType === "Execute Code" ||
+        node.data.label.toLowerCase().includes("execute code")
+      ) {
+        const code = (node.data.config?.code as string) || "return { result: 'success' }";
+        const codeLanguage = (node.data.config?.codeLanguage as string) || "javascript";
+        lines.push(`  // Execute ${codeLanguage} code`);
+        lines.push("  const result = await executeCode({");
+        lines.push(`    language: "${codeLanguage}",`);
+        lines.push(`    code: \`${code}\`,`);
+        lines.push("  });");
+        lines.push("");
+        lines.push(`  console.log('Code executed:', result);`);
+        lines.push("  return result;");
+      } else if (
+        actionType === "Create Ticket" ||
+        node.data.label.toLowerCase().includes("ticket")
+      ) {
+        const ticketTitle = (node.data.config?.ticketTitle as string) || "Bug report";
+        const ticketDescription = (node.data.config?.ticketDescription as string) || "Issue description";
+        const { convertedString: convertedTitle, hasTemplates: hasTitleTemplates } = convertTemplateToJS(ticketTitle);
+        const { convertedString: convertedDescription, hasTemplates: hasDescriptionTemplates } = convertTemplateToJS(ticketDescription);
+        
+        if (hasTitleTemplates || hasDescriptionTemplates) {
+          lines.push("  // Create ticket with dynamic values");
+          if (hasTitleTemplates) lines.push(`  const title = \`${convertedTitle}\`;`);
+          if (hasDescriptionTemplates) lines.push(`  const description = \`${convertedDescription}\`;`);
+          lines.push("  const result = await createTicket({");
+          lines.push(hasTitleTemplates ? "    title," : `    title: "${ticketTitle}",`);
+          lines.push(hasDescriptionTemplates ? "    description," : `    description: "${ticketDescription}",`);
+          lines.push(`    priority: 2,`);
+        } else {
+          lines.push("  const result = await createTicket({");
+          lines.push(`    title: "${ticketTitle}",`);
+          lines.push(`    description: "${ticketDescription}",`);
+          lines.push(`    priority: 2,`);
+        }
+        lines.push("  });");
+        lines.push("");
+        lines.push(`  console.log('Ticket created:', result);`);
+        lines.push("  return result;");
+      } else if (
+        actionType === "Find Issues" ||
+        node.data.label.toLowerCase().includes("find issues")
+      ) {
+        lines.push("  const result = await findIssues({");
+        lines.push(`    assigneeId: "user-id",`);
+        lines.push(`    status: "in_progress",`);
+        lines.push("  });");
+        lines.push("");
+        lines.push(`  console.log('Issues found:', result);`);
         lines.push("  return result;");
       } else {
         lines.push(`  const response = await fetch('${endpoint}', {`);
@@ -136,8 +381,19 @@ const generateNodeCode = (node: {
 
     case "condition": {
       const condition = (node.data.config?.condition as string) || "true";
+      const { convertedString: convertedCondition, hasTemplates } = convertTemplateToJS(condition);
+      
       lines.push("  // Evaluate condition");
-      lines.push(`  const result = ${condition};`);
+      if (hasTemplates) {
+        // Convert template string to actual JS expression that accesses the values
+        // Remove the template literal backticks and ${ } wrappers to get raw JS
+        const jsExpression = convertedCondition
+          .replace(/\$\{/g, '(')
+          .replace(/\}/g, ')');
+        lines.push(`  const result = ${jsExpression};`);
+      } else {
+        lines.push(`  const result = ${condition};`);
+      }
       lines.push("");
       lines.push(`  console.log('Condition evaluated:', result);`);
       lines.push("  return { condition: result };");
