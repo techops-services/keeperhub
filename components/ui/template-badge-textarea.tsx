@@ -49,12 +49,151 @@ export function TemplateBadgeTextarea({
     }
   }, [value]);
 
+  // Save cursor position
+  const saveCursorPosition = (): { offset: number } | null => {
+    if (!contentRef.current) return null;
+    
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      console.log("[Textarea] saveCursorPosition: No selection");
+      return null;
+    }
+    
+    const range = selection.getRangeAt(0);
+    const preCaretRange = range.cloneRange();
+    preCaretRange.selectNodeContents(contentRef.current);
+    preCaretRange.setEnd(range.endContainer, range.endOffset);
+    
+    console.log("[Textarea] saveCursorPosition: range.endContainer", range.endContainer, "endOffset", range.endOffset);
+    
+    // Calculate offset considering badges as single characters
+    let offset = 0;
+    const walker = document.createTreeWalker(
+      contentRef.current,
+      NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+      null
+    );
+    
+    let node;
+    let found = false;
+    while ((node = walker.nextNode()) && !found) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        if (node === range.endContainer) {
+          offset += range.endOffset;
+          found = true;
+          console.log("[Textarea] saveCursorPosition: Found cursor in text node, offset:", offset);
+        } else {
+          const textLength = (node.textContent || "").length;
+          offset += textLength;
+          console.log("[Textarea] saveCursorPosition: Text node before cursor, length:", textLength);
+        }
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        const element = node as HTMLElement;
+        const template = element.getAttribute("data-template");
+        if (template) {
+          if (element.contains(range.endContainer) || element === range.endContainer) {
+            offset += template.length;
+            found = true;
+            console.log("[Textarea] saveCursorPosition: Found cursor in badge, offset:", offset);
+          } else {
+            offset += template.length;
+            console.log("[Textarea] saveCursorPosition: Badge before cursor, length:", template.length);
+          }
+        } else if (element.tagName === "BR") {
+          if (element === range.endContainer || element.contains(range.endContainer)) {
+            found = true;
+          } else {
+            offset += 1; // Count line break as 1 character
+            console.log("[Textarea] saveCursorPosition: BR before cursor");
+          }
+        }
+      }
+    }
+    
+    console.log("[Textarea] saveCursorPosition: Final offset:", offset);
+    return { offset };
+  };
+  
+  // Restore cursor position
+  const restoreCursorPosition = (cursorPos: { offset: number } | null) => {
+    if (!contentRef.current || !cursorPos) return;
+    
+    let offset = 0;
+    const walker = document.createTreeWalker(
+      contentRef.current,
+      NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+      null
+    );
+    
+    let node;
+    let targetNode: Node | null = null;
+    let targetOffset = 0;
+    
+    while ((node = walker.nextNode())) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const textLength = (node.textContent || "").length;
+        if (offset + textLength >= cursorPos.offset) {
+          targetNode = node;
+          targetOffset = cursorPos.offset - offset;
+          break;
+        }
+        offset += textLength;
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        const element = node as HTMLElement;
+        const template = element.getAttribute("data-template");
+        if (template) {
+          if (offset + template.length >= cursorPos.offset) {
+            // Position cursor after the badge
+            targetNode = element.nextSibling;
+            targetOffset = 0;
+            if (!targetNode && element.parentNode) {
+              // If no next sibling, create a text node
+              targetNode = document.createTextNode("");
+              element.parentNode.appendChild(targetNode);
+            }
+            break;
+          }
+          offset += template.length;
+        } else if (element.tagName === "BR") {
+          if (offset + 1 >= cursorPos.offset) {
+            // Position cursor after the BR
+            targetNode = element.nextSibling;
+            targetOffset = 0;
+            if (!targetNode && element.parentNode) {
+              targetNode = document.createTextNode("");
+              element.parentNode.appendChild(targetNode);
+            }
+            break;
+          }
+          offset += 1;
+        }
+      }
+    }
+    
+    if (targetNode) {
+      const range = document.createRange();
+      const selection = window.getSelection();
+      try {
+        range.setStart(targetNode, Math.min(targetOffset, targetNode.textContent?.length || 0));
+        range.collapse(true);
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+      } catch (e) {
+        // If positioning fails, just focus the element
+        contentRef.current.focus();
+      }
+    }
+  };
+
   // Parse text and render with badges
   const updateDisplay = () => {
     if (!contentRef.current || !shouldUpdateDisplay.current) return;
 
     const container = contentRef.current;
     const text = internalValue || "";
+    
+    // Save cursor position before updating
+    const cursorPos = isFocused ? saveCursorPosition() : null;
 
     // Clear current content
     container.innerHTML = "";
@@ -104,6 +243,12 @@ export function TemplateBadgeTextarea({
     }
 
     shouldUpdateDisplay.current = false;
+    
+    // Restore cursor position after updating
+    if (cursorPos) {
+      // Use requestAnimationFrame to ensure DOM is fully updated
+      requestAnimationFrame(() => restoreCursorPosition(cursorPos));
+    }
   };
 
   // Helper to add text with line breaks preserved
@@ -133,18 +278,38 @@ export function TemplateBadgeTextarea({
     let node;
     while ((node = walker.nextNode())) {
       if (node.nodeType === Node.TEXT_NODE) {
-        result += node.textContent;
+        // Check if this text node is inside a badge element
+        let parent = node.parentElement;
+        let isInsideBadge = false;
+        while (parent && parent !== contentRef.current) {
+          if (parent.getAttribute("data-template")) {
+            isInsideBadge = true;
+            break;
+          }
+          parent = parent.parentElement;
+        }
+        
+        // Only add text if it's NOT inside a badge
+        if (!isInsideBadge) {
+          result += node.textContent;
+          console.log("[Textarea] extractValue: Adding text node:", node.textContent);
+        } else {
+          console.log("[Textarea] extractValue: Skipping text inside badge:", node.textContent);
+        }
       } else if (node.nodeType === Node.ELEMENT_NODE) {
         const element = node as HTMLElement;
         const template = element.getAttribute("data-template");
         if (template) {
           result += template;
+          console.log("[Textarea] extractValue: Adding template:", template);
         } else if (element.tagName === "BR") {
           result += "\n";
+          console.log("[Textarea] extractValue: Adding line break");
         }
       }
     }
 
+    console.log("[Textarea] extractValue: Final result:", result);
     return result;
   };
 
@@ -152,40 +317,85 @@ export function TemplateBadgeTextarea({
     // Extract the value from DOM
     const newValue = extractValue();
     
+    console.log("[Textarea] handleInput: newValue:", newValue);
+    console.log("[Textarea] handleInput: internalValue:", internalValue);
+    console.log("[Textarea] handleInput: DOM innerHTML:", contentRef.current?.innerHTML);
+    
     // Check if the value has changed
     if (newValue === internalValue) {
       // No change, ignore (this can happen with badge clicks, etc)
+      console.log("[Textarea] handleInput: No change detected, ignoring");
       return;
     }
     
-    // Check if a template was just inserted (contains the template pattern)
-    const hasTemplate = /\{\{@([^:]+):([^}]+)\}\}/g.test(newValue);
-    const hadTemplate = /\{\{@([^:]+):([^}]+)\}\}/g.test(internalValue);
+    // Count templates in old and new values
+    const oldTemplates = (internalValue.match(/\{\{@([^:]+):([^}]+)\}\}/g) || []).length;
+    const newTemplates = (newValue.match(/\{\{@([^:]+):([^}]+)\}\}/g) || []).length;
     
-    if (hasTemplate && !hadTemplate) {
-      // A template was just inserted for the first time, update display to show badge
+    console.log("[Textarea] handleInput: oldTemplates:", oldTemplates, "newTemplates:", newTemplates);
+    
+    if (newTemplates > oldTemplates) {
+      // A new template was added, update display to show badge
+      console.log("[Textarea] handleInput: New template added, rendering badge");
       setInternalValue(newValue);
       onChange?.(newValue);
       shouldUpdateDisplay.current = true;
       setShowAutocomplete(false);
       
-      // Call updateDisplay synchronously to render badges immediately
+      // Call updateDisplay immediately to render badges
       requestAnimationFrame(() => updateDisplay());
       return;
     }
     
-    if (hadTemplate) {
-      // We already have badges - need to extract carefully and update
+    if (newTemplates === oldTemplates && newTemplates > 0) {
+      // Same number of templates, just typing around existing badges
+      // DON'T update display, just update the value
+      console.log("[Textarea] handleInput: Typing around existing badges, NOT updating display");
+      setInternalValue(newValue);
+      onChange?.(newValue);
+      // Don't trigger display update - this prevents cursor reset!
+      
+      // Check for @ sign to show autocomplete (moved here so it works with existing badges)
+      const lastAtSign = newValue.lastIndexOf("@");
+      
+      if (lastAtSign !== -1) {
+        const filter = newValue.slice(lastAtSign + 1);
+        
+        if (!filter.includes(" ") && !filter.includes("\n")) {
+          setAutocompleteFilter(filter);
+          setAtSignPosition(lastAtSign);
+          
+          if (contentRef.current) {
+            const textareaRect = contentRef.current.getBoundingClientRect();
+            const position = {
+              top: textareaRect.bottom + window.scrollY + 4,
+              left: textareaRect.left + window.scrollX,
+            };
+            setAutocompletePosition(position);
+          }
+          setShowAutocomplete(true);
+        } else {
+          setShowAutocomplete(false);
+        }
+      } else {
+        setShowAutocomplete(false);
+      }
+      
+      return;
+    }
+    
+    if (newTemplates < oldTemplates) {
+      // A template was removed (e.g., user deleted a badge or part of template text)
+      console.log("[Textarea] handleInput: Template removed, updating display");
       setInternalValue(newValue);
       onChange?.(newValue);
       shouldUpdateDisplay.current = true;
-      
-      // Update display on next frame to avoid fighting with browser
       requestAnimationFrame(() => updateDisplay());
       return;
     }
     
     // Normal typing (no badges present)
+    console.log("[Textarea] handleInput: Normal typing, no badges");
     setInternalValue(newValue);
     onChange?.(newValue);
     
