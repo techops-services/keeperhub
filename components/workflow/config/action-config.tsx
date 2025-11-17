@@ -327,38 +327,48 @@ export function ActionConfig({
       {/* Database Query fields */}
       {config?.actionType === "Database Query" && (
         <>
-          {loadingDataSources ? (
-            <div className="space-y-2">
-              <Label>Loading data sources...</Label>
-            </div>
-          ) : dataSources.length === 0 ? (
-            <Alert>
-              <AlertDescription>
-                No data sources configured. Please add a data source in Settings
-                to query databases.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <div className="space-y-2">
-              <Label htmlFor="dataSourceId">Data Source</Label>
-              <Select
-                disabled={disabled}
-                onValueChange={(value) => onUpdateConfig("dataSourceId", value)}
-                value={(config?.dataSourceId as string) || ""}
-              >
-                <SelectTrigger className="w-full" id="dataSourceId">
-                  <SelectValue placeholder="Select a data source" />
-                </SelectTrigger>
-                <SelectContent>
-                  {dataSources.map((source) => (
-                    <SelectItem key={source.id} value={source.id}>
-                      {source.name} {source.isDefault && "(Default)"}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          {(() => {
+            if (loadingDataSources) {
+              return (
+                <div className="space-y-2">
+                  <Label>Loading data sources...</Label>
+                </div>
+              );
+            }
+            if (dataSources.length === 0) {
+              return (
+                <Alert>
+                  <AlertDescription>
+                    No data sources configured. Please add a data source in
+                    Settings to query databases.
+                  </AlertDescription>
+                </Alert>
+              );
+            }
+            return (
+              <div className="space-y-2">
+                <Label htmlFor="dataSourceId">Data Source</Label>
+                <Select
+                  disabled={disabled}
+                  onValueChange={(value) =>
+                    onUpdateConfig("dataSourceId", value)
+                  }
+                  value={(config?.dataSourceId as string) || ""}
+                >
+                  <SelectTrigger className="w-full" id="dataSourceId">
+                    <SelectValue placeholder="Select a data source" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {dataSources.map((source) => (
+                      <SelectItem key={source.id} value={source.id}>
+                        {source.name} {source.isDefault && "(Default)"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            );
+          })()}
           <div className="space-y-2">
             <Label htmlFor="dbQuery">SQL Query</Label>
             <div className="overflow-hidden rounded-md border">

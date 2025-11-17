@@ -50,7 +50,10 @@ export const Recents = ({ limit }: RecentsProps = {}) => {
     return (
       <div className="grid w-full gap-1 px-4">
         {new Array(limit).fill(0).map((_, index) => (
-          <Skeleton className="h-[30px] w-full rounded-full" key={index} />
+          <Skeleton
+            className="h-[30px] w-full rounded-full"
+            key={`skeleton-${index}`}
+          />
         ))}
         <Skeleton className="mt-2 h-4 w-12 rounded-full" />
       </div>

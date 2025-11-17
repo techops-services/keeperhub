@@ -75,7 +75,10 @@ export function SchemaBuilder({
   return (
     <div className={`space-y-3 ${indentClass}`}>
       {schema.map((field, index) => (
-        <div className="space-y-2 rounded-md border p-3" key={index}>
+        <div
+          className="space-y-2 rounded-md border p-3"
+          key={field.name || `field-${level}-${index}`}
+        >
           <div className="flex gap-2">
             <div className="flex-1">
               <Label htmlFor={`field-name-${level}-${index}`}>

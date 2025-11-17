@@ -51,7 +51,7 @@ const generateNodeCode = (node: {
   // Convert label to camelCase function name
   const functionName = `${node.data.label
     .replace(/[^a-zA-Z0-9\s]/g, "")
-    .split(/\s+/)
+    .split(WORD_SPLIT_REGEX)
     .map((word, i) => {
       if (i === 0) {
         return word.toLowerCase();
@@ -157,6 +157,11 @@ const generateNodeCode = (node: {
       lines.push("  return transformed;");
       break;
     }
+
+    default:
+      lines.push("  // No implementation for this node type");
+      lines.push("  return input;");
+      break;
   }
 
   lines.push("}");
@@ -269,24 +274,20 @@ const PanelInner = () => {
             )}
 
             {selectedNode.data.type === "condition" && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="condition">Condition Expression</Label>
-                  <TemplateBadgeInput
-                    disabled={isGenerating}
-                    id="condition"
-                    onChange={(value) => handleUpdateConfig("condition", value)}
-                    placeholder="e.g., 5 > 3, status === 200, {{PreviousNode.value}} > 100"
-                    value={
-                      (selectedNode.data.config?.condition as string) || ""
-                    }
-                  />
-                  <p className="text-muted-foreground text-xs">
-                    Enter a JavaScript expression that evaluates to true or
-                    false. You can use @ to reference previous node outputs.
-                  </p>
-                </div>
-              </>
+              <div className="space-y-2">
+                <Label htmlFor="condition">Condition Expression</Label>
+                <TemplateBadgeInput
+                  disabled={isGenerating}
+                  id="condition"
+                  onChange={(value) => handleUpdateConfig("condition", value)}
+                  placeholder="e.g., 5 > 3, status === 200, {{PreviousNode.value}} > 100"
+                  value={(selectedNode.data.config?.condition as string) || ""}
+                />
+                <p className="text-muted-foreground text-xs">
+                  Enter a JavaScript expression that evaluates to true or false.
+                  You can use @ to reference previous node outputs.
+                </p>
+              </div>
             )}
 
             {selectedNode.data.type === "transform" && (
@@ -422,6 +423,9 @@ const PanelInner = () => {
     </>
   );
 };
+
+// Regex for splitting camel case - defined at top level
+const WORD_SPLIT_REGEX = /\s+/;
 
 export const NodeConfigPanel = () => {
   const [selectedNodeId] = useAtom(selectedNodeAtom);
