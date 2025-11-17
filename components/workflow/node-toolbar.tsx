@@ -83,7 +83,7 @@ export function NodeToolbar() {
       <ButtonGroup className="flex lg:hidden" orientation="vertical">
         {nodeTemplates.map((template) => (
           <Button
-            className="border disabled:opacity-100 disabled:[&>svg]:text-muted-foreground"
+            className="border hover:bg-black/5 disabled:opacity-100 disabled:[&>svg]:text-muted-foreground dark:hover:bg-white/5"
             disabled={isGenerating}
             key={template.type}
             onClick={() => handleAddNode(template)}
@@ -100,7 +100,7 @@ export function NodeToolbar() {
       <ButtonGroup className="hidden lg:flex" orientation="horizontal">
         {nodeTemplates.map((template) => (
           <Button
-            className="border disabled:opacity-100 disabled:[&>svg]:text-muted-foreground"
+            className="border hover:bg-black/5 disabled:opacity-100 disabled:[&>svg]:text-muted-foreground dark:hover:bg-white/5"
             disabled={isGenerating}
             key={template.type}
             onClick={() => handleAddNode(template)}
