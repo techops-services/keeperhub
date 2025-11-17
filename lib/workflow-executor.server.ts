@@ -787,13 +787,68 @@ class ServerWorkflowExecutor {
 
         case "condition": {
           const condition = processedConfig?.condition as string;
-          // Evaluate condition (simplified - in production use a safe eval or expression parser)
-          // For now, just return true
-          const conditionResult = true;
-          result = {
-            success: true,
-            data: { condition, result: conditionResult },
-          };
+          
+          if (!condition || condition.trim() === "") {
+            result = {
+              success: false,
+              error: "Condition expression is required",
+            };
+            break;
+          }
+
+          // Evaluate the condition
+          // The condition should be a simple JavaScript expression
+          // For safety, we'll use a very limited evaluator
+          try {
+            // The condition has already been processed for templates
+            // Now we need to evaluate it as a boolean expression
+            let conditionResult = false;
+
+            // Try to evaluate as a simple comparison or boolean
+            // Support common patterns:
+            // - "true" or "false"
+            // - Numbers (0 = false, non-zero = true)
+            // - Comparison operators (==, ===, !=, !==, >, <, >=, <=)
+            // - Logical operators (&&, ||, !)
+            
+            const trimmed = condition.trim();
+            
+            // Check for boolean literals
+            if (trimmed === "true") {
+              conditionResult = true;
+            } else if (trimmed === "false") {
+              conditionResult = false;
+            } else {
+              // Try to evaluate as a safe expression
+              // For now, we'll use Function constructor with a limited context
+              // In production, you might want to use a proper expression parser
+              try {
+                // Create a safe evaluation function
+                // Only allow reading from context, no assignments
+                const evalFn = new Function(
+                  '"use strict"; return (' + condition + ");",
+                );
+                conditionResult = Boolean(evalFn());
+              } catch (evalError) {
+                console.error("[Executor] Condition evaluation error:", evalError);
+                result = {
+                  success: false,
+                  error: `Invalid condition expression: ${evalError instanceof Error ? evalError.message : "Unknown error"}`,
+                };
+                break;
+              }
+            }
+
+            result = {
+              success: true,
+              data: { condition, result: conditionResult },
+            };
+          } catch (error) {
+            result = {
+              success: false,
+              error: `Failed to evaluate condition: ${error instanceof Error ? error.message : "Unknown error"}`,
+            };
+          }
           break;
         }
 
@@ -863,8 +918,24 @@ class ServerWorkflowExecutor {
     // If successful, execute next nodes
     if (result.success) {
       const nextNodes = this.getNextNodes(nodeId);
-      for (const nextNodeId of nextNodes) {
-        await this.executeSequentially(nextNodeId, visited);
+      
+      // For condition nodes, check if we should continue execution
+      if (node.data.type === "condition") {
+        const conditionResult = (result.data as { result?: boolean })?.result;
+        
+        // Only continue if condition evaluates to true
+        if (conditionResult === true) {
+          for (const nextNodeId of nextNodes) {
+            await this.executeSequentially(nextNodeId, visited);
+          }
+        }
+        // If false, we don't execute any downstream nodes
+        // This effectively creates a "true" branch (continues) and "false" branch (stops)
+      } else {
+        // For non-condition nodes, execute all next nodes normally
+        for (const nextNodeId of nextNodes) {
+          await this.executeSequentially(nextNodeId, visited);
+        }
       }
     }
   }

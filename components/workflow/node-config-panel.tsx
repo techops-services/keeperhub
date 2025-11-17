@@ -269,18 +269,28 @@ const PanelInner = () => {
             )}
 
             {selectedNode.data.type === "condition" && (
-              <div className="space-y-2">
-                <Label htmlFor="condition">Condition</Label>
-                <Input
-                  disabled={isGenerating}
-                  id="condition"
-                  onChange={(e) =>
-                    handleUpdateConfig("condition", e.target.value)
-                  }
-                  placeholder="e.g., value > 100"
-                  value={(selectedNode.data.config?.condition as string) || ""}
-                />
-              </div>
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="condition">Condition Expression</Label>
+                  <Input
+                    disabled={isGenerating}
+                    id="condition"
+                    onChange={(e) =>
+                      handleUpdateConfig("condition", e.target.value)
+                    }
+                    placeholder="e.g., 5 > 3, status === 200, {{PreviousNode.value}} > 100"
+                    value={(selectedNode.data.config?.condition as string) || ""}
+                  />
+                  <p className="text-muted-foreground text-xs">
+                    Enter a JavaScript expression that evaluates to true or
+                    false. You can use template syntax like{" "}
+                    <code className="rounded bg-muted px-1">
+                      {"{{NodeName.field}}"}
+                    </code>{" "}
+                    to reference previous node outputs.
+                  </p>
+                </div>
+              </>
             )}
 
             {selectedNode.data.type === "transform" && (
