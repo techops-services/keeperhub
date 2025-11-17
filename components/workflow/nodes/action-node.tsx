@@ -1,7 +1,7 @@
 "use client";
 
 import type { NodeProps } from "@xyflow/react";
-import { Zap } from "lucide-react";
+import { Code, Database, Settings, Zap } from "lucide-react";
 import { memo } from "react";
 import {
   Node,
@@ -10,6 +10,7 @@ import {
   NodeHeader,
   NodeTitle,
 } from "@/components/ai-elements/node";
+import { IntegrationIcon } from "@/components/ui/integration-icon";
 import { cn } from "@/lib/utils";
 import type { WorkflowNodeData } from "@/lib/workflow-store";
 
@@ -97,6 +98,30 @@ const getIntegrationFromActionType = (actionType: string): string => {
   return integrationMap[actionType] || "System";
 };
 
+// Helper to get provider logo for action type
+const getProviderLogo = (actionType: string) => {
+  switch (actionType) {
+    case "Send Email":
+      return <IntegrationIcon integration="resend" className="size-5" />;
+    case "Send Slack Message":
+      return <IntegrationIcon integration="slack" className="size-5" />;
+    case "Create Ticket":
+    case "Find Issues":
+      return <IntegrationIcon integration="linear" className="size-5" />;
+    case "HTTP Request":
+      return <Zap className="size-5 text-amber-300" />;
+    case "Database Query":
+      return <Database className="size-5 text-blue-300" />;
+    case "Generate Text":
+    case "Generate Image":
+      return <Settings className="size-5 text-purple-300" />;
+    case "Execute Code":
+      return <Code className="size-5 text-green-300" />;
+    default:
+      return <Zap className="size-5 text-amber-300" />;
+  }
+};
+
 type ActionNodeProps = NodeProps & {
   data?: WorkflowNodeData;
 };
@@ -158,8 +183,8 @@ export const ActionNode = memo(({ data, selected }: ActionNodeProps) => {
     >
       <NodeHeader>
         <div className="flex items-center gap-2.5">
-          <span className="flex size-9 items-center justify-center rounded-md bg-amber-600/25">
-            <Zap className="size-4 text-amber-300" />
+          <span className="flex size-9 items-center justify-center rounded-md bg-muted">
+            {getProviderLogo(actionType)}
           </span>
           <div className="flex flex-col gap-0.5">
             <NodeTitle>{displayTitle}</NodeTitle>

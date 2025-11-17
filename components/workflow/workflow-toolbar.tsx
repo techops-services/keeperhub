@@ -240,7 +240,6 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
     try {
       await workflowApi.update(currentWorkflowId, { nodes, edges });
       setHasUnsavedChanges(false);
-      toast.success("Workflow saved successfully");
     } catch (error) {
       console.error("Failed to save workflow:", error);
       toast.error("Failed to save workflow. Please try again.");

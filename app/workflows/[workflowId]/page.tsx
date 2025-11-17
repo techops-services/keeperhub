@@ -181,7 +181,6 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
     try {
       await workflowApi.update(currentWorkflowId, { nodes, edges });
       setHasUnsavedChanges(false);
-      toast.success("Workflow saved");
     } catch (error) {
       console.error("Failed to save workflow:", error);
       toast.error("Failed to save workflow");
