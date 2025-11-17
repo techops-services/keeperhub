@@ -3,8 +3,11 @@
 import Editor from "@monaco-editor/react";
 import { useAtom } from "jotai";
 import { Settings } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getAll as getAllDataSources } from "@/app/actions/data-source/get-all";
 import { ProjectIntegrationsDialog } from "@/components/settings/project-integrations-dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { IntegrationIcon } from "@/components/ui/integration-icon";
 import { Label } from "@/components/ui/label";
@@ -30,6 +33,14 @@ type ActionConfigProps = {
   disabled: boolean;
 };
 
+type DataSource = {
+  id: string;
+  name: string;
+  type: string;
+  connectionString: string;
+  isDefault: boolean;
+};
+
 // Map action types to their required integrations
 const ACTION_INTEGRATION_MAP: Record<string, { name: string; label: string }> =
   {
@@ -47,6 +58,26 @@ export function ActionConfig({
   const [showIntegrationsDialog, setShowIntegrationsDialog] = useState(false);
   const [projectId] = useAtom(currentVercelProjectIdAtom);
   const [projectName] = useAtom(currentVercelProjectNameAtom);
+  const [dataSources, setDataSources] = useState<DataSource[]>([]);
+  const [loadingDataSources, setLoadingDataSources] = useState(false);
+
+  // Load data sources when the component mounts or when actionType is Database Query
+  useEffect(() => {
+    if (config?.actionType === "Database Query") {
+      setLoadingDataSources(true);
+      getAllDataSources()
+        .then((sources) => {
+          setDataSources(sources as DataSource[]);
+        })
+        .catch((err) => {
+          console.error("Failed to load data sources:", err);
+        })
+        .finally(() => {
+          setLoadingDataSources(false);
+        });
+    }
+  }, [config?.actionType]);
+
 
   const actionType = (config?.actionType as string) || "HTTP Request";
   const requiredIntegration = ACTION_INTEGRATION_MAP[actionType];
@@ -301,6 +332,38 @@ export function ActionConfig({
       {/* Database Query fields */}
       {config?.actionType === "Database Query" && (
         <>
+          {loadingDataSources ? (
+            <div className="space-y-2">
+              <Label>Loading data sources...</Label>
+            </div>
+          ) : dataSources.length === 0 ? (
+            <Alert>
+              <AlertDescription>
+                No data sources configured. Please add a data source in
+                Settings to query databases.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <div className="space-y-2">
+              <Label htmlFor="dataSourceId">Data Source</Label>
+              <Select
+                disabled={disabled}
+                onValueChange={(value) => onUpdateConfig("dataSourceId", value)}
+                value={(config?.dataSourceId as string) || ""}
+              >
+                <SelectTrigger className="w-full" id="dataSourceId">
+                  <SelectValue placeholder="Select a data source" />
+                </SelectTrigger>
+                <SelectContent>
+                  {dataSources.map((source) => (
+                    <SelectItem key={source.id} value={source.id}>
+                      {source.name} {source.isDefault && "(Default)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="dbQuery">SQL Query</Label>
             <div className="overflow-hidden rounded-md border">
@@ -319,16 +382,6 @@ export function ActionConfig({
                 value={(config?.dbQuery as string) || ""}
               />
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="dbTable">Table Name (optional)</Label>
-            <Input
-              disabled={disabled}
-              id="dbTable"
-              onChange={(e) => onUpdateConfig("dbTable", e.target.value)}
-              placeholder="users"
-              value={(config?.dbTable as string) || ""}
-            />
           </div>
         </>
       )}

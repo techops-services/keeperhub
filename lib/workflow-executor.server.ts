@@ -219,12 +219,24 @@ class ServerWorkflowExecutor {
     try {
       console.log(`[Executor] Starting node ${node.id} (${node.data.type})`);
 
+      // Get a meaningful node name based on label, action type, or trigger type
+      let nodeName = node.data.label;
+      if (!nodeName) {
+        if (node.data.type === "action") {
+          nodeName = (node.data.config?.actionType as string) || "Action";
+        } else if (node.data.type === "trigger") {
+          nodeName = (node.data.config?.triggerType as string) || "Trigger";
+        } else {
+          nodeName = node.data.type;
+        }
+      }
+
       const [log] = await db
         .insert(workflowExecutionLogs)
         .values({
           executionId: this.context.executionId,
           nodeId: node.id,
-          nodeName: node.data.label || node.data.type,
+          nodeName,
           nodeType: node.data.type,
           status: "running",
           input,
@@ -475,8 +487,34 @@ class ServerWorkflowExecutor {
             actionType === "Database Query" ||
             node.data.label.toLowerCase().includes("database")
           ) {
-            const dbResult = await queryData("your_table", {});
-            result = { success: dbResult.status === "success", data: dbResult };
+            const dbQuery = processedConfig?.dbQuery as string;
+            const dataSourceId = processedConfig?.dataSourceId as string;
+
+            if (!dbQuery || dbQuery.trim() === "") {
+              result = {
+                success: false,
+                error: "SQL query is required for Database Query action",
+              };
+            } else if (!dataSourceId || dataSourceId === "") {
+              result = {
+                success: false,
+                error:
+                  "Data source not configured. Please add a data source in settings and select it in the action configuration.",
+              };
+            } else {
+              // Import and execute the query
+              const { executeQuery } = await import("./integrations/database");
+              const dbResult = await executeQuery({
+                query: dbQuery,
+              });
+              result = {
+                success: dbResult.status === "success",
+                data: dbResult,
+              };
+              if (dbResult.status === "error") {
+                result.error = dbResult.error;
+              }
+            }
           } else if (actionType === "Generate Text") {
             console.log("[Executor] ===== GENERATE TEXT ACTION =====");
             console.log(
