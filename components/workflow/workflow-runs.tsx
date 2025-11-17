@@ -25,6 +25,8 @@ type ExecutionLog = {
   startedAt: Date;
   completedAt: Date | null;
   duration: string | null;
+  input?: unknown;
+  output?: unknown;
   error: string | null;
 };
 
@@ -47,6 +49,7 @@ export function WorkflowRuns({ isActive = false }: WorkflowRunsProps) {
   const [executions, setExecutions] = useState<WorkflowExecution[]>([]);
   const [logs, setLogs] = useState<Record<string, ExecutionLog[]>>({});
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set());
+  const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -116,6 +119,16 @@ export function WorkflowRuns({ isActive = false }: WorkflowRunsProps) {
       await loadExecutionLogs(executionId);
     }
     setExpandedRuns(newExpanded);
+  };
+
+  const toggleLog = (logId: string) => {
+    const newExpanded = new Set(expandedLogs);
+    if (newExpanded.has(logId)) {
+      newExpanded.delete(logId);
+    } else {
+      newExpanded.add(logId);
+    }
+    setExpandedLogs(newExpanded);
   };
 
   const getStatusIcon = (status: string) => {
@@ -194,38 +207,80 @@ export function WorkflowRuns({ isActive = false }: WorkflowRunsProps) {
                   </div>
                 ) : (
                   <div className="space-y-1 p-2">
-                    {executionLogs.map((log) => (
-                      <div
-                        className="rounded px-2 py-1.5 hover:bg-muted/30"
-                        key={log.id}
-                      >
-                        <div className="flex items-center gap-2">
-                          {getStatusIcon(log.status)}
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="font-medium text-xs">
-                                {log.nodeName || log.nodeType}
-                              </span>
-                              {log.duration && (
-                                <span className="text-muted-foreground text-xs">
-                                  {Number.parseInt(log.duration, 10) < 1000
-                                    ? `${log.duration}ms`
-                                    : `${(Number.parseInt(log.duration, 10) / 1000).toFixed(2)}s`}
-                                </span>
+                    {executionLogs.map((log) => {
+                      const isLogExpanded = expandedLogs.has(log.id);
+                      return (
+                        <div className="rounded border" key={log.id}>
+                          <div
+                            className="cursor-pointer px-2 py-1.5 hover:bg-muted/30"
+                            onClick={() => toggleLog(log.id)}
+                          >
+                            <div className="flex items-center gap-2">
+                              {isLogExpanded ? (
+                                <ChevronDown className="h-3 w-3" />
+                              ) : (
+                                <ChevronRight className="h-3 w-3" />
                               )}
-                            </div>
-                            <div className="text-muted-foreground text-xs">
-                              {log.nodeType}
-                            </div>
-                            {log.error && (
-                              <div className="mt-1 text-red-600 text-xs">
-                                {log.error}
+                              {getStatusIcon(log.status)}
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-medium text-xs">
+                                    {log.nodeName || log.nodeType}
+                                  </span>
+                                  {log.duration && (
+                                    <span className="text-muted-foreground text-xs">
+                                      {Number.parseInt(log.duration, 10) < 1000
+                                        ? `${log.duration}ms`
+                                        : `${(Number.parseInt(log.duration, 10) / 1000).toFixed(2)}s`}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-muted-foreground text-xs">
+                                  {log.nodeType}
+                                </div>
+                                {log.error && (
+                                  <div className="mt-1 text-red-600 text-xs">
+                                    {log.error}
+                                  </div>
+                                )}
                               </div>
-                            )}
+                            </div>
                           </div>
+
+                          {isLogExpanded && (
+                            <div className="border-t bg-muted/20 p-2">
+                              <div className="space-y-2">
+                                {log.input && (
+                                  <div>
+                                    <div className="mb-1 font-semibold text-xs">
+                                      Input
+                                    </div>
+                                    <pre className="overflow-auto rounded bg-background p-2 text-xs">
+                                      {JSON.stringify(log.input, null, 2)}
+                                    </pre>
+                                  </div>
+                                )}
+                                {log.output && (
+                                  <div>
+                                    <div className="mb-1 font-semibold text-xs">
+                                      Output
+                                    </div>
+                                    <pre className="overflow-auto rounded bg-background p-2 text-xs">
+                                      {JSON.stringify(log.output, null, 2)}
+                                    </pre>
+                                  </div>
+                                )}
+                                {!log.input && !log.output && !log.error && (
+                                  <div className="text-muted-foreground text-xs">
+                                    No data recorded
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
