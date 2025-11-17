@@ -716,30 +716,38 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
               Enter a new name for your workflow.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <Label htmlFor="workflow-name">Workflow Name</Label>
-            <Input
-              className="mt-2"
-              id="workflow-name"
-              onChange={(e) => setNewWorkflowName(e.target.value)}
-              placeholder="Enter workflow name"
-              value={newWorkflowName}
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              onClick={() => setShowRenameDialog(false)}
-              variant="outline"
-            >
-              Cancel
-            </Button>
-            <Button
-              disabled={!newWorkflowName.trim()}
-              onClick={handleRenameWorkflow}
-            >
-              Rename
-            </Button>
-          </DialogFooter>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleRenameWorkflow();
+            }}
+          >
+            <div className="py-4">
+              <Label htmlFor="workflow-name">Workflow Name</Label>
+              <Input
+                className="mt-2"
+                id="workflow-name"
+                onChange={(e) => setNewWorkflowName(e.target.value)}
+                placeholder="Enter workflow name"
+                value={newWorkflowName}
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                onClick={() => setShowRenameDialog(false)}
+                type="button"
+                variant="outline"
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={!newWorkflowName.trim()}
+                type="submit"
+              >
+                Rename
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
