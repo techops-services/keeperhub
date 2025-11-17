@@ -3,20 +3,111 @@ import "server-only";
 import type { WorkflowEdge, WorkflowNode } from "./workflow-store";
 
 /**
- * Escape a string for safe use in generated code
- * Handles newlines, quotes, backticks, and other special characters
+ * Convert template variables to JavaScript expressions
+ * Converts {{@nodeId:DisplayName.field}} to ${outputs?.['nodeId']?.data?.field}
  */
-function escapeString(str: string): string {
+function convertTemplateToJS(template: string): string {
+  if (!template || typeof template !== "string") {
+    return template;
+  }
+
+  // Match {{...}} patterns
+  const pattern = /\{\{([^}]+)\}\}/g;
+
+  return template.replace(pattern, (match, expression) => {
+    const trimmed = expression.trim();
+
+    // Check if this is a new format ID reference (starts with @)
+    if (trimmed.startsWith("@")) {
+      // Format: @nodeId:DisplayName or @nodeId:DisplayName.field
+      const withoutAt = trimmed.substring(1);
+      const colonIndex = withoutAt.indexOf(":");
+
+      if (colonIndex === -1) {
+        return match; // Invalid format, keep original
+      }
+
+      const nodeId = withoutAt.substring(0, colonIndex);
+      const rest = withoutAt.substring(colonIndex + 1);
+
+      // Check if there's a field accessor after the display name
+      const dotIndex = rest.indexOf(".");
+      const fieldPath = dotIndex !== -1 ? rest.substring(dotIndex + 1) : "";
+
+      // Sanitize node ID for use as object key
+      const sanitizedNodeId = nodeId.replace(/[^a-zA-Z0-9]/g, "_");
+
+      // Handle special case: {{@nodeId:DisplayName}} (entire output)
+      if (!fieldPath) {
+        return `\${outputs?.['${sanitizedNodeId}']?.data}`;
+      }
+
+      // Parse field path like "field.nested" or "items[0]"
+      const accessPath = fieldPath
+        .split(".")
+        .map((part: string) => {
+          // Handle array access
+          const arrayMatch = part.match(/^([^[]+)\[(\d+)\]$/);
+          if (arrayMatch) {
+            return `?.${arrayMatch[1]}?.[${arrayMatch[2]}]`;
+          }
+          return `?.${part}`;
+        })
+        .join("");
+
+      return `\${outputs?.['${sanitizedNodeId}']?.data${accessPath}}`;
+    }
+    // Check if this is a legacy node ID reference (starts with $)
+    else if (trimmed.startsWith("$")) {
+      const withoutDollar = trimmed.substring(1);
+
+      // Handle special case: {{$nodeId}} (entire output)
+      if (!(withoutDollar.includes(".") || withoutDollar.includes("["))) {
+        const sanitizedNodeId = withoutDollar.replace(/[^a-zA-Z0-9]/g, "_");
+        return `\${outputs?.['${sanitizedNodeId}']?.data}`;
+      }
+
+      // Parse expression like "$nodeId.field.nested"
+      const parts = withoutDollar.split(".");
+      const nodeId = parts[0];
+      const sanitizedNodeId = nodeId.replace(/[^a-zA-Z0-9]/g, "_");
+      const fieldPath = parts.slice(1).join(".");
+
+      if (!fieldPath) {
+        return `\${outputs?.['${sanitizedNodeId}']?.data}`;
+      }
+
+      const accessPath = fieldPath
+        .split(".")
+        .map((part: string) => {
+          const arrayMatch = part.match(/^([^[]+)\[(\d+)\]$/);
+          if (arrayMatch) {
+            return `?.${arrayMatch[1]}?.[${arrayMatch[2]}]`;
+          }
+          return `?.${part}`;
+        })
+        .join("");
+
+      return `\${outputs?.['${sanitizedNodeId}']?.data${accessPath}}`;
+    }
+
+    // For legacy label-based references, keep them as is for now
+    // They will be processed at runtime
+    return match;
+  });
+}
+
+/**
+ * Escape a string for safe use in template literals
+ * Only escapes backslashes and backticks
+ */
+function escapeForTemplateLiteral(str: string): string {
   if (!str) {
     return "";
   }
   return str
     .replace(/\\/g, "\\\\") // Escape backslashes first
-    .replace(/`/g, "\\`") // Escape backticks
-    .replace(/\$/g, "\\$") // Escape dollar signs (for template literals)
-    .replace(/\n/g, "\\n") // Escape newlines
-    .replace(/\r/g, "\\r") // Escape carriage returns
-    .replace(/\t/g, "\\t"); // Escape tabs
+    .replace(/`/g, "\\`"); // Escape backticks
 }
 
 /**
@@ -49,9 +140,6 @@ export function generateWorkflowSDKCode(
   // Always import sleep and FatalError
   imports.add("import { sleep, FatalError } from 'workflow';");
 
-  // Always include template processing utilities comment
-  imports.add("// Template processing utilities are included below");
-
   function generateStepFunction(
     node: WorkflowNode,
     uniqueStepName?: string
@@ -73,22 +161,22 @@ export function generateWorkflowSDKCode(
             (config.emailSubject as string) || "Notification";
           const emailBody = (config.emailBody as string) || "No content";
 
-          const escapedEmailTo = escapeString(emailTo);
-          const escapedSubject = escapeString(emailSubject);
-          const escapedBody = escapeString(emailBody);
+          const convertedEmailTo = convertTemplateToJS(emailTo);
+          const convertedSubject = convertTemplateToJS(emailSubject);
+          const convertedBody = convertTemplateToJS(emailBody);
 
           stepBody = `  const resend = new Resend(process.env.RESEND_API_KEY);
   
-  // Process templates in email fields
-  const processedEmailTo = processTemplate(\`${escapedEmailTo}\`, input.outputs || {});
-  const processedEmailSubject = processTemplate(\`${escapedSubject}\`, input.outputs || {});
-  const processedEmailBody = processTemplate(\`${escapedBody}\`, input.outputs || {});
+  // Use template literals with dynamic values from outputs
+  const emailTo = \`${escapeForTemplateLiteral(convertedEmailTo)}\`;
+  const emailSubject = \`${escapeForTemplateLiteral(convertedSubject)}\`;
+  const emailBody = \`${escapeForTemplateLiteral(convertedBody)}\`;
   
   const result = await resend.emails.send({
     from: '${config.resendFromEmail || "onboarding@resend.dev"}',
-    to: (input.emailTo as string) || processedEmailTo,
-    subject: (input.emailSubject as string) || processedEmailSubject,
-    text: (input.emailBody as string) || processedEmailBody,
+    to: (input.emailTo as string) || emailTo,
+    subject: (input.emailSubject as string) || emailSubject,
+    text: (input.emailBody as string) || emailBody,
   });
   
   console.log('Email sent:', result);
@@ -96,15 +184,19 @@ export function generateWorkflowSDKCode(
         } else if (actionType === "Send Slack Message") {
           imports.add("import { WebClient } from '@slack/web-api';");
           const slackMessage = (config.slackMessage as string) || "No message";
-          const escapedSlackMessage = escapeString(slackMessage);
+          const slackChannel = (config.slackChannel as string) || "#general";
+          const convertedSlackMessage = convertTemplateToJS(slackMessage);
+          const convertedSlackChannel = convertTemplateToJS(slackChannel);
+          
           stepBody = `  const slack = new WebClient(process.env.SLACK_API_KEY);
   
-  // Process template in Slack message
-  const processedSlackMessage = processTemplate(\`${escapedSlackMessage}\`, input.outputs || {});
+  // Use template literals with dynamic values from outputs
+  const slackMessage = \`${escapeForTemplateLiteral(convertedSlackMessage)}\`;
+  const slackChannel = \`${escapeForTemplateLiteral(convertedSlackChannel)}\`;
   
   const result = await slack.chat.postMessage({
-    channel: '${config.slackChannel || "#general"}',
-    text: (input.slackMessage as string) || processedSlackMessage,
+    channel: (input.slackChannel as string) || slackChannel,
+    text: (input.slackMessage as string) || slackMessage,
   });
   
   console.log('Slack message sent:', result);
@@ -113,17 +205,18 @@ export function generateWorkflowSDKCode(
           imports.add("import { LinearClient } from '@linear/sdk';");
           const ticketTitle = (config.ticketTitle as string) || "New Issue";
           const ticketDescription = (config.ticketDescription as string) || "";
-          const escapedTitle = escapeString(ticketTitle);
-          const escapedDescription = escapeString(ticketDescription);
+          const convertedTitle = convertTemplateToJS(ticketTitle);
+          const convertedDescription = convertTemplateToJS(ticketDescription);
+          
           stepBody = `  const linear = new LinearClient({ apiKey: process.env.LINEAR_API_KEY });
   
-  // Process templates in ticket fields
-  const processedTicketTitle = processTemplate(\`${escapedTitle}\`, input.outputs || {});
-  const processedTicketDescription = processTemplate(\`${escapedDescription}\`, input.outputs || {});
+  // Use template literals with dynamic values from outputs
+  const ticketTitle = \`${escapeForTemplateLiteral(convertedTitle)}\`;
+  const ticketDescription = \`${escapeForTemplateLiteral(convertedDescription)}\`;
   
   const issue = await linear.issueCreate({
-    title: (input.ticketTitle as string) || processedTicketTitle,
-    description: (input.ticketDescription as string) || processedTicketDescription,
+    title: (input.ticketTitle as string) || ticketTitle,
+    description: (input.ticketDescription as string) || ticketDescription,
     teamId: process.env.LINEAR_TEAM_ID!,
   });
   
@@ -137,9 +230,10 @@ export function generateWorkflowSDKCode(
               ? "openai"
               : "anthropic";
           const aiPrompt = (config.aiPrompt as string) || "";
-          const escapedPrompt = escapeString(aiPrompt);
-          stepBody = `  // Process template in AI prompt
-  const aiPrompt = processTemplate(\`${escapedPrompt}\`, input.outputs || {});
+          const convertedPrompt = convertTemplateToJS(aiPrompt);
+          
+          stepBody = `  // Use template literal with dynamic values from outputs
+  const aiPrompt = \`${escapeForTemplateLiteral(convertedPrompt)}\`;
   const finalPrompt = (input.aiPrompt as string) || aiPrompt;
   
   const { text } = await generateText({
@@ -152,11 +246,12 @@ export function generateWorkflowSDKCode(
         } else if (actionType === "Generate Image") {
           imports.add("import OpenAI from 'openai';");
           const imagePrompt = (config.imagePrompt as string) || "";
-          const escapedImagePrompt = escapeString(imagePrompt);
+          const convertedImagePrompt = convertTemplateToJS(imagePrompt);
+          
           stepBody = `  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   
-  // Process template in image prompt
-  const imagePrompt = processTemplate(\`${escapedImagePrompt}\`, input.outputs || {});
+  // Use template literal with dynamic values from outputs
+  const imagePrompt = \`${escapeForTemplateLiteral(convertedImagePrompt)}\`;
   const finalPrompt = (input.imagePrompt as string) || imagePrompt;
   
   const response = await openai.images.generate({
@@ -168,6 +263,26 @@ export function generateWorkflowSDKCode(
   
   console.log('Image generated');
   return { base64: response.data[0].b64_json };`;
+        } else if (actionType === "Database Query") {
+          const dbQuery = (config.dbQuery as string) || "SELECT 1";
+          const convertedQuery = convertTemplateToJS(dbQuery);
+          
+          stepBody = `  // Database Query - You need to set up your database connection
+  // Install: pnpm add postgres (or your preferred database library)
+  // Set DATABASE_URL in your environment variables
+  
+  // Use template literal with dynamic values from outputs
+  const query = \`${escapeForTemplateLiteral(convertedQuery)}\`;
+  const finalQuery = (input.dbQuery as string) || query;
+  
+  // Example using postgres library:
+  // import postgres from 'postgres';
+  // const sql = postgres(process.env.DATABASE_URL!);
+  // const result = await sql.unsafe(finalQuery);
+  // await sql.end();
+  
+  console.log('Database query:', finalQuery);
+  throw new Error('Database Query not implemented - see comments in generated code');`;
         } else if (actionType === "HTTP Request") {
           // Parse headers if provided
           let headersCode = "'Content-Type': 'application/json'";
@@ -301,11 +416,17 @@ ${stepBody}
 
       case "condition": {
         const condition = (node.data.config?.condition as string) || "true";
+        const convertedCondition = convertTemplateToJS(condition);
         const nextNodes = edgesBySource.get(nodeId) || [];
+        const conditionVarName = `conditionValue_${sanitizeVarName(node.id)}`;
 
         if (nextNodes.length > 0) {
           lines.push(`${indent}// ${node.data.label}`);
-          lines.push(`${indent}if (${condition}) {`);
+          
+          // Use template literal to evaluate condition with dynamic values
+          // Then convert to boolean
+          lines.push(`${indent}const ${conditionVarName} = \`${escapeForTemplateLiteral(convertedCondition)}\`;`);
+          lines.push(`${indent}if (${conditionVarName}) {`);
 
           if (nextNodes[0]) {
             lines.push(
@@ -374,69 +495,8 @@ ${stepBody}
 ${workflowBody.join("\n")}
 }`;
 
-  // Always add template processing utilities (they're small and useful)
-  const templateUtilities = `
-// Template processing utilities
-function processTemplate(template: string, outputs: Record<string, { label: string; data: unknown }>): string {
-  if (!template || typeof template !== 'string') {
-    return template;
-  }
-
-  const pattern = /\\{\\{([^}]+)\\}\\}/g;
-
-  return template.replace(pattern, (match, expression) => {
-    const trimmed = expression.trim();
-    const isNodeIdRef = trimmed.startsWith('$');
-
-    if (isNodeIdRef) {
-      const withoutDollar = trimmed.substring(1);
-      const parts = withoutDollar.split('.');
-      const nodeId = parts[0].trim();
-      const nodeOutput = outputs[nodeId.replace(/-/g, '_')];
-
-      if (!nodeOutput) {
-        console.warn(\`Node "\${nodeId}" not found in outputs\`);
-        return match;
-      }
-
-      if (parts.length === 1) {
-        return formatValue(nodeOutput.data);
-      }
-
-      let current: any = nodeOutput.data;
-      for (let i = 1; i < parts.length; i++) {
-        current = current?.[parts[i].trim()];
-        if (current === undefined || current === null) {
-          return match;
-        }
-      }
-
-      return formatValue(current);
-    }
-
-    return match;
-  });
-}
-
-function formatValue(value: unknown): string {
-  if (value === null || value === undefined) return '';
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  if (Array.isArray(value)) return value.map(formatValue).join(', ');
-  if (typeof value === 'object') {
-    const obj = value as any;
-    if (obj.title) return String(obj.title);
-    if (obj.name) return String(obj.name);
-    if (obj.id) return String(obj.id);
-    return JSON.stringify(value, null, 2);
-  }
-  return String(value);
-}
-`;
-
-  // Combine everything - template utilities MUST come before step functions
+  // Combine everything
   const code = `${Array.from(imports).join("\n")}
-${templateUtilities}
 
 ${stepFunctions.join("\n\n")}
 
