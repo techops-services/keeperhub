@@ -22,13 +22,41 @@ export const generateNodeCode = (node: {
   };
 }): string => {
   if (node.data.type === "trigger") {
-    return `async function triggerStep(input: Record<string, unknown>) {
-  "use step";
-  
-  // Trigger setup
-  console.log('Workflow triggered with input:', input);
-  return input;
+    const triggerType = (node.data.config?.triggerType as string) || "Manual";
+
+    if (triggerType === "Schedule") {
+      const cron = (node.data.config?.scheduleCron as string) || "0 9 * * *";
+      const timezone =
+        (node.data.config?.scheduleTimezone as string) || "America/New_York";
+      return `{
+  "crons": [
+    {
+      "path": "/api/workflow",
+      "schedule": "${cron}",
+      "timezone": "${timezone}"
+    }
+  ]
 }`;
+    }
+
+    if (triggerType === "Webhook") {
+      const method = (
+        (node.data.config?.webhookMethod as string) || "POST"
+      ).toLowerCase();
+      return `import { NextRequest } from 'next/server';
+
+export async function ${method}(request: NextRequest) {
+  const body = await request.json();
+  
+  // Call your workflow function here
+  await executeWorkflow(body);
+  
+  return Response.json({ success: true });
+}`;
+    }
+
+    // Manual trigger - no code
+    return "";
   }
 
   if (node.data.type === "action") {
@@ -65,7 +93,7 @@ export const generateNodeCode = (node: {
 
   return `async function unknownStep(input: Record<string, unknown>) {
   "use step";
-  
+
   return input;
 }`;
 };

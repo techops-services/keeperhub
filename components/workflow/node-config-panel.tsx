@@ -504,12 +504,15 @@ const PanelInner = () => {
           >
             Properties
           </TabsTrigger>
-          <TabsTrigger
-            className="bg-transparent text-muted-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none"
-            value="code"
-          >
-            Code
-          </TabsTrigger>
+          {selectedNode.data.type !== "trigger" ||
+          (selectedNode.data.config?.triggerType as string) !== "Manual" ? (
+            <TabsTrigger
+              className="bg-transparent text-muted-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              value="code"
+            >
+              Code
+            </TabsTrigger>
+          ) : null}
         </TabsList>
         <TabsContent
           className="flex flex-col overflow-hidden"
@@ -580,41 +583,68 @@ const PanelInner = () => {
           </div>
         </TabsContent>
         <TabsContent className="flex flex-col overflow-hidden" value="code">
-          <div className="shrink-0 border-b bg-muted/30 px-3 pb-2">
-            <div className="flex items-center gap-2">
-              <FileCode className="size-3.5 text-muted-foreground" />
-              <code className="text-muted-foreground text-xs">
-                steps/
-                {(selectedNode.data.config?.actionType as string)
+          {(() => {
+            const triggerType = selectedNode.data.config?.triggerType as string;
+            let filename = "";
+            let language = "typescript";
+
+            if (selectedNode.data.type === "trigger") {
+              if (triggerType === "Schedule") {
+                filename = "vercel.json";
+                language = "json";
+              } else if (triggerType === "Webhook") {
+                const webhookPath =
+                  (selectedNode.data.config?.webhookPath as string) ||
+                  "/webhook";
+                filename = `app/api${webhookPath}/route.ts`;
+                language = "typescript";
+              }
+            } else {
+              filename = `steps/${
+                (selectedNode.data.config?.actionType as string)
                   ?.toLowerCase()
                   .replace(/\s+/g, "-")
-                  .replace(/[^a-z0-9-]/g, "") || "action"}
-                -step.ts
-              </code>
-            </div>
-          </div>
-          <div className="flex-1 overflow-hidden">
-            <CodeEditor
-              height="100%"
-              language="typescript"
-              options={{
-                readOnly: true,
-                minimap: { enabled: false },
-                scrollBeyondLastLine: false,
-                fontSize: 13,
-                lineNumbers: "on",
-                folding: false,
-                wordWrap: "off",
-                padding: { top: 16, bottom: 16 },
-              }}
-              value={generateNodeCode(selectedNode)}
-            />
-          </div>
-          <div className="shrink-0 border-t p-4">
-            <Button onClick={handleCopyCode} size="icon" variant="ghost">
-              <Copy className="size-4" />
-            </Button>
-          </div>
+                  .replace(/[^a-z0-9-]/g, "") || "action"
+              }-step.ts`;
+            }
+
+            return (
+              <>
+                {filename && (
+                  <div className="shrink-0 border-b bg-muted/30 px-3 pb-2">
+                    <div className="flex items-center gap-2">
+                      <FileCode className="size-3.5 text-muted-foreground" />
+                      <code className="text-muted-foreground text-xs">
+                        {filename}
+                      </code>
+                    </div>
+                  </div>
+                )}
+                <div className="flex-1 overflow-hidden">
+                  <CodeEditor
+                    height="100%"
+                    language={language}
+                    options={{
+                      readOnly: true,
+                      minimap: { enabled: false },
+                      scrollBeyondLastLine: false,
+                      fontSize: 13,
+                      lineNumbers: "on",
+                      folding: false,
+                      wordWrap: "off",
+                      padding: { top: 16, bottom: 16 },
+                    }}
+                    value={generateNodeCode(selectedNode)}
+                  />
+                </div>
+                <div className="shrink-0 border-t p-4">
+                  <Button onClick={handleCopyCode} size="icon" variant="ghost">
+                    <Copy className="size-4" />
+                  </Button>
+                </div>
+              </>
+            );
+          })()}
         </TabsContent>
       </Tabs>
 

@@ -45,7 +45,6 @@ export function TriggerConfig({
               </SelectLabel>
               <SelectItem value="Manual">Manual</SelectItem>
               <SelectItem value="Schedule">Schedule</SelectItem>
-              <SelectItem value="Database Event">Database Event</SelectItem>
             </SelectGroup>
             <SelectGroup>
               <SelectLabel className="flex items-center gap-2">
@@ -114,39 +113,6 @@ export function TriggerConfig({
               }
               value={(config?.scheduleTimezone as string) || "America/New_York"}
             />
-          </div>
-        </>
-      )}
-
-      {/* Database Event fields */}
-      {config?.triggerType === "Database Event" && (
-        <>
-          <div className="space-y-2">
-            <Label htmlFor="dbEventTable">Table Name</Label>
-            <Input
-              disabled={disabled}
-              id="dbEventTable"
-              onChange={(e) => onUpdateConfig("dbEventTable", e.target.value)}
-              placeholder="users"
-              value={(config?.dbEventTable as string) || ""}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="dbEventType">Event Type</Label>
-            <Select
-              disabled={disabled}
-              onValueChange={(value) => onUpdateConfig("dbEventType", value)}
-              value={(config?.dbEventType as string) || "INSERT"}
-            >
-              <SelectTrigger className="w-full" id="dbEventType">
-                <SelectValue placeholder="Select event" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="INSERT">INSERT</SelectItem>
-                <SelectItem value="UPDATE">UPDATE</SelectItem>
-                <SelectItem value="DELETE">DELETE</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </>
       )}

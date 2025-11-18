@@ -40,7 +40,6 @@ TRIGGER NODES:
 - Manual: { triggerType: "Manual" }
 - Webhook: { triggerType: "Webhook", webhookPath: "/webhooks/name", webhookMethod: "POST" }
 - Schedule: { triggerType: "Schedule", scheduleCron: "0 9 * * *", scheduleTimezone: "America/New_York" }
-- Database Event: { triggerType: "Database Event", dbEventTable: "table_name", dbEventType: "INSERT" }
 
 ACTION NODES:
 - Send Email: { actionType: "Send Email", emailTo: "user@example.com", emailSubject: "Subject", emailBody: "Body text" }
