@@ -2,7 +2,36 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { anonymous } from "better-auth/plugins";
 import { db } from "./db";
-import * as schema from "./db/schema";
+import {
+  account,
+  dataSources,
+  projects,
+  projectsRelations,
+  session,
+  user,
+  verification,
+  workflowExecutionLogs,
+  workflowExecutions,
+  workflowExecutionsRelations,
+  workflows,
+  workflowsRelations,
+} from "./db/schema";
+
+// Construct schema object for drizzle adapter
+const schema = {
+  user,
+  session,
+  account,
+  verification,
+  workflows,
+  projects,
+  workflowExecutions,
+  workflowExecutionLogs,
+  dataSources,
+  workflowsRelations,
+  projectsRelations,
+  workflowExecutionsRelations,
+};
 
 // Determine the base URL for authentication
 // This supports Vercel Preview deployments with dynamic URLs

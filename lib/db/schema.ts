@@ -8,6 +8,15 @@ const nanoid = customAlphabet(
   21
 );
 
+// Type definition for JSON values
+type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
 // Better Auth tables
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -72,9 +81,9 @@ export const workflows = pgTable("workflows", {
     .notNull()
     .references(() => user.id),
   vercelProjectId: text("vercel_project_id").notNull().unique(), // 1-to-1 enforced with unique constraint
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: JSONB type - structure validated at application level
   nodes: jsonb("nodes").notNull().$type<any[]>(),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: JSONB type - structure validated at application level
   edges: jsonb("edges").notNull().$type<any[]>(),
   deploymentStatus: text("deployment_status")
     .$type<"none" | "pending" | "deploying" | "deployed" | "failed">()
@@ -113,9 +122,9 @@ export const workflowExecutions = pgTable("workflow_executions", {
   status: text("status")
     .notNull()
     .$type<"pending" | "running" | "success" | "error" | "cancelled">(),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: JSONB type - structure validated at application level
   input: jsonb("input").$type<Record<string, any>>(),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: JSONB type - structure validated at application level
   output: jsonb("output").$type<any>(),
   error: text("error"),
   startedAt: timestamp("started_at").notNull().defaultNow(),
@@ -137,9 +146,9 @@ export const workflowExecutionLogs = pgTable("workflow_execution_logs", {
   status: text("status")
     .notNull()
     .$type<"pending" | "running" | "success" | "error">(),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: JSONB type - structure validated at application level
   input: jsonb("input").$type<any>(),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: JSONB type - structure validated at application level
   output: jsonb("output").$type<any>(),
   error: text("error"),
   startedAt: timestamp("started_at").notNull().defaultNow(),

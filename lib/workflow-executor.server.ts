@@ -46,8 +46,7 @@ type ProjectIntegrations = {
 function schemaFieldsToZod(
   fields: SchemaField[]
 ): z.ZodObject<Record<string, z.ZodTypeAny>> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const shape: Record<string, any> = {};
+  const shape: Record<string, z.ZodTypeAny> = {};
 
   for (const field of fields) {
     let zodType: z.ZodTypeAny;

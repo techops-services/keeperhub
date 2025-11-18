@@ -1,6 +1,35 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import * as schema from "./schema";
+import {
+  account,
+  dataSources,
+  projects,
+  projectsRelations,
+  session,
+  user,
+  verification,
+  workflowExecutionLogs,
+  workflowExecutions,
+  workflowExecutionsRelations,
+  workflows,
+  workflowsRelations,
+} from "./schema";
+
+// Construct schema object for drizzle
+const schema = {
+  user,
+  session,
+  account,
+  verification,
+  workflows,
+  projects,
+  workflowExecutions,
+  workflowExecutionLogs,
+  dataSources,
+  workflowsRelations,
+  projectsRelations,
+  workflowExecutionsRelations,
+};
 
 const connectionString =
   process.env.DATABASE_URL || "postgres://localhost:5432/workflow";
