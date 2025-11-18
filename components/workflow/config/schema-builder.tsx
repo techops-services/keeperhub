@@ -91,7 +91,7 @@ export function SchemaBuilder({
           key={`field-${level}-${field.name || "unnamed"}-${index}`}
         >
           <div className="flex gap-2">
-            <div className="flex-1">
+            <div className="flex-1 space-y-1.5">
               <Label htmlFor={`field-name-${level}-${index}`}>
                 Property Name
               </Label>
@@ -103,7 +103,7 @@ export function SchemaBuilder({
                 value={field.name}
               />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 space-y-1.5">
               <Label htmlFor={`field-type-${level}-${index}`}>Type</Label>
               <Select
                 disabled={disabled}
@@ -142,7 +142,7 @@ export function SchemaBuilder({
           </div>
 
           {field.type === "array" && (
-            <div>
+            <div className="space-y-1.5">
               <Label htmlFor={`field-item-type-${level}-${index}`}>
                 Array Item Type
               </Label>
@@ -195,7 +195,7 @@ export function SchemaBuilder({
             </div>
           )}
 
-          <div>
+          <div className="space-y-1.5">
             <Label htmlFor={`field-desc-${level}-${index}`}>
               Description (optional)
             </Label>
