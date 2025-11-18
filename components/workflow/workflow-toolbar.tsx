@@ -77,7 +77,6 @@ import { UserMenu } from "../workflows/user-menu";
 
 type WorkflowToolbarProps = {
   workflowId?: string;
-  showSidebar?: boolean;
 };
 
 // Helper functions to reduce complexity
@@ -1062,10 +1061,7 @@ function WorkflowDialogsComponent({
   );
 }
 
-export const WorkflowToolbar = ({
-  workflowId,
-  showSidebar = true,
-}: WorkflowToolbarProps) => {
+export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
   const state = useWorkflowState();
   const actions = useWorkflowActions(state);
 
@@ -1085,7 +1081,6 @@ export const WorkflowToolbar = ({
       <Panel
         className="flex flex-col-reverse items-end gap-2 border-none bg-transparent p-0 lg:flex-row lg:items-center"
         position="top-right"
-        style={showSidebar ? { right: "400px" } : undefined}
       >
         <ToolbarActions
           actions={actions}

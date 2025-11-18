@@ -963,8 +963,8 @@ export const NodeConfigPanel = () => {
         </Drawer>
       </div>
 
-      {/* Desktop: Docked sidebar - always visible */}
-      <div className="hidden w-96 flex-col border-l bg-background md:flex">
+      {/* Desktop: Docked sidebar - now resizable */}
+      <div className="hidden size-full flex-col border-l bg-background md:flex">
         <PanelInner />
       </div>
     </>

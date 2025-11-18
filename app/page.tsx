@@ -155,10 +155,7 @@ const Home = () => {
       <main className="relative flex size-full overflow-hidden">
         <ReactFlowProvider>
           <div className="relative flex-1 overflow-hidden">
-            <WorkflowToolbar
-              showSidebar={false}
-              workflowId={currentWorkflowId ?? undefined}
-            />
+            <WorkflowToolbar workflowId={currentWorkflowId ?? undefined} />
             <WorkflowCanvas showMinimap={false} />
           </div>
         </ReactFlowProvider>

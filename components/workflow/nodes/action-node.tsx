@@ -214,9 +214,8 @@ export const ActionNode = memo(({ data, selected }: ActionNodeProps) => {
   return (
     <Node
       className={cn(
-        "flex h-48 w-48 flex-col items-center justify-center shadow-none",
-        selected &&
-          "rounded-md ring ring-primary/50 transition-all duration-150 ease-out"
+        "flex h-48 w-48 flex-col items-center justify-center shadow-none transition-all duration-150 ease-out",
+        selected && "border-primary"
       )}
       handles={{ target: true, source: true }}
     >

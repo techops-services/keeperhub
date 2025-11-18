@@ -2,11 +2,17 @@
 
 import { ReactFlowProvider } from "@xyflow/react";
 import { useAtom, useSetAtom } from "jotai";
-import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { use, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import { generate } from "@/app/actions/ai/generate";
 import { Button } from "@/components/ui/button";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import { NodeConfigPanel } from "@/components/workflow/node-config-panel";
 import { WorkflowCanvas } from "@/components/workflow/workflow-canvas";
 import { WorkflowToolbar } from "@/components/workflow/workflow-toolbar";
@@ -35,7 +41,6 @@ type WorkflowPageProps = {
 const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   const { workflowId } = use(params);
   const searchParams = useSearchParams();
-  const router = useRouter();
   const [isGenerating, setIsGenerating] = useAtom(isGeneratingAtom);
   const [isExecuting, setIsExecuting] = useAtom(isExecutingAtom);
   const [_isSaving, setIsSaving] = useAtom(isSavingAtom);
@@ -325,28 +330,37 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden">
-      <WorkflowToolbar workflowId={workflowId} />
       <main className="relative flex size-full overflow-hidden">
         <ReactFlowProvider>
-          <div className="relative flex-1 overflow-hidden">
-            <WorkflowCanvas />
+          <ResizablePanelGroup direction="horizontal">
+            <ResizablePanel defaultSize={70} minSize={30}>
+              <div className="relative size-full overflow-hidden">
+                <WorkflowToolbar workflowId={workflowId} />
+                <WorkflowCanvas />
 
-            {workflowNotFound && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="rounded-lg border bg-background p-8 text-center shadow-lg">
-                  <h1 className="mb-2 font-semibold text-2xl">
-                    Workflow Not Found
-                  </h1>
-                  <p className="mb-6 text-muted-foreground">
-                    The workflow you're looking for doesn't exist or has been
-                    deleted.
-                  </p>
-                  <Button onClick={() => router.push("/")}>New Workflow</Button>
-                </div>
+                {workflowNotFound && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="rounded-lg border bg-background p-8 text-center shadow-lg">
+                      <h1 className="mb-2 font-semibold text-2xl">
+                        Workflow Not Found
+                      </h1>
+                      <p className="mb-6 text-muted-foreground">
+                        The workflow you're looking for doesn't exist or has
+                        been deleted.
+                      </p>
+                      <Button asChild>
+                        <Link href="/">New Workflow</Link>
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-          <NodeConfigPanel />
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={30} maxSize={50} minSize={20}>
+              <NodeConfigPanel />
+            </ResizablePanel>
+          </ResizablePanelGroup>
         </ReactFlowProvider>
       </main>
     </div>

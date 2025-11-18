@@ -40,14 +40,6 @@ const getNodeDisplayName = (node: WorkflowNode): string => {
     return triggerType || "Manual";
   }
 
-  if (node.data.type === "condition") {
-    return "Condition";
-  }
-
-  if (node.data.type === "transform") {
-    return "Transform";
-  }
-
   return "Node";
 };
 

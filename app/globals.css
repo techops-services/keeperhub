@@ -173,3 +173,19 @@
 .dark .react-flow__attribution a {
   color: rgba(255, 255, 255, 0.5) !important;
 }
+
+/* React Flow handle positioning and styling */
+.react-flow__handle {
+  width: 12px !important;
+  height: 12px !important;
+  border: 2px solid var(--border) !important;
+  background: var(--primary) !important;
+}
+
+.react-flow__handle-left {
+  left: -0.5px !important;
+}
+
+.react-flow__handle-right {
+  right: -0.5px !important;
+}

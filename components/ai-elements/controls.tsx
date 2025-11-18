@@ -1,14 +1,12 @@
 "use client";
 
 import { useReactFlow } from "@xyflow/react";
-import { Minus, Plus, Maximize2, Lock, Unlock } from "lucide-react";
+import { Minus, Plus, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
-import { useState } from "react";
 
 export const Controls = () => {
-  const { zoomIn, zoomOut, fitView, setInteractive } = useReactFlow();
-  const [isInteractive, setIsInteractive] = useState(true);
+  const { zoomIn, zoomOut, fitView } = useReactFlow();
 
   const handleZoomIn = () => {
     zoomIn();
@@ -20,12 +18,6 @@ export const Controls = () => {
 
   const handleFitView = () => {
     fitView({ padding: 0.2, duration: 300 });
-  };
-
-  const handleToggleInteractivity = () => {
-    const newState = !isInteractive;
-    setIsInteractive(newState);
-    setInteractive(newState);
   };
 
   return (
@@ -56,15 +48,6 @@ export const Controls = () => {
         variant="secondary"
       >
         <Maximize2 className="size-4" />
-      </Button>
-      <Button
-        className="border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
-        onClick={handleToggleInteractivity}
-        size="icon"
-        title={isInteractive ? "Lock canvas" : "Unlock canvas"}
-        variant="secondary"
-      >
-        {isInteractive ? <Unlock className="size-4" /> : <Lock className="size-4" />}
       </Button>
     </ButtonGroup>
   );

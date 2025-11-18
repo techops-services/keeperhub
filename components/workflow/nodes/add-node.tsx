@@ -4,7 +4,11 @@ import type { NodeProps } from "@xyflow/react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export function AddNode({ data }: NodeProps) {
+type AddNodeData = {
+  onClick?: () => void;
+};
+
+export function AddNode({ data }: NodeProps & { data?: AddNodeData }) {
   return (
     <div className="flex flex-col items-center justify-center gap-6 rounded-lg border-2 border-border border-dashed bg-background/50 p-8 backdrop-blur-sm">
       <div className="text-center">
