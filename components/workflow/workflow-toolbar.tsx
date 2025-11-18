@@ -269,8 +269,8 @@ function useWorkflowHandlers({
   };
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Component complexity is due to extensive JSX with conditional rendering
-export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
+// Hook for workflow state management
+function useWorkflowState() {
   const [nodes] = useAtom(nodesAtom);
   const [edges] = useAtom(edgesAtom);
   const [isExecuting, setIsExecuting] = useAtom(isExecutingAtom);
@@ -307,6 +307,90 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
   >([]);
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [newWorkflowName, setNewWorkflowName] = useState(workflowName);
+
+  // Load deployment status on mount
+  useEffect(() => {
+    if (!currentWorkflowId) {
+      return;
+    }
+
+    getDeploymentStatus(currentWorkflowId)
+      .then((data) => setDeploymentUrl(data.deploymentUrl || null))
+      .catch((error) =>
+        console.error("Failed to load deployment status:", error)
+      );
+  }, [currentWorkflowId]);
+
+  // Sync newWorkflowName when workflowName changes
+  useEffect(() => {
+    setNewWorkflowName(workflowName);
+  }, [workflowName]);
+
+  return {
+    nodes,
+    edges,
+    isExecuting,
+    setIsExecuting,
+    isGenerating,
+    clearWorkflow,
+    updateNodeData,
+    currentWorkflowId,
+    workflowName,
+    setCurrentWorkflowName,
+    router,
+    showClearDialog,
+    setShowClearDialog,
+    showDeleteDialog,
+    setShowDeleteDialog,
+    isSaving,
+    setIsSaving,
+    hasUnsavedChanges,
+    setHasUnsavedChanges,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    session,
+    isDeploying,
+    setIsDeploying,
+    deploymentUrl,
+    setDeploymentUrl,
+    showCodeDialog,
+    setShowCodeDialog,
+    generatedCode,
+    allWorkflows,
+    setAllWorkflows,
+    showRenameDialog,
+    setShowRenameDialog,
+    newWorkflowName,
+    setNewWorkflowName,
+  };
+}
+
+// Hook for workflow actions
+function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
+  const {
+    currentWorkflowId,
+    workflowName,
+    nodes,
+    edges,
+    updateNodeData,
+    setIsExecuting,
+    setIsSaving,
+    setHasUnsavedChanges,
+    deploymentUrl,
+    setShowClearDialog,
+    clearWorkflow,
+    setShowDeleteDialog,
+    router,
+    setCurrentWorkflowName,
+    setAllWorkflows,
+    newWorkflowName,
+    setShowRenameDialog,
+    setIsDeploying,
+    setDeploymentUrl,
+    generatedCode,
+  } = state;
 
   const {
     runMode,
@@ -384,7 +468,6 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
     }
   };
 
-  // Helper to save workflow before deployment
   const saveBeforeDeploy = async (): Promise<boolean> => {
     if (!currentWorkflowId) {
       return false;
@@ -399,7 +482,6 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
     }
   };
 
-  // Helper to execute deployment
   const executeDeployment = async (workflowIdParam: string) => {
     const result = await deploy(workflowIdParam);
 
@@ -421,13 +503,11 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
       return;
     }
 
-    // Save first
     const saved = await saveBeforeDeploy();
     if (!saved) {
       return;
     }
 
-    // Deploy
     setIsDeploying(true);
     toast.info("Starting deployment to Vercel...");
 
@@ -442,20 +522,6 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
     }
   };
 
-  // Load deployment status on mount
-  useEffect(() => {
-    if (!currentWorkflowId) {
-      return;
-    }
-
-    getDeploymentStatus(currentWorkflowId)
-      .then((data) => setDeploymentUrl(data.deploymentUrl || null))
-      .catch((error) =>
-        console.error("Failed to load deployment status:", error)
-      );
-  }, [currentWorkflowId]);
-
-  // Load workflows
   const loadWorkflows = async () => {
     try {
       const workflows = await workflowApi.getAll();
@@ -465,323 +531,375 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
     }
   };
 
-  // Sync newWorkflowName when workflowName changes
-  useEffect(() => {
-    setNewWorkflowName(workflowName);
-  }, [workflowName]);
-
   const handleCopyCode = () => {
     navigator.clipboard.writeText(generatedCode);
     toast.success("Code copied to clipboard");
   };
 
+  return {
+    runMode,
+    setRunMode,
+    showUnsavedRunDialog,
+    setShowUnsavedRunDialog,
+    handleSave,
+    handleExecute,
+    handleSaveAndRun,
+    handleRunWithoutSaving,
+    handleClearWorkflow,
+    handleDeleteWorkflow,
+    handleNewWorkflow,
+    handleRenameWorkflow,
+    handleDeploy,
+    loadWorkflows,
+    handleCopyCode,
+  };
+}
+
+// Toolbar Actions Component - handles undo/redo, save/deploy, and run buttons
+function ToolbarActions({
+  workflowId,
+  state,
+  actions,
+}: {
+  workflowId?: string;
+  state: ReturnType<typeof useWorkflowState>;
+  actions: ReturnType<typeof useWorkflowActions>;
+}) {
+  if (!workflowId) {
+    return null;
+  }
+
   return (
     <>
-      <Panel
-        className="flex flex-col gap-2 rounded-none border-none bg-transparent p-0 lg:flex-row lg:items-center"
-        position="top-left"
+      {/* Undo/Redo - Mobile Vertical */}
+      <ButtonGroup className="flex lg:hidden" orientation="vertical">
+        <Button
+          className="border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
+          disabled={!state.canUndo || state.isGenerating}
+          onClick={() => state.undo()}
+          size="icon"
+          title="Undo"
+          variant="secondary"
+        >
+          <Undo2 className="size-4" />
+        </Button>
+        <Button
+          className="border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
+          disabled={!state.canRedo || state.isGenerating}
+          onClick={() => state.redo()}
+          size="icon"
+          title="Redo"
+          variant="secondary"
+        >
+          <Redo2 className="size-4" />
+        </Button>
+      </ButtonGroup>
+
+      {/* Undo/Redo - Desktop Horizontal */}
+      <ButtonGroup className="hidden lg:flex" orientation="horizontal">
+        <Button
+          className="border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
+          disabled={!state.canUndo || state.isGenerating}
+          onClick={() => state.undo()}
+          size="icon"
+          title="Undo"
+          variant="secondary"
+        >
+          <Undo2 className="size-4" />
+        </Button>
+        <Button
+          className="border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
+          disabled={!state.canRedo || state.isGenerating}
+          onClick={() => state.redo()}
+          size="icon"
+          title="Redo"
+          variant="secondary"
+        >
+          <Redo2 className="size-4" />
+        </Button>
+      </ButtonGroup>
+
+      {/* Save/Deploy - Mobile Vertical */}
+      <ButtonGroup className="flex lg:hidden" orientation="vertical">
+        <SaveButton handleSave={actions.handleSave} state={state} />
+        <DeployButton handleDeploy={actions.handleDeploy} state={state} />
+        {state.deploymentUrl && (
+          <Button
+            className="border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
+            onClick={() =>
+              state.deploymentUrl && window.open(state.deploymentUrl, "_blank")
+            }
+            size="icon"
+            title="Open deployment"
+            variant="secondary"
+          >
+            <ExternalLink className="size-4" />
+          </Button>
+        )}
+      </ButtonGroup>
+
+      {/* Save/Deploy - Desktop Horizontal */}
+      <ButtonGroup className="hidden lg:flex" orientation="horizontal">
+        <SaveButton handleSave={actions.handleSave} state={state} />
+        <DeployButton handleDeploy={actions.handleDeploy} state={state} />
+        {state.deploymentUrl && (
+          <Button
+            className="border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
+            onClick={() =>
+              state.deploymentUrl && window.open(state.deploymentUrl, "_blank")
+            }
+            size="icon"
+            title="Open deployment"
+            variant="secondary"
+          >
+            <ExternalLink className="size-4" />
+          </Button>
+        )}
+      </ButtonGroup>
+
+      <RunButtonGroup actions={actions} state={state} />
+    </>
+  );
+}
+
+// Save Button Component
+function SaveButton({
+  state,
+  handleSave,
+}: {
+  state: ReturnType<typeof useWorkflowState>;
+  handleSave: () => Promise<void>;
+}) {
+  return (
+    <Button
+      className="relative border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
+      disabled={
+        !state.currentWorkflowId || state.isGenerating || state.isSaving
+      }
+      onClick={handleSave}
+      size="icon"
+      title={state.isSaving ? "Saving..." : "Save workflow"}
+      variant="secondary"
+    >
+      {state.isSaving ? (
+        <Loader2 className="size-4 animate-spin" />
+      ) : (
+        <Save className="size-4" />
+      )}
+      {state.hasUnsavedChanges && !state.isSaving && (
+        <div className="-top-0.5 -right-0.5 absolute size-2 rounded-full bg-primary" />
+      )}
+    </Button>
+  );
+}
+
+// Deploy Button Component
+function DeployButton({
+  state,
+  handleDeploy,
+}: {
+  state: ReturnType<typeof useWorkflowState>;
+  handleDeploy: () => Promise<void>;
+}) {
+  return (
+    <Button
+      className="border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
+      disabled={
+        state.isDeploying ||
+        state.nodes.length === 0 ||
+        state.isGenerating ||
+        !state.currentWorkflowId
+      }
+      onClick={handleDeploy}
+      size="icon"
+      title={
+        state.isDeploying
+          ? "Deploying to production..."
+          : "Deploy to production"
+      }
+      variant="secondary"
+    >
+      {state.isDeploying ? (
+        <Loader2 className="size-4 animate-spin" />
+      ) : (
+        <Rocket className="size-4" />
+      )}
+    </Button>
+  );
+}
+
+// Run Button Group Component
+function RunButtonGroup({
+  state,
+  actions,
+}: {
+  state: ReturnType<typeof useWorkflowState>;
+  actions: ReturnType<typeof useWorkflowActions>;
+}) {
+  return (
+    <ButtonGroup>
+      <Button
+        className="relative border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
+        disabled={
+          state.isExecuting || state.nodes.length === 0 || state.isGenerating
+        }
+        onClick={() => actions.handleExecute()}
+        size="icon"
+        variant="secondary"
       >
-        {session && (
-          <div className="flex h-9 items-center overflow-hidden rounded-md border bg-secondary text-secondary-foreground">
-            <DropdownMenu onOpenChange={(open) => open && loadWorkflows()}>
-              <DropdownMenuTrigger className="flex h-full cursor-pointer items-center gap-2 px-3 font-medium text-sm transition-all hover:bg-black/5 dark:hover:bg-white/5">
-                <WorkflowIcon className="size-4" />
-                <p className="font-medium text-sm">
-                  {workflowId ? workflowName : "New Workflow"}
-                </p>
-                <ChevronDown className="size-3 opacity-50" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-64">
-                <DropdownMenuItem
-                  className="flex items-center justify-between"
-                  onClick={handleNewWorkflow}
-                >
-                  <span>New Workflow</span>
-                  {!workflowId && <Check className="size-4 shrink-0" />}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel className="text-muted-foreground text-xs uppercase">
-                  Recent Workflows
-                </DropdownMenuLabel>
-                {allWorkflows.length === 0 ? (
-                  <DropdownMenuItem disabled>
-                    No workflows found
-                  </DropdownMenuItem>
-                ) : (
-                  allWorkflows
-                    .filter((w) => w.name !== "__current__")
-                    .map((workflow) => (
-                      <DropdownMenuItem
-                        className="flex items-center justify-between"
-                        key={workflow.id}
-                        onClick={() => router.push(`/workflows/${workflow.id}`)}
-                      >
-                        <span className="truncate">{workflow.name}</span>
-                        {workflow.id === currentWorkflowId && (
-                          <Check className="size-4 shrink-0" />
-                        )}
-                      </DropdownMenuItem>
-                    ))
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <div className="h-full w-px bg-border" />
-            <DropdownMenu>
-              <DropdownMenuTrigger className="flex h-full cursor-pointer items-center px-2 font-medium text-sm transition-all hover:bg-black/5 dark:hover:bg-white/5">
-                <MoreHorizontal className="size-4" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48">
-                <DropdownMenuItem
-                  disabled={!currentWorkflowId}
-                  onClick={() => setShowRenameDialog(true)}
-                >
-                  <span>Rename</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={nodes.length === 0}
-                  onClick={() => setShowClearDialog(true)}
-                >
-                  <span>Clear</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={!currentWorkflowId}
-                  onClick={() => setShowDeleteDialog(true)}
-                >
-                  <span>Delete</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+        {state.isExecuting ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <Play className="size-4" />
+        )}
+        {actions.runMode === "test" && !state.isExecuting && (
+          <div className="absolute right-0.5 bottom-0.5">
+            <FlaskConical
+              className="text-muted-foreground"
+              strokeWidth={2.5}
+              style={{ width: "12px", height: "12px" }}
+            />
           </div>
         )}
-        <NodeToolbar />
-      </Panel>
+      </Button>
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            className="w-6 border px-1 hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
+            disabled={
+              state.isExecuting ||
+              state.nodes.length === 0 ||
+              state.isGenerating
+            }
+            size="icon"
+            title="Select run mode"
+            variant="secondary"
+          >
+            <ChevronDown className="h-3 w-3" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" side="bottom" sideOffset={5}>
+          <DropdownMenuItem onClick={() => actions.setRunMode("test")}>
+            <Play className="size-4" />
+            <span>Test Run (Local)</span>
+            {actions.runMode === "test" && <Check className="ml-auto size-4" />}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={!state.deploymentUrl}
+            onClick={() => actions.setRunMode("production")}
+          >
+            <Play className="size-4" />
+            <span>Production Run</span>
+            {actions.runMode === "production" && (
+              <Check className="ml-auto size-4" />
+            )}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </ButtonGroup>
+  );
+}
 
-      <Panel
-        className="flex flex-col-reverse items-end gap-2 border-none bg-transparent p-0 lg:flex-row lg:items-center"
-        position="top-right"
+// Workflow Menu Component
+function WorkflowMenuComponent({
+  workflowId,
+  state,
+  actions,
+}: {
+  workflowId?: string;
+  state: ReturnType<typeof useWorkflowState>;
+  actions: ReturnType<typeof useWorkflowActions>;
+}) {
+  if (!state.session) {
+    return null;
+  }
+
+  return (
+    <div className="flex h-9 items-center overflow-hidden rounded-md border bg-secondary text-secondary-foreground">
+      <DropdownMenu onOpenChange={(open) => open && actions.loadWorkflows()}>
+        <DropdownMenuTrigger className="flex h-full cursor-pointer items-center gap-2 px-3 font-medium text-sm transition-all hover:bg-black/5 dark:hover:bg-white/5">
+          <WorkflowIcon className="size-4" />
+          <p className="font-medium text-sm">
+            {workflowId ? state.workflowName : "New Workflow"}
+          </p>
+          <ChevronDown className="size-3 opacity-50" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-64">
+          <DropdownMenuItem
+            className="flex items-center justify-between"
+            onClick={actions.handleNewWorkflow}
+          >
+            <span>New Workflow</span>
+            {!workflowId && <Check className="size-4 shrink-0" />}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel className="text-muted-foreground text-xs uppercase">
+            Recent Workflows
+          </DropdownMenuLabel>
+          {state.allWorkflows.length === 0 ? (
+            <DropdownMenuItem disabled>No workflows found</DropdownMenuItem>
+          ) : (
+            state.allWorkflows
+              .filter((w) => w.name !== "__current__")
+              .map((workflow) => (
+                <DropdownMenuItem
+                  className="flex items-center justify-between"
+                  key={workflow.id}
+                  onClick={() => state.router.push(`/workflows/${workflow.id}`)}
+                >
+                  <span className="truncate">{workflow.name}</span>
+                  {workflow.id === state.currentWorkflowId && (
+                    <Check className="size-4 shrink-0" />
+                  )}
+                </DropdownMenuItem>
+              ))
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <div className="h-full w-px bg-border" />
+      <DropdownMenu>
+        <DropdownMenuTrigger className="flex h-full cursor-pointer items-center px-2 font-medium text-sm transition-all hover:bg-black/5 dark:hover:bg-white/5">
+          <MoreHorizontal className="size-4" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-48">
+          <DropdownMenuItem
+            disabled={!state.currentWorkflowId}
+            onClick={() => state.setShowRenameDialog(true)}
+          >
+            <span>Rename</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={state.nodes.length === 0}
+            onClick={() => state.setShowClearDialog(true)}
+          >
+            <span>Clear</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={!state.currentWorkflowId}
+            onClick={() => state.setShowDeleteDialog(true)}
+          >
+            <span>Delete</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
+
+// Workflow Dialogs Component
+function WorkflowDialogsComponent({
+  state,
+  actions,
+}: {
+  state: ReturnType<typeof useWorkflowState>;
+  actions: ReturnType<typeof useWorkflowActions>;
+}) {
+  return (
+    <>
+      <Dialog
+        onOpenChange={state.setShowClearDialog}
+        open={state.showClearDialog}
       >
-        {workflowId && (
-          <>
-            {/* Undo/Redo - Mobile Vertical */}
-            <ButtonGroup className="flex lg:hidden" orientation="vertical">
-              <Button
-                className="border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
-                disabled={!canUndo || isGenerating}
-                onClick={() => undo()}
-                size="icon"
-                title="Undo"
-                variant="secondary"
-              >
-                <Undo2 className="size-4" />
-              </Button>
-              <Button
-                className="border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
-                disabled={!canRedo || isGenerating}
-                onClick={() => redo()}
-                size="icon"
-                title="Redo"
-                variant="secondary"
-              >
-                <Redo2 className="size-4" />
-              </Button>
-            </ButtonGroup>
-
-            {/* Undo/Redo - Desktop Horizontal */}
-            <ButtonGroup className="hidden lg:flex" orientation="horizontal">
-              <Button
-                className="border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
-                disabled={!canUndo || isGenerating}
-                onClick={() => undo()}
-                size="icon"
-                title="Undo"
-                variant="secondary"
-              >
-                <Undo2 className="size-4" />
-              </Button>
-              <Button
-                className="border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
-                disabled={!canRedo || isGenerating}
-                onClick={() => redo()}
-                size="icon"
-                title="Redo"
-                variant="secondary"
-              >
-                <Redo2 className="size-4" />
-              </Button>
-            </ButtonGroup>
-
-            {/* Save/Deploy - Mobile Vertical */}
-            <ButtonGroup className="flex lg:hidden" orientation="vertical">
-              <Button
-                className="relative border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
-                disabled={!currentWorkflowId || isGenerating || isSaving}
-                onClick={handleSave}
-                size="icon"
-                title={isSaving ? "Saving..." : "Save workflow"}
-                variant="secondary"
-              >
-                {isSaving ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Save className="size-4" />
-                )}
-                {hasUnsavedChanges && !isSaving && (
-                  <div className="-top-0.5 -right-0.5 absolute size-2 rounded-full bg-primary" />
-                )}
-              </Button>
-              <Button
-                className="border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
-                disabled={
-                  isDeploying ||
-                  nodes.length === 0 ||
-                  isGenerating ||
-                  !currentWorkflowId
-                }
-                onClick={handleDeploy}
-                size="icon"
-                title={
-                  isDeploying
-                    ? "Deploying to production..."
-                    : "Deploy to production"
-                }
-                variant="secondary"
-              >
-                {isDeploying ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Rocket className="size-4" />
-                )}
-              </Button>
-              {deploymentUrl && (
-                <Button
-                  className="border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
-                  onClick={() => window.open(deploymentUrl, "_blank")}
-                  size="icon"
-                  title="Open deployment"
-                  variant="secondary"
-                >
-                  <ExternalLink className="size-4" />
-                </Button>
-              )}
-            </ButtonGroup>
-
-            {/* Save/Deploy - Desktop Horizontal */}
-            <ButtonGroup className="hidden lg:flex" orientation="horizontal">
-              <Button
-                className="relative border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
-                disabled={!currentWorkflowId || isGenerating || isSaving}
-                onClick={handleSave}
-                size="icon"
-                title={isSaving ? "Saving..." : "Save workflow"}
-                variant="secondary"
-              >
-                {isSaving ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Save className="size-4" />
-                )}
-                {hasUnsavedChanges && !isSaving && (
-                  <div className="-top-0.5 -right-0.5 absolute size-2 rounded-full bg-primary" />
-                )}
-              </Button>
-              <Button
-                className="border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
-                disabled={
-                  isDeploying ||
-                  nodes.length === 0 ||
-                  isGenerating ||
-                  !currentWorkflowId
-                }
-                onClick={handleDeploy}
-                size="icon"
-                title={
-                  isDeploying
-                    ? "Deploying to production..."
-                    : "Deploy to production"
-                }
-                variant="secondary"
-              >
-                {isDeploying ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Rocket className="size-4" />
-                )}
-              </Button>
-              {deploymentUrl && (
-                <Button
-                  className="border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
-                  onClick={() => window.open(deploymentUrl, "_blank")}
-                  size="icon"
-                  title="Open deployment"
-                  variant="secondary"
-                >
-                  <ExternalLink className="size-4" />
-                </Button>
-              )}
-            </ButtonGroup>
-
-            <ButtonGroup>
-              <Button
-                className="relative border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
-                disabled={isExecuting || nodes.length === 0 || isGenerating}
-                onClick={() => handleExecute()}
-                size="icon"
-                variant="secondary"
-              >
-                {isExecuting ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Play className="size-4" />
-                )}
-                {runMode === "test" && !isExecuting && (
-                  <div className="absolute right-0.5 bottom-0.5">
-                    <FlaskConical
-                      className="text-muted-foreground"
-                      strokeWidth={2.5}
-                      style={{ width: "12px", height: "12px" }}
-                    />
-                  </div>
-                )}
-              </Button>
-              <DropdownMenu modal={false}>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    className="w-6 border px-1 hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
-                    disabled={isExecuting || nodes.length === 0 || isGenerating}
-                    size="icon"
-                    title="Select run mode"
-                    variant="secondary"
-                  >
-                    <ChevronDown className="h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" side="bottom" sideOffset={5}>
-                  <DropdownMenuItem onClick={() => setRunMode("test")}>
-                    <Play className="size-4" />
-                    <span>Test Run (Local)</span>
-                    {runMode === "test" && <Check className="ml-auto size-4" />}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    disabled={!deploymentUrl}
-                    onClick={() => setRunMode("production")}
-                  >
-                    <Play className="size-4" />
-                    <span>Production Run</span>
-                    {runMode === "production" && (
-                      <Check className="ml-auto size-4" />
-                    )}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </ButtonGroup>
-          </>
-        )}
-
-        <UserMenu />
-      </Panel>
-
-      {/* Clear Workflow Dialog */}
-      <Dialog onOpenChange={setShowClearDialog} open={showClearDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Clear Workflow</DialogTitle>
@@ -791,18 +909,23 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button onClick={() => setShowClearDialog(false)} variant="outline">
+            <Button
+              onClick={() => state.setShowClearDialog(false)}
+              variant="outline"
+            >
               Cancel
             </Button>
-            <Button onClick={handleClearWorkflow} variant="destructive">
+            <Button onClick={actions.handleClearWorkflow} variant="destructive">
               Clear Workflow
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Rename Workflow Dialog */}
-      <Dialog onOpenChange={setShowRenameDialog} open={showRenameDialog}>
+      <Dialog
+        onOpenChange={state.setShowRenameDialog}
+        open={state.showRenameDialog}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Rename Workflow</DialogTitle>
@@ -813,7 +936,7 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              handleRenameWorkflow();
+              actions.handleRenameWorkflow();
             }}
           >
             <div className="py-4">
@@ -821,20 +944,20 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
               <Input
                 className="mt-2"
                 id="workflow-name"
-                onChange={(e) => setNewWorkflowName(e.target.value)}
+                onChange={(e) => state.setNewWorkflowName(e.target.value)}
                 placeholder="Enter workflow name"
-                value={newWorkflowName}
+                value={state.newWorkflowName}
               />
             </div>
             <DialogFooter>
               <Button
-                onClick={() => setShowRenameDialog(false)}
+                onClick={() => state.setShowRenameDialog(false)}
                 type="button"
                 variant="outline"
               >
                 Cancel
               </Button>
-              <Button disabled={!newWorkflowName.trim()} type="submit">
+              <Button disabled={!state.newWorkflowName.trim()} type="submit">
                 Rename
               </Button>
             </DialogFooter>
@@ -842,33 +965,40 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Workflow Dialog */}
-      <Dialog onOpenChange={setShowDeleteDialog} open={showDeleteDialog}>
+      <Dialog
+        onOpenChange={state.setShowDeleteDialog}
+        open={state.showDeleteDialog}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Workflow</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete &ldquo;{workflowName}&rdquo;? This
-              will permanently delete the workflow and its associated project.
-              This cannot be undone.
+              Are you sure you want to delete &ldquo;{state.workflowName}
+              &rdquo;? This will permanently delete the workflow and its
+              associated project. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button
-              onClick={() => setShowDeleteDialog(false)}
+              onClick={() => state.setShowDeleteDialog(false)}
               variant="outline"
             >
               Cancel
             </Button>
-            <Button onClick={handleDeleteWorkflow} variant="destructive">
+            <Button
+              onClick={actions.handleDeleteWorkflow}
+              variant="destructive"
+            >
               Delete Workflow
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* View Generated Code Dialog */}
-      <Dialog onOpenChange={setShowCodeDialog} open={showCodeDialog}>
+      <Dialog
+        onOpenChange={state.setShowCodeDialog}
+        open={state.showCodeDialog}
+      >
         <DialogContent className="flex max-h-[80vh] max-w-4xl flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle>Generated Workflow Code</DialogTitle>
@@ -877,26 +1007,26 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
               Workflow SDK. Copy this code and deploy it to a Next.js project.
             </DialogDescription>
           </DialogHeader>
-
           <div className="flex-1 overflow-auto">
             <pre className="overflow-auto rounded-lg bg-muted p-4 text-sm">
-              <code>{generatedCode}</code>
+              <code>{state.generatedCode}</code>
             </pre>
           </div>
-
           <DialogFooter>
-            <Button onClick={() => setShowCodeDialog(false)} variant="outline">
+            <Button
+              onClick={() => state.setShowCodeDialog(false)}
+              variant="outline"
+            >
               Close
             </Button>
-            <Button onClick={handleCopyCode}>Copy to Clipboard</Button>
+            <Button onClick={actions.handleCopyCode}>Copy to Clipboard</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Unsaved Changes Run Confirmation Dialog */}
       <AlertDialog
-        onOpenChange={setShowUnsavedRunDialog}
-        open={showUnsavedRunDialog}
+        onOpenChange={actions.setShowUnsavedRunDialog}
+        open={actions.showUnsavedRunDialog}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -908,13 +1038,48 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <Button onClick={handleRunWithoutSaving} variant="outline">
+            <Button onClick={actions.handleRunWithoutSaving} variant="outline">
               Run Without Saving
             </Button>
-            <Button onClick={handleSaveAndRun}>Save and Run</Button>
+            <Button onClick={actions.handleSaveAndRun}>Save and Run</Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </>
+  );
+}
+
+export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
+  const state = useWorkflowState();
+  const actions = useWorkflowActions(state);
+
+  return (
+    <>
+      <Panel
+        className="flex flex-col gap-2 rounded-none border-none bg-transparent p-0 lg:flex-row lg:items-center"
+        position="top-left"
+      >
+        <WorkflowMenuComponent
+          actions={actions}
+          state={state}
+          workflowId={workflowId}
+        />
+        <NodeToolbar />
+      </Panel>
+
+      <Panel
+        className="flex flex-col-reverse items-end gap-2 border-none bg-transparent p-0 lg:flex-row lg:items-center"
+        position="top-right"
+      >
+        <ToolbarActions
+          actions={actions}
+          state={state}
+          workflowId={workflowId}
+        />
+        <UserMenu />
+      </Panel>
+
+      <WorkflowDialogsComponent actions={actions} state={state} />
     </>
   );
 };
