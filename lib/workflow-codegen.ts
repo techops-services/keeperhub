@@ -194,7 +194,7 @@ export function generateWorkflowCode(
       .join("");
   }
 
-  // Helper to process @nodeId:DisplayName.field format
+  // Helper to process @nodeId:DisplayName.field format for template strings
   function processAtFormat(trimmed: string, match: string): string {
     const withoutAt = trimmed.substring(1);
     const colonIndex = withoutAt.indexOf(":");
@@ -220,7 +220,7 @@ export function generateWorkflowCode(
     return `\${${varName}${accessPath}}`;
   }
 
-  // Helper to process $nodeId.field format
+  // Helper to process $nodeId.field format for template strings
   function processDollarFormat(trimmed: string, match: string): string {
     const withoutDollar = trimmed.substring(1);
     const parts = withoutDollar.split(".");
@@ -240,7 +240,53 @@ export function generateWorkflowCode(
     return `\${${varName}${accessPath}}`;
   }
 
-  // Helper to convert template variables to JavaScript expressions
+  // Helper to process @nodeId:DisplayName.field format for JavaScript expressions (not template strings)
+  function processAtFormatForExpression(trimmed: string, match: string): string {
+    const withoutAt = trimmed.substring(1);
+    const colonIndex = withoutAt.indexOf(":");
+    if (colonIndex === -1) {
+      return match;
+    }
+
+    const nodeId = withoutAt.substring(0, colonIndex);
+    const rest = withoutAt.substring(colonIndex + 1);
+    const dotIndex = rest.indexOf(".");
+    const fieldPath = dotIndex !== -1 ? rest.substring(dotIndex + 1) : "";
+
+    const varName = nodeIdToVarName.get(nodeId);
+    if (!varName) {
+      return match; // Node not found, keep original
+    }
+
+    if (!fieldPath) {
+      return varName;
+    }
+
+    const accessPath = buildAccessPath(fieldPath);
+    return `${varName}${accessPath}`;
+  }
+
+  // Helper to process $nodeId.field format for JavaScript expressions (not template strings)
+  function processDollarFormatForExpression(trimmed: string, match: string): string {
+    const withoutDollar = trimmed.substring(1);
+    const parts = withoutDollar.split(".");
+    const nodeId = parts[0];
+    const fieldPath = parts.slice(1).join(".");
+
+    const varName = nodeIdToVarName.get(nodeId);
+    if (!varName) {
+      return match; // Node not found, keep original
+    }
+
+    if (!fieldPath) {
+      return varName;
+    }
+
+    const accessPath = buildAccessPath(fieldPath);
+    return `${varName}${accessPath}`;
+  }
+
+  // Helper to convert template variables to JavaScript expressions for template strings
   function convertTemplateToJS(template: string): string {
     if (!template || typeof template !== "string") {
       return template;
@@ -259,6 +305,42 @@ export function generateWorkflowCode(
 
       return match;
     });
+  }
+
+  // Helper to remove invisible characters (non-breaking spaces, etc.)
+  function removeInvisibleChars(str: string): string {
+    // Replace non-breaking space (U+00a0) and other invisible spaces with regular space
+    return str
+      .replace(/\u00a0/g, " ") // Non-breaking space
+      .replace(/[\u2000-\u200B\u2028\u2029]/g, " "); // Various invisible space characters
+  }
+
+  // Helper to convert template variables to JavaScript expressions (not template literal syntax)
+  function convertConditionToJS(condition: string): string {
+    if (!condition || typeof condition !== "string") {
+      return condition;
+    }
+
+    // First remove invisible characters (non-breaking spaces, etc.)
+    const cleaned = removeInvisibleChars(condition);
+
+    // Then convert template references
+    const converted = cleaned.replace(TEMPLATE_PATTERN, (match, expression) => {
+      const trimmed = expression.trim();
+
+      if (trimmed.startsWith("@")) {
+        return processAtFormatForExpression(trimmed, match);
+      }
+
+      if (trimmed.startsWith("$")) {
+        return processDollarFormatForExpression(trimmed, match);
+      }
+
+      return match;
+    });
+
+    // Final cleanup to ensure no non-breaking spaces remain
+    return removeInvisibleChars(converted);
   }
 
   // Helper to convert a JavaScript value to TypeScript object literal syntax
@@ -396,13 +478,51 @@ export function generateWorkflowCode(
   }
 
   function generateDatabaseActionCode(
+    node: WorkflowNode,
     indent: string,
     varName: string
   ): string[] {
+    const stepInfo = getStepInfo("Database Query");
     imports.add(
-      "import { executeQuery, insertData, queryData } from './integrations/database';"
+      `import { ${stepInfo.functionName} } from '${stepInfo.importPath}';`
     );
-    return [`${indent}const ${varName} = await queryData('your_table', {});`];
+
+    const config = node.data.config || {};
+    const dbQuery = (config.dbQuery as string) || "";
+    const dataSource = (config.dataSource as string) || "";
+    const tableName = (config.dbTable as string) || (config.tableName as string) || "your_table";
+
+    const lines = [
+      `${indent}const ${varName} = await ${stepInfo.functionName}({`,
+    ];
+
+    // dataSource as an object
+    if (dataSource) {
+      lines.push(`${indent}  dataSource: { name: "${dataSource}" },`);
+    } else {
+      lines.push(`${indent}  dataSource: {},`);
+    }
+
+    // query: SQL query if provided, otherwise table name
+    if (dbQuery) {
+      // Convert template references in SQL query
+      const convertedQuery = convertTemplateToJS(dbQuery);
+      const hasTemplateRefs = convertedQuery.includes("${");
+      
+      // Escape backticks and template literal syntax for SQL query
+      const escapeForOuterTemplate = (str: string) => str.replace(/\$\{/g, "$${");
+      const queryValue = hasTemplateRefs
+        ? `\`${escapeForOuterTemplate(convertedQuery).replace(/`/g, "\\`")}\``
+        : `\`${dbQuery.replace(/`/g, "\\`")}\``;
+
+      lines.push(`${indent}  query: ${queryValue},`);
+    } else {
+      // Use table name as query string
+      lines.push(`${indent}  query: "${tableName}",`);
+    }
+
+    lines.push(`${indent}});`);
+    return lines;
   }
 
   function generateHTTPActionCode(
@@ -668,7 +788,7 @@ export function generateWorkflowCode(
       );
     } else if (actionType === "Database Query") {
       lines.push(
-        ...wrapActionCall(generateDatabaseActionCode(indent, varName))
+        ...wrapActionCall(generateDatabaseActionCode(node, indent, varName))
       );
     } else if (actionType === "Execute Code") {
       lines.push(
@@ -703,7 +823,7 @@ export function generateWorkflowCode(
       lines.push(...wrapActionCall(generateLinearActionCode(indent, varName)));
     } else if (label.includes("database")) {
       lines.push(
-        ...wrapActionCall(generateDatabaseActionCode(indent, varName))
+        ...wrapActionCall(generateDatabaseActionCode(node, indent, varName))
       );
     } else if (label.includes("execute code")) {
       lines.push(
@@ -742,7 +862,12 @@ export function generateWorkflowCode(
       const trueNode = nextNodes[0];
       const falseNode = nextNodes[1];
 
-      lines.push(`${indent}if (${condition || "true"}) {`);
+      // Convert template references in condition to JavaScript expressions (not template literal syntax)
+      const convertedCondition = condition
+        ? convertConditionToJS(condition)
+        : "true";
+
+      lines.push(`${indent}if (${convertedCondition}) {`);
       if (trueNode) {
         const trueNodeCode = generateNodeCode(trueNode, `${indent}  `);
         lines.push(...trueNodeCode);
