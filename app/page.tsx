@@ -2,18 +2,15 @@
 
 import { ReactFlowProvider } from "@xyflow/react";
 import { useAtomValue, useSetAtom } from "jotai";
-import { Plus } from "lucide-react";
 import { nanoid } from "nanoid";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { WorkflowCanvas } from "@/components/workflow/workflow-canvas";
 import { WorkflowToolbar } from "@/components/workflow/workflow-toolbar";
 import { authClient, useSession } from "@/lib/auth-client";
 import { workflowApi } from "@/lib/workflow-api";
 import {
-  addNodeAtom,
   currentVercelProjectIdAtom,
   currentVercelProjectNameAtom,
   currentWorkflowIdAtom,
@@ -50,7 +47,6 @@ const Home = () => {
   const setCurrentWorkflowName = useSetAtom(currentWorkflowNameAtom);
   const setCurrentVercelProjectId = useSetAtom(currentVercelProjectIdAtom);
   const setCurrentVercelProjectName = useSetAtom(currentVercelProjectNameAtom);
-  const addNode = useSetAtom(addNodeAtom);
   const hasCreatedWorkflowRef = useRef(false);
   const currentWorkflowName = useAtomValue(currentWorkflowNameAtom);
 
@@ -79,9 +75,28 @@ const Home = () => {
     [setCurrentVercelProjectId, setCurrentVercelProjectName]
   );
 
-  // Initialize with no nodes on mount
+  // Handler to add the first node (replaces the "add" node)
+  const handleAddNode = useCallback(() => {
+    const newNode: WorkflowNode = createDefaultTriggerNode();
+    // Replace all nodes (removes the "add" node)
+    setNodes([newNode]);
+  }, [setNodes]);
+
+  // Initialize with a temporary "add" node on mount
   useEffect(() => {
-    setNodes([]);
+    const addNodePlaceholder: WorkflowNode = {
+      id: "add-node-placeholder",
+      type: "add",
+      position: { x: 0, y: 0 },
+      data: {
+        label: "",
+        type: "add",
+        onClick: handleAddNode,
+      },
+      draggable: false,
+      selectable: false,
+    };
+    setNodes([addNodePlaceholder]);
     setEdges([]);
     setCurrentWorkflowName("Untitled Workflow");
     setCurrentVercelProjectId(null);
@@ -93,13 +108,17 @@ const Home = () => {
     setCurrentWorkflowName,
     setCurrentVercelProjectId,
     setCurrentVercelProjectName,
+    handleAddNode,
   ]);
 
-  // Create workflow when first node is added
+  // Create workflow when first real node is added
   useEffect(() => {
     const createWorkflowAndRedirect = async () => {
-      // Only create when we have at least one node and haven't created a workflow yet
-      if (nodes.length === 0 || hasCreatedWorkflowRef.current) {
+      // Filter out the placeholder "add" node
+      const realNodes = nodes.filter((node) => node.type !== "add");
+
+      // Only create when we have at least one real node and haven't created a workflow yet
+      if (realNodes.length === 0 || hasCreatedWorkflowRef.current) {
         return;
       }
       hasCreatedWorkflowRef.current = true;
@@ -107,11 +126,11 @@ const Home = () => {
       try {
         await ensureSession();
 
-        // Create workflow with all current nodes
+        // Create workflow with all real nodes
         const newWorkflow = await workflowApi.create({
           name: "Untitled Workflow",
           description: "",
-          nodes,
+          nodes: realNodes,
           edges,
         });
 
@@ -131,12 +150,6 @@ const Home = () => {
     createWorkflowAndRedirect();
   }, [nodes, edges, router, ensureSession, loadProjectDetails]);
 
-  // Handler to add the first node
-  const handleAddNode = useCallback(() => {
-    const newNode: WorkflowNode = createDefaultTriggerNode();
-    addNode(newNode);
-  }, [addNode]);
-
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden">
       <main className="relative flex size-full overflow-hidden">
@@ -147,18 +160,6 @@ const Home = () => {
               workflowId={currentWorkflowId ?? undefined}
             />
             <WorkflowCanvas showMinimap={false} />
-            {nodes.length === 0 && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Button
-                  className="h-14 gap-2 text-lg"
-                  onClick={handleAddNode}
-                  size="lg"
-                >
-                  <Plus className="h-5 w-5" />
-                  Add Node
-                </Button>
-              </div>
-            )}
           </div>
         </ReactFlowProvider>
       </main>

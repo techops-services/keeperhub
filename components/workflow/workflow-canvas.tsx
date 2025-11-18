@@ -37,6 +37,7 @@ import {
 import { Edge } from "../ai-elements/edge";
 import { Panel } from "../ai-elements/panel";
 import { ActionNode } from "./nodes/action-node";
+import { AddNode } from "./nodes/add-node";
 import { TriggerNode } from "./nodes/trigger-node";
 
 const nodeTemplates = [
@@ -150,6 +151,7 @@ export function WorkflowCanvas({ showMinimap = true }: WorkflowCanvasProps) {
     () => ({
       trigger: TriggerNode,
       action: ActionNode,
+      add: AddNode,
     }),
     []
   );

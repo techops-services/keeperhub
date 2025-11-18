@@ -3,7 +3,7 @@ import { applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
 import { atom } from "jotai";
 import { workflowApi } from "./workflow-api";
 
-export type WorkflowNodeType = "trigger" | "action";
+export type WorkflowNodeType = "trigger" | "action" | "add";
 
 export type WorkflowNodeData = {
   label: string;
@@ -11,6 +11,7 @@ export type WorkflowNodeData = {
   type: WorkflowNodeType;
   config?: Record<string, unknown>;
   status?: "idle" | "running" | "success" | "error";
+  onClick?: () => void; // For the "add" node type
 };
 
 export type WorkflowNode = Node<WorkflowNodeData>;
