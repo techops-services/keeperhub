@@ -25,10 +25,7 @@ const nodeTemplates = [
     label: "Action",
     description: "Perform an action",
     icon: Zap,
-    defaultConfig: {
-      actionType: "HTTP Request",
-      endpoint: "https://api.example.com",
-    },
+    defaultConfig: {},
   },
   {
     type: "condition" as WorkflowNodeType,

@@ -56,7 +56,7 @@ const nodeTemplates = [
     description: "",
     displayLabel: "Action",
     icon: Zap,
-    defaultConfig: { actionType: "HTTP Request" },
+    defaultConfig: {},
   },
 ];
 

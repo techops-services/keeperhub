@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
+import { nanoid } from "nanoid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +14,7 @@ import {
 } from "@/components/ui/select";
 
 export type SchemaField = {
+  id?: string;
   name: string;
   type: "string" | "number" | "boolean" | "array" | "object";
   itemType?: "string" | "number" | "boolean" | "object";
@@ -34,7 +36,7 @@ export function SchemaBuilder({
   level = 0,
 }: SchemaBuilderProps) {
   const addField = () => {
-    onChange([...schema, { name: "", type: "string" }]);
+    onChange([...schema, { id: nanoid(), name: "", type: "string" }]);
   };
 
   const resetDependentFields = (
@@ -85,132 +87,132 @@ export function SchemaBuilder({
 
   return (
     <div className={`space-y-3 ${indentClass}`}>
-      {schema.map((field, index) => (
-        <div
-          className="space-y-2 rounded-md border p-3"
-          key={`field-${level}-${field.name || "unnamed"}-${index}`}
-        >
-          <div className="flex gap-2">
-            <div className="flex-1 space-y-1.5">
-              <Label htmlFor={`field-name-${level}-${index}`}>
-                Property Name
+      {schema.map((field, index) => {
+        const fieldId = field.id || `field-${level}-${index}`;
+        return (
+          <div className="space-y-2 rounded-md border p-3" key={fieldId}>
+            <div className="flex gap-2">
+              <div className="flex-1 space-y-1.5">
+                <Label htmlFor={`field-name-${level}-${index}`}>
+                  Property Name
+                </Label>
+                <Input
+                  disabled={disabled}
+                  id={`field-name-${level}-${index}`}
+                  onChange={(e) => updateField(index, { name: e.target.value })}
+                  placeholder="propertyName"
+                  value={field.name}
+                />
+              </div>
+              <div className="flex-1 space-y-1.5">
+                <Label htmlFor={`field-type-${level}-${index}`}>Type</Label>
+                <Select
+                  disabled={disabled}
+                  onValueChange={(value) =>
+                    updateField(index, {
+                      type: value as SchemaField["type"],
+                    })
+                  }
+                  value={field.type}
+                >
+                  <SelectTrigger
+                    className="w-full"
+                    id={`field-type-${level}-${index}`}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="string">String</SelectItem>
+                    <SelectItem value="number">Number</SelectItem>
+                    <SelectItem value="boolean">Boolean</SelectItem>
+                    <SelectItem value="array">Array</SelectItem>
+                    <SelectItem value="object">Object</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-end">
+                <Button
+                  disabled={disabled}
+                  onClick={() => removeField(index)}
+                  size="icon"
+                  variant="ghost"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {field.type === "array" && (
+              <div className="space-y-1.5">
+                <Label htmlFor={`field-item-type-${level}-${index}`}>
+                  Array Item Type
+                </Label>
+                <Select
+                  disabled={disabled}
+                  onValueChange={(value) =>
+                    updateField(index, {
+                      itemType: value as SchemaField["itemType"],
+                    })
+                  }
+                  value={field.itemType || "string"}
+                >
+                  <SelectTrigger
+                    className="w-full"
+                    id={`field-item-type-${level}-${index}`}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="string">String</SelectItem>
+                    <SelectItem value="number">Number</SelectItem>
+                    <SelectItem value="boolean">Boolean</SelectItem>
+                    <SelectItem value="object">Object</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {field.type === "object" && (
+              <div className="mt-2">
+                <Label className="mb-2 block">Object Properties</Label>
+                <SchemaBuilder
+                  disabled={disabled}
+                  level={level + 1}
+                  onChange={(fields) => updateNestedFields(index, fields)}
+                  schema={field.fields || []}
+                />
+              </div>
+            )}
+
+            {field.type === "array" && field.itemType === "object" && (
+              <div className="mt-2">
+                <Label className="mb-2 block">Array Item Properties</Label>
+                <SchemaBuilder
+                  disabled={disabled}
+                  level={level + 1}
+                  onChange={(fields) => updateNestedFields(index, fields)}
+                  schema={field.fields || []}
+                />
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label htmlFor={`field-desc-${level}-${index}`}>
+                Description (optional)
               </Label>
               <Input
                 disabled={disabled}
-                id={`field-name-${level}-${index}`}
-                onChange={(e) => updateField(index, { name: e.target.value })}
-                placeholder="propertyName"
-                value={field.name}
-              />
-            </div>
-            <div className="flex-1 space-y-1.5">
-              <Label htmlFor={`field-type-${level}-${index}`}>Type</Label>
-              <Select
-                disabled={disabled}
-                onValueChange={(value) =>
-                  updateField(index, {
-                    type: value as SchemaField["type"],
-                  })
+                id={`field-desc-${level}-${index}`}
+                onChange={(e) =>
+                  updateField(index, { description: e.target.value })
                 }
-                value={field.type}
-              >
-                <SelectTrigger
-                  className="w-full"
-                  id={`field-type-${level}-${index}`}
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="string">String</SelectItem>
-                  <SelectItem value="number">Number</SelectItem>
-                  <SelectItem value="boolean">Boolean</SelectItem>
-                  <SelectItem value="array">Array</SelectItem>
-                  <SelectItem value="object">Object</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-end">
-              <Button
-                disabled={disabled}
-                onClick={() => removeField(index)}
-                size="icon"
-                variant="ghost"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+                placeholder="Description for the AI"
+                value={field.description || ""}
+              />
             </div>
           </div>
-
-          {field.type === "array" && (
-            <div className="space-y-1.5">
-              <Label htmlFor={`field-item-type-${level}-${index}`}>
-                Array Item Type
-              </Label>
-              <Select
-                disabled={disabled}
-                onValueChange={(value) =>
-                  updateField(index, {
-                    itemType: value as SchemaField["itemType"],
-                  })
-                }
-                value={field.itemType || "string"}
-              >
-                <SelectTrigger
-                  className="w-full"
-                  id={`field-item-type-${level}-${index}`}
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="string">String</SelectItem>
-                  <SelectItem value="number">Number</SelectItem>
-                  <SelectItem value="boolean">Boolean</SelectItem>
-                  <SelectItem value="object">Object</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {field.type === "object" && (
-            <div className="mt-2">
-              <Label className="mb-2 block">Object Properties</Label>
-              <SchemaBuilder
-                disabled={disabled}
-                level={level + 1}
-                onChange={(fields) => updateNestedFields(index, fields)}
-                schema={field.fields || []}
-              />
-            </div>
-          )}
-
-          {field.type === "array" && field.itemType === "object" && (
-            <div className="mt-2">
-              <Label className="mb-2 block">Array Item Properties</Label>
-              <SchemaBuilder
-                disabled={disabled}
-                level={level + 1}
-                onChange={(fields) => updateNestedFields(index, fields)}
-                schema={field.fields || []}
-              />
-            </div>
-          )}
-
-          <div className="space-y-1.5">
-            <Label htmlFor={`field-desc-${level}-${index}`}>
-              Description (optional)
-            </Label>
-            <Input
-              disabled={disabled}
-              id={`field-desc-${level}-${index}`}
-              onChange={(e) =>
-                updateField(index, { description: e.target.value })
-              }
-              placeholder="Description for the AI"
-              value={field.description || ""}
-            />
-          </div>
-        </div>
-      ))}
+        );
+      })}
 
       <Button
         className="w-full"

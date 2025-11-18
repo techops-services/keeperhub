@@ -326,6 +326,7 @@ function DatabaseQueryFields({
               scrollBeyondLastLine: false,
               fontSize: 12,
               readOnly: disabled,
+              wordWrap: "off",
             }}
             value={(config?.dbQuery as string) || ""}
           />
@@ -403,6 +404,7 @@ function HttpRequestFields({
               scrollBeyondLastLine: false,
               fontSize: 12,
               readOnly: disabled,
+              wordWrap: "off",
             }}
             value={(config?.httpHeaders as string) || "{}"}
           />
@@ -424,6 +426,7 @@ function HttpRequestFields({
               fontSize: 12,
               readOnly: config?.httpMethod === "GET" || disabled,
               domReadOnly: config?.httpMethod === "GET" || disabled,
+              wordWrap: "off",
             }}
             value={(config?.httpBody as string) || "{}"}
           />
@@ -610,6 +613,7 @@ function ExecuteCodeFields({
               scrollBeyondLastLine: false,
               fontSize: 12,
               readOnly: disabled,
+              wordWrap: "off",
             }}
             value={(config?.code as string) || ""}
           />
@@ -684,7 +688,7 @@ export function ActionConfig({
     }
   }, [config?.actionType]);
 
-  const actionType = (config?.actionType as string) || "HTTP Request";
+  const actionType = (config?.actionType as string) || "";
   const requiredIntegration = ACTION_INTEGRATION_MAP[actionType];
 
   return (
@@ -694,7 +698,7 @@ export function ActionConfig({
         <Select
           disabled={disabled}
           onValueChange={(value) => onUpdateConfig("actionType", value)}
-          value={actionType}
+          value={actionType || undefined}
         >
           <SelectTrigger className="w-full" id="actionType">
             <SelectValue placeholder="Select action type" />

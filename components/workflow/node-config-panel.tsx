@@ -37,6 +37,7 @@ import { Panel } from "../ai-elements/panel";
 import { Drawer, DrawerContent, DrawerTrigger } from "../ui/drawer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { ActionConfig } from "./config/action-config";
+import { ActionGrid } from "./config/action-grid";
 import { TriggerConfig } from "./config/trigger-config";
 import { WorkflowRuns } from "./workflow-runs";
 
@@ -692,6 +693,7 @@ const MultiSelectionPanel = ({
   );
 };
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex UI logic with multiple conditions
 const PanelInner = () => {
   const [selectedNodeId] = useAtom(selectedNodeAtom);
   const [selectedEdgeId] = useAtom(selectedEdgeAtom);
@@ -1015,34 +1017,50 @@ const PanelInner = () => {
               />
             )}
 
-            {selectedNode.data.type === "action" && (
+            {selectedNode.data.type === "action" &&
+            !selectedNode.data.config?.actionType ? (
+              <ActionGrid
+                disabled={isGenerating}
+                onSelectAction={(actionType) =>
+                  handleUpdateConfig("actionType", actionType)
+                }
+              />
+            ) : null}
+
+            {selectedNode.data.type === "action" &&
+            selectedNode.data.config?.actionType ? (
               <ActionConfig
                 config={selectedNode.data.config || {}}
                 disabled={isGenerating}
                 onUpdateConfig={handleUpdateConfig}
               />
-            )}
+            ) : null}
 
-            <div className="space-y-2">
-              <Label htmlFor="label">Label</Label>
-              <Input
-                disabled={isGenerating}
-                id="label"
-                onChange={(e) => handleUpdateLabel(e.target.value)}
-                value={selectedNode.data.label}
-              />
-            </div>
+            {selectedNode.data.type !== "action" ||
+            selectedNode.data.config?.actionType ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="label">Label</Label>
+                  <Input
+                    disabled={isGenerating}
+                    id="label"
+                    onChange={(e) => handleUpdateLabel(e.target.value)}
+                    value={selectedNode.data.label}
+                  />
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Input
-                disabled={isGenerating}
-                id="description"
-                onChange={(e) => handleUpdateDescription(e.target.value)}
-                placeholder="Optional description"
-                value={selectedNode.data.description || ""}
-              />
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Input
+                    disabled={isGenerating}
+                    id="description"
+                    onChange={(e) => handleUpdateDescription(e.target.value)}
+                    placeholder="Optional description"
+                    value={selectedNode.data.description || ""}
+                  />
+                </div>
+              </>
+            ) : null}
           </div>
           <div className="shrink-0 border-t p-4">
             <Button
