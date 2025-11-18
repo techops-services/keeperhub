@@ -12,6 +12,64 @@ type GeneratedCode = {
   imports: string[];
 };
 
+// Helper to find all node references in templates
+function findNodeReferences(template: string): Set<string> {
+  const refs = new Set<string>();
+  if (!template || typeof template !== "string") {
+    return refs;
+  }
+
+  const pattern = /\{\{([^}]+)\}\}/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(template)) !== null) {
+    const expression = match[1].trim();
+    
+    // Handle @nodeId:DisplayName.field format
+    if (expression.startsWith("@")) {
+      const withoutAt = expression.substring(1);
+      const colonIndex = withoutAt.indexOf(":");
+      if (colonIndex !== -1) {
+        const nodeId = withoutAt.substring(0, colonIndex);
+        refs.add(nodeId);
+      }
+    }
+    // Handle $nodeId.field format
+    else if (expression.startsWith("$")) {
+      const withoutDollar = expression.substring(1);
+      const parts = withoutDollar.split(".");
+      if (parts.length > 0) {
+        refs.add(parts[0]);
+      }
+    }
+  }
+
+  return refs;
+}
+
+// Helper to analyze which node outputs are used
+function analyzeNodeUsage(nodes: WorkflowNode[]): Set<string> {
+  const usedNodes = new Set<string>();
+
+  for (const node of nodes) {
+    if (node.data.type === "action") {
+      const config = node.data.config || {};
+      
+      // Check all config values for template references
+      for (const value of Object.values(config)) {
+        if (typeof value === "string") {
+          const refs = findNodeReferences(value);
+          for (const ref of refs) {
+            usedNodes.add(ref);
+          }
+        }
+      }
+    }
+  }
+
+  return usedNodes;
+}
+
 /**
  * Generate TypeScript code from workflow JSON with "use workflow" directive
  */
@@ -22,13 +80,13 @@ export function generateWorkflowCode(
 ): GeneratedCode {
   const {
     functionName = "executeWorkflow",
-    parameters = [{ name: "input", type: "Record<string, unknown>" }],
-    returnType = "Promise<unknown>",
   } = options;
+
+  // Analyze which node outputs are actually used
+  const usedNodeOutputs = analyzeNodeUsage(nodes);
 
   // Track required imports
   const imports = new Set<string>();
-  imports.add("// Workflow integrations");
 
   // Build a map of node connections
   const nodeMap = new Map(nodes.map((n) => [n.id, n]));
@@ -49,28 +107,239 @@ export function generateWorkflowCode(
   const codeLines: string[] = [];
   const visited = new Set<string>();
 
-  // Parameter declarations
-  const paramDeclarations = parameters
-    .map((p) => `${p.name}: ${p.type}`)
-    .join(", ");
-
   // Start function
   codeLines.push(
-    `export async function ${functionName}(${paramDeclarations}): ${returnType} {`
+    `export async function ${functionName}() {`
   );
   codeLines.push(`  "use workflow";`);
   codeLines.push("");
 
+  // Helper to convert label or action type to a friendly variable name
+  function toFriendlyVarName(label: string, actionType?: string): string {
+    // Use label if available, otherwise fall back to action type
+    const baseName = label || actionType || "result";
+    
+    // Convert to camelCase: "Generate Friendly Greeting Email" -> "generateFriendlyGreetingEmail"
+    const camelCase = baseName
+      .split(/\s+/)
+      .map((word, index) => {
+        const cleaned = word.replace(/[^a-zA-Z0-9]/g, "");
+        if (!cleaned) return "";
+        if (index === 0) {
+          return cleaned.toLowerCase();
+        }
+        return cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase();
+      })
+      .filter((word) => word.length > 0)
+      .join("");
+    
+    // Add "Result" suffix
+    return `${camelCase}Result`;
+  }
+
+  // Build a map of nodeId to variable name for template references
+  const nodeIdToVarName = new Map<string, string>();
+  const usedVarNames = new Set<string>();
+  
+  for (const node of nodes) {
+    let varName: string;
+    
+    if (node.data.type === "action") {
+      const actionType = node.data.config?.actionType as string | undefined;
+      const label = node.data.label || "";
+      const baseVarName = toFriendlyVarName(label, actionType);
+      
+      // Ensure uniqueness
+      varName = baseVarName;
+      let counter = 1;
+      while (usedVarNames.has(varName)) {
+        varName = `${baseVarName}${counter}`;
+        counter++;
+      }
+      usedVarNames.add(varName);
+    } else {
+      // For triggers, use a simple name
+      varName = `${node.data.type}_${node.id.replace(/-/g, "_")}`;
+    }
+    
+    nodeIdToVarName.set(node.id, varName);
+  }
+
+  // Helper to convert template variables to JavaScript expressions
+  function convertTemplateToJS(template: string): string {
+    if (!template || typeof template !== "string") {
+      return template;
+    }
+
+    const pattern = /\{\{([^}]+)\}\}/g;
+
+    return template.replace(pattern, (match, expression) => {
+      const trimmed = expression.trim();
+      
+      // Handle @nodeId:DisplayName.field format
+      if (trimmed.startsWith("@")) {
+        const withoutAt = trimmed.substring(1);
+        const colonIndex = withoutAt.indexOf(":");
+        if (colonIndex !== -1) {
+          const nodeId = withoutAt.substring(0, colonIndex);
+          const rest = withoutAt.substring(colonIndex + 1);
+          const dotIndex = rest.indexOf(".");
+          const fieldPath = dotIndex !== -1 ? rest.substring(dotIndex + 1) : "";
+          
+          const varName = nodeIdToVarName.get(nodeId);
+          if (!varName) {
+            return match; // Node not found, keep original
+          }
+          
+          if (!fieldPath) {
+            return `\${${varName}}`;
+          }
+          
+          const accessPath = fieldPath
+            .split(".")
+            .map((part: string) => {
+              const arrayMatch = part.match(/^([^[]+)\[(\d+)\]$/);
+              if (arrayMatch) {
+                return `.${arrayMatch[1]}[${arrayMatch[2]}]`;
+              }
+              return `.${part}`;
+            })
+            .join("");
+          
+          return `\${${varName}${accessPath}}`;
+        }
+      }
+      
+      // Handle $nodeId.field format
+      if (trimmed.startsWith("$")) {
+        const withoutDollar = trimmed.substring(1);
+        const parts = withoutDollar.split(".");
+        const nodeId = parts[0];
+        const fieldPath = parts.slice(1).join(".");
+        
+        const varName = nodeIdToVarName.get(nodeId);
+        if (!varName) {
+          return match; // Node not found, keep original
+        }
+        
+        if (!fieldPath) {
+          return `\${${varName}}`;
+        }
+        
+        const accessPath = fieldPath
+          .split(".")
+          .map((part: string) => {
+            const arrayMatch = part.match(/^([^[]+)\[(\d+)\]$/);
+            if (arrayMatch) {
+              return `.${arrayMatch[1]}[${arrayMatch[2]}]`;
+            }
+            return `.${part}`;
+          })
+          .join("");
+        
+        return `\${${varName}${accessPath}}`;
+      }
+      
+      return match;
+    });
+  }
+
+  // Helper to escape a string for safe use in template literals
+  function escapeForTemplateLiteral(str: string): string {
+    if (!str) {
+      return "";
+    }
+    return str
+      .replace(/\\/g, "\\\\")
+      .replace(/`/g, "\\`");
+  }
+
+  // Helper to convert a JavaScript value to TypeScript object literal syntax
+  function toTypeScriptLiteral(value: unknown): string {
+    if (value === null) {
+      return "null";
+    }
+    if (value === undefined) {
+      return "undefined";
+    }
+    if (typeof value === "string") {
+      return JSON.stringify(value);
+    }
+    if (typeof value === "number" || typeof value === "boolean") {
+      return String(value);
+    }
+    if (Array.isArray(value)) {
+      const items = value.map((item) => toTypeScriptLiteral(item));
+      return `[${items.join(", ")}]`;
+    }
+    if (typeof value === "object") {
+      const entries = Object.entries(value).map(([key, val]) => {
+        // Use quoted key only if it's not a valid identifier
+        const keyStr = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key) ? key : JSON.stringify(key);
+        return `${keyStr}: ${toTypeScriptLiteral(val)}`;
+      });
+      return `{${entries.join(", ")}}`;
+    }
+    return String(value);
+  }
+
+  // Helper to convert action type to step function name and import path
+  function getStepInfo(actionType: string): { functionName: string; importPath: string } {
+    const stepMap: Record<string, { functionName: string; importPath: string }> = {
+      "Generate Text": { functionName: "generateTextStep", importPath: "./steps/generate-text-step" },
+      "Send Email": { functionName: "sendEmailStep", importPath: "./steps/send-email-step" },
+      "Send Slack Message": { functionName: "sendSlackMessageStep", importPath: "./steps/send-slack-message-step" },
+      "Create Ticket": { functionName: "createTicketStep", importPath: "./steps/create-ticket-step" },
+      "Generate Image": { functionName: "generateImageStep", importPath: "./steps/generate-image-step" },
+      "Database Query": { functionName: "databaseQueryStep", importPath: "./steps/database-query-step" },
+      "HTTP Request": { functionName: "httpRequestStep", importPath: "./steps/http-request-step" },
+    };
+    
+    return stepMap[actionType] || { functionName: "unknownStep", importPath: "./steps/unknown-step" };
+  }
+
   // Helper functions to generate code for different action types
-  function generateEmailActionCode(indent: string, varName: string): string[] {
-    imports.add(
-      "import { sendEmail, generateEmail } from './integrations/resend';"
-    );
+  function generateEmailActionCode(
+    node: WorkflowNode,
+    indent: string,
+    varName: string
+  ): string[] {
+    const stepInfo = getStepInfo("Send Email");
+    imports.add(`import { ${stepInfo.functionName} } from '${stepInfo.importPath}';`);
+    
+    const config = node.data.config || {};
+    const emailTo = (config.emailTo as string) || "user@example.com";
+    const emailSubject = (config.emailSubject as string) || "Notification";
+    const emailBody = (config.emailBody as string) || "No content";
+    
+    const convertedEmailTo = convertTemplateToJS(emailTo);
+    const convertedSubject = convertTemplateToJS(emailSubject);
+    const convertedBody = convertTemplateToJS(emailBody);
+    
+    // Check if template references are used (converted string contains ${)
+    const hasTemplateRefs = (str: string) => str.includes("${");
+    
+    // Escape template expressions for the outer template literal (use $$ to escape $)
+    const escapeForOuterTemplate = (str: string) => {
+      return str.replace(/\$\{/g, "$${");
+    };
+    
+    // Build values - use template literals if references exist, otherwise use string literals
+    const emailToValue = hasTemplateRefs(convertedEmailTo)
+      ? `\`${escapeForOuterTemplate(convertedEmailTo).replace(/`/g, "\\`")}\``
+      : `'${emailTo.replace(/'/g, "\\'")}'`;
+    const subjectValue = hasTemplateRefs(convertedSubject)
+      ? `\`${escapeForOuterTemplate(convertedSubject).replace(/`/g, "\\`")}\``
+      : `'${emailSubject.replace(/'/g, "\\'")}'`;
+    const bodyValue = hasTemplateRefs(convertedBody)
+      ? `\`${escapeForOuterTemplate(convertedBody).replace(/`/g, "\\`")}\``
+      : `'${emailBody.replace(/'/g, "\\'")}'`;
+    
     return [
-      `${indent}const ${varName} = await sendEmail({`,
-      `${indent}  to: input.email as string,`,
-      `${indent}  subject: input.subject as string || 'Notification',`,
-      `${indent}  body: input.body as string || 'No content',`,
+      `${indent}const ${varName} = await ${stepInfo.functionName}({`,
+      `${indent}  emailTo: ${emailToValue},`,
+      `${indent}  emailSubject: ${subjectValue},`,
+      `${indent}  emailBody: ${bodyValue},`,
       `${indent}});`,
     ];
   }
@@ -79,8 +348,8 @@ export function generateWorkflowCode(
     imports.add("import { createTicket } from './integrations/linear';");
     return [
       `${indent}const ${varName} = await createTicket({`,
-      `${indent}  title: input.title as string || 'New Ticket',`,
-      `${indent}  description: input.description as string || '',`,
+      `${indent}  title: 'New Ticket',`,
+      `${indent}  description: '',`,
       `${indent}});`,
     ];
   }
@@ -105,7 +374,7 @@ export function generateWorkflowCode(
       `${indent}const ${varName} = await callApi({`,
       `${indent}  url: '${endpoint || "https://api.example.com/endpoint"}',`,
       `${indent}  method: 'POST',`,
-      `${indent}  body: input,`,
+      `${indent}  body: {},`,
       `${indent}});`,
     ];
   }
@@ -115,21 +384,50 @@ export function generateWorkflowCode(
     indent: string,
     varName: string
   ): string[] {
-    imports.add("import { generateText } from './integrations/ai';");
+    const stepInfo = getStepInfo("Generate Text");
+    imports.add(`import { ${stepInfo.functionName} } from '${stepInfo.importPath}';`);
+    
+    const config = node.data.config || {};
     const aiPrompt =
-      (node.data.config?.aiPrompt as string) || "Generate a summary";
-    const aiModel = (node.data.config?.aiModel as string) || "gpt-4o-mini";
-    const aiFormat = (node.data.config?.aiFormat as string) || "text";
+      (config.aiPrompt as string) || "Generate a summary";
+    const aiModel = (config.aiModel as string) || "gpt-4o-mini";
+    const aiFormat = (config.aiFormat as string) || "text";
+    const aiSchema = config.aiSchema as string | undefined;
+    
+    const convertedPrompt = convertTemplateToJS(aiPrompt);
+    const hasTemplateRefs = convertedPrompt.includes("${");
+    const escapeForOuterTemplate = (str: string) => str.replace(/\$\{/g, "$${");
+    
+    const promptValue = hasTemplateRefs
+      ? `\`${escapeForOuterTemplate(convertedPrompt).replace(/`/g, "\\`")}\``
+      : `\`${aiPrompt.replace(/`/g, "\\`")}\``;
 
     const lines = [
       `${indent}// Generate text using AI`,
-      `${indent}const ${varName} = await generateText({`,
+      `${indent}const ${varName} = await ${stepInfo.functionName}({`,
       `${indent}  model: "${aiModel}",`,
-      `${indent}  prompt: \`${aiPrompt}\`,`,
+      `${indent}  prompt: ${promptValue},`,
     ];
 
     if (aiFormat === "object") {
       lines.push(`${indent}  format: "object",`);
+      if (aiSchema) {
+        // Parse schema and convert to TypeScript object literal syntax, removing id fields
+        try {
+          const parsedSchema = JSON.parse(aiSchema);
+          // Remove id field from each schema object
+          const schemaWithoutIds = Array.isArray(parsedSchema)
+            ? parsedSchema.map((field: Record<string, unknown>) => {
+                const { id, ...rest } = field;
+                return rest;
+              })
+            : parsedSchema;
+          const schemaString = toTypeScriptLiteral(schemaWithoutIds);
+          lines.push(`${indent}  schema: ${schemaString},`);
+        } catch {
+          // If schema is invalid JSON, skip it
+        }
+      }
     }
 
     lines.push(`${indent}});`);
@@ -221,60 +519,117 @@ export function generateWorkflowCode(
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Action type routing requires many conditionals
   function generateActionNodeCode(
     node: WorkflowNode,
+    nodeId: string,
     indent: string,
     varName: string
   ): string[] {
-    const lines: string[] = [`${indent}// Action: ${node.data.label}`];
+    const actionType = node.data.config?.actionType as string;
+    const endpoint = node.data.config?.endpoint as string;
+    const label = node.data.label.toLowerCase();
+    
+    // Use label if available, otherwise fall back to action type
+    const actionLabel = node.data.label || actionType || "Unknown Action";
+    const lines: string[] = [`${indent}// Action: ${actionLabel}`];
 
     if (node.data.description) {
       lines.push(`${indent}// ${node.data.description}`);
     }
 
-    const actionType = node.data.config?.actionType as string;
-    const endpoint = node.data.config?.endpoint as string;
-    const label = node.data.label.toLowerCase();
+    // Check if this node's output is used
+    const outputIsUsed = usedNodeOutputs.has(nodeId);
+    
+    // Helper to conditionally wrap action call with variable assignment
+    const wrapActionCall = (actionLines: string[]): string[] => {
+      const result: string[] = [];
+      
+      if (!outputIsUsed) {
+        // Remove variable assignment, just call the function
+        actionLines.forEach((line) => {
+          // Replace "const varName = await" or "const varName = { ... }" with just the call
+          // Match: "  const action_xxx = await function(...)" -> "  await function(...)"
+          // Match: "  const action_xxx = { ... }" -> "  void ({ ... });"
+          if (line.includes("await")) {
+            // Preserve leading whitespace, remove "const varName = "
+            const match = line.match(/^(\s*)(const\s+\w+\s*=\s*)(.*)$/);
+            if (match) {
+              const [, indent, , rest] = match;
+              result.push(`${indent}${rest}`);
+            } else {
+              result.push(line);
+            }
+          } else if (line.trim().startsWith("const") && line.includes("{")) {
+            // Preserve leading whitespace, replace "const varName = " with "void "
+            const match = line.match(/^(\s*)(const\s+\w+\s*=\s*)(.*)$/);
+            if (match) {
+              const [, indent, , rest] = match;
+              result.push(`${indent}void ${rest}`);
+            } else {
+              result.push(line);
+            }
+          } else {
+            result.push(line);
+          }
+        });
+      } else {
+        // Keep variable assignment
+        result.push(...actionLines);
+      }
+      
+      return result;
+    };
 
-    if (actionType === "Send Email" || label.includes("email")) {
-      lines.push(...generateEmailActionCode(indent, varName));
-    } else if (
-      actionType === "Create Linear Issue" ||
-      actionType === "linear" ||
-      label.includes("linear")
-    ) {
-      lines.push(...generateLinearActionCode(indent, varName));
-    } else if (
-      actionType === "Send Slack Message" ||
-      actionType === "slack" ||
-      label.includes("slack")
-    ) {
-      lines.push(...generateSlackActionCode(node, indent, varName));
-    } else if (actionType === "Database Query" || label.includes("database")) {
-      lines.push(...generateDatabaseActionCode(indent, varName));
-    } else if (
-      actionType === "Generate Text" ||
-      label.includes("generate text")
-    ) {
-      lines.push(...generateAiTextActionCode(node, indent, varName));
-    } else if (
-      actionType === "Generate Image" ||
-      label.includes("generate image")
-    ) {
-      lines.push(...generateAiImageActionCode(node, indent, varName));
-    } else if (
-      actionType === "Execute Code" ||
-      label.includes("execute code")
-    ) {
-      lines.push(...generateExecuteCodeActionCode(node, indent, varName));
-    } else if (actionType === "Create Ticket" || label.includes("ticket")) {
-      lines.push(...generateTicketActionCode(indent, varName));
-    } else if (actionType === "Find Issues" || label.includes("find issues")) {
-      lines.push(...generateFindIssuesActionCode(indent, varName));
+    // Check explicit actionType first, then fall back to label matching
+    // Order matters: more specific types first
+    if (actionType === "Generate Text") {
+      lines.push(...wrapActionCall(generateAiTextActionCode(node, indent, varName)));
+    } else if (actionType === "Generate Image") {
+      lines.push(...wrapActionCall(generateAiImageActionCode(node, indent, varName)));
+    } else if (actionType === "Send Email") {
+      lines.push(...wrapActionCall(generateEmailActionCode(node, indent, varName)));
+    } else if (actionType === "Send Slack Message") {
+      lines.push(...wrapActionCall(generateSlackActionCode(node, indent, varName)));
+    } else if (actionType === "Create Ticket") {
+      lines.push(...wrapActionCall(generateTicketActionCode(indent, varName)));
+    } else if (actionType === "Create Linear Issue") {
+      lines.push(...wrapActionCall(generateLinearActionCode(indent, varName)));
+    } else if (actionType === "Find Issues") {
+      lines.push(...wrapActionCall(generateFindIssuesActionCode(indent, varName)));
+    } else if (actionType === "Database Query") {
+      lines.push(...wrapActionCall(generateDatabaseActionCode(indent, varName)));
+    } else if (actionType === "Execute Code") {
+      lines.push(...wrapActionCall(generateExecuteCodeActionCode(node, indent, varName)));
     } else if (actionType === "HTTP Request" || endpoint) {
-      lines.push(...generateHTTPActionCode(indent, varName, endpoint));
+      lines.push(...wrapActionCall(generateHTTPActionCode(indent, varName, endpoint)));
+    } else if (label.includes("generate text") && !label.includes("email")) {
+      // Fallback: check label but avoid matching "email" in labels
+      lines.push(...wrapActionCall(generateAiTextActionCode(node, indent, varName)));
+    } else if (label.includes("generate image")) {
+      lines.push(...wrapActionCall(generateAiImageActionCode(node, indent, varName)));
+    } else if (label.includes("send email") || (label.includes("email") && !label.includes("generate"))) {
+      // Only match email if it doesn't contain "generate"
+      lines.push(...wrapActionCall(generateEmailActionCode(node, indent, varName)));
+    } else if (label.includes("slack")) {
+      lines.push(...wrapActionCall(generateSlackActionCode(node, indent, varName)));
+    } else if (label.includes("linear") || actionType === "linear") {
+      lines.push(...wrapActionCall(generateLinearActionCode(indent, varName)));
+    } else if (label.includes("database")) {
+      lines.push(...wrapActionCall(generateDatabaseActionCode(indent, varName)));
+    } else if (label.includes("execute code")) {
+      lines.push(...wrapActionCall(generateExecuteCodeActionCode(node, indent, varName)));
+    } else if (label.includes("ticket")) {
+      lines.push(...wrapActionCall(generateTicketActionCode(indent, varName)));
+    } else if (label.includes("find issues")) {
+      lines.push(...wrapActionCall(generateFindIssuesActionCode(indent, varName)));
+    } else {
+      if (outputIsUsed) {
+        lines.push(
+          `${indent}const ${varName} = { status: 'success' };`
+        );
     } else {
       lines.push(
-        `${indent}const ${varName} = { status: 'success', data: input };`
+          `${indent}void ({ status: 'success' });`
       );
+      }
     }
 
     return lines;
@@ -319,15 +674,22 @@ export function generateWorkflowCode(
   // Helper to generate trigger node code
   function generateTriggerCode(
     node: WorkflowNode,
+    nodeId: string,
     varName: string,
     indent: string
   ): string[] {
+    // Skip trigger code entirely if trigger outputs aren't used
+    if (!usedNodeOutputs.has(nodeId)) {
+      return [];
+    }
+    
     const lines: string[] = [];
     lines.push(`${indent}// Trigger: ${node.data.label}`);
     if (node.data.description) {
       lines.push(`${indent}// ${node.data.description}`);
     }
-    lines.push(`${indent}const ${varName} = { triggered: true, data: input };`);
+    
+    lines.push(`${indent}const ${varName} = { triggered: true };`);
     return lines;
   }
 
@@ -345,7 +707,6 @@ export function generateWorkflowCode(
     const transformType = node.data.config?.transformType as string;
     lines.push(`${indent}// Transform type: ${transformType || "Map Data"}`);
     lines.push(`${indent}const ${varName} = {`);
-    lines.push(`${indent}  ...input,`);
     lines.push(`${indent}  transformed: true,`);
     lines.push(`${indent}  timestamp: Date.now(),`);
     lines.push(`${indent}};`);
@@ -365,11 +726,23 @@ export function generateWorkflowCode(
     }
 
     const lines: string[] = [];
-    const varName = `${node.data.type}_${nodeId.replace(/-/g, "_")}`;
+    // Use friendly variable name from map, fallback to node type + id if not found
+    const varName = nodeIdToVarName.get(nodeId) || `${node.data.type}_${nodeId.replace(/-/g, "_")}`;
 
     switch (node.data.type) {
       case "trigger":
-        lines.push(...generateTriggerCode(node, varName, indent));
+        const triggerCode = generateTriggerCode(node, nodeId, varName, indent);
+        // If trigger was skipped (empty array), return early
+        if (triggerCode.length === 0) {
+          // Process next nodes even if trigger was skipped
+          const nextNodes = edgesBySource.get(nodeId) || [];
+          for (const nextNodeId of nextNodes) {
+            const nextCode = generateNodeCode(nextNodeId, indent);
+            lines.push(...nextCode);
+          }
+          return lines;
+        }
+        lines.push(...triggerCode);
         break;
 
       case "action": {
@@ -379,7 +752,7 @@ export function generateWorkflowCode(
           lines.push(...generateConditionNodeCode(node, nodeId, indent));
           return lines;
         }
-        lines.push(...generateActionNodeCode(node, indent, varName));
+        lines.push(...generateActionNodeCode(node, nodeId, indent, varName));
         break;
       }
 
@@ -388,10 +761,14 @@ export function generateWorkflowCode(
         break;
     }
 
-    lines.push("");
-
     // Process next nodes (conditions return early above)
     const nextNodes = edgesBySource.get(nodeId) || [];
+    
+    // Only add blank line if we actually generated code for this node AND there are more nodes
+    if (lines.length > 0 && nextNodes.length > 0) {
+      lines.push("");
+    }
+
     for (const nextNodeId of nextNodes) {
       const nextCode = generateNodeCode(nextNodeId, indent);
       lines.push(...nextCode);
@@ -403,18 +780,10 @@ export function generateWorkflowCode(
   // Generate code starting from trigger nodes
   if (triggerNodes.length === 0) {
     codeLines.push("  // No trigger nodes found");
-    codeLines.push(`  return { status: 'error', error: 'No trigger nodes' };`);
   } else {
     for (const trigger of triggerNodes) {
       const triggerCode = generateNodeCode(trigger.id, "  ");
       codeLines.push(...triggerCode);
-    }
-
-    // Return the last result
-    const lastNode = nodes.at(-1);
-    if (lastNode) {
-      const lastVarName = `${lastNode.data.type}_${lastNode.id.replace(/-/g, "_")}`;
-      codeLines.push(`  return ${lastVarName};`);
     }
   }
 
