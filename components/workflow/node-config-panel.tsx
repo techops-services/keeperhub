@@ -40,12 +40,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { ActionConfig } from "./config/action-config";
 import { ActionGrid } from "./config/action-grid";
 import { TriggerConfig } from "./config/trigger-config";
-import {
-  generateNodeCode,
-  NON_ALPHANUMERIC_REGEX,
-  WORD_SPLIT_REGEX,
-} from "./utils/code-generators";
+import { generateNodeCode } from "./utils/code-generators";
 import { WorkflowRuns } from "./workflow-runs";
+
+// Regex constants
+const NON_ALPHANUMERIC_REGEX = /[^a-zA-Z0-9\s]/g;
+const WORD_SPLIT_REGEX = /\s+/;
 
 // Multi-selection panel component
 const MultiSelectionPanel = ({
