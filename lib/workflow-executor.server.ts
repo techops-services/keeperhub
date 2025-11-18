@@ -417,13 +417,11 @@ class ServerWorkflowExecutor {
     };
   }
 
-  private async executeDatabaseQueryAction(
-    processedConfig: Record<string, unknown>
-  ): Promise<ExecutionResult> {
-    const dbQuery = processedConfig?.dbQuery as string;
-    const dataSourceId = processedConfig?.dataSourceId as string;
-    const dbSchema = processedConfig?.dbSchema as string | undefined;
-
+  // Helper to validate database query input
+  private validateDatabaseQueryInput(
+    dbQuery: string | undefined,
+    dataSourceId: string | undefined
+  ): ExecutionResult | null {
     if (!dbQuery || dbQuery.trim() === "") {
       return {
         success: false,
@@ -439,38 +437,66 @@ class ServerWorkflowExecutor {
       };
     }
 
-    const { executeQuery } = await import("./integrations/database");
-    const dbResult = await executeQuery({ query: dbQuery });
+    return null;
+  }
 
-    if (dbSchema && dbResult.status === "success") {
-      try {
-        const schemaFields = JSON.parse(dbSchema) as SchemaField[];
-        if (schemaFields.length > 0) {
-          const zodSchema = schemaFieldsToZod(schemaFields);
+  // Helper to validate data against schema
+  private validateAgainstSchema(
+    data: unknown,
+    dbSchema: string
+  ): ExecutionResult | null {
+    try {
+      const schemaFields = JSON.parse(dbSchema) as SchemaField[];
+      if (schemaFields.length > 0) {
+        const zodSchema = schemaFieldsToZod(schemaFields);
 
-          if (Array.isArray(dbResult.data)) {
-            const validatedData = dbResult.data.map((row) =>
-              zodSchema.parse(row)
-            );
-            return { success: true, data: validatedData };
-          }
-
-          const validatedData = zodSchema.parse(dbResult.data);
+        if (Array.isArray(data)) {
+          const validatedData = data.map((row) => zodSchema.parse(row));
           return { success: true, data: validatedData };
         }
 
-        return {
-          success: dbResult.status === "success",
-          data: dbResult.data,
-        };
-      } catch (schemaError) {
-        return {
-          success: false,
-          error: `Schema validation error: ${schemaError instanceof Error ? schemaError.message : "Invalid data structure"}`,
-        };
+        const validatedData = zodSchema.parse(data);
+        return { success: true, data: validatedData };
+      }
+
+      return { success: true, data };
+    } catch (schemaError) {
+      return {
+        success: false,
+        error: `Schema validation error: ${schemaError instanceof Error ? schemaError.message : "Invalid data structure"}`,
+      };
+    }
+  }
+
+  private async executeDatabaseQueryAction(
+    processedConfig: Record<string, unknown>
+  ): Promise<ExecutionResult> {
+    const dbQuery = processedConfig?.dbQuery as string;
+    const dataSourceId = processedConfig?.dataSourceId as string;
+    const dbSchema = processedConfig?.dbSchema as string | undefined;
+
+    // Validate input
+    const validationError = this.validateDatabaseQueryInput(
+      dbQuery,
+      dataSourceId
+    );
+    if (validationError) {
+      return validationError;
+    }
+
+    // Execute query
+    const { executeQuery } = await import("./integrations/database");
+    const dbResult = await executeQuery({ query: dbQuery });
+
+    // Handle validation with schema
+    if (dbSchema && dbResult.status === "success") {
+      const schemaResult = this.validateAgainstSchema(dbResult.data, dbSchema);
+      if (schemaResult) {
+        return schemaResult;
       }
     }
 
+    // Return result
     if (dbResult.status === "success") {
       return { success: true, data: dbResult.data };
     }
@@ -482,10 +508,8 @@ class ServerWorkflowExecutor {
     };
   }
 
-  private async executeGenerateTextAction(
-    nodeConfig: Record<string, unknown>,
-    processedConfig: Record<string, unknown>
-  ): Promise<ExecutionResult> {
+  // Helper to log Generate Text action debug info
+  private logGenerateTextDebugInfo(nodeConfig: Record<string, unknown>): void {
     console.log("[Executor] ===== GENERATE TEXT ACTION =====");
     console.log(
       "[Executor] Original aiPrompt (before processing):",
@@ -499,6 +523,49 @@ class ServerWorkflowExecutor {
         dataPreview: JSON.stringify(output.data).substring(0, 200),
       }))
     );
+  }
+
+  // Helper to get model string from model ID
+  private getModelString(modelId: string): string {
+    if (modelId.startsWith("gpt-") || modelId.startsWith("o1-")) {
+      return `openai/${modelId}`;
+    }
+    if (modelId.startsWith("claude-")) {
+      return `anthropic/${modelId}`;
+    }
+    return modelId;
+  }
+
+  // Helper to generate object with schema
+  private async generateObjectWithSchema(
+    modelString: string,
+    prompt: string,
+    aiSchema: string
+  ): Promise<ExecutionResult> {
+    try {
+      const schemaFields = JSON.parse(aiSchema) as SchemaField[];
+      const zodSchema = schemaFieldsToZod(schemaFields);
+
+      const { object } = await generateObject({
+        model: modelString,
+        schema: zodSchema,
+        prompt,
+      });
+
+      return { success: true, data: object };
+    } catch (schemaError) {
+      return {
+        success: false,
+        error: `Schema error: ${schemaError instanceof Error ? schemaError.message : "Invalid schema"}`,
+      };
+    }
+  }
+
+  private async executeGenerateTextAction(
+    nodeConfig: Record<string, unknown>,
+    processedConfig: Record<string, unknown>
+  ): Promise<ExecutionResult> {
+    this.logGenerateTextDebugInfo(nodeConfig);
 
     try {
       const modelId = (processedConfig?.aiModel as string) || "gpt-4o-mini";
@@ -519,35 +586,18 @@ class ServerWorkflowExecutor {
         };
       }
 
-      let modelString: string;
-      if (modelId.startsWith("gpt-") || modelId.startsWith("o1-")) {
-        modelString = `openai/${modelId}`;
-      } else if (modelId.startsWith("claude-")) {
-        modelString = `anthropic/${modelId}`;
-      } else {
-        modelString = modelId;
-      }
+      const modelString = this.getModelString(modelId);
 
+      // Handle object format with schema
       if (aiFormat === "object" && aiSchema) {
-        try {
-          const schemaFields = JSON.parse(aiSchema) as SchemaField[];
-          const zodSchema = schemaFieldsToZod(schemaFields);
-
-          const { object } = await generateObject({
-            model: modelString,
-            schema: zodSchema,
-            prompt,
-          });
-
-          return { success: true, data: object };
-        } catch (schemaError) {
-          return {
-            success: false,
-            error: `Schema error: ${schemaError instanceof Error ? schemaError.message : "Invalid schema"}`,
-          };
-        }
+        return await this.generateObjectWithSchema(
+          modelString,
+          prompt,
+          aiSchema
+        );
       }
 
+      // Generate text
       const { text } = await generateText({
         model: modelString,
         prompt,

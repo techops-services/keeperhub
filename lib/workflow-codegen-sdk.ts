@@ -116,62 +116,21 @@ function escapeForTemplateLiteral(str: string): string {
     .replace(/`/g, "\\`"); // Escape backticks
 }
 
-/**
- * Generate workflow SDK code from workflow definition
- * This generates proper "use workflow" and "use step" code
- */
-export function generateWorkflowSDKCode(
-  workflowName: string,
-  nodes: WorkflowNode[],
-  edges: WorkflowEdge[]
+// Helper to generate Send Email step body
+function generateSendEmailStepBody(
+  config: Record<string, unknown>,
+  imports: Set<string>
 ): string {
-  const imports = new Set<string>();
-  const stepFunctions: string[] = [];
+  imports.add("import { Resend } from 'resend';");
+  const emailTo = (config.emailTo as string) || "user@example.com";
+  const emailSubject = (config.emailSubject as string) || "Notification";
+  const emailBody = (config.emailBody as string) || "No content";
 
-  // Build a map of node connections
-  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
-  const edgesBySource = new Map<string, string[]>();
-  for (const edge of edges) {
-    const targets = edgesBySource.get(edge.source) || [];
-    targets.push(edge.target);
-    edgesBySource.set(edge.source, targets);
-  }
+  const convertedEmailTo = convertTemplateToJS(emailTo);
+  const convertedSubject = convertTemplateToJS(emailSubject);
+  const convertedBody = convertTemplateToJS(emailBody);
 
-  // Find trigger nodes
-  const nodesWithIncoming = new Set(edges.map((e) => e.target));
-  const triggerNodes = nodes.filter(
-    (node) => node.data.type === "trigger" && !nodesWithIncoming.has(node.id)
-  );
-
-  // Always import sleep and FatalError
-  imports.add("import { sleep, FatalError } from 'workflow';");
-
-  function generateStepFunction(
-    node: WorkflowNode,
-    uniqueStepName?: string
-  ): string {
-    // Use provided unique step name or generate one
-    const config = node.data.config || {};
-    const actionType = config.actionType as string;
-    const label = node.data.label || actionType || "UnnamedStep";
-    const stepName = uniqueStepName || sanitizeStepName(label);
-
-    let stepBody = "";
-
-    switch (node.data.type) {
-      case "action":
-        if (actionType === "Send Email") {
-          imports.add("import { Resend } from 'resend';");
-          const emailTo = (config.emailTo as string) || "user@example.com";
-          const emailSubject =
-            (config.emailSubject as string) || "Notification";
-          const emailBody = (config.emailBody as string) || "No content";
-
-          const convertedEmailTo = convertTemplateToJS(emailTo);
-          const convertedSubject = convertTemplateToJS(emailSubject);
-          const convertedBody = convertTemplateToJS(emailBody);
-
-          stepBody = `  const resend = new Resend(process.env.RESEND_API_KEY);
+  return `  const resend = new Resend(process.env.RESEND_API_KEY);
   
   // Use template literals with dynamic values from outputs
   const emailTo = \`${escapeForTemplateLiteral(convertedEmailTo)}\`;
@@ -187,14 +146,20 @@ export function generateWorkflowSDKCode(
   
   console.log('Email sent:', result);
   return result;`;
-        } else if (actionType === "Send Slack Message") {
-          imports.add("import { WebClient } from '@slack/web-api';");
-          const slackMessage = (config.slackMessage as string) || "No message";
-          const slackChannel = (config.slackChannel as string) || "#general";
-          const convertedSlackMessage = convertTemplateToJS(slackMessage);
-          const convertedSlackChannel = convertTemplateToJS(slackChannel);
+}
 
-          stepBody = `  const slack = new WebClient(process.env.SLACK_API_KEY);
+// Helper to generate Send Slack Message step body
+function generateSendSlackMessageStepBody(
+  config: Record<string, unknown>,
+  imports: Set<string>
+): string {
+  imports.add("import { WebClient } from '@slack/web-api';");
+  const slackMessage = (config.slackMessage as string) || "No message";
+  const slackChannel = (config.slackChannel as string) || "#general";
+  const convertedSlackMessage = convertTemplateToJS(slackMessage);
+  const convertedSlackChannel = convertTemplateToJS(slackChannel);
+
+  return `  const slack = new WebClient(process.env.SLACK_API_KEY);
   
   // Use template literals with dynamic values from outputs
   const slackMessage = \`${escapeForTemplateLiteral(convertedSlackMessage)}\`;
@@ -207,14 +172,20 @@ export function generateWorkflowSDKCode(
   
   console.log('Slack message sent:', result);
   return result;`;
-        } else if (actionType === "Create Ticket") {
-          imports.add("import { LinearClient } from '@linear/sdk';");
-          const ticketTitle = (config.ticketTitle as string) || "New Issue";
-          const ticketDescription = (config.ticketDescription as string) || "";
-          const convertedTitle = convertTemplateToJS(ticketTitle);
-          const convertedDescription = convertTemplateToJS(ticketDescription);
+}
 
-          stepBody = `  const linear = new LinearClient({ apiKey: process.env.LINEAR_API_KEY });
+// Helper to generate Create Ticket step body
+function generateCreateTicketStepBody(
+  config: Record<string, unknown>,
+  imports: Set<string>
+): string {
+  imports.add("import { LinearClient } from '@linear/sdk';");
+  const ticketTitle = (config.ticketTitle as string) || "New Issue";
+  const ticketDescription = (config.ticketDescription as string) || "";
+  const convertedTitle = convertTemplateToJS(ticketTitle);
+  const convertedDescription = convertTemplateToJS(ticketDescription);
+
+  return `  const linear = new LinearClient({ apiKey: process.env.LINEAR_API_KEY });
   
   // Use template literals with dynamic values from outputs
   const ticketTitle = \`${escapeForTemplateLiteral(convertedTitle)}\`;
@@ -228,17 +199,23 @@ export function generateWorkflowSDKCode(
   
   console.log('Linear issue created:', issue);
   return issue;`;
-        } else if (actionType === "Generate Text") {
-          imports.add("import { generateText } from 'ai';");
-          const modelId = (config.aiModel as string) || "gpt-4o-mini";
-          const provider =
-            modelId.startsWith("gpt-") || modelId.startsWith("o1-")
-              ? "openai"
-              : "anthropic";
-          const aiPrompt = (config.aiPrompt as string) || "";
-          const convertedPrompt = convertTemplateToJS(aiPrompt);
+}
 
-          stepBody = `  // Use template literal with dynamic values from outputs
+// Helper to generate Generate Text step body
+function generateGenerateTextStepBody(
+  config: Record<string, unknown>,
+  imports: Set<string>
+): string {
+  imports.add("import { generateText } from 'ai';");
+  const modelId = (config.aiModel as string) || "gpt-4o-mini";
+  const provider =
+    modelId.startsWith("gpt-") || modelId.startsWith("o1-")
+      ? "openai"
+      : "anthropic";
+  const aiPrompt = (config.aiPrompt as string) || "";
+  const convertedPrompt = convertTemplateToJS(aiPrompt);
+
+  return `  // Use template literal with dynamic values from outputs
   const aiPrompt = \`${escapeForTemplateLiteral(convertedPrompt)}\`;
   const finalPrompt = (input.aiPrompt as string) || aiPrompt;
   
@@ -249,12 +226,18 @@ export function generateWorkflowSDKCode(
   
   console.log('Text generated:', text);
   return { text };`;
-        } else if (actionType === "Generate Image") {
-          imports.add("import OpenAI from 'openai';");
-          const imagePrompt = (config.imagePrompt as string) || "";
-          const convertedImagePrompt = convertTemplateToJS(imagePrompt);
+}
 
-          stepBody = `  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Helper to generate Generate Image step body
+function generateGenerateImageStepBody(
+  config: Record<string, unknown>,
+  imports: Set<string>
+): string {
+  imports.add("import OpenAI from 'openai';");
+  const imagePrompt = (config.imagePrompt as string) || "";
+  const convertedImagePrompt = convertTemplateToJS(imagePrompt);
+
+  return `  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   
   // Use template literal with dynamic values from outputs
   const imagePrompt = \`${escapeForTemplateLiteral(convertedImagePrompt)}\`;
@@ -269,11 +252,16 @@ export function generateWorkflowSDKCode(
   
   console.log('Image generated');
   return { base64: response.data[0].b64_json };`;
-        } else if (actionType === "Database Query") {
-          const dbQuery = (config.dbQuery as string) || "SELECT 1";
-          const convertedQuery = convertTemplateToJS(dbQuery);
+}
 
-          stepBody = `  // Database Query - You need to set up your database connection
+// Helper to generate Database Query step body
+function generateDatabaseQueryStepBody(
+  config: Record<string, unknown>
+): string {
+  const dbQuery = (config.dbQuery as string) || "SELECT 1";
+  const convertedQuery = convertTemplateToJS(dbQuery);
+
+  return `  // Database Query - You need to set up your database connection
   // Install: pnpm add postgres (or your preferred database library)
   // Set DATABASE_URL in your environment variables
   
@@ -289,30 +277,29 @@ export function generateWorkflowSDKCode(
   
   console.log('Database query:', finalQuery);
   throw new Error('Database Query not implemented - see comments in generated code');`;
-        } else if (actionType === "HTTP Request") {
-          // Parse headers if provided
-          let headersCode = "'Content-Type': 'application/json'";
-          if (config.httpHeaders) {
-            try {
-              const headers =
-                typeof config.httpHeaders === "string"
-                  ? JSON.parse(config.httpHeaders as string)
-                  : config.httpHeaders;
-              const headerEntries = Object.entries(
-                headers as Record<string, string>
-              )
-                .map(([key, value]) => `'${key}': '${value}'`)
-                .join(",\n      ");
-              if (headerEntries) {
-                headersCode = headerEntries;
-              }
-            } catch {
-              // If parsing fails, use default
-              headersCode = "'Content-Type': 'application/json'";
-            }
-          }
+}
 
-          stepBody = `  const response = await fetch('${config.endpoint || "https://api.example.com"}', {
+// Helper to generate HTTP Request step body
+function generateHTTPRequestStepBody(config: Record<string, unknown>): string {
+  let headersCode = "'Content-Type': 'application/json'";
+  if (config.httpHeaders) {
+    try {
+      const headers =
+        typeof config.httpHeaders === "string"
+          ? JSON.parse(config.httpHeaders as string)
+          : config.httpHeaders;
+      const headerEntries = Object.entries(headers as Record<string, string>)
+        .map(([key, value]) => `'${key}': '${value}'`)
+        .join(",\n      ");
+      if (headerEntries) {
+        headersCode = headerEntries;
+      }
+    } catch {
+      headersCode = "'Content-Type': 'application/json'";
+    }
+  }
+
+  return `  const response = await fetch('${config.endpoint || "https://api.example.com"}', {
     method: '${config.httpMethod || "POST"}',
     headers: {
       ${headersCode}
@@ -323,8 +310,130 @@ export function generateWorkflowSDKCode(
   const data = await response.json();
   console.log('HTTP request completed:', data);
   return data;`;
-        } else {
-          stepBody = `  console.log('Executing ${node.data.label}');
+}
+
+// Helper to build edge map
+function buildEdgeMap(edges: WorkflowEdge[]): Map<string, string[]> {
+  const edgesBySource = new Map<string, string[]>();
+  for (const edge of edges) {
+    const targets = edgesBySource.get(edge.source) || [];
+    targets.push(edge.target);
+    edgesBySource.set(edge.source, targets);
+  }
+  return edgesBySource;
+}
+
+// Helper to find trigger nodes
+function findTriggerNodes(
+  nodes: WorkflowNode[],
+  edges: WorkflowEdge[]
+): WorkflowNode[] {
+  const nodesWithIncoming = new Set(edges.map((e) => e.target));
+  return nodes.filter(
+    (node) => node.data.type === "trigger" && !nodesWithIncoming.has(node.id)
+  );
+}
+
+// Helper to create step name mapping
+function createStepNameMapping(nodes: WorkflowNode[]): Map<string, string> {
+  const stepNameCounts = new Map<string, number>();
+  const nodeToStepName = new Map<string, string>();
+
+  for (const node of nodes) {
+    if (node.data.type === "action" || node.data.type === "transform") {
+      const config = node.data.config || {};
+      const actionType = config.actionType as string;
+      const baseLabel = node.data.label || actionType || "UnnamedStep";
+      const baseName = sanitizeStepName(baseLabel);
+
+      const count = stepNameCounts.get(baseName) || 0;
+      stepNameCounts.set(baseName, count + 1);
+
+      const uniqueName = count > 0 ? `${baseName}${count + 1}` : baseName;
+      nodeToStepName.set(node.id, uniqueName);
+    }
+  }
+
+  return nodeToStepName;
+}
+
+// Helper to generate all step functions
+function generateAllStepFunctions(
+  nodes: WorkflowNode[],
+  nodeToStepName: Map<string, string>,
+  generateStepFunc: (node: WorkflowNode, name?: string) => string
+): string[] {
+  const stepFunctions: string[] = [];
+
+  for (const node of nodes) {
+    if (node.data.type === "action" || node.data.type === "transform") {
+      const uniqueName = nodeToStepName.get(node.id);
+      stepFunctions.push(generateStepFunc(node, uniqueName));
+    }
+  }
+
+  return stepFunctions;
+}
+
+/**
+ * Generate workflow SDK code from workflow definition
+ * This generates proper "use workflow" and "use step" code
+ */
+export function generateWorkflowSDKCode(
+  workflowName: string,
+  nodes: WorkflowNode[],
+  edges: WorkflowEdge[]
+): string {
+  const imports = new Set<string>();
+  const stepFunctions: string[] = [];
+
+  // Build a map of node connections
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+  const edgesBySource = buildEdgeMap(edges);
+
+  // Find trigger nodes
+  const triggerNodes = findTriggerNodes(nodes, edges);
+
+  // Always import sleep and FatalError
+  imports.add("import { sleep, FatalError } from 'workflow';");
+
+  function generateStepFunction(
+    node: WorkflowNode,
+    uniqueStepName?: string
+  ): string {
+    const config = node.data.config || {};
+    const actionType = config.actionType as string;
+    const label = node.data.label || actionType || "UnnamedStep";
+    const stepName = uniqueStepName || sanitizeStepName(label);
+
+    let stepBody = "";
+
+    switch (node.data.type) {
+      case "action":
+        switch (actionType) {
+          case "Send Email":
+            stepBody = generateSendEmailStepBody(config, imports);
+            break;
+          case "Send Slack Message":
+            stepBody = generateSendSlackMessageStepBody(config, imports);
+            break;
+          case "Create Ticket":
+            stepBody = generateCreateTicketStepBody(config, imports);
+            break;
+          case "Generate Text":
+            stepBody = generateGenerateTextStepBody(config, imports);
+            break;
+          case "Generate Image":
+            stepBody = generateGenerateImageStepBody(config, imports);
+            break;
+          case "Database Query":
+            stepBody = generateDatabaseQueryStepBody(config);
+            break;
+          case "HTTP Request":
+            stepBody = generateHTTPRequestStepBody(config);
+            break;
+          default:
+            stepBody = `  console.log('Executing ${node.data.label}');
   return { success: true };`;
         }
         break;
@@ -351,28 +460,82 @@ ${stepBody}
   }
 
   // Generate all step functions with unique names
-  const stepNameCounts = new Map<string, number>();
-  const nodeToStepName = new Map<string, string>();
+  const nodeToStepName = createStepNameMapping(nodes);
+  stepFunctions.push(
+    ...generateAllStepFunctions(nodes, nodeToStepName, generateStepFunction)
+  );
 
-  for (const node of nodes) {
-    if (node.data.type === "action" || node.data.type === "transform") {
-      const config = node.data.config || {};
-      const actionType = config.actionType as string;
-      const baseLabel = node.data.label || actionType || "UnnamedStep";
-      const baseName = sanitizeStepName(baseLabel);
+  // Helper to generate trigger node code
+  function generateTriggerCode(
+    nodeId: string,
+    label: string,
+    indent: string
+  ): string[] {
+    const varName = `result_${sanitizeVarName(nodeId)}`;
+    return [
+      `${indent}// Triggered`,
+      `${indent}let ${varName} = input;`,
+      `${indent}outputs['${sanitizeVarName(nodeId)}'] = { label: '${label}', data: ${varName} };`,
+    ];
+  }
 
-      // Track how many times we've seen this base name
-      const count = stepNameCounts.get(baseName) || 0;
-      stepNameCounts.set(baseName, count + 1);
+  // Helper to generate action/transform node code
+  function generateActionTransformCode(
+    nodeId: string,
+    nodeConfig: Record<string, unknown>,
+    label: string,
+    indent: string
+  ): string[] {
+    const varName = `result_${sanitizeVarName(nodeId)}`;
+    const nodeActionType = nodeConfig.actionType as string;
+    const nodeLabel = label || nodeActionType || "UnnamedStep";
+    const stepFnName =
+      nodeToStepName.get(nodeId) || sanitizeStepName(nodeLabel);
 
-      // Append number if we've seen this name before
-      const uniqueName = count > 0 ? `${baseName}${count + 1}` : baseName;
+    return [
+      `${indent}// ${nodeLabel}`,
+      `${indent}const ${varName} = await ${stepFnName}({ ...input, outputs });`,
+      `${indent}outputs['${sanitizeVarName(nodeId)}'] = { label: '${nodeLabel}', data: ${varName} };`,
+    ];
+  }
 
-      // Store mapping for later use in workflow body generation
-      nodeToStepName.set(node.id, uniqueName);
+  // Helper to generate condition node code
+  function generateConditionCode(
+    nodeId: string,
+    node: WorkflowNode,
+    indent: string,
+    visitedLocal: Set<string>
+  ): string[] {
+    const condition = (node.data.config?.condition as string) || "true";
+    const convertedCondition = convertTemplateToJS(condition);
+    const nextNodes = edgesBySource.get(nodeId) || [];
+    const conditionVarName = `conditionValue_${sanitizeVarName(nodeId)}`;
+    const lines: string[] = [];
 
-      stepFunctions.push(generateStepFunction(node, uniqueName));
+    if (nextNodes.length > 0) {
+      lines.push(`${indent}// ${node.data.label}`);
+      lines.push(
+        `${indent}const ${conditionVarName} = \`${escapeForTemplateLiteral(convertedCondition)}\`;`
+      );
+      lines.push(`${indent}if (${conditionVarName}) {`);
+
+      if (nextNodes[0]) {
+        lines.push(
+          ...generateWorkflowBody(nextNodes[0], `${indent}  `, visitedLocal)
+        );
+      }
+
+      if (nextNodes[1]) {
+        lines.push(`${indent}} else {`);
+        lines.push(
+          ...generateWorkflowBody(nextNodes[1], `${indent}  `, visitedLocal)
+        );
+      }
+
+      lines.push(`${indent}}`);
     }
+
+    return lines;
   }
 
   // Generate main workflow function
@@ -392,80 +555,40 @@ ${stepBody}
     }
 
     const lines: string[] = [];
-    const varName = `result_${sanitizeVarName(node.id)}`;
 
     switch (node.data.type) {
       case "trigger":
-        lines.push(`${indent}// Triggered`);
-        lines.push(`${indent}let ${varName} = input;`);
-        lines.push(
-          `${indent}outputs['${sanitizeVarName(node.id)}'] = { label: '${node.data.label}', data: ${varName} };`
-        );
+        lines.push(...generateTriggerCode(nodeId, node.data.label, indent));
         break;
 
       case "action":
-      case "transform": {
-        const nodeConfig = node.data.config || {};
-        const nodeActionType = nodeConfig.actionType as string;
-        const nodeLabel = node.data.label || nodeActionType || "UnnamedStep";
-        const stepFnName =
-          nodeToStepName.get(nodeId) || sanitizeStepName(nodeLabel);
-        lines.push(`${indent}// ${nodeLabel}`);
+      case "transform":
         lines.push(
-          `${indent}const ${varName} = await ${stepFnName}({ ...input, outputs });`
-        );
-        lines.push(
-          `${indent}outputs['${sanitizeVarName(node.id)}'] = { label: '${nodeLabel}', data: ${varName} };`
+          ...generateActionTransformCode(
+            nodeId,
+            node.data.config || {},
+            node.data.label,
+            indent
+          )
         );
         break;
-      }
 
-      case "condition": {
-        const condition = (node.data.config?.condition as string) || "true";
-        const convertedCondition = convertTemplateToJS(condition);
-        const nextNodes = edgesBySource.get(nodeId) || [];
-        const conditionVarName = `conditionValue_${sanitizeVarName(node.id)}`;
-
-        if (nextNodes.length > 0) {
-          lines.push(`${indent}// ${node.data.label}`);
-
-          // Use template literal to evaluate condition with dynamic values
-          // Then convert to boolean
-          lines.push(
-            `${indent}const ${conditionVarName} = \`${escapeForTemplateLiteral(convertedCondition)}\`;`
-          );
-          lines.push(`${indent}if (${conditionVarName}) {`);
-
-          if (nextNodes[0]) {
-            lines.push(
-              ...generateWorkflowBody(nextNodes[0], `${indent}  `, visitedLocal)
-            );
-          }
-
-          if (nextNodes[1]) {
-            lines.push(`${indent}} else {`);
-            lines.push(
-              ...generateWorkflowBody(nextNodes[1], `${indent}  `, visitedLocal)
-            );
-          }
-
-          lines.push(`${indent}}`);
-          return lines;
-        }
-        break;
-      }
+      case "condition":
+        lines.push(
+          ...generateConditionCode(nodeId, node, indent, visitedLocal)
+        );
+        // Conditions handle their own next nodes
+        return lines;
 
       default:
         lines.push(`${indent}// Unknown node type: ${node.data.type}`);
         break;
     }
 
-    // Process next nodes (unless it's a condition)
-    if (node.data.type !== "condition") {
-      const nextNodes = edgesBySource.get(nodeId) || [];
-      for (const nextNodeId of nextNodes) {
-        lines.push(...generateWorkflowBody(nextNodeId, indent, visitedLocal));
-      }
+    // Process next nodes (conditions return early above)
+    const nextNodes = edgesBySource.get(nodeId) || [];
+    for (const nextNodeId of nextNodes) {
+      lines.push(...generateWorkflowBody(nextNodeId, indent, visitedLocal));
     }
 
     return lines;

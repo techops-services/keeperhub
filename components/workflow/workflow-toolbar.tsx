@@ -68,6 +68,7 @@ import {
   showDeleteDialogAtom,
   undoAtom,
   updateNodeDataAtom,
+  type WorkflowEdge,
   type WorkflowNode,
 } from "@/lib/workflow-store";
 import { Panel } from "../ai-elements/panel";
@@ -168,65 +169,51 @@ function showDeploymentSuccessToast(deploymentUrl: string) {
   );
 }
 
-export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
-  const [nodes] = useAtom(nodesAtom);
-  const [edges] = useAtom(edgesAtom);
-  const [isExecuting, setIsExecuting] = useAtom(isExecutingAtom);
-  const [isGenerating] = useAtom(isGeneratingAtom);
-  const clearWorkflow = useSetAtom(clearWorkflowAtom);
-  const updateNodeData = useSetAtom(updateNodeDataAtom);
-  const [currentWorkflowId] = useAtom(currentWorkflowIdAtom);
-  const [workflowName, setCurrentWorkflowName] = useAtom(
-    currentWorkflowNameAtom
-  );
-  const router = useRouter();
-  const [showClearDialog, setShowClearDialog] = useAtom(showClearDialogAtom);
-  const [showDeleteDialog, setShowDeleteDialog] = useAtom(showDeleteDialogAtom);
-  const [isSaving, setIsSaving] = useAtom(isSavingAtom);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useAtom(
-    hasUnsavedChangesAtom
-  );
-  const undo = useSetAtom(undoAtom);
-  const redo = useSetAtom(redoAtom);
-  const [canUndo] = useAtom(canUndoAtom);
-  const [canRedo] = useAtom(canRedoAtom);
-  const { data: session } = useSession();
+// Hook for workflow handlers
+type WorkflowHandlerParams = {
+  currentWorkflowId: string | null;
+  workflowName: string;
+  nodes: WorkflowNode[];
+  edges: WorkflowEdge[];
+  updateNodeData: (update: {
+    id: string;
+    data: { status?: "idle" | "running" | "success" | "error" };
+  }) => void;
+  setIsExecuting: (value: boolean) => void;
+  setIsSaving: (value: boolean) => void;
+  setHasUnsavedChanges: (value: boolean) => void;
+  deploymentUrl: string | null;
+};
 
-  const [isDeploying, setIsDeploying] = useState(false);
-  const [deploymentUrl, setDeploymentUrl] = useState<string | null>(null);
-  const [showCodeDialog, setShowCodeDialog] = useState(false);
-  const [generatedCode, _setGeneratedCode] = useState<string>("");
+function useWorkflowHandlers({
+  currentWorkflowId,
+  workflowName,
+  nodes,
+  edges,
+  updateNodeData,
+  setIsExecuting,
+  setIsSaving,
+  setHasUnsavedChanges,
+  deploymentUrl,
+}: WorkflowHandlerParams) {
   const [runMode, setRunMode] = useState<"test" | "production">("test");
-  const [allWorkflows, setAllWorkflows] = useState<
-    Array<{
-      id: string;
-      name: string;
-      updatedAt: string;
-    }>
-  >([]);
-  const [showRenameDialog, setShowRenameDialog] = useState(false);
-  const [newWorkflowName, setNewWorkflowName] = useState(workflowName);
   const [showUnsavedRunDialog, setShowUnsavedRunDialog] = useState(false);
 
-  const handleExecute = async (mode: "test" | "production" = runMode) => {
-    // Check for unsaved changes only on test runs
-    if (mode === "test" && hasUnsavedChanges) {
-      setShowUnsavedRunDialog(true);
+  const handleSave = async () => {
+    if (!currentWorkflowId) {
       return;
     }
 
-    await executeWorkflow(mode);
-  };
-
-  const handleSaveAndRun = async () => {
-    await handleSave();
-    setShowUnsavedRunDialog(false);
-    await executeWorkflow(runMode);
-  };
-
-  const handleRunWithoutSaving = async () => {
-    setShowUnsavedRunDialog(false);
-    await executeWorkflow(runMode);
+    setIsSaving(true);
+    try {
+      await workflowApi.update(currentWorkflowId, { nodes, edges });
+      setHasUnsavedChanges(false);
+    } catch (error) {
+      console.error("Failed to save workflow:", error);
+      toast.error("Failed to save workflow. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const executeWorkflow = async (mode: "test" | "production" = runMode) => {
@@ -263,27 +250,92 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
       return;
     }
 
-    // Test run = execute locally
     setIsExecuting(true);
     await executeTestWorkflow(currentWorkflowId, nodes, updateNodeData);
     setIsExecuting(false);
   };
 
-  const handleSave = async () => {
-    if (!currentWorkflowId) {
-      return;
-    }
+  const handleExecute = async (mode: "test" | "production" = runMode) => {
+    await executeWorkflow(mode);
+  };
 
-    setIsSaving(true);
-    try {
-      await workflowApi.update(currentWorkflowId, { nodes, edges });
-      setHasUnsavedChanges(false);
-    } catch (error) {
-      console.error("Failed to save workflow:", error);
-      toast.error("Failed to save workflow. Please try again.");
-    } finally {
-      setIsSaving(false);
-    }
+  return {
+    runMode,
+    setRunMode,
+    showUnsavedRunDialog,
+    setShowUnsavedRunDialog,
+    handleSave,
+    handleExecute,
+  };
+}
+
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Component complexity is due to extensive JSX with conditional rendering
+export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
+  const [nodes] = useAtom(nodesAtom);
+  const [edges] = useAtom(edgesAtom);
+  const [isExecuting, setIsExecuting] = useAtom(isExecutingAtom);
+  const [isGenerating] = useAtom(isGeneratingAtom);
+  const clearWorkflow = useSetAtom(clearWorkflowAtom);
+  const updateNodeData = useSetAtom(updateNodeDataAtom);
+  const [currentWorkflowId] = useAtom(currentWorkflowIdAtom);
+  const [workflowName, setCurrentWorkflowName] = useAtom(
+    currentWorkflowNameAtom
+  );
+  const router = useRouter();
+  const [showClearDialog, setShowClearDialog] = useAtom(showClearDialogAtom);
+  const [showDeleteDialog, setShowDeleteDialog] = useAtom(showDeleteDialogAtom);
+  const [isSaving, setIsSaving] = useAtom(isSavingAtom);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useAtom(
+    hasUnsavedChangesAtom
+  );
+  const undo = useSetAtom(undoAtom);
+  const redo = useSetAtom(redoAtom);
+  const [canUndo] = useAtom(canUndoAtom);
+  const [canRedo] = useAtom(canRedoAtom);
+  const { data: session } = useSession();
+
+  const [isDeploying, setIsDeploying] = useState(false);
+  const [deploymentUrl, setDeploymentUrl] = useState<string | null>(null);
+  const [showCodeDialog, setShowCodeDialog] = useState(false);
+  const [generatedCode, _setGeneratedCode] = useState<string>("");
+  const [allWorkflows, setAllWorkflows] = useState<
+    Array<{
+      id: string;
+      name: string;
+      updatedAt: string;
+    }>
+  >([]);
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
+  const [newWorkflowName, setNewWorkflowName] = useState(workflowName);
+
+  const {
+    runMode,
+    setRunMode,
+    showUnsavedRunDialog,
+    setShowUnsavedRunDialog,
+    handleSave,
+    handleExecute,
+  } = useWorkflowHandlers({
+    currentWorkflowId,
+    workflowName,
+    nodes,
+    edges,
+    updateNodeData,
+    setIsExecuting,
+    setIsSaving,
+    setHasUnsavedChanges,
+    deploymentUrl,
+  });
+
+  const handleSaveAndRun = async () => {
+    await handleSave();
+    setShowUnsavedRunDialog(false);
+    await handleExecute(runMode);
+  };
+
+  const handleRunWithoutSaving = async () => {
+    setShowUnsavedRunDialog(false);
+    await handleExecute(runMode);
   };
 
   const handleClearWorkflow = () => {
@@ -322,15 +374,44 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
         name: newWorkflowName,
       });
       setShowRenameDialog(false);
-      // Update the current workflow name
       setCurrentWorkflowName(newWorkflowName);
       toast.success("Workflow renamed successfully");
-      // Reload workflows to update the list
       const workflows = await workflowApi.getAll();
       setAllWorkflows(workflows);
     } catch (error) {
       console.error("Failed to rename workflow:", error);
       toast.error("Failed to rename workflow. Please try again.");
+    }
+  };
+
+  // Helper to save workflow before deployment
+  const saveBeforeDeploy = async (): Promise<boolean> => {
+    if (!currentWorkflowId) {
+      return false;
+    }
+
+    try {
+      await workflowApi.update(currentWorkflowId, { nodes, edges });
+      return true;
+    } catch {
+      toast.error("Failed to save workflow before deployment");
+      return false;
+    }
+  };
+
+  // Helper to execute deployment
+  const executeDeployment = async (workflowIdParam: string) => {
+    const result = await deploy(workflowIdParam);
+
+    if (!result.success) {
+      throw new Error(result.error || "Deployment failed");
+    }
+
+    setDeploymentUrl(result.deploymentUrl || null);
+    toast.success("Workflow deployed successfully!");
+
+    if (result.deploymentUrl) {
+      showDeploymentSuccessToast(result.deploymentUrl);
     }
   };
 
@@ -340,32 +421,19 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
       return;
     }
 
-    // Save workflow first
-    try {
-      await workflowApi.update(currentWorkflowId, { nodes, edges });
-    } catch {
-      toast.error("Failed to save workflow before deployment");
+    // Save first
+    const saved = await saveBeforeDeploy();
+    if (!saved) {
       return;
     }
 
+    // Deploy
     setIsDeploying(true);
     toast.info("Starting deployment to Vercel...");
 
     try {
-      const result = await deploy(currentWorkflowId);
-
-      if (!result.success) {
-        throw new Error(result.error || "Deployment failed");
-      }
-
-      setDeploymentUrl(result.deploymentUrl || null);
-      toast.success("Workflow deployed successfully!");
-
-      if (result.deploymentUrl) {
-        showDeploymentSuccessToast(result.deploymentUrl);
-      }
+      await executeDeployment(currentWorkflowId);
     } catch (error) {
-      console.error("Failed to deploy workflow:", error);
       toast.error(
         error instanceof Error ? error.message : "Failed to deploy workflow"
       );
@@ -376,15 +444,15 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
 
   // Load deployment status on mount
   useEffect(() => {
-    if (currentWorkflowId) {
-      getDeploymentStatus(currentWorkflowId)
-        .then((data) => {
-          setDeploymentUrl(data.deploymentUrl || null);
-        })
-        .catch((error) => {
-          console.error("Failed to load deployment status:", error);
-        });
+    if (!currentWorkflowId) {
+      return;
     }
+
+    getDeploymentStatus(currentWorkflowId)
+      .then((data) => setDeploymentUrl(data.deploymentUrl || null))
+      .catch((error) =>
+        console.error("Failed to load deployment status:", error)
+      );
   }, [currentWorkflowId]);
 
   // Load workflows

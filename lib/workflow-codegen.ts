@@ -184,6 +184,43 @@ export function generateWorkflowCode(
     return lines;
   }
 
+  // Helper to generate trigger node code
+  function generateTriggerCode(
+    node: WorkflowNode,
+    varName: string,
+    indent: string
+  ): string[] {
+    const lines: string[] = [];
+    lines.push(`${indent}// Trigger: ${node.data.label}`);
+    if (node.data.description) {
+      lines.push(`${indent}// ${node.data.description}`);
+    }
+    lines.push(`${indent}const ${varName} = { triggered: true, data: input };`);
+    imports.add("import { getUser } from './integrations';");
+    return lines;
+  }
+
+  // Helper to generate transform node code
+  function generateTransformCode(
+    node: WorkflowNode,
+    varName: string,
+    indent: string
+  ): string[] {
+    const lines: string[] = [];
+    lines.push(`${indent}// Transform: ${node.data.label}`);
+    if (node.data.description) {
+      lines.push(`${indent}// ${node.data.description}`);
+    }
+    const transformType = node.data.config?.transformType as string;
+    lines.push(`${indent}// Transform type: ${transformType || "Map Data"}`);
+    lines.push(`${indent}const ${varName} = {`);
+    lines.push(`${indent}  ...input,`);
+    lines.push(`${indent}  transformed: true,`);
+    lines.push(`${indent}  timestamp: Date.now(),`);
+    lines.push(`${indent}};`);
+    return lines;
+  }
+
   // Generate code for each node in the workflow
   function generateNodeCode(nodeId: string, indent = "  "): string[] {
     if (visited.has(nodeId)) {
@@ -201,42 +238,20 @@ export function generateWorkflowCode(
 
     switch (node.data.type) {
       case "trigger":
-        lines.push(`${indent}// Trigger: ${node.data.label}`);
-        if (node.data.description) {
-          lines.push(`${indent}// ${node.data.description}`);
-        }
-        lines.push(
-          `${indent}const ${varName} = { triggered: true, data: input };`
-        );
-        imports.add("import { getUser } from './integrations';");
+        lines.push(...generateTriggerCode(node, varName, indent));
         break;
 
       case "action":
         lines.push(...generateActionNodeCode(node, indent, varName));
         break;
 
-      case "condition": {
-        const conditionLines = generateConditionNodeCode(node, nodeId, indent);
-        lines.push(...conditionLines);
-        return lines; // Don't process next nodes normally
-      }
+      case "condition":
+        lines.push(...generateConditionNodeCode(node, nodeId, indent));
+        return lines;
 
-      case "transform": {
-        lines.push(`${indent}// Transform: ${node.data.label}`);
-        if (node.data.description) {
-          lines.push(`${indent}// ${node.data.description}`);
-        }
-        const transformType = node.data.config?.transformType as string;
-        lines.push(
-          `${indent}// Transform type: ${transformType || "Map Data"}`
-        );
-        lines.push(`${indent}const ${varName} = {`);
-        lines.push(`${indent}  ...input,`);
-        lines.push(`${indent}  transformed: true,`);
-        lines.push(`${indent}  timestamp: Date.now(),`);
-        lines.push(`${indent}};`);
+      case "transform":
+        lines.push(...generateTransformCode(node, varName, indent));
         break;
-      }
 
       default:
         lines.push(`${indent}// Unknown node type: ${node.data.type}`);
@@ -245,13 +260,11 @@ export function generateWorkflowCode(
 
     lines.push("");
 
-    // Process next nodes (unless it's a condition which handles its own flow)
-    if (node.data.type !== "condition") {
-      const nextNodes = edgesBySource.get(nodeId) || [];
-      for (const nextNodeId of nextNodes) {
-        const nextCode = generateNodeCode(nextNodeId, indent);
-        lines.push(...nextCode);
-      }
+    // Process next nodes (conditions return early above)
+    const nextNodes = edgesBySource.get(nodeId) || [];
+    for (const nextNodeId of nextNodes) {
+      const nextCode = generateNodeCode(nextNodeId, indent);
+      lines.push(...nextCode);
     }
 
     return lines;
