@@ -17,6 +17,7 @@ const Temporary = ({
   targetY,
   sourcePosition,
   targetPosition,
+  selected,
 }: EdgeProps) => {
   const [edgePath] = getSimpleBezierPath({
     sourceX,
@@ -29,10 +30,11 @@ const Temporary = ({
 
   return (
     <BaseEdge
-      className="stroke-1 stroke-ring"
+      className="stroke-1"
       id={id}
       path={edgePath}
       style={{
+        stroke: selected ? "var(--muted-foreground)" : "var(--border)",
         strokeDasharray: "5, 5",
       }}
     />
@@ -102,7 +104,7 @@ const getEdgeParams = (
   };
 };
 
-const Animated = ({ id, source, target, style }: EdgeProps) => {
+const Animated = ({ id, source, target, style, selected }: EdgeProps) => {
   const sourceNode = useInternalNode(source);
   const targetNode = useInternalNode(target);
 
@@ -130,7 +132,7 @@ const Animated = ({ id, source, target, style }: EdgeProps) => {
       path={edgePath} 
       style={{
         ...style,
-        stroke: "var(--muted-foreground)",
+        stroke: selected ? "var(--muted-foreground)" : "var(--border)",
         strokeWidth: 2,
         animation: "dashdraw 0.5s linear infinite",
         strokeDasharray: 5,

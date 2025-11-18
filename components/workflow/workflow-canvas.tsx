@@ -30,6 +30,7 @@ import {
   nodesAtom,
   onEdgesChangeAtom,
   onNodesChangeAtom,
+  selectedEdgeAtom,
   selectedNodeAtom,
   type WorkflowNode,
   type WorkflowNodeType,
@@ -76,6 +77,7 @@ export function WorkflowCanvas({ showMinimap = true }: WorkflowCanvasProps) {
   const onNodesChange = useSetAtom(onNodesChangeAtom);
   const onEdgesChange = useSetAtom(onEdgesChangeAtom);
   const setSelectedNode = useSetAtom(selectedNodeAtom);
+  const setSelectedEdge = useSetAtom(selectedEdgeAtom);
   const addNode = useSetAtom(addNodeAtom);
   const setHasUnsavedChanges = useSetAtom(hasUnsavedChangesAtom);
   const { screenToFlowPosition, setViewport } = useReactFlow();
@@ -308,7 +310,8 @@ export function WorkflowCanvas({ showMinimap = true }: WorkflowCanvasProps) {
 
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
-  }, [setSelectedNode]);
+    setSelectedEdge(null);
+  }, [setSelectedNode, setSelectedEdge]);
 
   const onSelectionChange = useCallback(
     ({ nodes: selectedNodes }: { nodes: Node[] }) => {

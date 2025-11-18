@@ -21,10 +21,13 @@ import { workflowApi } from "@/lib/workflow-api";
 import {
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
+  deleteEdgeAtom,
   deleteNodeAtom,
+  deleteSelectedItemsAtom,
   edgesAtom,
   isGeneratingAtom,
   nodesAtom,
+  selectedEdgeAtom,
   selectedNodeAtom,
   showClearDialogAtom,
   showDeleteDialogAtom,
@@ -615,8 +618,83 @@ const generateNodeCode = (node: {
   return lines.join("\n");
 };
 
+// Multi-selection panel component
+const MultiSelectionPanel = ({
+  selectedNodes,
+  selectedEdges,
+  onDelete,
+}: {
+  selectedNodes: { id: string; selected?: boolean }[];
+  selectedEdges: { id: string; selected?: boolean }[];
+  onDelete: () => void;
+}) => {
+  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+
+  const nodeText = selectedNodes.length === 1 ? "node" : "nodes";
+  const edgeText = selectedEdges.length === 1 ? "line" : "lines";
+  const selectionParts: string[] = [];
+
+  if (selectedNodes.length > 0) {
+    selectionParts.push(`${selectedNodes.length} ${nodeText}`);
+  }
+  if (selectedEdges.length > 0) {
+    selectionParts.push(`${selectedEdges.length} ${edgeText}`);
+  }
+
+  const selectionText = selectionParts.join(" and ");
+
+  const handleDelete = () => {
+    onDelete();
+    setShowDeleteAlert(false);
+  };
+
+  return (
+    <>
+      <div className="flex size-full flex-col">
+        <div className="h-auto w-full border-b bg-transparent p-3">
+          <h2 className="font-semibold text-foreground">Properties</h2>
+        </div>
+        <div className="flex-1 space-y-4 overflow-y-auto p-3">
+          <div className="space-y-2">
+            <Label>Selection</Label>
+            <p className="text-muted-foreground text-sm">
+              {selectionText} selected
+            </p>
+          </div>
+        </div>
+        <div className="shrink-0 border-t p-4">
+          <Button
+            onClick={() => setShowDeleteAlert(true)}
+            size="icon"
+            variant="ghost"
+          >
+            <Trash2 className="size-4" />
+          </Button>
+        </div>
+      </div>
+
+      <AlertDialog onOpenChange={setShowDeleteAlert} open={showDeleteAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Selected Items</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectionText}? This action
+              cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+};
+
 const PanelInner = () => {
   const [selectedNodeId] = useAtom(selectedNodeAtom);
+  const [selectedEdgeId] = useAtom(selectedEdgeAtom);
   const [nodes] = useAtom(nodesAtom);
   const edges = useAtomValue(edgesAtom);
   const [isGenerating] = useAtom(isGeneratingAtom);
@@ -626,13 +704,22 @@ const PanelInner = () => {
   );
   const updateNodeData = useSetAtom(updateNodeDataAtom);
   const deleteNode = useSetAtom(deleteNodeAtom);
+  const deleteEdge = useSetAtom(deleteEdgeAtom);
+  const deleteSelectedItems = useSetAtom(deleteSelectedItemsAtom);
   const setShowClearDialog = useSetAtom(showClearDialogAtom);
   const setShowDeleteDialog = useSetAtom(showDeleteDialogAtom);
   const [showDeleteNodeAlert, setShowDeleteNodeAlert] = useState(false);
+  const [showDeleteEdgeAlert, setShowDeleteEdgeAlert] = useState(false);
   const [showDeleteRunsAlert, setShowDeleteRunsAlert] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const refreshRunsRef = useRef<(() => Promise<void>) | null>(null);
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
+  const selectedEdge = edges.find((edge) => edge.id === selectedEdgeId);
+
+  // Count multiple selections
+  const selectedNodes = nodes.filter((node) => node.selected);
+  const selectedEdges = edges.filter((edge) => edge.selected);
+  const hasMultipleSelections = selectedNodes.length + selectedEdges.length > 1;
 
   const handleCopyCode = () => {
     if (selectedNode) {
@@ -644,6 +731,13 @@ const PanelInner = () => {
     if (selectedNodeId) {
       deleteNode(selectedNodeId);
       setShowDeleteNodeAlert(false);
+    }
+  };
+
+  const handleDeleteEdge = () => {
+    if (selectedEdgeId) {
+      deleteEdge(selectedEdgeId);
+      setShowDeleteEdgeAlert(false);
     }
   };
 
@@ -714,6 +808,74 @@ const PanelInner = () => {
       setIsRefreshing(false);
     }
   };
+
+  // If multiple items are selected, show multi-selection properties
+  if (hasMultipleSelections) {
+    return (
+      <MultiSelectionPanel
+        onDelete={deleteSelectedItems}
+        selectedEdges={selectedEdges}
+        selectedNodes={selectedNodes}
+      />
+    );
+  }
+
+  // If an edge is selected, show edge properties
+  if (selectedEdge) {
+    return (
+      <>
+        <div className="flex size-full flex-col">
+          <div className="h-auto w-full border-b bg-transparent p-3">
+            <h2 className="font-semibold text-foreground">Properties</h2>
+          </div>
+          <div className="flex-1 space-y-4 overflow-y-auto p-3">
+            <div className="space-y-2">
+              <Label htmlFor="edge-id">Edge ID</Label>
+              <Input disabled id="edge-id" value={selectedEdge.id} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edge-source">Source</Label>
+              <Input disabled id="edge-source" value={selectedEdge.source} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edge-target">Target</Label>
+              <Input disabled id="edge-target" value={selectedEdge.target} />
+            </div>
+          </div>
+          <div className="shrink-0 border-t p-4">
+            <Button
+              onClick={() => setShowDeleteEdgeAlert(true)}
+              size="icon"
+              variant="ghost"
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          </div>
+        </div>
+
+        <AlertDialog
+          onOpenChange={setShowDeleteEdgeAlert}
+          open={showDeleteEdgeAlert}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Edge</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this connection? This action
+                cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteEdge}>
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
+    );
+  }
 
   // If no node is selected, show workspace properties and runs
   if (!selectedNode) {
