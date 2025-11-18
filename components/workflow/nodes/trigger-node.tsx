@@ -34,7 +34,7 @@ export const TriggerNode = memo(({ data, selected }: TriggerNodeProps) => {
       handles={{ target: false, source: true }}
     >
       <div className="flex flex-col items-center justify-center gap-3 p-6">
-        <PlayCircle className="size-12 text-blue-500" />
+        <PlayCircle className="size-12 text-blue-500" strokeWidth={1.5} />
         <div className="flex flex-col items-center gap-1 text-center">
           <NodeTitle className="text-base">{displayTitle}</NodeTitle>
           {displayDescription && (

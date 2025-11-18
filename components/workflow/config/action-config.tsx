@@ -1,12 +1,12 @@
 "use client";
 
-import Editor from "@monaco-editor/react";
 import { useAtom } from "jotai";
 import { Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getAll as getAllDataSources } from "@/app/actions/data-source/get-all";
 import { ProjectIntegrationsDialog } from "@/components/settings/project-integrations-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { CodeEditor } from "@/components/ui/code-editor";
 import { IntegrationIcon } from "@/components/ui/integration-icon";
 import { Label } from "@/components/ui/label";
 import {
@@ -316,7 +316,7 @@ function DatabaseQueryFields({
       <div className="space-y-2">
         <Label htmlFor="dbQuery">SQL Query</Label>
         <div className="overflow-hidden rounded-md border">
-          <Editor
+          <CodeEditor
             defaultLanguage="sql"
             height="150px"
             onChange={(value) => onUpdateConfig("dbQuery", value || "")}
@@ -327,7 +327,6 @@ function DatabaseQueryFields({
               fontSize: 12,
               readOnly: disabled,
             }}
-            theme="vs-dark"
             value={(config?.dbQuery as string) || ""}
           />
         </div>
@@ -394,7 +393,7 @@ function HttpRequestFields({
       <div className="space-y-2">
         <Label htmlFor="httpHeaders">Headers (JSON)</Label>
         <div className="overflow-hidden rounded-md border">
-          <Editor
+          <CodeEditor
             defaultLanguage="json"
             height="100px"
             onChange={(value) => onUpdateConfig("httpHeaders", value || "{}")}
@@ -405,7 +404,6 @@ function HttpRequestFields({
               fontSize: 12,
               readOnly: disabled,
             }}
-            theme="vs-dark"
             value={(config?.httpHeaders as string) || "{}"}
           />
         </div>
@@ -415,7 +413,7 @@ function HttpRequestFields({
         <div
           className={`overflow-hidden rounded-md border ${config?.httpMethod === "GET" ? "opacity-50" : ""}`}
         >
-          <Editor
+          <CodeEditor
             defaultLanguage="json"
             height="120px"
             onChange={(value) => onUpdateConfig("httpBody", value || "{}")}
@@ -427,7 +425,6 @@ function HttpRequestFields({
               readOnly: config?.httpMethod === "GET" || disabled,
               domReadOnly: config?.httpMethod === "GET" || disabled,
             }}
-            theme="vs-dark"
             value={(config?.httpBody as string) || "{}"}
           />
         </div>
@@ -603,7 +600,7 @@ function ExecuteCodeFields({
       <div className="space-y-2">
         <Label htmlFor="code">Code</Label>
         <div className="overflow-hidden rounded-md border">
-          <Editor
+          <CodeEditor
             defaultLanguage={(config?.codeLanguage as string) || "javascript"}
             height="300px"
             onChange={(value) => onUpdateConfig("code", value || "")}
@@ -614,7 +611,6 @@ function ExecuteCodeFields({
               fontSize: 12,
               readOnly: disabled,
             }}
-            theme="vs-dark"
             value={(config?.code as string) || ""}
           />
         </div>

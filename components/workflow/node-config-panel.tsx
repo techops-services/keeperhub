@@ -1,9 +1,5 @@
-"use client";
-
-import Editor from "@monaco-editor/react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { Copy, Eraser, MenuIcon, RefreshCw, Trash2 } from "lucide-react";
-import { useTheme } from "next-themes";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { deleteExecutions } from "@/app/actions/workflow/delete-executions";
@@ -18,6 +14,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { CodeEditor } from "@/components/ui/code-editor";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { workflowApi } from "@/lib/workflow-api";
@@ -636,7 +633,6 @@ const PanelInner = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const refreshRunsRef = useRef<(() => Promise<void>) | null>(null);
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
-  const { theme } = useTheme();
 
   const handleCopyCode = () => {
     if (selectedNode) {
@@ -898,7 +894,7 @@ const PanelInner = () => {
         </TabsContent>
         <TabsContent className="flex flex-col overflow-hidden" value="code">
           <div className="flex-1 overflow-hidden">
-            <Editor
+            <CodeEditor
               height="100%"
               language="typescript"
               options={{
@@ -911,7 +907,6 @@ const PanelInner = () => {
                 wordWrap: "on",
                 padding: { top: 16, bottom: 16 },
               }}
-              theme={theme === "dark" ? "vs-dark" : "light"}
               value={generateNodeCode(selectedNode)}
             />
           </div>

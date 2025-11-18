@@ -115,18 +115,18 @@ const getProviderLogo = (actionType: string) => {
     case "Find Issues":
       return <IntegrationIcon className="size-12" integration="linear" />;
     case "HTTP Request":
-      return <Zap className="size-12 text-amber-300" />;
+      return <Zap className="size-12 text-amber-300" strokeWidth={1.5} />;
     case "Database Query":
-      return <Database className="size-12 text-blue-300" />;
+      return <Database className="size-12 text-blue-300" strokeWidth={1.5} />;
     case "Generate Text":
     case "Generate Image":
       return <IntegrationIcon className="size-12" integration="vercel" />;
     case "Execute Code":
-      return <Code className="size-12 text-green-300" />;
+      return <Code className="size-12 text-green-300" strokeWidth={1.5} />;
     case "Condition":
-      return <GitBranch className="size-12 text-pink-300" />;
+      return <GitBranch className="size-12 text-pink-300" strokeWidth={1.5} />;
     default:
-      return <Zap className="size-12 text-amber-300" />;
+      return <Zap className="size-12 text-amber-300" strokeWidth={1.5} />;
   }
 };
 

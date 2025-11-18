@@ -81,7 +81,7 @@
 .dark {
   --background: oklch(0 0 0);
   --foreground: oklch(0.98 0 0);
-  --card: oklch(0.07 0 0);
+  --card: oklch(0.04 0 0);
   --card-foreground: oklch(0.98 0 0);
   --popover: oklch(0.04 0 0);
   --popover-foreground: oklch(0.98 0 0);
@@ -155,4 +155,21 @@
   to {
     stroke-dashoffset: 0;
   }
+}
+
+/* React Flow attribution styling */
+.react-flow__attribution {
+  background: transparent !important;
+  padding: 2px 4px !important;
+  font-size: 10px !important;
+  opacity: 0.4 !important;
+}
+
+.dark .react-flow__attribution {
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.4) !important;
+}
+
+.dark .react-flow__attribution a {
+  color: rgba(255, 255, 255, 0.5) !important;
 }

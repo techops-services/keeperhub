@@ -115,7 +115,7 @@ export const ConditionNode = memo(({ data, selected }: ConditionNodeProps) => {
       <NodeHeader>
         <div className="flex items-center gap-2.5">
           <span className="flex size-9 items-center justify-center rounded-md bg-pink-500/25">
-            <GitBranch className="size-4.5 text-pink-400" />
+            <GitBranch className="size-4.5 text-pink-400" strokeWidth={1.5} />
           </span>
           <div className="flex flex-col gap-0.5">
             <NodeTitle>{displayTitle}</NodeTitle>

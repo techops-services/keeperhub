@@ -37,7 +37,7 @@ export const TransformNode = memo(({ data, selected }: TransformNodeProps) => {
     >
       <NodeHeader>
         <div className="flex items-center gap-2">
-          <Shuffle className="size-4" />
+          <Shuffle className="size-4" strokeWidth={1.5} />
           <NodeTitle>{displayTitle}</NodeTitle>
         </div>
         {displayDescription && (

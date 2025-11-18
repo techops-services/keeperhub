@@ -823,10 +823,6 @@ function WorkflowMenuComponent({
   state: ReturnType<typeof useWorkflowState>;
   actions: ReturnType<typeof useWorkflowActions>;
 }) {
-  if (!state.session) {
-    return null;
-  }
-
   return (
     <div className="flex h-9 items-center overflow-hidden rounded-md border bg-secondary text-secondary-foreground">
       <DropdownMenu onOpenChange={(open) => open && actions.loadWorkflows()}>
