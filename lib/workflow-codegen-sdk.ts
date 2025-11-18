@@ -8,6 +8,76 @@ const WHITESPACE_PATTERN = /\s+/;
 const NUMBER_START_PATTERN = /^[0-9]/;
 
 /**
+ * Process new format ID references (@nodeId:DisplayName)
+ */
+function processNewFormatID(trimmed: string, match: string): string {
+  const withoutAt = trimmed.substring(1);
+  const colonIndex = withoutAt.indexOf(":");
+
+  if (colonIndex === -1) {
+    return match; // Invalid format, keep original
+  }
+
+  const nodeId = withoutAt.substring(0, colonIndex);
+  const rest = withoutAt.substring(colonIndex + 1);
+  const dotIndex = rest.indexOf(".");
+  const fieldPath = dotIndex !== -1 ? rest.substring(dotIndex + 1) : "";
+
+  const sanitizedNodeId = nodeId.replace(/[^a-zA-Z0-9]/g, "_");
+
+  if (!fieldPath) {
+    return `\${outputs?.['${sanitizedNodeId}']?.data}`;
+  }
+
+  const accessPath = fieldPath
+    .split(".")
+    .map((part: string) => {
+      const arrayMatch = part.match(ARRAY_PATTERN);
+      if (arrayMatch) {
+        return `?.${arrayMatch[1]}?.[${arrayMatch[2]}]`;
+      }
+      return `?.${part}`;
+    })
+    .join("");
+
+  return `\${outputs?.['${sanitizedNodeId}']?.data${accessPath}}`;
+}
+
+/**
+ * Process legacy dollar references ($nodeId)
+ */
+function processLegacyDollarRef(trimmed: string): string {
+  const withoutDollar = trimmed.substring(1);
+
+  if (!(withoutDollar.includes(".") || withoutDollar.includes("["))) {
+    const sanitizedNodeId = withoutDollar.replace(/[^a-zA-Z0-9]/g, "_");
+    return `\${outputs?.['${sanitizedNodeId}']?.data}`;
+  }
+
+  const parts = withoutDollar.split(".");
+  const nodeId = parts[0];
+  const sanitizedNodeId = nodeId.replace(/[^a-zA-Z0-9]/g, "_");
+  const fieldPath = parts.slice(1).join(".");
+
+  if (!fieldPath) {
+    return `\${outputs?.['${sanitizedNodeId}']?.data}`;
+  }
+
+  const accessPath = fieldPath
+    .split(".")
+    .map((part: string) => {
+      const arrayMatch = part.match(ARRAY_PATTERN);
+      if (arrayMatch) {
+        return `?.${arrayMatch[1]}?.[${arrayMatch[2]}]`;
+      }
+      return `?.${part}`;
+    })
+    .join("");
+
+  return `\${outputs?.['${sanitizedNodeId}']?.data${accessPath}}`;
+}
+
+/**
  * Convert template variables to JavaScript expressions
  * Converts {{@nodeId:DisplayName.field}} to ${outputs?.['nodeId']?.data?.field}
  */
@@ -16,88 +86,19 @@ function convertTemplateToJS(template: string): string {
     return template;
   }
 
-  // Match {{...}} patterns
   const pattern = /\{\{([^}]+)\}\}/g;
 
   return template.replace(pattern, (match, expression) => {
     const trimmed = expression.trim();
 
-    // Check if this is a new format ID reference (starts with @)
     if (trimmed.startsWith("@")) {
-      // Format: @nodeId:DisplayName or @nodeId:DisplayName.field
-      const withoutAt = trimmed.substring(1);
-      const colonIndex = withoutAt.indexOf(":");
-
-      if (colonIndex === -1) {
-        return match; // Invalid format, keep original
-      }
-
-      const nodeId = withoutAt.substring(0, colonIndex);
-      const rest = withoutAt.substring(colonIndex + 1);
-
-      // Check if there's a field accessor after the display name
-      const dotIndex = rest.indexOf(".");
-      const fieldPath = dotIndex !== -1 ? rest.substring(dotIndex + 1) : "";
-
-      // Sanitize node ID for use as object key
-      const sanitizedNodeId = nodeId.replace(/[^a-zA-Z0-9]/g, "_");
-
-      // Handle special case: {{@nodeId:DisplayName}} (entire output)
-      if (!fieldPath) {
-        return `\${outputs?.['${sanitizedNodeId}']?.data}`;
-      }
-
-      // Parse field path like "field.nested" or "items[0]"
-      const accessPath = fieldPath
-        .split(".")
-        .map((part: string) => {
-          // Handle array access
-          const arrayMatch = part.match(ARRAY_PATTERN);
-          if (arrayMatch) {
-            return `?.${arrayMatch[1]}?.[${arrayMatch[2]}]`;
-          }
-          return `?.${part}`;
-        })
-        .join("");
-
-      return `\${outputs?.['${sanitizedNodeId}']?.data${accessPath}}`;
+      return processNewFormatID(trimmed, match);
     }
-    // Check if this is a legacy node ID reference (starts with $)
+
     if (trimmed.startsWith("$")) {
-      const withoutDollar = trimmed.substring(1);
-
-      // Handle special case: {{$nodeId}} (entire output)
-      if (!(withoutDollar.includes(".") || withoutDollar.includes("["))) {
-        const sanitizedNodeId = withoutDollar.replace(/[^a-zA-Z0-9]/g, "_");
-        return `\${outputs?.['${sanitizedNodeId}']?.data}`;
-      }
-
-      // Parse expression like "$nodeId.field.nested"
-      const parts = withoutDollar.split(".");
-      const nodeId = parts[0];
-      const sanitizedNodeId = nodeId.replace(/[^a-zA-Z0-9]/g, "_");
-      const fieldPath = parts.slice(1).join(".");
-
-      if (!fieldPath) {
-        return `\${outputs?.['${sanitizedNodeId}']?.data}`;
-      }
-
-      const accessPath = fieldPath
-        .split(".")
-        .map((part: string) => {
-          const arrayMatch = part.match(ARRAY_PATTERN);
-          if (arrayMatch) {
-            return `?.${arrayMatch[1]}?.[${arrayMatch[2]}]`;
-          }
-          return `?.${part}`;
-        })
-        .join("");
-
-      return `\${outputs?.['${sanitizedNodeId}']?.data${accessPath}}`;
+      return processLegacyDollarRef(trimmed);
     }
 
-    // For legacy label-based references, keep them as is for now
-    // They will be processed at runtime
     return match;
   });
 }

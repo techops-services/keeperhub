@@ -472,7 +472,9 @@ export function getAvailableFields(nodeOutputs: NodeOutputs): Array<{
 
     // Add individual fields if data is an object
     if (output.data && typeof output.data === "object") {
-      extractFields(output.data, output.label, fields, `{{${output.label}}`);
+      extractFields(output.data, output.label, fields, {
+        currentPath: `{{${output.label}`,
+      });
     }
   }
 
@@ -491,10 +493,13 @@ function extractFields(
     path: string;
     sample?: unknown;
   }>,
-  currentPath: string,
-  options: { maxDepth?: number; currentDepth?: number } = {}
+  options: {
+    currentPath: string;
+    maxDepth?: number;
+    currentDepth?: number;
+  }
 ): void {
-  const { maxDepth = 3, currentDepth = 0 } = options;
+  const { currentPath, maxDepth = 3, currentDepth = 0 } = options;
 
   if (currentDepth >= maxDepth || !obj || typeof obj !== "object") {
     return;
@@ -512,7 +517,8 @@ function extractFields(
 
     // Recurse for nested objects (but not arrays)
     if (value && typeof value === "object" && !Array.isArray(value)) {
-      extractFields(value, nodeLabel, fields, `${currentPath}.${key}`, {
+      extractFields(value, nodeLabel, fields, {
+        currentPath: `${currentPath}.${key}`,
         maxDepth,
         currentDepth: currentDepth + 1,
       });

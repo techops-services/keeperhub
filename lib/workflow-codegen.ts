@@ -61,6 +61,129 @@ export function generateWorkflowCode(
   codeLines.push(`  "use workflow";`);
   codeLines.push("");
 
+  // Helper functions to generate code for different action types
+  function generateEmailActionCode(indent: string, varName: string): string[] {
+    imports.add("import { sendEmail, generateEmail } from './integrations';");
+    return [
+      `${indent}const ${varName} = await sendEmail({`,
+      `${indent}  to: input.email as string,`,
+      `${indent}  subject: input.subject as string || 'Notification',`,
+      `${indent}  body: input.body as string || 'No content',`,
+      `${indent}});`,
+    ];
+  }
+
+  function generateTicketActionCode(indent: string, varName: string): string[] {
+    imports.add("import { createTicket } from './integrations';");
+    return [
+      `${indent}const ${varName} = await createTicket({`,
+      `${indent}  title: input.title as string || 'New Ticket',`,
+      `${indent}  description: input.description as string || '',`,
+      `${indent}});`,
+    ];
+  }
+
+  function generateDatabaseActionCode(
+    indent: string,
+    varName: string
+  ): string[] {
+    imports.add(
+      "import { executeQuery, insertData, queryData } from './integrations';"
+    );
+    return [`${indent}const ${varName} = await queryData('your_table', {});`];
+  }
+
+  function generateHTTPActionCode(
+    indent: string,
+    varName: string,
+    endpoint?: string
+  ): string[] {
+    imports.add("import { callApi } from './integrations';");
+    return [
+      `${indent}const ${varName} = await callApi({`,
+      `${indent}  url: '${endpoint || "https://api.example.com/endpoint"}',`,
+      `${indent}  method: 'POST',`,
+      `${indent}  body: input,`,
+      `${indent}});`,
+    ];
+  }
+
+  function generateActionNodeCode(
+    node: WorkflowNode,
+    indent: string,
+    varName: string
+  ): string[] {
+    const lines: string[] = [`${indent}// Action: ${node.data.label}`];
+
+    if (node.data.description) {
+      lines.push(`${indent}// ${node.data.description}`);
+    }
+
+    const actionType = node.data.config?.actionType as string;
+    const endpoint = node.data.config?.endpoint as string;
+
+    if (
+      actionType === "Send Email" ||
+      node.data.label.toLowerCase().includes("email")
+    ) {
+      lines.push(...generateEmailActionCode(indent, varName));
+    } else if (
+      actionType === "Create Ticket" ||
+      node.data.label.toLowerCase().includes("ticket")
+    ) {
+      lines.push(...generateTicketActionCode(indent, varName));
+    } else if (
+      actionType === "Database Query" ||
+      node.data.label.toLowerCase().includes("database")
+    ) {
+      lines.push(...generateDatabaseActionCode(indent, varName));
+    } else if (actionType === "HTTP Request" || endpoint) {
+      lines.push(...generateHTTPActionCode(indent, varName, endpoint));
+    } else {
+      lines.push(
+        `${indent}const ${varName} = { status: 'success', data: input };`
+      );
+    }
+
+    return lines;
+  }
+
+  function generateConditionNodeCode(
+    node: WorkflowNode,
+    nodeId: string,
+    indent: string
+  ): string[] {
+    const lines: string[] = [`${indent}// Condition: ${node.data.label}`];
+
+    if (node.data.description) {
+      lines.push(`${indent}// ${node.data.description}`);
+    }
+
+    const condition = node.data.config?.condition as string;
+    const nextNodes = edgesBySource.get(nodeId) || [];
+
+    if (nextNodes.length > 0) {
+      const trueNode = nextNodes[0];
+      const falseNode = nextNodes[1];
+
+      lines.push(`${indent}if (${condition || "true"}) {`);
+      if (trueNode) {
+        const trueNodeCode = generateNodeCode(trueNode, `${indent}  `);
+        lines.push(...trueNodeCode);
+      }
+
+      if (falseNode) {
+        lines.push(`${indent}} else {`);
+        const falseNodeCode = generateNodeCode(falseNode, `${indent}  `);
+        lines.push(...falseNodeCode);
+      }
+
+      lines.push(`${indent}}`);
+    }
+
+    return lines;
+  }
+
   // Generate code for each node in the workflow
   function generateNodeCode(nodeId: string, indent = "  "): string[] {
     if (visited.has(nodeId)) {
@@ -88,99 +211,14 @@ export function generateWorkflowCode(
         imports.add("import { getUser } from './integrations';");
         break;
 
-      case "action": {
-        lines.push(`${indent}// Action: ${node.data.label}`);
-        if (node.data.description) {
-          lines.push(`${indent}// ${node.data.description}`);
-        }
-
-        const actionType = node.data.config?.actionType as string;
-        const endpoint = node.data.config?.endpoint as string;
-
-        if (
-          actionType === "Send Email" ||
-          node.data.label.toLowerCase().includes("email")
-        ) {
-          imports.add(
-            "import { sendEmail, generateEmail } from './integrations';"
-          );
-          lines.push(`${indent}const ${varName} = await sendEmail({`);
-          lines.push(`${indent}  to: input.email as string,`);
-          lines.push(
-            `${indent}  subject: input.subject as string || 'Notification',`
-          );
-          lines.push(`${indent}  body: input.body as string || 'No content',`);
-          lines.push(`${indent}});`);
-        } else if (
-          actionType === "Create Ticket" ||
-          node.data.label.toLowerCase().includes("ticket")
-        ) {
-          imports.add("import { createTicket } from './integrations';");
-          lines.push(`${indent}const ${varName} = await createTicket({`);
-          lines.push(
-            `${indent}  title: input.title as string || 'New Ticket',`
-          );
-          lines.push(
-            `${indent}  description: input.description as string || '',`
-          );
-          lines.push(`${indent}});`);
-        } else if (
-          actionType === "Database Query" ||
-          node.data.label.toLowerCase().includes("database")
-        ) {
-          imports.add(
-            "import { executeQuery, insertData, queryData } from './integrations';"
-          );
-          lines.push(
-            `${indent}const ${varName} = await queryData('your_table', {});`
-          );
-        } else if (actionType === "HTTP Request" || endpoint) {
-          imports.add("import { callApi } from './integrations';");
-          lines.push(`${indent}const ${varName} = await callApi({`);
-          lines.push(
-            `${indent}  url: '${endpoint || "https://api.example.com/endpoint"}',`
-          );
-          lines.push(`${indent}  method: 'POST',`);
-          lines.push(`${indent}  body: input,`);
-          lines.push(`${indent}});`);
-        } else {
-          lines.push(
-            `${indent}const ${varName} = { status: 'success', data: input };`
-          );
-        }
+      case "action":
+        lines.push(...generateActionNodeCode(node, indent, varName));
         break;
-      }
 
       case "condition": {
-        lines.push(`${indent}// Condition: ${node.data.label}`);
-        if (node.data.description) {
-          lines.push(`${indent}// ${node.data.description}`);
-        }
-
-        const condition = node.data.config?.condition as string;
-        const nextNodes = edgesBySource.get(nodeId) || [];
-
-        if (nextNodes.length > 0) {
-          // Assume first edge is "true" path, second is "false" path
-          const trueNode = nextNodes[0];
-          const falseNode = nextNodes[1];
-
-          lines.push(`${indent}if (${condition || "true"}) {`);
-          if (trueNode) {
-            const trueNodeCode = generateNodeCode(trueNode, `${indent}  `);
-            lines.push(...trueNodeCode);
-          }
-
-          if (falseNode) {
-            lines.push(`${indent}} else {`);
-            const falseNodeCode = generateNodeCode(falseNode, `${indent}  `);
-            lines.push(...falseNodeCode);
-          }
-
-          lines.push(`${indent}}`);
-          return lines; // Don't process next nodes normally
-        }
-        break;
+        const conditionLines = generateConditionNodeCode(node, nodeId, indent);
+        lines.push(...conditionLines);
+        return lines; // Don't process next nodes normally
       }
 
       case "transform": {
@@ -188,7 +226,6 @@ export function generateWorkflowCode(
         if (node.data.description) {
           lines.push(`${indent}// ${node.data.description}`);
         }
-
         const transformType = node.data.config?.transformType as string;
         lines.push(
           `${indent}// Transform type: ${transformType || "Map Data"}`
