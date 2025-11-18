@@ -77,6 +77,7 @@ import { UserMenu } from "../workflows/user-menu";
 
 type WorkflowToolbarProps = {
   workflowId?: string;
+  showSidebar?: boolean;
 };
 
 // Helper functions to reduce complexity
@@ -868,32 +869,36 @@ function WorkflowMenuComponent({
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-      <div className="h-full w-px bg-border" />
-      <DropdownMenu>
-        <DropdownMenuTrigger className="flex h-full cursor-pointer items-center px-2 font-medium text-sm transition-all hover:bg-black/5 dark:hover:bg-white/5">
-          <MoreHorizontal className="size-4" />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-48">
-          <DropdownMenuItem
-            disabled={!state.currentWorkflowId}
-            onClick={() => state.setShowRenameDialog(true)}
-          >
-            <span>Rename</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            disabled={state.nodes.length === 0}
-            onClick={() => state.setShowClearDialog(true)}
-          >
-            <span>Clear</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            disabled={!state.currentWorkflowId}
-            onClick={() => state.setShowDeleteDialog(true)}
-          >
-            <span>Delete</span>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {workflowId && (
+        <>
+          <div className="h-full w-px bg-border" />
+          <DropdownMenu>
+            <DropdownMenuTrigger className="flex h-full cursor-pointer items-center px-2 font-medium text-sm transition-all hover:bg-black/5 dark:hover:bg-white/5">
+              <MoreHorizontal className="size-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48">
+              <DropdownMenuItem
+                disabled={!state.currentWorkflowId}
+                onClick={() => state.setShowRenameDialog(true)}
+              >
+                <span>Rename</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={state.nodes.length === 0}
+                onClick={() => state.setShowClearDialog(true)}
+              >
+                <span>Clear</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={!state.currentWorkflowId}
+                onClick={() => state.setShowDeleteDialog(true)}
+              >
+                <span>Delete</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </>
+      )}
     </div>
   );
 }
@@ -1061,7 +1066,10 @@ function WorkflowDialogsComponent({
   );
 }
 
-export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
+export const WorkflowToolbar = ({
+  workflowId,
+  showSidebar = true,
+}: WorkflowToolbarProps) => {
   const state = useWorkflowState();
   const actions = useWorkflowActions(state);
 
@@ -1081,7 +1089,7 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
       <Panel
         className="flex flex-col-reverse items-end gap-2 border-none bg-transparent p-0 lg:flex-row lg:items-center"
         position="top-right"
-        style={{ right: "400px" }}
+        style={showSidebar ? { right: "400px" } : undefined}
       >
         <ToolbarActions
           actions={actions}
