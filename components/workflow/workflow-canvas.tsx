@@ -431,22 +431,18 @@ export function WorkflowCanvas() {
         >
           {nodeTemplates
             .filter((template) => template.type !== "trigger")
-            .map((template, index, filteredArray) => {
+            .map((template) => {
               const Icon = template.icon;
               return (
-                <div key={template.type}>
-                  <button
-                    className="relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                    onClick={() => onAddNodeFromMenu(template)}
-                    type="button"
-                  >
-                    <Icon className="size-4" />
-                    {template.displayLabel}
-                  </button>
-                  {index < filteredArray.length - 1 && (
-                    <div className="-mx-1 my-1 h-px bg-muted" />
-                  )}
-                </div>
+                <button
+                  className="relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+                  key={template.type}
+                  onClick={() => onAddNodeFromMenu(template)}
+                  type="button"
+                >
+                  <Icon className="size-4" />
+                  {template.displayLabel}
+                </button>
               );
             })}
         </div>

@@ -1,14 +1,12 @@
 "use client";
 
 import { ReactFlowProvider } from "@xyflow/react";
-import { useAtom, useSetAtom } from "jotai";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef } from "react";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import { NodeConfigPanel } from "@/components/workflow/node-config-panel";
 import { WorkflowCanvas } from "@/components/workflow/workflow-canvas";
 import { WorkflowToolbar } from "@/components/workflow/workflow-toolbar";
-import { authClient, useSession } from "@/lib/auth-client";
 import { workflowApi } from "@/lib/workflow-api";
 import {
   currentVercelProjectIdAtom,
@@ -19,95 +17,39 @@ import {
   isExecutingAtom,
   isSavingAtom,
   nodesAtom,
-  selectedNodeAtom,
   updateNodeDataAtom,
 } from "@/lib/workflow-store";
 
 const Home = () => {
-  const router = useRouter();
-  const { data: session } = useSession();
   const [isExecuting, setIsExecuting] = useAtom(isExecutingAtom);
-  const [_isSaving, setIsSaving] = useAtom(isSavingAtom);
-  const [nodes] = useAtom(nodesAtom);
-  const [edges] = useAtom(edgesAtom);
+  const setIsSaving = useSetAtom(isSavingAtom);
+  const nodes = useAtomValue(nodesAtom);
+  const edges = useAtomValue(edgesAtom);
   const [currentWorkflowId, setCurrentWorkflowId] = useAtom(
     currentWorkflowIdAtom
   );
-  const _setNodes = useSetAtom(nodesAtom);
-  const _setEdges = useSetAtom(edgesAtom);
+  const setNodes = useSetAtom(nodesAtom);
+  const setEdges = useSetAtom(edgesAtom);
   const setCurrentWorkflowName = useSetAtom(currentWorkflowNameAtom);
   const setCurrentVercelProjectId = useSetAtom(currentVercelProjectIdAtom);
   const setCurrentVercelProjectName = useSetAtom(currentVercelProjectNameAtom);
   const updateNodeData = useSetAtom(updateNodeDataAtom);
-  const _setSelectedNodeId = useSetAtom(selectedNodeAtom);
-  const hasRedirectedRef = useRef(false);
 
-  // Helper to create anonymous session if needed
-  const ensureSession = useCallback(async () => {
-    if (!session) {
-      await authClient.signIn.anonymous();
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-  }, [session]);
-
-  // Helper to load project details if workflow has one
-  const loadProjectDetails = useCallback(
-    async (workflowId: string, _projectId: string) => {
-      const fullWorkflow = await workflowApi.getById(workflowId);
-      if (fullWorkflow?.vercelProject) {
-        setCurrentVercelProjectId(fullWorkflow.vercelProject.id);
-        setCurrentVercelProjectName(fullWorkflow.vercelProject.name);
-      }
-    },
-    [setCurrentVercelProjectId, setCurrentVercelProjectName]
-  );
-
-  // Create workflow and redirect when first node is added
+  // Ensure state is cleared on mount (landing page should always be empty)
   useEffect(() => {
-    const createWorkflowAndRedirect = async () => {
-      // Only run when nodes are added and we haven't redirected yet
-      if (nodes.length === 0 || hasRedirectedRef.current) {
-        return;
-      }
-      hasRedirectedRef.current = true;
-
-      try {
-        await ensureSession();
-
-        // Create workflow with the first node
-        const newWorkflow = await workflowApi.create({
-          name: "Untitled Workflow",
-          description: "",
-          nodes,
-          edges,
-        });
-
-        // Set the workflow ID and name
-        setCurrentWorkflowId(newWorkflow.id);
-        setCurrentWorkflowName(newWorkflow.name);
-
-        // Load project details if available
-        if (newWorkflow.vercelProjectId) {
-          await loadProjectDetails(newWorkflow.id, newWorkflow.vercelProjectId);
-        }
-
-        // Redirect to the workflow page
-        router.replace(`/workflows/${newWorkflow.id}`);
-      } catch (error) {
-        console.error("Failed to create workflow:", error);
-        toast.error("Failed to create workflow");
-      }
-    };
-
-    createWorkflowAndRedirect();
+    setNodes([]);
+    setEdges([]);
+    setCurrentWorkflowId(null);
+    setCurrentWorkflowName("Untitled Workflow");
+    setCurrentVercelProjectId(null);
+    setCurrentVercelProjectName(null);
   }, [
-    nodes,
-    edges,
-    router,
-    ensureSession,
-    loadProjectDetails,
+    setNodes,
+    setEdges,
     setCurrentWorkflowId,
     setCurrentWorkflowName,
+    setCurrentVercelProjectId,
+    setCurrentVercelProjectName,
   ]);
 
   // Keyboard shortcuts

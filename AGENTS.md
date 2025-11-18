@@ -57,3 +57,11 @@ If any of the above commands fail or show errors:
   3. Run `pnpm db:push` to apply the migration to the database
 - The migration generator will create properly formatted SQL files based on your schema changes
 
+## Code Cleanliness
+- **Remove Unused Code**: If a variable, import, or function is unused, remove it entirely. Do not prefix with underscore unless it's intentionally unused but required (e.g., function parameters)
+- **Use Correct Jotai Hooks**: When working with Jotai atoms, use the appropriate hook based on usage:
+  - `useAtom(atom)` - Use when you need both the value and setter
+  - `useAtomValue(atom)` - Use when you only need to read the value
+  - `useSetAtom(atom)` - Use when you only need the setter function
+  - Never use `useAtom` if you're only using one part (getter or setter)
+

@@ -74,7 +74,6 @@ import {
 import { Panel } from "../ai-elements/panel";
 import { WorkflowIcon } from "../ui/workflow-icon";
 import { UserMenu } from "../workflows/user-menu";
-import { NodeToolbar } from "./node-toolbar";
 
 type WorkflowToolbarProps = {
   workflowId?: string;
@@ -1064,7 +1063,6 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
           state={state}
           workflowId={workflowId}
         />
-        <NodeToolbar />
       </Panel>
 
       <Panel

@@ -20,6 +20,7 @@ export const WorkflowIndexPrompt = () => {
     }
 
     try {
+      // Create workflow with empty nodes/edges - trigger will be added automatically
       const newWorkflow = await workflowApi.create({
         name: "Untitled Workflow",
         description: "",

@@ -1,11 +1,28 @@
 "use server";
 
 import { eq } from "drizzle-orm";
+import { nanoid } from "nanoid";
 import { db } from "@/lib/db";
 import { workflows } from "@/lib/db/schema";
 import { create as createVercelProject } from "../vercel-project/create";
 import type { SavedWorkflow, WorkflowData } from "./types";
 import { getSession } from "./utils";
+
+// Helper function to create a default trigger node
+function createDefaultTriggerNode() {
+  return {
+    id: nanoid(),
+    type: "trigger" as const,
+    position: { x: 250, y: 150 },
+    data: {
+      label: "Trigger",
+      description: "Start your workflow",
+      type: "trigger" as const,
+      config: { triggerType: "Manual" },
+      status: "idle" as const,
+    },
+  };
+}
 
 /**
  * Create a new workflow
@@ -18,6 +35,12 @@ export async function create(
 
   if (!(data.name && data.nodes && data.edges)) {
     throw new Error("Name, nodes, and edges are required");
+  }
+
+  // Ensure there's always a trigger node
+  let nodes = data.nodes;
+  if (nodes.length === 0) {
+    nodes = [createDefaultTriggerNode()];
   }
 
   // Generate "Untitled N" name if the provided name is "Untitled Workflow"
@@ -40,7 +63,7 @@ export async function create(
     .values({
       name: workflowName,
       description: data.description,
-      nodes: data.nodes,
+      nodes,
       edges: data.edges,
       userId: session.user.id,
       vercelProjectId: project.id,
