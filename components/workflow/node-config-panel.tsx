@@ -1,10 +1,10 @@
 "use client";
 
 import Editor from "@monaco-editor/react";
-import { useAtom, useSetAtom } from "jotai";
-import { MenuIcon, Trash2 } from "lucide-react";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { Copy, Eraser, MenuIcon, RefreshCw, Trash2 } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { deleteExecutions } from "@/app/actions/workflow/delete-executions";
 import {
@@ -20,12 +20,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { workflowApi } from "@/lib/workflow-api";
 import {
   currentWorkflowIdAtom,
+  currentWorkflowNameAtom,
   deleteNodeAtom,
+  edgesAtom,
   isGeneratingAtom,
   nodesAtom,
   selectedNodeAtom,
+  showClearDialogAtom,
+  showDeleteDialogAtom,
   updateNodeDataAtom,
 } from "@/lib/workflow-store";
 import { Panel } from "../ai-elements/panel";
@@ -616,19 +621,26 @@ const generateNodeCode = (node: {
 const PanelInner = () => {
   const [selectedNodeId] = useAtom(selectedNodeAtom);
   const [nodes] = useAtom(nodesAtom);
+  const edges = useAtomValue(edgesAtom);
   const [isGenerating] = useAtom(isGeneratingAtom);
   const [currentWorkflowId] = useAtom(currentWorkflowIdAtom);
+  const [currentWorkflowName, setCurrentWorkflowName] = useAtom(
+    currentWorkflowNameAtom
+  );
   const updateNodeData = useSetAtom(updateNodeDataAtom);
   const deleteNode = useSetAtom(deleteNodeAtom);
+  const setShowClearDialog = useSetAtom(showClearDialogAtom);
+  const setShowDeleteDialog = useSetAtom(showDeleteDialogAtom);
   const [showDeleteNodeAlert, setShowDeleteNodeAlert] = useState(false);
   const [showDeleteRunsAlert, setShowDeleteRunsAlert] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const refreshRunsRef = useRef<(() => Promise<void>) | null>(null);
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
   const { theme } = useTheme();
 
   const handleCopyCode = () => {
     if (selectedNode) {
       navigator.clipboard.writeText(generateNodeCode(selectedNode));
-      toast.success("Code copied to clipboard");
     }
   };
 
@@ -656,22 +668,164 @@ const PanelInner = () => {
     }
   };
 
-  if (!selectedNode) {
-    return null;
-  }
-
   const handleUpdateLabel = (label: string) => {
-    updateNodeData({ id: selectedNode.id, data: { label } });
+    if (selectedNode) {
+      updateNodeData({ id: selectedNode.id, data: { label } });
+    }
   };
 
   const handleUpdateDescription = (description: string) => {
-    updateNodeData({ id: selectedNode.id, data: { description } });
+    if (selectedNode) {
+      updateNodeData({ id: selectedNode.id, data: { description } });
+    }
   };
 
   const handleUpdateConfig = (key: string, value: string) => {
-    const newConfig = { ...selectedNode.data.config, [key]: value };
-    updateNodeData({ id: selectedNode.id, data: { config: newConfig } });
+    if (selectedNode) {
+      const newConfig = { ...selectedNode.data.config, [key]: value };
+      updateNodeData({ id: selectedNode.id, data: { config: newConfig } });
+    }
   };
+
+  const handleUpdateWorkspaceName = async (newName: string) => {
+    setCurrentWorkflowName(newName);
+
+    // Save to database if workflow exists
+    if (currentWorkflowId) {
+      try {
+        await workflowApi.update(currentWorkflowId, {
+          name: newName,
+          nodes,
+          edges,
+        });
+      } catch (error) {
+        console.error("Failed to update workflow name:", error);
+        toast.error("Failed to update workspace name");
+      }
+    }
+  };
+
+  const handleRefreshRuns = async () => {
+    setIsRefreshing(true);
+    try {
+      if (refreshRunsRef.current) {
+        await refreshRunsRef.current();
+      }
+    } catch (error) {
+      console.error("Failed to refresh runs:", error);
+      toast.error("Failed to refresh runs");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // If no node is selected, show workspace properties and runs
+  if (!selectedNode) {
+    return (
+      <>
+        <Tabs className="size-full" defaultValue="properties">
+          <TabsList className="h-auto w-full rounded-none border-b bg-transparent p-3">
+            <TabsTrigger
+              className="bg-transparent text-muted-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              value="properties"
+            >
+              Properties
+            </TabsTrigger>
+            <TabsTrigger
+              className="bg-transparent text-muted-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              value="runs"
+            >
+              Runs
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent
+            className="flex flex-col overflow-hidden"
+            value="properties"
+          >
+            <div className="flex-1 space-y-4 overflow-y-auto p-3">
+              <div className="space-y-2">
+                <Label htmlFor="workspace-name">Workspace Name</Label>
+                <Input
+                  id="workspace-name"
+                  onChange={(e) => handleUpdateWorkspaceName(e.target.value)}
+                  value={currentWorkflowName}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="workspace-id">Workspace ID</Label>
+                <Input
+                  disabled
+                  id="workspace-id"
+                  value={currentWorkflowId || "Not saved"}
+                />
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2 border-t p-4">
+              <Button
+                onClick={() => setShowClearDialog(true)}
+                size="icon"
+                variant="ghost"
+              >
+                <Eraser className="size-4" />
+              </Button>
+              <Button
+                onClick={() => setShowDeleteDialog(true)}
+                size="icon"
+                variant="ghost"
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </div>
+          </TabsContent>
+          <TabsContent className="flex flex-col overflow-hidden" value="runs">
+            <div className="flex-1 space-y-4 overflow-y-auto p-3">
+              <WorkflowRuns onRefreshRef={refreshRunsRef} />
+            </div>
+            <div className="flex shrink-0 items-center gap-2 border-t p-4">
+              <Button
+                disabled={isRefreshing}
+                onClick={handleRefreshRuns}
+                size="icon"
+                variant="ghost"
+              >
+                <RefreshCw
+                  className={`size-4 ${isRefreshing ? "animate-spin" : ""}`}
+                />
+              </Button>
+              <Button
+                onClick={() => setShowDeleteRunsAlert(true)}
+                size="icon"
+                variant="ghost"
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        <AlertDialog
+          onOpenChange={setShowDeleteRunsAlert}
+          open={showDeleteRunsAlert}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete All Runs</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete all workflow runs? This action
+                cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteAllRuns}>
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
+    );
+  }
 
   return (
     <>
@@ -688,12 +842,6 @@ const PanelInner = () => {
             value="code"
           >
             Code
-          </TabsTrigger>
-          <TabsTrigger
-            className="bg-transparent text-muted-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none"
-            value="runs"
-          >
-            Runs
           </TabsTrigger>
         </TabsList>
         <TabsContent
@@ -741,11 +889,10 @@ const PanelInner = () => {
           <div className="shrink-0 border-t p-4">
             <Button
               onClick={() => setShowDeleteNodeAlert(true)}
-              size="sm"
-              variant="destructive"
+              size="icon"
+              variant="ghost"
             >
               <Trash2 className="size-4" />
-              Delete Node
             </Button>
           </div>
         </TabsContent>
@@ -769,48 +916,12 @@ const PanelInner = () => {
             />
           </div>
           <div className="shrink-0 border-t p-4">
-            <Button onClick={handleCopyCode} size="sm" variant="outline">
-              Copy Code
-            </Button>
-          </div>
-        </TabsContent>
-        <TabsContent className="flex flex-col overflow-hidden" value="runs">
-          <div className="flex-1 space-y-4 overflow-y-auto p-3">
-            <WorkflowRuns />
-          </div>
-          <div className="shrink-0 border-t p-4">
-            <Button
-              onClick={() => setShowDeleteRunsAlert(true)}
-              size="sm"
-              variant="destructive"
-            >
-              <Trash2 className="size-4" />
-              Delete All Runs
+            <Button onClick={handleCopyCode} size="icon" variant="ghost">
+              <Copy className="size-4" />
             </Button>
           </div>
         </TabsContent>
       </Tabs>
-
-      <AlertDialog
-        onOpenChange={setShowDeleteRunsAlert}
-        open={showDeleteRunsAlert}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete All Runs</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete all workflow runs? This action
-              cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteAllRuns}>
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <AlertDialog
         onOpenChange={setShowDeleteNodeAlert}
@@ -839,14 +950,6 @@ const WORD_SPLIT_REGEX = /\s+/;
 const ARRAY_ACCESS_REGEX = /^([^[]+)\[(\d+)\]$/;
 
 export const NodeConfigPanel = () => {
-  const [selectedNodeId] = useAtom(selectedNodeAtom);
-  const [nodes] = useAtom(nodesAtom);
-  const selectedNode = nodes.find((node) => node.id === selectedNodeId);
-
-  if (!selectedNode) {
-    return null;
-  }
-
   return (
     <>
       {/* Mobile: Drawer */}
@@ -865,7 +968,7 @@ export const NodeConfigPanel = () => {
         </Drawer>
       </div>
 
-      {/* Desktop: Docked sidebar */}
+      {/* Desktop: Docked sidebar - always visible */}
       <div className="hidden w-96 flex-col border-l bg-background md:flex">
         <PanelInner />
       </div>

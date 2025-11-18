@@ -56,6 +56,12 @@ const Home = () => {
   const setCurrentVercelProjectName = useSetAtom(currentVercelProjectNameAtom);
   const updateNodeData = useSetAtom(updateNodeDataAtom);
   const hasCreatedWorkflowRef = useRef(false);
+  const currentWorkflowName = useAtomValue(currentWorkflowNameAtom);
+
+  // Update page title when workflow name changes
+  useEffect(() => {
+    document.title = `${currentWorkflowName} - Workflow Builder`;
+  }, [currentWorkflowName]);
 
   // Helper to create anonymous session if needed
   const ensureSession = useCallback(async () => {

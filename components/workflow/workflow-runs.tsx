@@ -10,7 +10,7 @@ import {
   XCircle,
 } from "lucide-react";
 import type { JSX } from "react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getExecutionLogs } from "@/app/actions/workflow/get-execution-logs";
 import { getExecutions } from "@/app/actions/workflow/get-executions";
 import { getRelativeTime } from "@/lib/utils/time";
@@ -43,6 +43,7 @@ type WorkflowExecution = {
 
 type WorkflowRunsProps = {
   isActive?: boolean;
+  onRefreshRef?: React.MutableRefObject<(() => Promise<void>) | null>;
 };
 
 // Component for rendering individual execution log entries
@@ -123,7 +124,10 @@ function ExecutionLogEntry({
   );
 }
 
-export function WorkflowRuns({ isActive = false }: WorkflowRunsProps) {
+export function WorkflowRuns({
+  isActive = false,
+  onRefreshRef,
+}: WorkflowRunsProps) {
   const [currentWorkflowId] = useAtom(currentWorkflowIdAtom);
   const [executions, setExecutions] = useState<WorkflowExecution[]>([]);
   const [logs, setLogs] = useState<Record<string, ExecutionLog[]>>({});
@@ -131,27 +135,34 @@ export function WorkflowRuns({ isActive = false }: WorkflowRunsProps) {
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const loadExecutions = useCallback(async () => {
     if (!currentWorkflowId) {
       setLoading(false);
       return;
     }
 
-    const loadExecutions = async () => {
-      try {
-        setLoading(true);
-        const data = await getExecutions(currentWorkflowId);
-        setExecutions(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Failed to load executions:", error);
-        setExecutions([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadExecutions();
+    try {
+      setLoading(true);
+      const data = await getExecutions(currentWorkflowId);
+      setExecutions(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Failed to load executions:", error);
+      setExecutions([]);
+    } finally {
+      setLoading(false);
+    }
   }, [currentWorkflowId]);
+
+  // Expose refresh function via ref
+  useEffect(() => {
+    if (onRefreshRef) {
+      onRefreshRef.current = loadExecutions;
+    }
+  }, [loadExecutions, onRefreshRef]);
+
+  useEffect(() => {
+    loadExecutions();
+  }, [loadExecutions]);
 
   // Poll for new executions when tab is active
   useEffect(() => {
@@ -159,7 +170,7 @@ export function WorkflowRuns({ isActive = false }: WorkflowRunsProps) {
       return;
     }
 
-    const loadExecutions = async () => {
+    const pollExecutions = async () => {
       try {
         const data = await getExecutions(currentWorkflowId);
         setExecutions(Array.isArray(data) ? data : []);
@@ -168,7 +179,7 @@ export function WorkflowRuns({ isActive = false }: WorkflowRunsProps) {
       }
     };
 
-    const interval = setInterval(loadExecutions, 5000);
+    const interval = setInterval(pollExecutions, 5000);
     return () => clearInterval(interval);
   }, [isActive, currentWorkflowId]);
 
