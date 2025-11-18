@@ -33,11 +33,11 @@ export function generateWorkflowCode(
   // Build a map of node connections
   const nodeMap = new Map(nodes.map((n) => [n.id, n]));
   const edgesBySource = new Map<string, string[]>();
-  edges.forEach((edge) => {
+  for (const edge of edges) {
     const targets = edgesBySource.get(edge.source) || [];
     targets.push(edge.target);
     edgesBySource.set(edge.source, targets);
-  });
+  }
 
   // Find trigger nodes (nodes with no incoming edges)
   const nodesWithIncoming = new Set(edges.map((e) => e.target));
@@ -200,6 +200,10 @@ export function generateWorkflowCode(
         lines.push(`${indent}};`);
         break;
       }
+
+      default:
+        lines.push(`${indent}// Unknown node type: ${node.data.type}`);
+        break;
     }
 
     lines.push("");
@@ -207,10 +211,10 @@ export function generateWorkflowCode(
     // Process next nodes (unless it's a condition which handles its own flow)
     if (node.data.type !== "condition") {
       const nextNodes = edgesBySource.get(nodeId) || [];
-      nextNodes.forEach((nextNodeId) => {
+      for (const nextNodeId of nextNodes) {
         const nextCode = generateNodeCode(nextNodeId, indent);
         lines.push(...nextCode);
-      });
+      }
     }
 
     return lines;
@@ -221,10 +225,10 @@ export function generateWorkflowCode(
     codeLines.push("  // No trigger nodes found");
     codeLines.push(`  return { status: 'error', error: 'No trigger nodes' };`);
   } else {
-    triggerNodes.forEach((trigger) => {
+    for (const trigger of triggerNodes) {
       const triggerCode = generateNodeCode(trigger.id, "  ");
       codeLines.push(...triggerCode);
-    });
+    }
 
     // Return the last result
     const lastNode = nodes.at(-1);

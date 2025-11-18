@@ -836,7 +836,9 @@ class ServerWorkflowExecutor {
                 };
               } else {
                 // Create a sandboxed environment with access to node outputs
-                const AsyncFunction = (async () => {}).constructor;
+                const AsyncFunction = Object.getPrototypeOf(
+                  async () => {}
+                ).constructor;
 
                 // Create a safe context with outputs from previous nodes
                 const safeContext = {
@@ -859,8 +861,8 @@ class ServerWorkflowExecutor {
                 // Wrap the user code in an async function
                 const userFunction = new (
                   AsyncFunction as new (
-                    ...args: string[]
-                  ) => (...args: unknown[]) => Promise<unknown>
+                    ...params: string[]
+                  ) => (...values: unknown[]) => Promise<unknown>
                 )(
                   "outputs",
                   "console",

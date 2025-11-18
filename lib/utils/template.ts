@@ -255,8 +255,7 @@ function resolveExpressionById(
   }
 
   // Start with the node's data
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let current: any = nodeOutput.data;
+  let current: unknown = nodeOutput.data;
 
   console.log(
     `[Template] Resolving "${expression}". Node data:`,
@@ -275,15 +274,17 @@ function resolveExpressionById(
     const arrayMatch = part.match(ARRAY_ACCESS_PATTERN);
     if (arrayMatch) {
       const [, field, index] = arrayMatch;
-      current = current?.[field]?.[Number.parseInt(index, 10)];
-    } else {
+      current = (current as Record<string, unknown>)?.[field]?.[
+        Number.parseInt(index, 10)
+      ];
+    } else if (Array.isArray(current)) {
       // If current is an array and we're trying to access a field,
       // map over the array and extract that field from each element
-      if (Array.isArray(current)) {
-        current = current.map((item) => item?.[part]);
-      } else {
-        current = current?.[part];
-      }
+      current = current.map(
+        (item) => (item as Record<string, unknown>)?.[part]
+      );
+    } else {
+      current = (current as Record<string, unknown>)?.[part];
     }
 
     if (current === undefined || current === null) {
@@ -321,8 +322,7 @@ function resolveExpression(
   }
 
   // Start with the node's data
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let current: any = nodeOutput.data;
+  let current: unknown = nodeOutput.data;
 
   console.log(
     `[Template] Resolving "${expression}". Node data:`,
@@ -341,15 +341,17 @@ function resolveExpression(
     const arrayMatch = part.match(ARRAY_ACCESS_PATTERN);
     if (arrayMatch) {
       const [, field, index] = arrayMatch;
-      current = current?.[field]?.[Number.parseInt(index, 10)];
-    } else {
+      current = (current as Record<string, unknown>)?.[field]?.[
+        Number.parseInt(index, 10)
+      ];
+    } else if (Array.isArray(current)) {
       // If current is an array and we're trying to access a field,
       // map over the array and extract that field from each element
-      if (Array.isArray(current)) {
-        current = current.map((item) => item?.[part]);
-      } else {
-        current = current?.[part];
-      }
+      current = current.map(
+        (item) => (item as Record<string, unknown>)?.[part]
+      );
+    } else {
+      current = (current as Record<string, unknown>)?.[part];
     }
 
     if (current === undefined || current === null) {
@@ -383,8 +385,7 @@ function formatValue(value: unknown): string {
 
   if (typeof value === "object") {
     // For objects, try to find a meaningful representation
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const obj = value as any;
+    const obj = value as Record<string, unknown>;
 
     // Common fields to check for meaningful representation
     if (obj.title) {
@@ -419,7 +420,7 @@ export function formatTemplateForDisplay(template: string): string {
   // Match {{@nodeId:DisplayName...}} patterns and show only DisplayName part
   return template.replace(
     /\{\{@[^:]+:([^}]+)\}\}/g,
-    (match, rest) => `{{${rest}}}`
+    (_match, rest) => `{{${rest}}}`
   );
 }
 
@@ -436,9 +437,8 @@ export function extractTemplateVariables(template: string): string[] {
 
   const pattern = /\{\{([^}]+)\}\}/g;
   const variables: string[] = [];
-  let match;
 
-  while ((match = pattern.exec(template)) !== null) {
+  for (const match of template.matchAll(pattern)) {
     variables.push(match[1].trim());
   }
 
@@ -483,8 +483,7 @@ export function getAvailableFields(nodeOutputs: NodeOutputs): Array<{
  * Recursively extract fields from an object
  */
 function extractFields(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  obj: any,
+  obj: Record<string, unknown> | unknown,
   nodeLabel: string,
   fields: Array<{
     nodeLabel: string;
@@ -493,14 +492,15 @@ function extractFields(
     sample?: unknown;
   }>,
   currentPath: string,
-  maxDepth = 3,
-  currentDepth = 0
+  options: { maxDepth?: number; currentDepth?: number } = {}
 ): void {
+  const { maxDepth = 3, currentDepth = 0 } = options;
+
   if (currentDepth >= maxDepth || !obj || typeof obj !== "object") {
     return;
   }
 
-  for (const [key, value] of Object.entries(obj)) {
+  for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
     const fieldPath = `${currentPath}.${key}}}`;
 
     fields.push({
@@ -512,14 +512,10 @@ function extractFields(
 
     // Recurse for nested objects (but not arrays)
     if (value && typeof value === "object" && !Array.isArray(value)) {
-      extractFields(
-        value,
-        nodeLabel,
-        fields,
-        `${currentPath}.${key}`,
+      extractFields(value, nodeLabel, fields, `${currentPath}.${key}`, {
         maxDepth,
-        currentDepth + 1
-      );
+        currentDepth: currentDepth + 1,
+      });
     }
   }
 }

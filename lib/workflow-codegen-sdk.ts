@@ -2,6 +2,11 @@ import "server-only";
 
 import type { WorkflowEdge, WorkflowNode } from "./workflow-store";
 
+// Regex constants at top level for performance
+const ARRAY_PATTERN = /^([^[]+)\[(\d+)\]$/;
+const WHITESPACE_PATTERN = /\s+/;
+const NUMBER_START_PATTERN = /^[0-9]/;
+
 /**
  * Convert template variables to JavaScript expressions
  * Converts {{@nodeId:DisplayName.field}} to ${outputs?.['nodeId']?.data?.field}
@@ -47,7 +52,7 @@ function convertTemplateToJS(template: string): string {
         .split(".")
         .map((part: string) => {
           // Handle array access
-          const arrayMatch = part.match(/^([^[]+)\[(\d+)\]$/);
+          const arrayMatch = part.match(ARRAY_PATTERN);
           if (arrayMatch) {
             return `?.${arrayMatch[1]}?.[${arrayMatch[2]}]`;
           }
@@ -80,7 +85,7 @@ function convertTemplateToJS(template: string): string {
       const accessPath = fieldPath
         .split(".")
         .map((part: string) => {
-          const arrayMatch = part.match(/^([^[]+)\[(\d+)\]$/);
+          const arrayMatch = part.match(ARRAY_PATTERN);
           if (arrayMatch) {
             return `?.${arrayMatch[1]}?.[${arrayMatch[2]}]`;
           }
@@ -125,11 +130,11 @@ export function generateWorkflowSDKCode(
   // Build a map of node connections
   const nodeMap = new Map(nodes.map((n) => [n.id, n]));
   const edgesBySource = new Map<string, string[]>();
-  edges.forEach((edge) => {
+  for (const edge of edges) {
     const targets = edgesBySource.get(edge.source) || [];
     targets.push(edge.target);
     edgesBySource.set(edge.source, targets);
-  });
+  }
 
   // Find trigger nodes
   const nodesWithIncoming = new Set(edges.map((e) => e.target));
@@ -448,6 +453,10 @@ ${stepBody}
         }
         break;
       }
+
+      default:
+        lines.push(`${indent}// Unknown node type: ${node.data.type}`);
+        break;
     }
 
     // Process next nodes (unless it's a condition)
@@ -511,7 +520,7 @@ ${mainFunction}
 function sanitizeFunctionName(name: string): string {
   return name
     .replace(/[^a-zA-Z0-9]/g, "_")
-    .replace(/^[0-9]/, "_$&")
+    .replace(NUMBER_START_PATTERN, "_$&")
     .replace(/_+/g, "_");
 }
 
@@ -519,7 +528,7 @@ function sanitizeStepName(name: string): string {
   // Create a more readable function name from the label
   // e.g., "Find Issues" -> "findIssuesStep", "Generate Email Text" -> "generateEmailTextStep"
   const result = name
-    .split(/\s+/) // Split by whitespace
+    .split(WHITESPACE_PATTERN) // Split by whitespace
     .filter((word) => word.length > 0) // Remove empty strings
     .map((word, index) => {
       // Remove non-alphanumeric characters
@@ -543,7 +552,7 @@ function sanitizeStepName(name: string): string {
   }
 
   // Prefix with underscore if starts with number
-  const sanitized = result.replace(/^[0-9]/, "_$&");
+  const sanitized = result.replace(NUMBER_START_PATTERN, "_$&");
 
   // Add "Step" suffix to avoid conflicts with imports (e.g., generateText from 'ai')
   return `${sanitized}Step`;
