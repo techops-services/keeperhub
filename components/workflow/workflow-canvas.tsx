@@ -166,9 +166,7 @@ export function WorkflowCanvas() {
     [currentWorkflowId]
   );
 
-  const nodeTypes = useMemo<
-    Record<string, React.ComponentType<{ data: WorkflowNode["data"] }>>
-  >(
+  const nodeTypes = useMemo(
     () => ({
       trigger: TriggerNode,
       action: ActionNode,
@@ -219,16 +217,13 @@ export function WorkflowCanvas() {
   );
 
   const onConnectStart = useCallback(
-    (
-      _event: React.MouseEvent | React.TouchEvent,
-      params: OnConnectStartParams
-    ) => {
+    (_event: MouseEvent | TouchEvent, params: OnConnectStartParams) => {
       connectingNodeId.current = params.nodeId;
     },
     []
   );
 
-  const getClientPosition = (event: MouseEvent | TouchEvent) => {
+  const getClientPosition = useCallback((event: MouseEvent | TouchEvent) => {
     const clientX =
       "changedTouches" in event
         ? event.changedTouches[0].clientX
@@ -238,56 +233,60 @@ export function WorkflowCanvas() {
         ? event.changedTouches[0].clientY
         : event.clientY;
     return { clientX, clientY };
-  };
-
-  const calculateMenuPosition = (
-    event: MouseEvent | TouchEvent,
-    clientX: number,
-    clientY: number
-  ) => {
-    const reactFlowBounds = (event.target as Element)
-      .closest(".react-flow")
-      ?.getBoundingClientRect();
-
-    const adjustedX = reactFlowBounds
-      ? clientX - reactFlowBounds.left
-      : clientX;
-    const adjustedY = reactFlowBounds ? clientY - reactFlowBounds.top : clientY;
-
-    return { adjustedX, adjustedY };
-  };
-
-  const onConnectEnd = useCallback((event: MouseEvent | TouchEvent) => {
-    if (!connectingNodeId.current) {
-      return;
-    }
-
-    const target = event.target as Element;
-    const isNode = target.closest(".react-flow__node");
-    const isHandle = target.closest(".react-flow__handle");
-
-    if (!(isNode || isHandle)) {
-      const { clientX, clientY } = getClientPosition(event);
-      const { adjustedX, adjustedY } = calculateMenuPosition(
-        event,
-        clientX,
-        clientY
-      );
-
-      menuJustOpened.current = true;
-      setMenu({
-        id: connectingNodeId.current,
-        top: adjustedY,
-        left: adjustedX,
-      });
-
-      setTimeout(() => {
-        menuJustOpened.current = false;
-      }, 100);
-    }
-
-    connectingNodeId.current = null;
   }, []);
+
+  const calculateMenuPosition = useCallback(
+    (event: MouseEvent | TouchEvent, clientX: number, clientY: number) => {
+      const reactFlowBounds = (event.target as Element)
+        .closest(".react-flow")
+        ?.getBoundingClientRect();
+
+      const adjustedX = reactFlowBounds
+        ? clientX - reactFlowBounds.left
+        : clientX;
+      const adjustedY = reactFlowBounds
+        ? clientY - reactFlowBounds.top
+        : clientY;
+
+      return { adjustedX, adjustedY };
+    },
+    []
+  );
+
+  const onConnectEnd = useCallback(
+    (event: MouseEvent | TouchEvent) => {
+      if (!connectingNodeId.current) {
+        return;
+      }
+
+      const target = event.target as Element;
+      const isNode = target.closest(".react-flow__node");
+      const isHandle = target.closest(".react-flow__handle");
+
+      if (!(isNode || isHandle)) {
+        const { clientX, clientY } = getClientPosition(event);
+        const { adjustedX, adjustedY } = calculateMenuPosition(
+          event,
+          clientX,
+          clientY
+        );
+
+        menuJustOpened.current = true;
+        setMenu({
+          id: connectingNodeId.current,
+          top: adjustedY,
+          left: adjustedX,
+        });
+
+        setTimeout(() => {
+          menuJustOpened.current = false;
+        }, 100);
+      }
+
+      connectingNodeId.current = null;
+    },
+    [getClientPosition, calculateMenuPosition]
+  );
 
   const onAddNodeFromMenu = useCallback(
     (template: (typeof nodeTemplates)[0]) => {

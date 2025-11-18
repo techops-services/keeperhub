@@ -9,6 +9,7 @@ import {
   Loader2,
   XCircle,
 } from "lucide-react";
+import type { JSX } from "react";
 import { useEffect, useState } from "react";
 import { getExecutionLogs } from "@/app/actions/workflow/get-execution-logs";
 import { getExecutions } from "@/app/actions/workflow/get-executions";
@@ -43,6 +44,84 @@ type WorkflowExecution = {
 type WorkflowRunsProps = {
   isActive?: boolean;
 };
+
+// Component for rendering individual execution log entries
+function ExecutionLogEntry({
+  log,
+  isExpanded,
+  onToggle,
+  getStatusIcon,
+}: {
+  log: ExecutionLog;
+  isExpanded: boolean;
+  onToggle: () => void;
+  getStatusIcon: (status: string) => JSX.Element;
+}) {
+  return (
+    <div className="rounded border" key={log.id}>
+      <button
+        className="w-full cursor-pointer px-2 py-1.5 text-left hover:bg-muted/30"
+        onClick={onToggle}
+        type="button"
+      >
+        <div className="flex items-center gap-2">
+          {isExpanded ? (
+            <ChevronDown className="h-3 w-3" />
+          ) : (
+            <ChevronRight className="h-3 w-3" />
+          )}
+          {getStatusIcon(log.status)}
+          <div className="flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-medium text-xs">
+                {log.nodeName || log.nodeType}
+              </span>
+              {log.duration && (
+                <span className="text-muted-foreground text-xs">
+                  {Number.parseInt(log.duration, 10) < 1000
+                    ? `${log.duration}ms`
+                    : `${(Number.parseInt(log.duration, 10) / 1000).toFixed(2)}s`}
+                </span>
+              )}
+            </div>
+            <div className="text-muted-foreground text-xs">{log.nodeType}</div>
+            {log.error && (
+              <div className="mt-1 text-red-600 text-xs">{log.error}</div>
+            )}
+          </div>
+        </div>
+      </button>
+
+      {isExpanded && (
+        <div className="border-t bg-muted/20 p-2">
+          <div className="space-y-2">
+            {log.input !== null && log.input !== undefined && (
+              <div>
+                <div className="mb-1 font-semibold text-xs">Input</div>
+                <pre className="overflow-auto rounded bg-background p-2 text-xs">
+                  {JSON.stringify(log.input, null, 2)}
+                </pre>
+              </div>
+            )}
+            {log.output !== null && log.output !== undefined && (
+              <div>
+                <div className="mb-1 font-semibold text-xs">Output</div>
+                <pre className="overflow-auto rounded bg-background p-2 text-xs">
+                  {JSON.stringify(log.output, null, 2)}
+                </pre>
+              </div>
+            )}
+            {!(log.input || log.output || log.error) && (
+              <div className="text-muted-foreground text-xs">
+                No data recorded
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function WorkflowRuns({ isActive = false }: WorkflowRunsProps) {
   const [currentWorkflowId] = useAtom(currentWorkflowIdAtom);
@@ -208,83 +287,15 @@ export function WorkflowRuns({ isActive = false }: WorkflowRunsProps) {
                   </div>
                 ) : (
                   <div className="space-y-1 p-2">
-                    {executionLogs.map((log) => {
-                      const isLogExpanded = expandedLogs.has(log.id);
-                      return (
-                        <div className="rounded border" key={log.id}>
-                          <button
-                            className="w-full cursor-pointer px-2 py-1.5 text-left hover:bg-muted/30"
-                            onClick={() => toggleLog(log.id)}
-                            type="button"
-                          >
-                            <div className="flex items-center gap-2">
-                              {isLogExpanded ? (
-                                <ChevronDown className="h-3 w-3" />
-                              ) : (
-                                <ChevronRight className="h-3 w-3" />
-                              )}
-                              {getStatusIcon(log.status)}
-                              <div className="flex-1">
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="font-medium text-xs">
-                                    {log.nodeName || log.nodeType}
-                                  </span>
-                                  {log.duration && (
-                                    <span className="text-muted-foreground text-xs">
-                                      {Number.parseInt(log.duration, 10) < 1000
-                                        ? `${log.duration}ms`
-                                        : `${(Number.parseInt(log.duration, 10) / 1000).toFixed(2)}s`}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-muted-foreground text-xs">
-                                  {log.nodeType}
-                                </div>
-                                {log.error && (
-                                  <div className="mt-1 text-red-600 text-xs">
-                                    {log.error}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </button>
-
-                          {isLogExpanded && (
-                            <div className="border-t bg-muted/20 p-2">
-                              <div className="space-y-2">
-                                {log.input !== null &&
-                                  log.input !== undefined && (
-                                    <div>
-                                      <div className="mb-1 font-semibold text-xs">
-                                        Input
-                                      </div>
-                                      <pre className="overflow-auto rounded bg-background p-2 text-xs">
-                                        {JSON.stringify(log.input, null, 2)}
-                                      </pre>
-                                    </div>
-                                  )}
-                                {log.output !== null &&
-                                  log.output !== undefined && (
-                                    <div>
-                                      <div className="mb-1 font-semibold text-xs">
-                                        Output
-                                      </div>
-                                      <pre className="overflow-auto rounded bg-background p-2 text-xs">
-                                        {JSON.stringify(log.output, null, 2)}
-                                      </pre>
-                                    </div>
-                                  )}
-                                {!(log.input || log.output || log.error) && (
-                                  <div className="text-muted-foreground text-xs">
-                                    No data recorded
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                    {executionLogs.map((log) => (
+                      <ExecutionLogEntry
+                        getStatusIcon={getStatusIcon}
+                        isExpanded={expandedLogs.has(log.id)}
+                        key={log.id}
+                        log={log}
+                        onToggle={() => toggleLog(log.id)}
+                      />
+                    ))}
                   </div>
                 )}
               </div>

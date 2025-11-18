@@ -105,7 +105,7 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
   const [isDeploying, setIsDeploying] = useState(false);
   const [deploymentUrl, setDeploymentUrl] = useState<string | null>(null);
   const [showCodeDialog, setShowCodeDialog] = useState(false);
-  const [generatedCode, setGeneratedCode] = useState<string>("");
+  const [generatedCode, _setGeneratedCode] = useState<string>("");
   const [runMode, setRunMode] = useState<"test" | "production">("test");
   const [allWorkflows, setAllWorkflows] = useState<
     Array<{

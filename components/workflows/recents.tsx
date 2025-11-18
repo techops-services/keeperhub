@@ -52,7 +52,7 @@ export const Recents = ({ limit }: RecentsProps = {}) => {
         {Array.from({ length: limit || 3 }, (_, index) => (
           <Skeleton
             className="h-[30px] w-full rounded-full"
-            key={`skeleton-workflow-${index}`}
+            key={`skeleton-workflow-loading-${index}-${Date.now()}`}
           />
         ))}
         <Skeleton className="mt-2 h-4 w-12 rounded-full" />
