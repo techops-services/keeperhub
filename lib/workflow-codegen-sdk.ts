@@ -241,9 +241,9 @@ function _generateGenerateTextStepBody(
 ): string {
   imports.add("import { generateText, generateObject } from 'ai';");
   imports.add("import { z } from 'zod';");
-  const modelId = (config.aiModel as string) || "gpt-4o-mini";
+  const modelId = (config.aiModel as string) || "gpt-5";
   const provider =
-    modelId.startsWith("gpt-") || modelId.startsWith("o1-")
+    modelId.startsWith("gpt-") || modelId.startsWith("o1")
       ? "openai"
       : "anthropic";
   const aiPrompt = (config.aiPrompt as string) || "";

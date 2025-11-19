@@ -452,12 +452,13 @@ function GenerateTextFields({
         <Select
           disabled={disabled}
           onValueChange={(value) => onUpdateConfig("aiModel", value)}
-          value={(config?.aiModel as string) || "gpt-4o-mini"}
+          value={(config?.aiModel as string) || "gpt-5"}
         >
           <SelectTrigger className="w-full" id="aiModel">
             <SelectValue placeholder="Select model" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="gpt-5">GPT-5</SelectItem>
             <SelectItem value="gpt-4o">GPT-4o</SelectItem>
             <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
             <SelectItem value="gpt-4-turbo">GPT-4 Turbo</SelectItem>

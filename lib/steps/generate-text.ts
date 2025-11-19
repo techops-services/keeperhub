@@ -52,7 +52,7 @@ export async function generateTextStep(input: {
   apiKey: string;
 }): Promise<{ text: string } | Record<string, unknown>> {
   // Get model and prompt from input
-  const modelId = input.aiModel || "gpt-4o-mini";
+  const modelId = input.aiModel || "gpt-5";
   const promptText = input.aiPrompt || "";
 
   if (!promptText || promptText.trim() === "") {

@@ -25,7 +25,7 @@ export const Canvas = ({ children, ...props }: CanvasProps) => {
         bgColor="var(--sidebar)" 
         color="var(--border)" 
         gap={24} 
-        size={1}
+        size={2}
       />
       {children}
     </ReactFlow>
