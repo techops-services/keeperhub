@@ -150,7 +150,6 @@ class ServerWorkflowExecutor {
       const vercelTeamId = process.env.VERCEL_TEAM_ID;
 
       if (!vercelApiToken) {
-        console.error("Vercel API token not configured");
         return;
       }
 
@@ -159,8 +158,7 @@ class ServerWorkflowExecutor {
         vercelApiToken,
         vercelTeamId
       );
-    } catch (error) {
-      console.error("Failed to load workflow integrations:", error);
+    } catch {
       this.credentials = getCredentials("system");
     }
   }
@@ -175,7 +173,6 @@ class ServerWorkflowExecutor {
     });
 
     if (!workflowData) {
-      console.error("Workflow not found");
       return null;
     }
 
@@ -213,10 +210,6 @@ class ServerWorkflowExecutor {
       envs.find((env) => env.key === key)?.value || null;
 
     const aiGatewayApiKey = findEnvValue("AI_GATEWAY_API_KEY");
-    console.log(
-      "[DEBUG Executor] AI_GATEWAY_API_KEY:",
-      aiGatewayApiKey ? `${aiGatewayApiKey.substring(0, 10)}...` : "null"
-    );
 
     this.credentials = getCredentials("user", {
       RESEND_API_KEY: findEnvValue("RESEND_API_KEY") || undefined,
@@ -226,17 +219,6 @@ class ServerWorkflowExecutor {
       OPENAI_API_KEY: findEnvValue("OPENAI_API_KEY") || undefined,
       DATABASE_URL: findEnvValue("DATABASE_URL") || undefined,
     });
-
-    console.log(
-      "[DEBUG Executor] credentials.AI_GATEWAY_API_KEY:",
-      this.credentials.AI_GATEWAY_API_KEY
-        ? `${this.credentials.AI_GATEWAY_API_KEY.substring(0, 10)}...`
-        : "undefined"
-    );
-    console.log(
-      "[DEBUG Executor] Full credentials keys:",
-      Object.keys(this.credentials)
-    );
   }
 
   private getNextNodes(nodeId: string): string[] {
@@ -257,16 +239,10 @@ class ServerWorkflowExecutor {
     input?: unknown
   ): Promise<void> {
     if (!this.context.executionId) {
-      console.warn(
-        "[Executor] No executionId, skipping log for node:",
-        node.id
-      );
       return;
     }
 
     try {
-      console.log(`[Executor] Starting node ${node.id} (${node.data.type})`);
-
       // Get a meaningful node name based on label, action type, or trigger type
       let nodeName = node.data.label;
       if (!nodeName) {
@@ -292,14 +268,12 @@ class ServerWorkflowExecutor {
         })
         .returning();
 
-      console.log("[Executor] Created log entry:", log.id);
-
       this.executionLogs.set(node.id, {
         logId: log.id,
         startTime: Date.now(),
       });
-    } catch (err) {
-      console.error("Failed to start node execution log:", err);
+    } catch {
+      // Silently fail
     }
   }
 
@@ -310,25 +284,16 @@ class ServerWorkflowExecutor {
     error?: string
   ): Promise<void> {
     if (!this.context.executionId) {
-      console.warn(
-        "[Executor] No executionId, skipping completion for node:",
-        node.id
-      );
       return;
     }
 
     const logInfo = this.executionLogs.get(node.id);
     if (!logInfo?.logId) {
-      console.warn("[Executor] No log entry found for node:", node.id);
       return;
     }
 
     try {
       const duration = Date.now() - logInfo.startTime;
-
-      console.log(
-        `[Executor] Completing node ${node.id} with status ${status}, duration ${duration}ms`
-      );
 
       await db
         .update(workflowExecutionLogs)
@@ -340,10 +305,8 @@ class ServerWorkflowExecutor {
           duration: duration.toString(),
         })
         .where(eq(workflowExecutionLogs.id, logInfo.logId));
-
-      console.log(`[Executor] Updated log entry ${logInfo.logId}`);
-    } catch (err) {
-      console.error("Failed to complete node execution log:", err);
+    } catch {
+      // Silently fail
     }
   }
 
@@ -354,20 +317,10 @@ class ServerWorkflowExecutor {
     processedConfig: Record<string, unknown>
   ): Promise<ExecutionResult> {
     try {
-      console.log(`[Executor] executeActionNode called for: ${actionType}`);
-      console.log(
-        "[Executor] Raw processedConfig:",
-        JSON.stringify(processedConfig, null, 2)
-      );
-
       // Check if we have a step function for this action type
       if (hasStep(actionType)) {
-        console.log(`[Executor] Found step function for: ${actionType}`);
         const stepFn = getStep(actionType);
         if (!stepFn) {
-          console.error(
-            `[Executor] Step function is undefined for: ${actionType}`
-          );
           return {
             success: false,
             error: `Step function not found for action type: ${actionType}`,
@@ -381,13 +334,8 @@ class ServerWorkflowExecutor {
           this.credentials
         );
 
-        console.log(`[Executor] Executing step: ${actionType}`);
-        console.log("[Executor] Enriched input:", enrichedInput);
-
         // Execute the step function
-        console.log(`[Executor] About to call stepFn for: ${actionType}`);
         const result = await stepFn(enrichedInput);
-        console.log(`[Executor] Step result for ${actionType}:`, result);
 
         return {
           success: true,
@@ -395,19 +343,12 @@ class ServerWorkflowExecutor {
         };
       }
 
-      console.log(
-        `[Executor] No step function found for: ${actionType}, using fallback`
-      );
       // Fallback for actions without step functions
       return {
         success: true,
         data: { status: 200, message: "Action executed successfully" },
       };
     } catch (error) {
-      console.error(
-        `[Executor] Error in executeActionNode for ${actionType}:`,
-        error
-      );
       return {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
@@ -447,9 +388,6 @@ class ServerWorkflowExecutor {
         // Get the variable name for this node ID
         const varName = idToVarName.get(nodeId);
         if (!varName) {
-          console.warn(
-            `[Executor] Node ID "${nodeId}" not found in outputs, keeping original: ${match}`
-          );
           return match;
         }
 
@@ -497,9 +435,6 @@ class ServerWorkflowExecutor {
         new Map(),
         idToVarName
       );
-
-      console.log("[Executor] Original condition:", condition);
-      console.log("[Executor] Transformed condition:", transformedCondition);
 
       const conditionResult = this.evaluateCondition(
         transformedCondition,
@@ -558,7 +493,6 @@ class ServerWorkflowExecutor {
       const evalFn = new Function(...paramNames, `return (${expression});`);
       return Boolean(evalFn(...paramValues));
     } catch (evalError) {
-      console.error("[Executor] Condition evaluation error:", evalError);
       throw new Error(
         `Invalid condition expression: ${evalError instanceof Error ? evalError.message : "Unknown error"}`
       );
@@ -597,10 +531,6 @@ class ServerWorkflowExecutor {
   private async executeNode(node: WorkflowNode): Promise<ExecutionResult> {
     try {
       const nodeConfig = node.data.config || {};
-
-      console.log(`[Executor] ===== EXECUTING NODE ${node.id} =====`);
-      console.log("[Executor] Node type:", node.data.type);
-      console.log("[Executor] Node label:", node.data.label);
 
       const actionType = nodeConfig.actionType as string;
       const processedConfig = this.prepareProcessedConfig(nodeConfig);

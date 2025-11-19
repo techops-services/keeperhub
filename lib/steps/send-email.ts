@@ -19,6 +19,5 @@ export async function sendEmailStep(input: {
     text: input.emailBody,
   });
 
-  console.log("Email sent:", result);
   return result;
 }

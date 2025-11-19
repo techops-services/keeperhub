@@ -15,6 +15,5 @@ export async function sendSlackMessageStep(input: {
     text: input.slackMessage,
   });
 
-  console.log("Slack message sent:", result);
   return result;
 }

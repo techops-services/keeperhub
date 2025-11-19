@@ -19,6 +19,5 @@ export async function generateImageStep(input: {
     response_format: 'b64_json',
   });
   
-  console.log('Image generated');
   return { base64: response.data[0].b64_json };
 }`;

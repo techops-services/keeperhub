@@ -103,21 +103,9 @@ function enrichAICredentials(
   input: Record<string, unknown>,
   credentials: EnvVarConfig
 ): void {
-  console.log(
-    "[DEBUG enrichStepInput] AI_GATEWAY_API_KEY from credentials:",
-    credentials.AI_GATEWAY_API_KEY
-      ? `${credentials.AI_GATEWAY_API_KEY.substring(0, 10)}...`
-      : "undefined"
-  );
   if (credentials.AI_GATEWAY_API_KEY) {
     input.apiKey = credentials.AI_GATEWAY_API_KEY;
   }
-  console.log(
-    "[DEBUG enrichStepInput] enrichedInput.apiKey after setting:",
-    input.apiKey
-      ? `${(input.apiKey as string).substring(0, 10)}...`
-      : "undefined"
-  );
 }
 
 function enrichDatabaseCredentials(

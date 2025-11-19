@@ -16,8 +16,6 @@ export async function databaseQueryStep(input: {
   // Accept either dbQuery or query field name
   const queryString = input.dbQuery || input.query;
 
-  console.log("Database query:", queryString);
-
   if (!queryString || queryString.trim() === "") {
     return {
       status: "error",
@@ -31,11 +29,8 @@ export async function databaseQueryStep(input: {
       query: queryString,
     });
 
-    console.log("Query result:", result.status, "rows:", result.rowCount);
-
     return result;
   } catch (error) {
-    console.error("Database query error:", error);
     return {
       status: "error",
       error: error instanceof Error ? error.message : "Unknown database error",

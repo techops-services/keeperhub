@@ -51,11 +51,7 @@ function loadStepImplementation(actionType: string): string | null {
     }
 
     return null;
-  } catch (error) {
-    console.error(
-      `Failed to load step implementation for ${actionType}:`,
-      error
-    );
+  } catch {
     return null;
   }
 }
@@ -184,7 +180,6 @@ function _generateSendEmailStepBody(
     text: (input.emailBody as string) || emailBody,
   });
   
-  console.log('Email sent:', result);
   return result;`;
 }
 
@@ -210,7 +205,6 @@ function _generateSendSlackMessageStepBody(
     text: (input.slackMessage as string) || slackMessage,
   });
   
-  console.log('Slack message sent:', result);
   return result;`;
 }
 
@@ -237,7 +231,6 @@ function _generateCreateTicketStepBody(
     teamId: process.env.LINEAR_TEAM_ID!,
   });
   
-  console.log('Linear issue created:', issue);
   return issue;`;
 }
 
@@ -264,7 +257,6 @@ function _generateGenerateTextStepBody(
     prompt: finalPrompt,
   });
   
-  console.log('Text generated:', text);
   return { text };`;
 }
 
@@ -290,7 +282,6 @@ function _generateGenerateImageStepBody(
     response_format: 'b64_json',
   });
   
-  console.log('Image generated');
   return { base64: response.data[0].b64_json };`;
 }
 
@@ -315,7 +306,6 @@ function _generateDatabaseQueryStepBody(
   // const result = await sql.unsafe(finalQuery);
   // await sql.end();
   
-  console.log('Database query:', finalQuery);
   throw new Error('Database Query not implemented - see comments in generated code');`;
 }
 
@@ -348,7 +338,6 @@ function _generateHTTPRequestStepBody(config: Record<string, unknown>): string {
   });
   
   const data = await response.json();
-  console.log('HTTP request completed:', data);
   return data;`;
 }
 
@@ -550,11 +539,10 @@ export function generateWorkflowSDKCode(
     ${inputParams.join(",\n    ")}
   };
 
-  // Execute step implementation
-  ${stepImplementation}`;
+      // Execute step implementation
+      ${stepImplementation}`;
     } else {
-      stepBody = `  console.log('Executing ${label}');
-  return { success: true };`;
+      stepBody = "  return { success: true };";
     }
 
     return `async function ${stepName}(input: Record<string, unknown> & { outputs?: Record<string, { label: string; data: unknown }> }) {
@@ -722,7 +710,6 @@ ${stepBody}
   const workflowBody: string[] = [];
 
   if (triggerNodes.length === 0) {
-    workflowBody.push('  console.log("No trigger nodes found");');
     workflowBody.push('  return { error: "No trigger nodes" };');
   } else {
     // Initialize outputs tracking

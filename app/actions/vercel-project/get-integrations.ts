@@ -104,11 +104,6 @@ export async function getProjectIntegrations(
   const databaseUrl =
     envResult.envs.find((env) => env.key === "DATABASE_URL")?.value || null;
 
-  console.log(
-    "[DEBUG] AI_GATEWAY_API_KEY:",
-    aiGatewayApiKey ? `${aiGatewayApiKey.substring(0, 10)}...` : "null"
-  );
-
   return {
     resendApiKey,
     resendFromEmail,

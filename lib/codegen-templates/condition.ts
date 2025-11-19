@@ -8,6 +8,5 @@ export default `export async function conditionStep(input: {
   "use step";
   
   // Evaluate condition
-  console.log('Condition evaluated:', input.condition);
   return { condition: input.condition };
 }`;

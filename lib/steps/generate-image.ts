@@ -21,6 +21,5 @@ export async function generateImageStep(input: {
     throw new Error("Failed to generate image");
   }
 
-  console.log("Image generated");
   return { base64: response.data[0].b64_json };
 }

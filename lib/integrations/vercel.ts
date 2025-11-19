@@ -396,8 +396,6 @@ export async function getDecryptedEnvironmentVariable(
       };
     }
 
-    console.log("[DEBUG Vercel API] Fetching decrypted env var:", params.envId);
-
     // Use direct fetch API to get the decrypted value
     const env = await vercelRequest<VercelEnvVariable>(
       `/v1/projects/${params.projectId}/env/${params.envId}`,
@@ -405,13 +403,6 @@ export async function getDecryptedEnvironmentVariable(
       {},
       params.teamId
     );
-
-    console.log("[DEBUG Vercel API] Decrypted env var:", {
-      key: env.key,
-      type: env.type,
-      valueLength: env.value?.length,
-      valuePreview: env.value ? `${env.value.substring(0, 20)}...` : undefined,
-    });
 
     return {
       status: "success",
@@ -426,10 +417,6 @@ export async function getDecryptedEnvironmentVariable(
       },
     };
   } catch (error) {
-    console.error(
-      "[DEBUG Vercel API] Error fetching decrypted env var:",
-      error
-    );
     return {
       status: "error",
       error: error instanceof Error ? error.message : "Unknown error",
@@ -465,13 +452,6 @@ export async function getEnvironmentVariables(
       bearerToken: params.apiToken,
     });
 
-    console.log(
-      "[DEBUG Vercel SDK] Fetching env vars for project:",
-      params.projectId,
-      "teamId:",
-      params.teamId
-    );
-
     // Use SDK to get environment variables
     const response = await vercel.projects.filterProjectEnvs({
       idOrName: params.projectId,
@@ -481,16 +461,6 @@ export async function getEnvironmentVariables(
 
     // Response can have envs as an array or object property
     const envList = (response as VercelEnvResponse).envs || [];
-
-    console.log(
-      "[DEBUG Vercel SDK] Found",
-      envList.length,
-      "environment variables"
-    );
-    console.log(
-      "[DEBUG Vercel SDK] Env var keys:",
-      envList.map((e) => e.key).join(", ")
-    );
 
     if (!envList || envList.length === 0) {
       return {
@@ -503,10 +473,6 @@ export async function getEnvironmentVariables(
     const envsWithDecryption = await Promise.all(
       envList.map(async (env) => {
         if (params.decrypt && env.type === "encrypted" && env.id) {
-          console.log(
-            "[DEBUG Vercel SDK] Fetching decrypted value for:",
-            env.key
-          );
           const decryptedResult = await getDecryptedEnvironmentVariable({
             projectId: params.projectId,
             apiToken: params.apiToken,
@@ -518,12 +484,6 @@ export async function getEnvironmentVariables(
             decryptedResult.status === "success" &&
             decryptedResult.env?.value
           ) {
-            console.log(
-              "[DEBUG Vercel SDK] Successfully decrypted:",
-              env.key,
-              "value length:",
-              decryptedResult.env.value.length
-            );
             return {
               ...env,
               value: decryptedResult.env.value,
@@ -532,22 +492,6 @@ export async function getEnvironmentVariables(
         }
         return env;
       })
-    );
-
-    const sampleEnv = envsWithDecryption.find(
-      (e) => e.key === "AI_GATEWAY_API_KEY"
-    );
-    console.log(
-      "[DEBUG Vercel SDK] Sample env var:",
-      sampleEnv
-        ? {
-            key: sampleEnv.key,
-            value: sampleEnv.value
-              ? `${sampleEnv.value.substring(0, 15)}...`
-              : undefined,
-            type: sampleEnv.type,
-          }
-        : "not found"
     );
 
     return {
@@ -563,7 +507,6 @@ export async function getEnvironmentVariables(
       })),
     };
   } catch (error) {
-    console.error("[DEBUG Vercel SDK] Error fetching env vars:", error);
     return {
       status: "error",
       error: error instanceof Error ? error.message : "Unknown error",
@@ -621,7 +564,6 @@ export async function setEnvironmentVariable(
 
     return formatEnvResponse(response.created);
   } catch (error) {
-    console.error("[DEBUG Vercel SDK] Error setting env var:", error);
     return {
       status: "error",
       error: error instanceof Error ? error.message : "Unknown error",

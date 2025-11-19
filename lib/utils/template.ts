@@ -25,9 +25,6 @@ function processNewFormatReference(
   const colonIndex = withoutAt.indexOf(":");
 
   if (colonIndex === -1) {
-    console.warn(
-      `[Template] Invalid format: "${trimmed}". Expected @nodeId:DisplayName`
-    );
     return match;
   }
 
@@ -41,7 +38,6 @@ function processNewFormatReference(
     if (nodeOutput) {
       return formatValue(nodeOutput.data);
     }
-    console.warn(`[Template] Node with ID "${nodeId}" not found in outputs`);
     return match;
   }
 
@@ -66,9 +62,6 @@ function processLegacyDollarReference(
     if (nodeOutput) {
       return formatValue(nodeOutput.data);
     }
-    console.warn(
-      `[Template] Node with ID "${withoutDollar}" not found in outputs`
-    );
     return match;
   }
 
@@ -91,7 +84,6 @@ function processLegacyLabelReference(
     if (nodeOutput) {
       return formatValue(nodeOutput.data);
     }
-    console.warn(`[Template] Node "${trimmed}" not found in outputs`);
     return match;
   }
 
@@ -130,10 +122,6 @@ export function processTemplate(
       result = processLegacyDollarReference(trimmed, nodeOutputs, match);
     } else {
       result = processLegacyLabelReference(trimmed, nodeOutputs, match);
-    }
-
-    if (result === match) {
-      console.warn(`[Template] Could not resolve "${trimmed}" in node outputs`);
     }
 
     return result;
@@ -250,17 +238,11 @@ function resolveExpressionById(
   const nodeOutput = nodeOutputs[nodeId];
 
   if (!nodeOutput) {
-    console.warn(`[Template] Node with ID "${nodeId}" not found in outputs`);
     return;
   }
 
   // Start with the node's data
   let current: unknown = nodeOutput.data;
-
-  console.log(
-    `[Template] Resolving "${expression}". Node data:`,
-    JSON.stringify(current, null, 2)
-  );
 
   // Navigate through remaining parts
   for (let i = 1; i < parts.length; i++) {
@@ -317,20 +299,11 @@ function resolveExpression(
   const nodeOutput = findNodeOutputByLabel(nodeLabel, nodeOutputs);
 
   if (!nodeOutput) {
-    console.warn(
-      `[Template] Node "${nodeLabel}" not found. Available nodes:`,
-      Object.values(nodeOutputs).map((n) => n.label)
-    );
     return;
   }
 
   // Start with the node's data
   let current: unknown = nodeOutput.data;
-
-  console.log(
-    `[Template] Resolving "${expression}". Node data:`,
-    JSON.stringify(current, null, 2)
-  );
 
   // Navigate through remaining parts
   for (let i = 1; i < parts.length; i++) {

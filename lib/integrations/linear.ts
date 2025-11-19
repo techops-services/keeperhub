@@ -99,15 +99,13 @@ export async function getTicket(
 ): Promise<Issue | null> {
   try {
     if (!apiKey) {
-      console.error("Linear API key not provided");
       return null;
     }
 
     const client = new LinearClient({ apiKey });
     const issue = await client.issue(issueId);
     return issue;
-  } catch (error) {
-    console.error("Error fetching Linear ticket:", error);
+  } catch {
     return null;
   }
 }

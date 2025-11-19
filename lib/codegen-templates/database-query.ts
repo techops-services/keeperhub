@@ -17,6 +17,5 @@ export default `export async function databaseQueryStep(input: {
   // const result = await sql.unsafe(input.query);
   // await sql.end();
   
-  console.log('Database query:', input.query);
   throw new Error('Database Query not implemented - see comments in generated code');
 }`;

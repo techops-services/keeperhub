@@ -78,8 +78,7 @@ export async function getSlackChannels(apiKey: string) {
       id: channel.id || "",
       name: channel.name || "",
     }));
-  } catch (error) {
-    console.error("Error fetching Slack channels:", error);
+  } catch {
     return [];
   }
 }

@@ -14,6 +14,5 @@ export async function httpRequestStep(input: {
   });
 
   const data = await response.json();
-  console.log("HTTP request completed:", data);
   return data;
 }

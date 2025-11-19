@@ -15,6 +15,5 @@ export async function generateTextStep(input: {
     prompt: input.prompt,
   });
   
-  console.log('Text generated:', text);
   return { text };
 }`;

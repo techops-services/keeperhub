@@ -38,7 +38,6 @@ export async function executeQuery(
       rowCount: Array.isArray(result) ? result.length : 0,
     };
   } catch (error) {
-    console.error("Database query error:", error);
     return {
       status: "error",
       error: error instanceof Error ? error.message : "Unknown error",

@@ -34,7 +34,6 @@ export async function createTicketStep(input: {
     throw new Error("Failed to create issue");
   }
 
-  console.log("Linear issue created:", issue);
   return {
     id: issue.id,
     url: issue.url,

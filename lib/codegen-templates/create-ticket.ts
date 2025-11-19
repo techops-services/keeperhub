@@ -18,6 +18,5 @@ export async function createTicketStep(input: {
     teamId: process.env.LINEAR_TEAM_ID!,
   });
   
-  console.log('Linear issue created:', issue);
   return issue;
 }`;

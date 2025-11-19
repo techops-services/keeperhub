@@ -13,12 +13,6 @@ export async function generateTextStep(input: {
   const modelId = input.aiModel || "gpt-4o-mini";
   const promptText = input.aiPrompt || "";
 
-  console.log("Generate Text - Model:", modelId, "Prompt:", promptText);
-  console.log(
-    "[DEBUG Generate Text] API Key:",
-    input.apiKey ? `${input.apiKey.substring(0, 10)}...` : "undefined"
-  );
-
   if (!promptText || promptText.trim() === "") {
     throw new Error("Prompt is required for text generation");
   }
@@ -34,7 +28,6 @@ export async function generateTextStep(input: {
 
   // Use AI Gateway format: {provider}/{model}
   const modelString = `${providerName}/${modelId}`;
-  console.log("Using AI Gateway model string:", modelString);
 
   const { text } = await generateText({
     model: modelString,
@@ -44,6 +37,5 @@ export async function generateTextStep(input: {
     },
   });
 
-  console.log("Text generated:", text);
   return { text };
 }
