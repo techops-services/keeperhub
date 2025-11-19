@@ -41,7 +41,7 @@ export function SchemaBuilder({
 
   const resetDependentFields = (
     field: SchemaField,
-    type: SchemaField["type"]
+    type: SchemaField["type"],
   ): SchemaField => {
     const updated = { ...field };
 
@@ -92,8 +92,11 @@ export function SchemaBuilder({
         return (
           <div className="space-y-2 rounded-md border p-3" key={fieldId}>
             <div className="flex gap-2">
-              <div className="flex-1 space-y-1.5">
-                <Label htmlFor={`field-name-${level}-${index}`}>
+              <div className="flex-1 space-y-2">
+                <Label
+                  className="ml-1"
+                  htmlFor={`field-name-${level}-${index}`}
+                >
                   Property Name
                 </Label>
                 <Input
@@ -104,8 +107,13 @@ export function SchemaBuilder({
                   value={field.name}
                 />
               </div>
-              <div className="flex-1 space-y-1.5">
-                <Label htmlFor={`field-type-${level}-${index}`}>Type</Label>
+              <div className="flex-1 space-y-2">
+                <Label
+                  className="ml-1"
+                  htmlFor={`field-type-${level}-${index}`}
+                >
+                  Type
+                </Label>
                 <Select
                   disabled={disabled}
                   onValueChange={(value) =>
@@ -143,8 +151,11 @@ export function SchemaBuilder({
             </div>
 
             {field.type === "array" && (
-              <div className="space-y-1.5">
-                <Label htmlFor={`field-item-type-${level}-${index}`}>
+              <div className="space-y-2">
+                <Label
+                  className="ml-1"
+                  htmlFor={`field-item-type-${level}-${index}`}
+                >
                   Array Item Type
                 </Label>
                 <Select
@@ -196,8 +207,8 @@ export function SchemaBuilder({
               </div>
             )}
 
-            <div className="space-y-1.5">
-              <Label htmlFor={`field-desc-${level}-${index}`}>
+            <div className="space-y-2">
+              <Label className="ml-1" htmlFor={`field-desc-${level}-${index}`}>
                 Description (optional)
               </Label>
               <Input

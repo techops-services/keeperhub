@@ -28,7 +28,9 @@ export function TriggerConfig({
   return (
     <>
       <div className="space-y-2">
-        <Label htmlFor="triggerType">Trigger Type</Label>
+        <Label className="ml-1" htmlFor="triggerType">
+          Trigger Type
+        </Label>
         <Select
           disabled={disabled}
           onValueChange={(value) => onUpdateConfig("triggerType", value)}
@@ -61,7 +63,9 @@ export function TriggerConfig({
       {config?.triggerType === "Webhook" && (
         <>
           <div className="space-y-2">
-            <Label htmlFor="webhookPath">Webhook Path</Label>
+            <Label className="ml-1" htmlFor="webhookPath">
+              Webhook Path
+            </Label>
             <Input
               disabled={disabled}
               id="webhookPath"
@@ -71,7 +75,9 @@ export function TriggerConfig({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="webhookMethod">HTTP Method</Label>
+            <Label className="ml-1" htmlFor="webhookMethod">
+              HTTP Method
+            </Label>
             <Select
               disabled={disabled}
               onValueChange={(value) => onUpdateConfig("webhookMethod", value)}
@@ -94,7 +100,9 @@ export function TriggerConfig({
       {config?.triggerType === "Schedule" && (
         <>
           <div className="space-y-2">
-            <Label htmlFor="scheduleCron">Cron Expression</Label>
+            <Label className="ml-1" htmlFor="scheduleCron">
+              Cron Expression
+            </Label>
             <Input
               disabled={disabled}
               id="scheduleCron"
@@ -104,7 +112,9 @@ export function TriggerConfig({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="scheduleTimezone">Timezone</Label>
+            <Label className="ml-1" htmlFor="scheduleTimezone">
+              Timezone
+            </Label>
             <TimezoneSelect
               disabled={disabled}
               id="scheduleTimezone"

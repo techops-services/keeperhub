@@ -84,7 +84,7 @@ function updateNodesStatus(
     id: string;
     data: { status?: "idle" | "running" | "success" | "error" };
   }) => void,
-  status: "idle" | "running" | "success" | "error"
+  status: "idle" | "running" | "success" | "error",
 ) {
   for (const node of nodes) {
     updateNodeData({ id: node.id, data: { status } });
@@ -93,7 +93,7 @@ function updateNodesStatus(
 
 async function triggerProductionWorkflow(
   workflowName: string,
-  deploymentUrl: string
+  deploymentUrl: string,
 ) {
   const workflowFileName = workflowName
     .toLowerCase()
@@ -121,7 +121,7 @@ async function executeTestWorkflow(
   updateNodeData: (update: {
     id: string;
     data: { status?: "idle" | "running" | "success" | "error" };
-  }) => void
+  }) => void,
 ) {
   // Set all nodes to idle first
   updateNodesStatus(nodes, updateNodeData, "idle");
@@ -142,7 +142,7 @@ async function executeTestWorkflow(
   } catch (error) {
     console.error("Failed to execute workflow:", error);
     toast.error(
-      error instanceof Error ? error.message : "Failed to execute workflow"
+      error instanceof Error ? error.message : "Failed to execute workflow",
     );
     updateNodesStatus(nodes, updateNodeData, "error");
   }
@@ -162,7 +162,7 @@ function showDeploymentSuccessToast(deploymentUrl: string) {
         <ExternalLink className="h-3 w-3" />
       </a>
     </div>,
-    { duration: 10_000 }
+    { duration: 10_000 },
   );
 }
 
@@ -230,7 +230,7 @@ function useWorkflowHandlers({
         toast.info("Triggering production workflow...");
         const result = await triggerProductionWorkflow(
           workflowName,
-          deploymentUrl
+          deploymentUrl,
         );
         toast.success("Production workflow triggered successfully");
         console.log("Production workflow result:", result);
@@ -239,7 +239,7 @@ function useWorkflowHandlers({
         toast.error(
           error instanceof Error
             ? error.message
-            : "Failed to trigger production workflow"
+            : "Failed to trigger production workflow",
         );
       } finally {
         setIsExecuting(false);
@@ -276,14 +276,14 @@ function useWorkflowState() {
   const updateNodeData = useSetAtom(updateNodeDataAtom);
   const [currentWorkflowId] = useAtom(currentWorkflowIdAtom);
   const [workflowName, setCurrentWorkflowName] = useAtom(
-    currentWorkflowNameAtom
+    currentWorkflowNameAtom,
   );
   const router = useRouter();
   const [showClearDialog, setShowClearDialog] = useAtom(showClearDialogAtom);
   const [showDeleteDialog, setShowDeleteDialog] = useAtom(showDeleteDialogAtom);
   const [isSaving, setIsSaving] = useAtom(isSavingAtom);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useAtom(
-    hasUnsavedChangesAtom
+    hasUnsavedChangesAtom,
   );
   const undo = useSetAtom(undoAtom);
   const redo = useSetAtom(redoAtom);
@@ -314,7 +314,7 @@ function useWorkflowState() {
     getDeploymentStatus(currentWorkflowId)
       .then((data) => setDeploymentUrl(data.deploymentUrl || null))
       .catch((error) =>
-        console.error("Failed to load deployment status:", error)
+        console.error("Failed to load deployment status:", error),
       );
   }, [currentWorkflowId]);
 
@@ -525,7 +525,7 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
       await executeDeployment(currentWorkflowId);
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to deploy workflow"
+        error instanceof Error ? error.message : "Failed to deploy workflow",
       );
     } finally {
       setIsDeploying(false);
@@ -916,10 +916,11 @@ function WorkflowDialogsComponent({
               actions.handleRenameWorkflow();
             }}
           >
-            <div className="py-4">
-              <Label htmlFor="workflow-name">Workflow Name</Label>
+            <div className="space-y-2 py-4">
+              <Label className="ml-1" htmlFor="workflow-name">
+                Workflow Name
+              </Label>
               <Input
-                className="mt-2"
                 id="workflow-name"
                 onChange={(e) => state.setNewWorkflowName(e.target.value)}
                 placeholder="Enter workflow name"

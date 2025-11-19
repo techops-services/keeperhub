@@ -32,7 +32,9 @@ export const ResendSettings = ({
     </CardHeader>
     <CardContent className="space-y-4 py-6">
       <div className="space-y-2">
-        <Label htmlFor="resendApiKey">API Key</Label>
+        <Label className="ml-1" htmlFor="resendApiKey">
+          API Key
+        </Label>
         <Input
           className="bg-background"
           id="resendApiKey"
@@ -58,7 +60,9 @@ export const ResendSettings = ({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="resendFromEmail">From Email</Label>
+        <Label className="ml-1" htmlFor="resendFromEmail">
+          From Email
+        </Label>
         <Input
           className="bg-background"
           id="resendFromEmail"

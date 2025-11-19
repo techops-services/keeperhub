@@ -100,8 +100,10 @@ export const WorkflowSettings = ({
           </DialogHeader>
 
           <div className="flex flex-col gap-6 py-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="workflow-name">Workflow Name</Label>
+            <div className="space-y-2">
+              <Label className="ml-1" htmlFor="workflow-name">
+                Workflow Name
+              </Label>
               <Input
                 disabled={isSaving}
                 id="workflow-name"

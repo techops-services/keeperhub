@@ -58,7 +58,9 @@ function SendEmailFields({
   return (
     <>
       <div className="space-y-2">
-        <Label htmlFor="emailTo">To (Email Address)</Label>
+        <Label className="ml-1" htmlFor="emailTo">
+          To (Email Address)
+        </Label>
         <TemplateBadgeInput
           disabled={disabled}
           id="emailTo"
@@ -68,7 +70,9 @@ function SendEmailFields({
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="emailSubject">Subject</Label>
+        <Label className="ml-1" htmlFor="emailSubject">
+          Subject
+        </Label>
         <TemplateBadgeInput
           disabled={disabled}
           id="emailSubject"
@@ -78,7 +82,9 @@ function SendEmailFields({
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="emailBody">Body</Label>
+        <Label className="ml-1" htmlFor="emailBody">
+          Body
+        </Label>
         <TemplateBadgeTextarea
           disabled={disabled}
           id="emailBody"
@@ -105,7 +111,9 @@ function SendSlackMessageFields({
   return (
     <>
       <div className="space-y-2">
-        <Label htmlFor="slackChannel">Channel</Label>
+        <Label className="ml-1" htmlFor="slackChannel">
+          Channel
+        </Label>
         <TemplateBadgeInput
           disabled={disabled}
           id="slackChannel"
@@ -115,7 +123,9 @@ function SendSlackMessageFields({
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="slackMessage">Message</Label>
+        <Label className="ml-1" htmlFor="slackMessage">
+          Message
+        </Label>
         <TemplateBadgeTextarea
           disabled={disabled}
           id="slackMessage"
@@ -142,7 +152,9 @@ function CreateTicketFields({
   return (
     <>
       <div className="space-y-2">
-        <Label htmlFor="ticketTitle">Ticket Title</Label>
+        <Label className="ml-1" htmlFor="ticketTitle">
+          Ticket Title
+        </Label>
         <TemplateBadgeInput
           disabled={disabled}
           id="ticketTitle"
@@ -152,7 +164,9 @@ function CreateTicketFields({
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="ticketDescription">Description</Label>
+        <Label className="ml-1" htmlFor="ticketDescription">
+          Description
+        </Label>
         <TemplateBadgeTextarea
           disabled={disabled}
           id="ticketDescription"
@@ -163,7 +177,9 @@ function CreateTicketFields({
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="ticketPriority">Priority</Label>
+        <Label className="ml-1" htmlFor="ticketPriority">
+          Priority
+        </Label>
         <Select
           disabled={disabled}
           onValueChange={(value) => onUpdateConfig("ticketPriority", value)}
@@ -198,7 +214,9 @@ function FindIssuesFields({
   return (
     <>
       <div className="space-y-2">
-        <Label htmlFor="linearAssigneeId">Assignee (User ID)</Label>
+        <Label className="ml-1" htmlFor="linearAssigneeId">
+          Assignee (User ID)
+        </Label>
         <TemplateBadgeInput
           disabled={disabled}
           id="linearAssigneeId"
@@ -208,7 +226,9 @@ function FindIssuesFields({
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="linearTeamId">Team ID (optional)</Label>
+        <Label className="ml-1" htmlFor="linearTeamId">
+          Team ID (optional)
+        </Label>
         <TemplateBadgeInput
           disabled={disabled}
           id="linearTeamId"
@@ -218,7 +238,9 @@ function FindIssuesFields({
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="linearStatus">Status (optional)</Label>
+        <Label className="ml-1" htmlFor="linearStatus">
+          Status (optional)
+        </Label>
         <Select
           disabled={disabled}
           onValueChange={(value) => onUpdateConfig("linearStatus", value)}
@@ -238,7 +260,9 @@ function FindIssuesFields({
         </Select>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="linearLabel">Label (optional)</Label>
+        <Label className="ml-1" htmlFor="linearLabel">
+          Label (optional)
+        </Label>
         <TemplateBadgeInput
           disabled={disabled}
           id="linearLabel"

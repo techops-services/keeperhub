@@ -28,7 +28,9 @@ export const AiGatewaySettings = ({
     </CardHeader>
     <CardContent className="space-y-4 py-6">
       <div className="space-y-2">
-        <Label htmlFor="aiGatewayApiKey">API Key</Label>
+        <Label className="ml-1" htmlFor="aiGatewayApiKey">
+          API Key
+        </Label>
         <Input
           className="bg-background"
           id="aiGatewayApiKey"

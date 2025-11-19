@@ -33,7 +33,9 @@ export function DatabaseSettings({
       </CardHeader>
       <CardContent className="space-y-4 px-0">
         <div className="space-y-2">
-          <Label htmlFor="database-url">Database URL</Label>
+          <Label className="ml-1" htmlFor="database-url">
+            Database URL
+          </Label>
           <Input
             id="database-url"
             onChange={(e) => onDatabaseUrlChange(e.target.value)}

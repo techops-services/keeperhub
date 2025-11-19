@@ -29,7 +29,9 @@ export const LinearSettings = ({
     </CardHeader>
     <CardContent className="space-y-4 py-6">
       <div className="space-y-2">
-        <Label htmlFor="linearApiKey">API Key</Label>
+        <Label className="ml-1" htmlFor="linearApiKey">
+          API Key
+        </Label>
         <Input
           className="bg-background"
           id="linearApiKey"

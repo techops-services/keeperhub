@@ -44,7 +44,9 @@ export function AccountSettings({
       </CardHeader>
       <CardContent className="space-y-4 px-0">
         <div className="space-y-2">
-          <Label htmlFor="accountName">Name</Label>
+          <Label className="ml-1" htmlFor="accountName">
+            Name
+          </Label>
           <Input
             id="accountName"
             onChange={(e) => onNameChange(e.target.value)}
@@ -54,7 +56,9 @@ export function AccountSettings({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="accountEmail">Email</Label>
+          <Label className="ml-1" htmlFor="accountEmail">
+            Email
+          </Label>
           <Input
             id="accountEmail"
             onChange={(e) => onEmailChange(e.target.value)}

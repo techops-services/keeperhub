@@ -132,7 +132,9 @@ export const AuthDialog = ({
         <form className="space-y-4" onSubmit={handleSubmit}>
           {mode === "signup" && (
             <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
+              <Label className="ml-1" htmlFor="name">
+                Name
+              </Label>
               <Input
                 id="name"
                 onChange={(e) => setName(e.target.value)}
@@ -144,7 +146,9 @@ export const AuthDialog = ({
             </div>
           )}
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label className="ml-1" htmlFor="email">
+              Email
+            </Label>
             <Input
               id="email"
               onChange={(e) => setEmail(e.target.value)}
@@ -155,7 +159,9 @@ export const AuthDialog = ({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label className="ml-1" htmlFor="password">
+              Password
+            </Label>
             <Input
               id="password"
               onChange={(e) => setPassword(e.target.value)}

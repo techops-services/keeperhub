@@ -137,7 +137,7 @@ const PanelInner = () => {
   const [isGenerating] = useAtom(isGeneratingAtom);
   const [currentWorkflowId] = useAtom(currentWorkflowIdAtom);
   const [currentWorkflowName, setCurrentWorkflowName] = useAtom(
-    currentWorkflowNameAtom
+    currentWorkflowNameAtom,
   );
   const updateNodeData = useSetAtom(updateNodeDataAtom);
   const deleteNode = useSetAtom(deleteNodeAtom);
@@ -292,15 +292,21 @@ const PanelInner = () => {
           </div>
           <div className="flex-1 space-y-4 overflow-y-auto p-4">
             <div className="space-y-2">
-              <Label htmlFor="edge-id">Edge ID</Label>
+              <Label className="ml-1" htmlFor="edge-id">
+                Edge ID
+              </Label>
               <Input disabled id="edge-id" value={selectedEdge.id} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edge-source">Source</Label>
+              <Label className="ml-1" htmlFor="edge-source">
+                Source
+              </Label>
               <Input disabled id="edge-source" value={selectedEdge.source} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edge-target">Target</Label>
+              <Label className="ml-1" htmlFor="edge-target">
+                Target
+              </Label>
               <Input disabled id="edge-target" value={selectedEdge.target} />
             </div>
           </div>
@@ -554,7 +560,9 @@ const PanelInner = () => {
             selectedNode.data.config?.actionType ? (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="label">Label</Label>
+                  <Label className="ml-1" htmlFor="label">
+                    Label
+                  </Label>
                   <Input
                     disabled={isGenerating}
                     id="label"
@@ -564,7 +572,9 @@ const PanelInner = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
+                  <Label className="ml-1" htmlFor="description">
+                    Description
+                  </Label>
                   <Input
                     disabled={isGenerating}
                     id="description"
