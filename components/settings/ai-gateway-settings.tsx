@@ -12,21 +12,17 @@ type AiGatewaySettingsProps = {
   apiKey: string;
   hasKey?: boolean;
   onApiKeyChange: (key: string) => void;
+  showCard?: boolean;
 };
 
 export const AiGatewaySettings = ({
   apiKey,
   hasKey,
   onApiKeyChange,
-}: AiGatewaySettingsProps) => (
-  <Card className="gap-4 border-0 py-0 shadow-none">
-    <CardHeader className="px-0">
-      <CardTitle>AI Gateway</CardTitle>
-      <CardDescription>
-        Configure your AI Gateway API key to use AI models in workflows
-      </CardDescription>
-    </CardHeader>
-    <CardContent className="space-y-4 py-6">
+  showCard = true,
+}: AiGatewaySettingsProps) => {
+  const content = (
+    <div className="space-y-4">
       <div className="space-y-2">
         <Label className="ml-1" htmlFor="aiGatewayApiKey">
           API Key
@@ -54,6 +50,22 @@ export const AiGatewaySettings = ({
           .
         </p>
       </div>
-    </CardContent>
-  </Card>
-);
+    </div>
+  );
+
+  if (!showCard) {
+    return content;
+  }
+
+  return (
+    <Card className="gap-4 border-0 py-0 shadow-none">
+      <CardHeader className="px-0">
+        <CardTitle>AI Gateway</CardTitle>
+        <CardDescription>
+          Configure your AI Gateway API key to use AI models in workflows
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="px-0">{content}</CardContent>
+    </Card>
+  );
+};

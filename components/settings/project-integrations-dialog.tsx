@@ -7,6 +7,7 @@ import { updateProjectIntegrations } from "@/app/actions/vercel-project/update-i
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -38,6 +39,8 @@ type ProjectIntegrationsDialogProps = {
   onOpenChange: (open: boolean) => void;
   workflowId: string | null;
   workflowName: string | null;
+  initialTab?: string;
+  singleIntegrationMode?: boolean;
 };
 
 // Helper functions extracted outside component to reduce complexity
@@ -165,9 +168,11 @@ export function ProjectIntegrationsDialog({
   onOpenChange,
   workflowId,
   workflowName,
+  initialTab = "resend",
+  singleIntegrationMode = false,
 }: ProjectIntegrationsDialogProps) {
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("resend");
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   // Integrations state
   const [integrations, setIntegrations] = useState<ProjectIntegrations | null>(
@@ -206,9 +211,10 @@ export function ProjectIntegrationsDialog({
   useEffect(() => {
     if (open && workflowId) {
       setLoading(true);
+      setActiveTab(initialTab);
       loadIntegrations().finally(() => setLoading(false));
     }
-  }, [open, workflowId, loadIntegrations]);
+  }, [open, workflowId, loadIntegrations, initialTab]);
 
   const handleSaveIntegrations = async (type: string) => {
     if (!workflowId) {
@@ -263,15 +269,66 @@ export function ProjectIntegrationsDialog({
     }
   };
 
+  // Get the integration title and description based on active tab
+  const getIntegrationInfo = () => {
+    switch (activeTab) {
+      case "resend":
+        return {
+          title: "Resend (Email)",
+          description:
+            "Configure your Resend API key to send emails from workflows",
+        };
+      case "linear":
+        return {
+          title: "Linear",
+          description:
+            "Configure your Linear API key to create and manage tickets from workflows",
+        };
+      case "slack":
+        return {
+          title: "Slack",
+          description:
+            "Configure your Slack Bot Token to send messages from workflows",
+        };
+      case "ai-gateway":
+        return {
+          title: "AI Gateway",
+          description:
+            "Configure your AI Gateway API key to use AI models in workflows",
+        };
+      case "database":
+        return {
+          title: "Database Connection",
+          description:
+            "Configure your database connection URL for Database Query actions",
+        };
+      default:
+        return {
+          title: "Workflow Integrations",
+          description: "",
+        };
+    }
+  };
+
+  const integrationInfo = getIntegrationInfo();
+
+  let dialogTitle: string;
+  if (singleIntegrationMode) {
+    dialogTitle = integrationInfo.title;
+  } else if (workflowName) {
+    dialogTitle = `${workflowName} - Integrations`;
+  } else {
+    dialogTitle = "Workflow Integrations";
+  }
+
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>
-            {workflowName
-              ? `${workflowName} - Integrations`
-              : "Workflow Integrations"}
-          </DialogTitle>
+          <DialogTitle>{dialogTitle}</DialogTitle>
+          {singleIntegrationMode && integrationInfo.description && (
+            <DialogDescription>{integrationInfo.description}</DialogDescription>
+          )}
         </DialogHeader>
 
         {loading ? (
@@ -280,13 +337,15 @@ export function ProjectIntegrationsDialog({
           </div>
         ) : (
           <Tabs onValueChange={setActiveTab} value={activeTab}>
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="resend">Resend</TabsTrigger>
-              <TabsTrigger value="linear">Linear</TabsTrigger>
-              <TabsTrigger value="slack">Slack</TabsTrigger>
-              <TabsTrigger value="ai-gateway">AI Gateway</TabsTrigger>
-              <TabsTrigger value="database">Database</TabsTrigger>
-            </TabsList>
+            {!singleIntegrationMode && (
+              <TabsList className="grid w-full grid-cols-5">
+                <TabsTrigger value="resend">Resend</TabsTrigger>
+                <TabsTrigger value="linear">Linear</TabsTrigger>
+                <TabsTrigger value="slack">Slack</TabsTrigger>
+                <TabsTrigger value="ai-gateway">AI Gateway</TabsTrigger>
+                <TabsTrigger value="database">Database</TabsTrigger>
+              </TabsList>
+            )}
 
             <TabsContent value="resend">
               <IntegrationTabContent
@@ -301,6 +360,7 @@ export function ProjectIntegrationsDialog({
                   hasKey={integrations?.hasResendKey}
                   onApiKeyChange={setResendApiKey}
                   onFromEmailChange={setResendFromEmail}
+                  showCard={!singleIntegrationMode}
                 />
               </IntegrationTabContent>
             </TabsContent>
@@ -316,6 +376,7 @@ export function ProjectIntegrationsDialog({
                   apiKey={linearApiKey}
                   hasKey={integrations?.hasLinearKey}
                   onApiKeyChange={setLinearApiKey}
+                  showCard={!singleIntegrationMode}
                 />
               </IntegrationTabContent>
             </TabsContent>
@@ -331,6 +392,7 @@ export function ProjectIntegrationsDialog({
                   apiKey={slackApiKey}
                   hasKey={integrations?.hasSlackKey}
                   onApiKeyChange={setSlackApiKey}
+                  showCard={!singleIntegrationMode}
                 />
               </IntegrationTabContent>
             </TabsContent>
@@ -346,6 +408,7 @@ export function ProjectIntegrationsDialog({
                   apiKey={aiGatewayApiKey}
                   hasKey={integrations?.hasAiGatewayKey}
                   onApiKeyChange={setAiGatewayApiKey}
+                  showCard={!singleIntegrationMode}
                 />
               </IntegrationTabContent>
             </TabsContent>
@@ -361,6 +424,7 @@ export function ProjectIntegrationsDialog({
                   databaseUrl={databaseUrl}
                   hasDatabaseUrl={integrations?.hasDatabaseUrl}
                   onDatabaseUrlChange={setDatabaseUrl}
+                  showCard={!singleIntegrationMode}
                 />
               </IntegrationTabContent>
             </TabsContent>

@@ -702,8 +702,10 @@ export function ActionConfig({
       </div>
 
       <ProjectIntegrationsDialog
+        initialTab={requiredIntegration?.name || "resend"}
         onOpenChange={setShowIntegrationsDialog}
         open={showIntegrationsDialog}
+        singleIntegrationMode={!!requiredIntegration}
         workflowId={workflowId}
         workflowName={workflowName}
       />

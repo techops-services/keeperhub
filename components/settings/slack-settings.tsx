@@ -12,21 +12,17 @@ type SlackSettingsProps = {
   apiKey: string;
   hasKey?: boolean;
   onApiKeyChange: (key: string) => void;
+  showCard?: boolean;
 };
 
 export const SlackSettings = ({
   apiKey,
   hasKey,
   onApiKeyChange,
-}: SlackSettingsProps) => (
-  <Card className="gap-4 border-0 py-0 shadow-none">
-    <CardHeader className="px-0">
-      <CardTitle>Slack</CardTitle>
-      <CardDescription>
-        Configure your Slack Bot Token to send messages from workflows
-      </CardDescription>
-    </CardHeader>
-    <CardContent className="space-y-4 py-6">
+  showCard = true,
+}: SlackSettingsProps) => {
+  const content = (
+    <div className="space-y-4">
       <div className="space-y-2">
         <Label className="ml-1" htmlFor="slackApiKey">
           Bot Token
@@ -53,6 +49,22 @@ export const SlackSettings = ({
           </a>
         </p>
       </div>
-    </CardContent>
-  </Card>
-);
+    </div>
+  );
+
+  if (!showCard) {
+    return content;
+  }
+
+  return (
+    <Card className="gap-4 border-0 py-0 shadow-none">
+      <CardHeader className="px-0">
+        <CardTitle>Slack</CardTitle>
+        <CardDescription>
+          Configure your Slack Bot Token to send messages from workflows
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="px-0">{content}</CardContent>
+    </Card>
+  );
+};

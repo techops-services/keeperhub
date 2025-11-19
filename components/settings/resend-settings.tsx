@@ -14,6 +14,7 @@ type ResendSettingsProps = {
   hasKey?: boolean;
   onApiKeyChange: (key: string) => void;
   onFromEmailChange: (email: string) => void;
+  showCard?: boolean;
 };
 
 export const ResendSettings = ({
@@ -22,15 +23,10 @@ export const ResendSettings = ({
   hasKey,
   onApiKeyChange,
   onFromEmailChange,
-}: ResendSettingsProps) => (
-  <Card className="gap-4 border-0 py-0 shadow-none">
-    <CardHeader className="px-0">
-      <CardTitle>Resend (Email)</CardTitle>
-      <CardDescription>
-        Configure your Resend API key to send emails from workflows
-      </CardDescription>
-    </CardHeader>
-    <CardContent className="space-y-4 py-6">
+  showCard = true,
+}: ResendSettingsProps) => {
+  const content = (
+    <div className="space-y-4">
       <div className="space-y-2">
         <Label className="ml-1" htmlFor="resendApiKey">
           API Key
@@ -75,6 +71,22 @@ export const ResendSettings = ({
           The email address that will appear as the sender.
         </p>
       </div>
-    </CardContent>
-  </Card>
-);
+    </div>
+  );
+
+  if (!showCard) {
+    return content;
+  }
+
+  return (
+    <Card className="gap-4 border-0 py-0 shadow-none">
+      <CardHeader className="px-0">
+        <CardTitle>Resend (Email)</CardTitle>
+        <CardDescription>
+          Configure your Resend API key to send emails from workflows
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="px-0">{content}</CardContent>
+    </Card>
+  );
+};

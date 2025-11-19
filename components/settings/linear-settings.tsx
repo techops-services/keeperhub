@@ -12,22 +12,17 @@ type LinearSettingsProps = {
   apiKey: string;
   hasKey?: boolean;
   onApiKeyChange: (key: string) => void;
+  showCard?: boolean;
 };
 
 export const LinearSettings = ({
   apiKey,
   hasKey,
   onApiKeyChange,
-}: LinearSettingsProps) => (
-  <Card className="gap-4 border-0 py-0 shadow-none">
-    <CardHeader className="px-0">
-      <CardTitle>Linear</CardTitle>
-      <CardDescription>
-        Configure your Linear API key to create and manage tickets from
-        workflows
-      </CardDescription>
-    </CardHeader>
-    <CardContent className="space-y-4 py-6">
+  showCard = true,
+}: LinearSettingsProps) => {
+  const content = (
+    <div className="space-y-4">
       <div className="space-y-2">
         <Label className="ml-1" htmlFor="linearApiKey">
           API Key
@@ -55,6 +50,23 @@ export const LinearSettings = ({
           .
         </p>
       </div>
-    </CardContent>
-  </Card>
-);
+    </div>
+  );
+
+  if (!showCard) {
+    return content;
+  }
+
+  return (
+    <Card className="gap-4 border-0 py-0 shadow-none">
+      <CardHeader className="px-0">
+        <CardTitle>Linear</CardTitle>
+        <CardDescription>
+          Configure your Linear API key to create and manage tickets from
+          workflows
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="px-0">{content}</CardContent>
+    </Card>
+  );
+};
