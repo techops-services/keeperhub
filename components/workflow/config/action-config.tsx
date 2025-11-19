@@ -1,11 +1,12 @@
 "use client";
 
-import { useAtom } from "jotai";
-import { Settings } from "lucide-react";
+import { useAtom, useAtomValue } from "jotai";
+import { AlertTriangle, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getAll as getAllDataSources } from "@/app/actions/data-source/get-all";
 import { ProjectIntegrationsDialog } from "@/components/settings/project-integrations-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { CodeEditor } from "@/components/ui/code-editor";
 import { IntegrationIcon } from "@/components/ui/integration-icon";
 import { Label } from "@/components/ui/label";
@@ -20,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { TemplateBadgeInput } from "@/components/ui/template-badge-input";
 import { TemplateBadgeTextarea } from "@/components/ui/template-badge-textarea";
+import { projectIntegrationsAtom } from "@/lib/integrations-store";
 import {
   currentVercelProjectIdAtom,
   currentVercelProjectNameAtom,
@@ -612,6 +614,7 @@ export function ActionConfig({
   const [projectName] = useAtom(currentVercelProjectNameAtom);
   const [dataSources, setDataSources] = useState<DataSource[]>([]);
   const [loadingDataSources, setLoadingDataSources] = useState(false);
+  const integrations = useAtomValue(projectIntegrationsAtom);
 
   // Load data sources when the component mounts or when actionType is Database Query
   useEffect(() => {
@@ -633,8 +636,54 @@ export function ActionConfig({
   const actionType = (config?.actionType as string) || "";
   const requiredIntegration = ACTION_INTEGRATION_MAP[actionType];
 
+  // Check if the required integration is configured
+  const isIntegrationConfigured = () => {
+    if (!requiredIntegration) return true;
+    if (!integrations) return false; // Changed: return false if integrations haven't loaded
+
+    switch (actionType) {
+      case "Send Email":
+        return integrations.hasResendKey;
+      case "Send Slack Message":
+        return integrations.hasSlackKey;
+      case "Create Ticket":
+      case "Find Issues":
+        return integrations.hasLinearKey;
+      case "Generate Text":
+      case "Generate Image":
+        return integrations.hasAiGatewayKey;
+      default:
+        return true;
+    }
+  };
+
+  const integrationMissing = requiredIntegration && !isIntegrationConfigured();
+
   return (
     <>
+      {integrationMissing && (
+        <Alert className="border-orange-500 bg-orange-50 dark:bg-orange-950/20">
+          <AlertTriangle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+          <AlertDescription className="text-sm">
+            <span className="font-semibold text-orange-900 dark:text-orange-100">
+              Integration Required
+            </span>
+            <p className="mt-1 text-orange-800 dark:text-orange-200">
+              This action requires {requiredIntegration.label} to be configured.
+              Add your API key in the project integrations to use this action.
+            </p>
+            <Button
+              className="mt-3"
+              onClick={() => setShowIntegrationsDialog(true)}
+              size="sm"
+              variant="outline"
+            >
+              Configure {requiredIntegration.label}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="space-y-2">
         <Label htmlFor="actionType">Action Type</Label>
         <Select

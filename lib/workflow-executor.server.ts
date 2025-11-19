@@ -193,21 +193,18 @@ class ServerWorkflowExecutor {
         );
 
         // Set up credentials for step execution
-        // For test runs, use user's stored credentials
-        // Note: encrypted env vars from Vercel can't be decrypted via API,
-        // so we fallback to local process.env for test runs
+        // For test runs, use ONLY user's environment variables from their Vercel project
+        // For prod runs, the generated code will use process.env from the deployment
         this.credentials = getCredentials("user", {
-          RESEND_API_KEY: resendApiKey || process.env.RESEND_API_KEY || undefined,
-          LINEAR_API_KEY: linearApiKey || process.env.LINEAR_API_KEY || undefined,
-          SLACK_API_KEY: slackApiKey || process.env.SLACK_API_KEY || undefined,
-          AI_GATEWAY_API_KEY: aiGatewayApiKey || process.env.AI_GATEWAY_API_KEY || undefined,
+          RESEND_API_KEY: resendApiKey || undefined,
+          LINEAR_API_KEY: linearApiKey || undefined,
+          SLACK_API_KEY: slackApiKey || undefined,
+          AI_GATEWAY_API_KEY: aiGatewayApiKey || undefined,
           OPENAI_API_KEY:
             envResult.envs.find((env) => env.key === "OPENAI_API_KEY")?.value ||
-            process.env.OPENAI_API_KEY ||
             undefined,
           DATABASE_URL:
             envResult.envs.find((env) => env.key === "DATABASE_URL")?.value ||
-            process.env.DATABASE_URL ||
             undefined,
         });
 
@@ -216,10 +213,6 @@ class ServerWorkflowExecutor {
           this.credentials.AI_GATEWAY_API_KEY
             ? `${this.credentials.AI_GATEWAY_API_KEY.substring(0, 10)}...`
             : "undefined"
-        );
-        console.log(
-          "[DEBUG Executor] Using fallback from process.env:",
-          !!process.env.AI_GATEWAY_API_KEY
         );
         console.log("[DEBUG Executor] Full credentials keys:", Object.keys(this.credentials));
       }

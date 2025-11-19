@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { use, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import { generate } from "@/app/actions/ai/generate";
+import { getProjectIntegrations } from "@/app/actions/vercel-project/get-integrations";
 import { execute } from "@/app/actions/workflow/execute";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +18,7 @@ import {
 import { NodeConfigPanel } from "@/components/workflow/node-config-panel";
 import { WorkflowCanvas } from "@/components/workflow/workflow-canvas";
 import { WorkflowToolbar } from "@/components/workflow/workflow-toolbar";
+import { projectIntegrationsAtom } from "@/lib/integrations-store";
 import { workflowApi } from "@/lib/workflow-api";
 import {
   currentVercelProjectIdAtom,
@@ -58,6 +60,29 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   const setSelectedNodeId = useSetAtom(selectedNodeAtom);
   const setHasUnsavedChanges = useSetAtom(hasUnsavedChangesAtom);
   const [workflowNotFound, setWorkflowNotFound] = useAtom(workflowNotFoundAtom);
+  const setProjectIntegrations = useSetAtom(projectIntegrationsAtom);
+
+  // Load project integrations
+  useEffect(() => {
+    const loadIntegrations = async () => {
+      try {
+        const workflow = await workflowApi.getById(workflowId);
+        if (workflow?.vercelProjectId) {
+          // Find the project by vercelProjectId
+          const { getProjectByVercelId } = await import("@/app/actions/project/get-by-vercel-id");
+          const project = await getProjectByVercelId(workflow.vercelProjectId);
+          if (project) {
+            const integrations = await getProjectIntegrations(project.id);
+            setProjectIntegrations(integrations);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load integrations:", error);
+      }
+    };
+
+    loadIntegrations();
+  }, [workflowId, setProjectIntegrations]);
 
   // Helper function to generate workflow from AI
   const generateWorkflowFromAI = useCallback(
