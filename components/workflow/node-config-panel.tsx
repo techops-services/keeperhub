@@ -367,15 +367,15 @@ const PanelInner = () => {
             </TabsTrigger>
             <TabsTrigger
               className="bg-transparent text-muted-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none"
-              value="runs"
-            >
-              Runs
-            </TabsTrigger>
-            <TabsTrigger
-              className="bg-transparent text-muted-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none"
               value="code"
             >
               Code
+            </TabsTrigger>
+            <TabsTrigger
+              className="bg-transparent text-muted-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              value="runs"
+            >
+              Runs
             </TabsTrigger>
           </TabsList>
           <TabsContent
@@ -641,6 +641,12 @@ const PanelInner = () => {
               Code
             </TabsTrigger>
           ) : null}
+          <TabsTrigger
+            className="bg-transparent text-muted-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            value="runs"
+          >
+            Runs
+          </TabsTrigger>
         </TabsList>
         <TabsContent
           className="flex flex-col overflow-hidden"
@@ -780,7 +786,53 @@ const PanelInner = () => {
             );
           })()}
         </TabsContent>
+        <TabsContent
+          className="flex flex-col overflow-hidden"
+          value="runs"
+        >
+          <div className="flex-1 space-y-4 overflow-y-auto p-4">
+            <WorkflowRuns isActive onRefreshRef={refreshRunsRef} />
+          </div>
+          <div className="flex shrink-0 items-center gap-2 border-t p-4">
+            <Button
+              disabled={isRefreshing}
+              onClick={handleRefreshRuns}
+              size="icon"
+              variant="ghost"
+            >
+              <RefreshCw className={isRefreshing ? "animate-spin" : ""} />
+            </Button>
+            <Button
+              onClick={() => setShowDeleteRunsAlert(true)}
+              size="icon"
+              variant="ghost"
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          </div>
+        </TabsContent>
       </Tabs>
+
+      <AlertDialog
+        onOpenChange={setShowDeleteRunsAlert}
+        open={showDeleteRunsAlert}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete All Runs</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete all workflow runs? This action
+              cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteAllRuns}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         onOpenChange={setShowDeleteNodeAlert}

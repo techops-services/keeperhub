@@ -2,10 +2,12 @@
 
 import { useAtom } from "jotai";
 import {
+  Check,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   Clock,
+  Copy,
   Loader2,
   XCircle,
 } from "lucide-react";
@@ -15,6 +17,7 @@ import { getExecutionLogs } from "@/app/actions/workflow/get-execution-logs";
 import { getExecutions } from "@/app/actions/workflow/get-executions";
 import { getRelativeTime } from "@/lib/utils/time";
 import { currentWorkflowIdAtom } from "@/lib/workflow-store";
+import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";
 
 type ExecutionLog = {
@@ -58,6 +61,23 @@ function ExecutionLogEntry({
   onToggle: () => void;
   getStatusIcon: (status: string) => JSX.Element;
 }) {
+  const [copiedInput, setCopiedInput] = useState(false);
+  const [copiedOutput, setCopiedOutput] = useState(false);
+
+  const copyToClipboard = async (data: unknown, type: "input" | "output") => {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+      if (type === "input") {
+        setCopiedInput(true);
+        setTimeout(() => setCopiedInput(false), 2000);
+      } else {
+        setCopiedOutput(true);
+        setTimeout(() => setCopiedOutput(false), 2000);
+      }
+    } catch (error) {
+      console.error("Failed to copy:", error);
+    }
+  };
   return (
     <div className="rounded border" key={log.id}>
       <button
@@ -98,7 +118,22 @@ function ExecutionLogEntry({
           <div className="space-y-2">
             {log.input !== null && log.input !== undefined && (
               <div>
-                <div className="mb-1 font-semibold text-xs">Input</div>
+                <div className="mb-1 flex items-center justify-between">
+                  <div className="font-semibold text-xs">Input</div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2"
+                    onClick={() => copyToClipboard(log.input, "input")}
+                    type="button"
+                  >
+                    {copiedInput ? (
+                      <Check className="h-3 w-3 text-green-600" />
+                    ) : (
+                      <Copy className="h-3 w-3" />
+                    )}
+                  </Button>
+                </div>
                 <pre className="overflow-auto rounded bg-background p-2 text-xs">
                   {JSON.stringify(log.input, null, 2)}
                 </pre>
@@ -106,7 +141,22 @@ function ExecutionLogEntry({
             )}
             {log.output !== null && log.output !== undefined && (
               <div>
-                <div className="mb-1 font-semibold text-xs">Output</div>
+                <div className="mb-1 flex items-center justify-between">
+                  <div className="font-semibold text-xs">Output</div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2"
+                    onClick={() => copyToClipboard(log.output, "output")}
+                    type="button"
+                  >
+                    {copiedOutput ? (
+                      <Check className="h-3 w-3 text-green-600" />
+                    ) : (
+                      <Copy className="h-3 w-3" />
+                    )}
+                  </Button>
+                </div>
                 <pre className="overflow-auto rounded bg-background p-2 text-xs">
                   {JSON.stringify(log.output, null, 2)}
                 </pre>
