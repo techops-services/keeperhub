@@ -577,13 +577,15 @@ const PanelInner = () => {
             ) : null}
           </div>
           <div className="shrink-0 border-t p-4">
-            <Button
-              onClick={() => setShowDeleteNodeAlert(true)}
-              size="icon"
-              variant="ghost"
-            >
-              <Trash2 className="size-4" />
-            </Button>
+            {selectedNode.data.type !== "trigger" && (
+              <Button
+                onClick={() => setShowDeleteNodeAlert(true)}
+                size="icon"
+                variant="ghost"
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            )}
           </div>
         </TabsContent>
         <TabsContent className="flex flex-col overflow-hidden" value="code">

@@ -38,7 +38,21 @@ export const onNodesChangeAtom = atom(
   null,
   (get, set, changes: NodeChange[]) => {
     const currentNodes = get(nodesAtom);
-    const newNodes = applyNodeChanges(changes, currentNodes) as WorkflowNode[];
+
+    // Filter out deletion attempts on trigger nodes
+    const filteredChanges = changes.filter((change) => {
+      if (change.type === "remove") {
+        const nodeToRemove = currentNodes.find((n) => n.id === change.id);
+        // Prevent deletion of trigger nodes
+        return nodeToRemove?.data.type !== "trigger";
+      }
+      return true;
+    });
+
+    const newNodes = applyNodeChanges(
+      filteredChanges,
+      currentNodes
+    ) as WorkflowNode[];
     set(nodesAtom, newNodes);
 
     // Sync selection state with selectedNodeAtom
@@ -204,8 +218,15 @@ function escapeRegex(str: string): string {
 }
 
 export const deleteNodeAtom = atom(null, (get, set, nodeId: string) => {
-  // Save current state to history before making changes
   const currentNodes = get(nodesAtom);
+
+  // Prevent deletion of trigger nodes
+  const nodeToDelete = currentNodes.find((node) => node.id === nodeId);
+  if (nodeToDelete?.data.type === "trigger") {
+    return;
+  }
+
+  // Save current state to history before making changes
   const currentEdges = get(edgesAtom);
   const history = get(historyAtom);
   set(historyAtom, [...history, { nodes: currentNodes, edges: currentEdges }]);
@@ -254,13 +275,21 @@ export const deleteSelectedItemsAtom = atom(null, (get, set) => {
   set(historyAtom, [...history, { nodes: currentNodes, edges: currentEdges }]);
   set(futureAtom, []);
 
-  // Get all selected nodes
+  // Get all selected nodes, excluding trigger nodes
   const selectedNodeIds = currentNodes
-    .filter((node) => node.selected)
+    .filter((node) => node.selected && node.data.type !== "trigger")
     .map((node) => node.id);
 
-  // Delete selected nodes and their connected edges
-  const newNodes = currentNodes.filter((node) => !node.selected);
+  // Delete selected nodes (excluding trigger nodes) and their connected edges
+  const newNodes = currentNodes.filter((node) => {
+    // Keep trigger nodes even if selected
+    if (node.data.type === "trigger") {
+      return true;
+    }
+    // Remove other selected nodes
+    return !node.selected;
+  });
+
   const newEdges = currentEdges.filter(
     (edge) =>
       !(
