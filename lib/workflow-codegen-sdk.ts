@@ -239,7 +239,8 @@ function _generateGenerateTextStepBody(
   config: Record<string, unknown>,
   imports: Set<string>
 ): string {
-  imports.add("import { generateText } from 'ai';");
+  imports.add("import { generateText, generateObject } from 'ai';");
+  imports.add("import { z } from 'zod';");
   const modelId = (config.aiModel as string) || "gpt-4o-mini";
   const provider =
     modelId.startsWith("gpt-") || modelId.startsWith("o1-")
@@ -251,6 +252,37 @@ function _generateGenerateTextStepBody(
   return `  // Use template literal with dynamic values from outputs
   const aiPrompt = \`${escapeForTemplateLiteral(convertedPrompt)}\`;
   const finalPrompt = (input.aiPrompt as string) || aiPrompt;
+  
+  // Handle structured output if schema is provided
+  if (input.aiFormat === 'object' && input.aiSchema) {
+    try {
+      const schema = JSON.parse(input.aiSchema as string);
+      
+      // Build Zod schema from the schema definition
+      const schemaShape: Record<string, z.ZodTypeAny> = {};
+      for (const field of schema) {
+        if (field.type === 'string') {
+          schemaShape[field.name] = z.string();
+        } else if (field.type === 'number') {
+          schemaShape[field.name] = z.number();
+        } else if (field.type === 'boolean') {
+          schemaShape[field.name] = z.boolean();
+        }
+      }
+      
+      const zodSchema = z.object(schemaShape);
+
+      const { object } = await generateObject({
+        model: '${provider}/${modelId}',
+        prompt: finalPrompt,
+        schema: zodSchema,
+      });
+
+      return object;
+    } catch {
+      // If structured output fails, fall back to text generation
+    }
+  }
   
   const { text } = await generateText({
     model: '${provider}/${modelId}',

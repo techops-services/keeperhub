@@ -213,6 +213,7 @@ class ServerWorkflowExecutor {
 
     this.credentials = getCredentials("user", {
       RESEND_API_KEY: findEnvValue("RESEND_API_KEY") || undefined,
+      RESEND_FROM_EMAIL: findEnvValue("RESEND_FROM_EMAIL") || undefined,
       LINEAR_API_KEY: findEnvValue("LINEAR_API_KEY") || undefined,
       SLACK_API_KEY: findEnvValue("SLACK_API_KEY") || undefined,
       AI_GATEWAY_API_KEY: aiGatewayApiKey || undefined,
