@@ -238,6 +238,7 @@ export function ProjectIntegrationsDialog({
       await updateProjectIntegrations(workflowId, updates);
       await loadIntegrations();
       toast.success("Integrations updated successfully");
+      onOpenChange(false);
     } catch (error) {
       console.error("Failed to save integrations:", error);
       toast.error("Failed to save integrations");
@@ -271,6 +272,35 @@ export function ProjectIntegrationsDialog({
     } finally {
       setSavingIntegrations(false);
     }
+  };
+
+  const handleCopyIntegrations = (copiedIntegrations: {
+    resendApiKey: string | null;
+    resendFromEmail: string | null;
+    linearApiKey: string | null;
+    slackApiKey: string | null;
+    aiGatewayApiKey: string | null;
+    databaseUrl: string | null;
+  }) => {
+    if (copiedIntegrations.resendApiKey) {
+      setResendApiKey(copiedIntegrations.resendApiKey);
+    }
+    if (copiedIntegrations.resendFromEmail) {
+      setResendFromEmail(copiedIntegrations.resendFromEmail);
+    }
+    if (copiedIntegrations.linearApiKey) {
+      setLinearApiKey(copiedIntegrations.linearApiKey);
+    }
+    if (copiedIntegrations.slackApiKey) {
+      setSlackApiKey(copiedIntegrations.slackApiKey);
+    }
+    if (copiedIntegrations.aiGatewayApiKey) {
+      setAiGatewayApiKey(copiedIntegrations.aiGatewayApiKey);
+    }
+    if (copiedIntegrations.databaseUrl) {
+      setDatabaseUrl(copiedIntegrations.databaseUrl);
+    }
+    toast.success("Integrations copied successfully");
   };
 
   // Get the integration title and description based on active tab
@@ -354,9 +384,11 @@ export function ProjectIntegrationsDialog({
             <TabsContent value="resend">
               <IntegrationTabContent
                 hasKey={integrations?.hasResendKey}
+                onCopyIntegrations={handleCopyIntegrations}
                 onRemove={() => handleRemoveIntegration("resend")}
                 onSave={() => handleSaveIntegrations("resend")}
                 saving={savingIntegrations}
+                workflowId={workflowId}
               >
                 <ResendSettings
                   apiKey={resendApiKey}
@@ -372,9 +404,11 @@ export function ProjectIntegrationsDialog({
             <TabsContent value="linear">
               <IntegrationTabContent
                 hasKey={integrations?.hasLinearKey}
+                onCopyIntegrations={handleCopyIntegrations}
                 onRemove={() => handleRemoveIntegration("linear")}
                 onSave={() => handleSaveIntegrations("linear")}
                 saving={savingIntegrations}
+                workflowId={workflowId}
               >
                 <LinearSettings
                   apiKey={linearApiKey}
@@ -388,9 +422,11 @@ export function ProjectIntegrationsDialog({
             <TabsContent value="slack">
               <IntegrationTabContent
                 hasKey={integrations?.hasSlackKey}
+                onCopyIntegrations={handleCopyIntegrations}
                 onRemove={() => handleRemoveIntegration("slack")}
                 onSave={() => handleSaveIntegrations("slack")}
                 saving={savingIntegrations}
+                workflowId={workflowId}
               >
                 <SlackSettings
                   apiKey={slackApiKey}
@@ -404,9 +440,11 @@ export function ProjectIntegrationsDialog({
             <TabsContent value="ai-gateway">
               <IntegrationTabContent
                 hasKey={integrations?.hasAiGatewayKey}
+                onCopyIntegrations={handleCopyIntegrations}
                 onRemove={() => handleRemoveIntegration("ai-gateway")}
                 onSave={() => handleSaveIntegrations("ai-gateway")}
                 saving={savingIntegrations}
+                workflowId={workflowId}
               >
                 <AiGatewaySettings
                   apiKey={aiGatewayApiKey}
@@ -420,9 +458,11 @@ export function ProjectIntegrationsDialog({
             <TabsContent value="database">
               <IntegrationTabContent
                 hasKey={integrations?.hasDatabaseUrl}
+                onCopyIntegrations={handleCopyIntegrations}
                 onRemove={() => handleRemoveIntegration("database")}
                 onSave={() => handleSaveIntegrations("database")}
                 saving={savingIntegrations}
+                workflowId={workflowId}
               >
                 <DatabaseSettings
                   databaseUrl={databaseUrl}
