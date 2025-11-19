@@ -41,7 +41,7 @@ export function SchemaBuilder({
 
   const resetDependentFields = (
     field: SchemaField,
-    type: SchemaField["type"],
+    type: SchemaField["type"]
   ): SchemaField => {
     const updated = { ...field };
 

@@ -2,6 +2,7 @@
 
 import {
   ConnectionMode,
+  MiniMap,
   type Node,
   type NodeMouseHandler,
   type OnConnect,
@@ -10,7 +11,6 @@ import {
   type Viewport,
   type Connection as XYFlowConnection,
   type Edge as XYFlowEdge,
-  MiniMap,
 } from "@xyflow/react";
 import { useAtom, useSetAtom } from "jotai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
