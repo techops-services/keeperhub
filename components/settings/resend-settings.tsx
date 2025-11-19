@@ -81,7 +81,7 @@ export const ResendSettings = ({
   return (
     <Card className="gap-4 border-0 py-0 shadow-none">
       <CardHeader className="px-0">
-        <CardTitle>Resend (Email)</CardTitle>
+        <CardTitle>Resend</CardTitle>
         <CardDescription>
           Configure your Resend API key to send emails from workflows
         </CardDescription>

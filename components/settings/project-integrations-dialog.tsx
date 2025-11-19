@@ -274,7 +274,7 @@ export function ProjectIntegrationsDialog({
     switch (activeTab) {
       case "resend":
         return {
-          title: "Resend (Email)",
+          title: "Resend",
           description:
             "Configure your Resend API key to send emails from workflows",
         };
