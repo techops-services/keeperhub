@@ -396,22 +396,17 @@ export async function getDecryptedEnvironmentVariable(
       };
     }
 
-    const vercel = new Vercel({
-      bearerToken: params.apiToken,
-    });
+    console.log("[DEBUG Vercel API] Fetching decrypted env var:", params.envId);
 
-    console.log("[DEBUG Vercel SDK] Fetching decrypted env var:", params.envId);
+    // Use direct fetch API to get the decrypted value
+    const env = await vercelRequest<VercelEnvVariable>(
+      `/v1/projects/${params.projectId}/env/${params.envId}`,
+      params.apiToken,
+      {},
+      params.teamId
+    );
 
-    // Use SDK to get the decrypted value
-    const response = await vercel.projects.getProjectEnv({
-      idOrName: params.projectId,
-      id: params.envId,
-      teamId: params.teamId,
-    });
-
-    const env = response as VercelEnvVariable;
-
-    console.log("[DEBUG Vercel SDK] Decrypted env var:", {
+    console.log("[DEBUG Vercel API] Decrypted env var:", {
       key: env.key,
       type: env.type,
       valueLength: env.value?.length,
@@ -432,7 +427,7 @@ export async function getDecryptedEnvironmentVariable(
     };
   } catch (error) {
     console.error(
-      "[DEBUG Vercel SDK] Error fetching decrypted env var:",
+      "[DEBUG Vercel API] Error fetching decrypted env var:",
       error
     );
     return {
