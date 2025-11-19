@@ -1,9 +1,10 @@
 /**
  * Executable step function for Database Query action
  */
-import postgres from "postgres";
-import { drizzle } from "drizzle-orm/postgres-js";
+
 import { sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 
 export async function databaseQueryStep(input: {
   dbQuery?: string;
@@ -28,7 +29,8 @@ export async function databaseQueryStep(input: {
   if (!input.databaseUrl || input.databaseUrl.trim() === "") {
     return {
       status: "error",
-      error: "Database URL is required. Please configure it in Project Integrations.",
+      error:
+        "Database URL is required. Please configure it in Project Integrations.",
     };
   }
 
