@@ -46,9 +46,13 @@ const requiresIntegration = (actionType: string): boolean => {
 // Helper to check if integration is configured
 const isIntegrationConfigured = (
   actionType: string,
-  integrations: ReturnType<typeof useAtomValue<typeof projectIntegrationsAtom>> | null
+  integrations: ReturnType<
+    typeof useAtomValue<typeof projectIntegrationsAtom>
+  > | null
 ): boolean => {
-  if (!integrations) return false;
+  if (!integrations) {
+    return false;
+  }
 
   switch (actionType) {
     case "Send Email":
@@ -147,7 +151,7 @@ export const ActionNode = memo(({ data, selected }: ActionNodeProps) => {
       handles={{ target: true, source: true }}
     >
       {integrationMissing && (
-        <div className="absolute left-2 top-2 rounded-full bg-orange-500 p-1">
+        <div className="absolute top-2 left-2 rounded-full bg-orange-500 p-1">
           <AlertCircle className="size-4 text-white" />
         </div>
       )}

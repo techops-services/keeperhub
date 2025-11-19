@@ -11,4 +11,3 @@ export async function getProjectByVercelId(vercelProjectId: string) {
 
   return project || null;
 }
-

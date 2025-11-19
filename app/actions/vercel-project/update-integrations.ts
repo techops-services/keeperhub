@@ -49,20 +49,21 @@ export async function updateProjectIntegrations(
   // Update environment variables in Vercel
   const envUpdates: Array<{ key: string; value: string }> = [];
 
-  if (data.resendApiKey !== undefined && data.resendApiKey) {
-    envUpdates.push({ key: "RESEND_API_KEY", value: data.resendApiKey });
-  }
-  if (data.resendFromEmail !== undefined && data.resendFromEmail) {
-    envUpdates.push({ key: "RESEND_FROM_EMAIL", value: data.resendFromEmail });
-  }
-  if (data.linearApiKey !== undefined && data.linearApiKey) {
-    envUpdates.push({ key: "LINEAR_API_KEY", value: data.linearApiKey });
-  }
-  if (data.slackApiKey !== undefined && data.slackApiKey) {
-    envUpdates.push({ key: "SLACK_API_KEY", value: data.slackApiKey });
-  }
-  if (data.aiGatewayApiKey !== undefined && data.aiGatewayApiKey) {
-    envUpdates.push({ key: "AI_GATEWAY_API_KEY", value: data.aiGatewayApiKey });
+  const keyValuePairs: Array<{
+    key: string;
+    value: string | null | undefined;
+  }> = [
+    { key: "RESEND_API_KEY", value: data.resendApiKey },
+    { key: "RESEND_FROM_EMAIL", value: data.resendFromEmail },
+    { key: "LINEAR_API_KEY", value: data.linearApiKey },
+    { key: "SLACK_API_KEY", value: data.slackApiKey },
+    { key: "AI_GATEWAY_API_KEY", value: data.aiGatewayApiKey },
+  ];
+
+  for (const { key, value } of keyValuePairs) {
+    if (value !== undefined && value) {
+      envUpdates.push({ key, value });
+    }
   }
 
   // Set environment variables in Vercel

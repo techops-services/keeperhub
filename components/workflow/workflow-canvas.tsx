@@ -2,7 +2,6 @@
 
 import {
   ConnectionMode,
-  MiniMap,
   type Node,
   type NodeMouseHandler,
   type OnConnect,
@@ -69,7 +68,7 @@ type WorkflowCanvasProps = {
   showMinimap?: boolean;
 };
 
-export function WorkflowCanvas({ showMinimap = true }: WorkflowCanvasProps) {
+export function WorkflowCanvas(_props: WorkflowCanvasProps) {
   const [nodes] = useAtom(nodesAtom);
   const [edges, setEdges] = useAtom(edgesAtom);
   const [isGenerating] = useAtom(isGeneratingAtom);
@@ -84,7 +83,7 @@ export function WorkflowCanvas({ showMinimap = true }: WorkflowCanvasProps) {
 
   const connectingNodeId = useRef<string | null>(null);
   const [defaultViewport, setDefaultViewport] = useState<Viewport | undefined>(
-    undefined,
+    undefined
   );
   const [viewportReady, setViewportReady] = useState(false);
   const [shouldFitView, setShouldFitView] = useState(false);
@@ -102,7 +101,7 @@ export function WorkflowCanvas({ showMinimap = true }: WorkflowCanvasProps) {
 
     setViewportReady(false);
     const saved = localStorage.getItem(
-      `workflow-viewport-${currentWorkflowId}`,
+      `workflow-viewport-${currentWorkflowId}`
     );
     if (saved) {
       try {
@@ -143,10 +142,10 @@ export function WorkflowCanvas({ showMinimap = true }: WorkflowCanvasProps) {
       }
       localStorage.setItem(
         `workflow-viewport-${currentWorkflowId}`,
-        JSON.stringify(viewport),
+        JSON.stringify(viewport)
       );
     },
-    [currentWorkflowId],
+    [currentWorkflowId]
   );
 
   const nodeTypes = useMemo(
@@ -155,7 +154,7 @@ export function WorkflowCanvas({ showMinimap = true }: WorkflowCanvasProps) {
       action: ActionNode,
       add: AddNode,
     }),
-    [],
+    []
   );
 
   const isValidConnection = useCallback(
@@ -175,7 +174,7 @@ export function WorkflowCanvas({ showMinimap = true }: WorkflowCanvasProps) {
       // targetHandle should be defined if connecting to a specific handle
       return true;
     },
-    [],
+    []
   );
 
   const onConnect: OnConnect = useCallback(
@@ -188,21 +187,21 @@ export function WorkflowCanvas({ showMinimap = true }: WorkflowCanvasProps) {
       setEdges([...edges, newEdge]);
       setHasUnsavedChanges(true);
     },
-    [edges, setEdges, setHasUnsavedChanges],
+    [edges, setEdges, setHasUnsavedChanges]
   );
 
   const onNodeClick: NodeMouseHandler = useCallback(
     (_event, node) => {
       setSelectedNode(node.id);
     },
-    [setSelectedNode],
+    [setSelectedNode]
   );
 
   const onConnectStart = useCallback(
     (_event: MouseEvent | TouchEvent, params: OnConnectStartParams) => {
       connectingNodeId.current = params.nodeId;
     },
-    [],
+    []
   );
 
   const getClientPosition = useCallback((event: MouseEvent | TouchEvent) => {
@@ -232,7 +231,7 @@ export function WorkflowCanvas({ showMinimap = true }: WorkflowCanvasProps) {
 
       return { adjustedX, adjustedY };
     },
-    [],
+    []
   );
 
   const onConnectEnd = useCallback(
@@ -250,7 +249,7 @@ export function WorkflowCanvas({ showMinimap = true }: WorkflowCanvasProps) {
         const { adjustedX, adjustedY } = calculateMenuPosition(
           event,
           clientX,
-          clientY,
+          clientY
         );
 
         // Get the action template
@@ -305,7 +304,7 @@ export function WorkflowCanvas({ showMinimap = true }: WorkflowCanvasProps) {
       addNode,
       edges,
       setEdges,
-    ],
+    ]
   );
 
   const onPaneClick = useCallback(() => {
@@ -321,7 +320,7 @@ export function WorkflowCanvas({ showMinimap = true }: WorkflowCanvasProps) {
         setSelectedNode(selectedNodes[0].id);
       }
     },
-    [setSelectedNode],
+    [setSelectedNode]
   );
 
   return (

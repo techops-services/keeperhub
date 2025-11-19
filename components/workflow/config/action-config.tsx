@@ -638,8 +638,12 @@ export function ActionConfig({
 
   // Check if the required integration is configured
   const isIntegrationConfigured = () => {
-    if (!requiredIntegration) return true;
-    if (!integrations) return false; // Changed: return false if integrations haven't loaded
+    if (!requiredIntegration) {
+      return true;
+    }
+    if (!integrations) {
+      return false; // Changed: return false if integrations haven't loaded
+    }
 
     switch (actionType) {
       case "Send Email":

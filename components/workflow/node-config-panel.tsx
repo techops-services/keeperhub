@@ -137,7 +137,7 @@ const PanelInner = () => {
   const [isGenerating] = useAtom(isGeneratingAtom);
   const [currentWorkflowId] = useAtom(currentWorkflowIdAtom);
   const [currentWorkflowName, setCurrentWorkflowName] = useAtom(
-    currentWorkflowNameAtom,
+    currentWorkflowNameAtom
   );
   const updateNodeData = useSetAtom(updateNodeDataAtom);
   const deleteNode = useSetAtom(deleteNodeAtom);

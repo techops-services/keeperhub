@@ -141,20 +141,11 @@ class ServerWorkflowExecutor {
     }
 
     try {
-      const projectData = await db.query.projects.findFirst({
-        where: eq(projects.id, this.context.projectId),
-        columns: {
-          vercelProjectId: true,
-          userId: true,
-        },
-      });
-
+      const projectData = await this.fetchProjectData();
       if (!projectData) {
-        console.error("Project not found");
         return;
       }
 
-      // Get app-level Vercel credentials from env vars
       const vercelApiToken = process.env.VERCEL_API_TOKEN;
       const vercelTeamId = process.env.VERCEL_TEAM_ID;
 
@@ -163,64 +154,89 @@ class ServerWorkflowExecutor {
         return;
       }
 
-      // Fetch environment variables from Vercel
-      const { getEnvironmentVariables } = await import("./integrations/vercel");
-      const envResult = await getEnvironmentVariables({
-        projectId: projectData.vercelProjectId,
-        apiToken: vercelApiToken,
-        teamId: vercelTeamId || undefined,
-        decrypt: true, // Decrypt encrypted environment variables
-      });
-
-      if (envResult.status === "success" && envResult.envs) {
-        // Extract integration keys from environment variables
-        const resendApiKey =
-          envResult.envs.find((env) => env.key === "RESEND_API_KEY")?.value ||
-          null;
-        const linearApiKey =
-          envResult.envs.find((env) => env.key === "LINEAR_API_KEY")?.value ||
-          null;
-        const slackApiKey =
-          envResult.envs.find((env) => env.key === "SLACK_API_KEY")?.value ||
-          null;
-        const aiGatewayApiKey =
-          envResult.envs.find((env) => env.key === "AI_GATEWAY_API_KEY")
-            ?.value || null;
-
-        console.log(
-          "[DEBUG Executor] AI_GATEWAY_API_KEY:",
-          aiGatewayApiKey ? `${aiGatewayApiKey.substring(0, 10)}...` : "null"
-        );
-
-        // Set up credentials for step execution
-        // For test runs, use ONLY user's environment variables from their Vercel project
-        // For prod runs, the generated code will use process.env from the deployment
-        this.credentials = getCredentials("user", {
-          RESEND_API_KEY: resendApiKey || undefined,
-          LINEAR_API_KEY: linearApiKey || undefined,
-          SLACK_API_KEY: slackApiKey || undefined,
-          AI_GATEWAY_API_KEY: aiGatewayApiKey || undefined,
-          OPENAI_API_KEY:
-            envResult.envs.find((env) => env.key === "OPENAI_API_KEY")?.value ||
-            undefined,
-          DATABASE_URL:
-            envResult.envs.find((env) => env.key === "DATABASE_URL")?.value ||
-            undefined,
-        });
-
-        console.log(
-          "[DEBUG Executor] credentials.AI_GATEWAY_API_KEY:",
-          this.credentials.AI_GATEWAY_API_KEY
-            ? `${this.credentials.AI_GATEWAY_API_KEY.substring(0, 10)}...`
-            : "undefined"
-        );
-        console.log("[DEBUG Executor] Full credentials keys:", Object.keys(this.credentials));
-      }
+      await this.loadEnvironmentVariables(
+        projectData.vercelProjectId,
+        vercelApiToken,
+        vercelTeamId
+      );
     } catch (error) {
       console.error("Failed to load project integrations:", error);
-      // Fallback to system credentials for production
       this.credentials = getCredentials("system");
     }
+  }
+
+  private async fetchProjectData() {
+    const projectData = await db.query.projects.findFirst({
+      where: eq(projects.id, this.context.projectId as string),
+      columns: {
+        vercelProjectId: true,
+        userId: true,
+      },
+    });
+
+    if (!projectData) {
+      console.error("Project not found");
+      return null;
+    }
+
+    return projectData;
+  }
+
+  private async loadEnvironmentVariables(
+    vercelProjectId: string,
+    apiToken: string,
+    teamId?: string
+  ): Promise<void> {
+    const { getEnvironmentVariables } = await import("./integrations/vercel");
+    const envResult = await getEnvironmentVariables({
+      projectId: vercelProjectId,
+      apiToken,
+      teamId: teamId || undefined,
+      decrypt: true,
+    });
+
+    if (envResult.status === "success" && envResult.envs) {
+      this.setupCredentials(envResult.envs);
+    }
+  }
+
+  private setupCredentials(
+    envs: Array<{
+      key: string;
+      value: string;
+      type: string;
+      id: string;
+      target: string[];
+    }>
+  ): void {
+    const findEnvValue = (key: string) =>
+      envs.find((env) => env.key === key)?.value || null;
+
+    const aiGatewayApiKey = findEnvValue("AI_GATEWAY_API_KEY");
+    console.log(
+      "[DEBUG Executor] AI_GATEWAY_API_KEY:",
+      aiGatewayApiKey ? `${aiGatewayApiKey.substring(0, 10)}...` : "null"
+    );
+
+    this.credentials = getCredentials("user", {
+      RESEND_API_KEY: findEnvValue("RESEND_API_KEY") || undefined,
+      LINEAR_API_KEY: findEnvValue("LINEAR_API_KEY") || undefined,
+      SLACK_API_KEY: findEnvValue("SLACK_API_KEY") || undefined,
+      AI_GATEWAY_API_KEY: aiGatewayApiKey || undefined,
+      OPENAI_API_KEY: findEnvValue("OPENAI_API_KEY") || undefined,
+      DATABASE_URL: findEnvValue("DATABASE_URL") || undefined,
+    });
+
+    console.log(
+      "[DEBUG Executor] credentials.AI_GATEWAY_API_KEY:",
+      this.credentials.AI_GATEWAY_API_KEY
+        ? `${this.credentials.AI_GATEWAY_API_KEY.substring(0, 10)}...`
+        : "undefined"
+    );
+    console.log(
+      "[DEBUG Executor] Full credentials keys:",
+      Object.keys(this.credentials)
+    );
   }
 
   private getNextNodes(nodeId: string): string[] {
@@ -475,55 +491,20 @@ class ServerWorkflowExecutor {
     }
 
     try {
-      // Process the condition expression to replace template variables
       const { idToVarName } = this.buildConditionVariables();
       const transformedCondition = this.transformConditionExpression(
         condition,
-        new Map(), // labelToVarName not needed anymore
+        new Map(),
         idToVarName
       );
 
       console.log("[Executor] Original condition:", condition);
       console.log("[Executor] Transformed condition:", transformedCondition);
 
-      // Use a simple safe evaluator for the condition
-      // We'll evaluate the transformed expression directly
-      let conditionResult = false;
-      const trimmed = transformedCondition.trim();
-
-      if (trimmed === "true") {
-        conditionResult = true;
-      } else if (trimmed === "false") {
-        conditionResult = false;
-      } else {
-        // For more complex conditions, we need to safely evaluate them
-        // Create a safe evaluation context with node outputs
-        const evalContext: Record<string, unknown> = {};
-        for (const [nodeId, output] of Object.entries(this.nodeOutputs)) {
-          const varName = idToVarName.get(nodeId);
-          if (varName) {
-            evalContext[varName] = output.data;
-          }
-        }
-
-        // Use a simple expression evaluator
-        // For now, we'll use Function but pass data as parameters (safer than building code strings)
-        try {
-          const paramNames = Object.keys(evalContext);
-          const paramValues = Object.values(evalContext);
-          const evalFn = new Function(
-            ...paramNames,
-            `return (${transformedCondition});`
-          );
-          conditionResult = Boolean(evalFn(...paramValues));
-        } catch (evalError) {
-          console.error("[Executor] Condition evaluation error:", evalError);
-          return {
-            success: false,
-            error: `Invalid condition expression: ${evalError instanceof Error ? evalError.message : "Unknown error"}`,
-          };
-        }
-      }
+      const conditionResult = this.evaluateCondition(
+        transformedCondition,
+        idToVarName
+      );
 
       return {
         success: true,
@@ -534,6 +515,53 @@ class ServerWorkflowExecutor {
         success: false,
         error: `Failed to evaluate condition: ${error instanceof Error ? error.message : "Unknown error"}`,
       };
+    }
+  }
+
+  private evaluateCondition(
+    transformedCondition: string,
+    idToVarName: Map<string, string>
+  ): boolean {
+    const trimmed = transformedCondition.trim();
+
+    if (trimmed === "true") {
+      return true;
+    }
+    if (trimmed === "false") {
+      return false;
+    }
+
+    const evalContext = this.buildEvalContext(idToVarName);
+    return this.safeEvaluateExpression(transformedCondition, evalContext);
+  }
+
+  private buildEvalContext(
+    idToVarName: Map<string, string>
+  ): Record<string, unknown> {
+    const evalContext: Record<string, unknown> = {};
+    for (const [nodeId, output] of Object.entries(this.nodeOutputs)) {
+      const varName = idToVarName.get(nodeId);
+      if (varName) {
+        evalContext[varName] = output.data;
+      }
+    }
+    return evalContext;
+  }
+
+  private safeEvaluateExpression(
+    expression: string,
+    context: Record<string, unknown>
+  ): boolean {
+    try {
+      const paramNames = Object.keys(context);
+      const paramValues = Object.values(context);
+      const evalFn = new Function(...paramNames, `return (${expression});`);
+      return Boolean(evalFn(...paramValues));
+    } catch (evalError) {
+      console.error("[Executor] Condition evaluation error:", evalError);
+      throw new Error(
+        `Invalid condition expression: ${evalError instanceof Error ? evalError.message : "Unknown error"}`
+      );
     }
   }
 

@@ -59,7 +59,7 @@ export function DataSourcesSettings({
         </CardHeader>
         <CardContent className="px-0">
           {dataSources.length === 0 ? (
-            <div className="py-8 text-center text-muted-foreground text-sm flex flex-col gap-4 max-w-xs mx-auto">
+            <div className="mx-auto flex max-w-xs flex-col gap-4 py-8 text-center text-muted-foreground text-sm">
               No data sources configured.
               <Button onClick={() => onShowAddSource(true)} size="sm">
                 <Plus className="size-4" />

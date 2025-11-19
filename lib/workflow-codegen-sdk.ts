@@ -431,6 +431,106 @@ export function generateWorkflowSDKCode(
   // Always import sleep and FatalError
   imports.add("import { sleep, FatalError } from 'workflow';");
 
+  function buildEmailParams(config: Record<string, unknown>): string[] {
+    imports.add("import { Resend } from 'resend';");
+    return [
+      `fromEmail: process.env.RESEND_FROM_EMAIL || 'noreply@example.com'`,
+      `emailTo: \`${convertTemplateToJS((config.emailTo as string) || "user@example.com")}\``,
+      `emailSubject: \`${convertTemplateToJS((config.emailSubject as string) || "Notification")}\``,
+      `emailBody: \`${convertTemplateToJS((config.emailBody as string) || "No content")}\``,
+      "apiKey: process.env.RESEND_API_KEY!",
+    ];
+  }
+
+  function buildSlackParams(config: Record<string, unknown>): string[] {
+    imports.add("import { WebClient } from '@slack/web-api';");
+    return [
+      `slackChannel: \`${convertTemplateToJS((config.slackChannel as string) || "#general")}\``,
+      `slackMessage: \`${convertTemplateToJS((config.slackMessage as string) || "No message")}\``,
+      "apiKey: process.env.SLACK_API_KEY!",
+    ];
+  }
+
+  function buildTicketParams(config: Record<string, unknown>): string[] {
+    imports.add("import { LinearClient } from '@linear/sdk';");
+    const params = [
+      `ticketTitle: \`${convertTemplateToJS((config.ticketTitle as string) || "New Issue")}\``,
+      `ticketDescription: \`${convertTemplateToJS((config.ticketDescription as string) || "")}\``,
+      "apiKey: process.env.LINEAR_API_KEY!",
+    ];
+    if (config.teamId) {
+      params.push(`teamId: "${config.teamId}"`);
+    }
+    return params;
+  }
+
+  function buildAITextParams(config: Record<string, unknown>): string[] {
+    imports.add("import { generateText } from 'ai';");
+    const modelId = (config.aiModel as string) || "gpt-4o-mini";
+    const provider =
+      modelId.startsWith("gpt-") || modelId.startsWith("o1-")
+        ? "openai"
+        : "anthropic";
+    return [
+      `model: "${provider}/${modelId}"`,
+      `prompt: \`${convertTemplateToJS((config.aiPrompt as string) || "")}\``,
+      "apiKey: process.env.OPENAI_API_KEY!",
+    ];
+  }
+
+  function buildAIImageParams(config: Record<string, unknown>): string[] {
+    imports.add("import OpenAI from 'openai';");
+    const imageModel = (config.imageModel as string) || "dall-e-3";
+    return [
+      `model: "${imageModel}"`,
+      `prompt: \`${convertTemplateToJS((config.imagePrompt as string) || "")}\``,
+      "apiKey: process.env.OPENAI_API_KEY!",
+    ];
+  }
+
+  function buildDatabaseParams(config: Record<string, unknown>): string[] {
+    return [
+      `query: \`${convertTemplateToJS((config.dbQuery as string) || "SELECT 1")}\``,
+    ];
+  }
+
+  function buildHttpParams(config: Record<string, unknown>): string[] {
+    const params = [
+      `url: "${config.endpoint || "https://api.example.com/endpoint"}"`,
+      `method: "${config.httpMethod || "POST"}"`,
+      `headers: ${config.httpHeaders || "{}"}`,
+    ];
+    if (config.httpBody) {
+      params.push(`body: ${config.httpBody}`);
+    }
+    return params;
+  }
+
+  function buildConditionParams(config: Record<string, unknown>): string[] {
+    return [
+      `condition: ${convertTemplateToJS((config.condition as string) || "true")}`,
+    ];
+  }
+
+  function buildStepInputParams(
+    actionType: string,
+    config: Record<string, unknown>
+  ): string[] {
+    const paramBuilders: Record<string, () => string[]> = {
+      "Send Email": () => buildEmailParams(config),
+      "Send Slack Message": () => buildSlackParams(config),
+      "Create Ticket": () => buildTicketParams(config),
+      "Generate Text": () => buildAITextParams(config),
+      "Generate Image": () => buildAIImageParams(config),
+      "Database Query": () => buildDatabaseParams(config),
+      "HTTP Request": () => buildHttpParams(config),
+      Condition: () => buildConditionParams(config),
+    };
+
+    const builder = paramBuilders[actionType];
+    return builder ? builder() : [];
+  }
+
   function generateStepFunction(
     node: WorkflowNode,
     uniqueStepName?: string
@@ -440,115 +540,11 @@ export function generateWorkflowSDKCode(
     const label = node.data.label || actionType || "UnnamedStep";
     const stepName = uniqueStepName || sanitizeStepName(label);
 
-    let stepBody = "";
-
-    // Try to load implementation from lib/steps/
     const stepImplementation = loadStepImplementation(actionType);
 
+    let stepBody: string;
     if (stepImplementation && node.data.type === "action") {
-      // Build the input object with processed config values
-      const inputParams: string[] = [];
-
-      // Map config fields to step function parameters
-      switch (actionType) {
-        case "Send Email":
-          imports.add("import { Resend } from 'resend';");
-          inputParams.push(
-            `fromEmail: process.env.RESEND_FROM_EMAIL || 'noreply@example.com'`
-          );
-          inputParams.push(
-            `emailTo: \`${convertTemplateToJS((config.emailTo as string) || "user@example.com")}\``
-          );
-          inputParams.push(
-            `emailSubject: \`${convertTemplateToJS((config.emailSubject as string) || "Notification")}\``
-          );
-          inputParams.push(
-            `emailBody: \`${convertTemplateToJS((config.emailBody as string) || "No content")}\``
-          );
-          inputParams.push("apiKey: process.env.RESEND_API_KEY!");
-          break;
-
-        case "Send Slack Message":
-          imports.add("import { WebClient } from '@slack/web-api';");
-          inputParams.push(
-            `slackChannel: \`${convertTemplateToJS((config.slackChannel as string) || "#general")}\``
-          );
-          inputParams.push(
-            `slackMessage: \`${convertTemplateToJS((config.slackMessage as string) || "No message")}\``
-          );
-          inputParams.push("apiKey: process.env.SLACK_API_KEY!");
-          break;
-
-        case "Create Ticket":
-          imports.add("import { LinearClient } from '@linear/sdk';");
-          inputParams.push(
-            `ticketTitle: \`${convertTemplateToJS((config.ticketTitle as string) || "New Issue")}\``
-          );
-          inputParams.push(
-            `ticketDescription: \`${convertTemplateToJS((config.ticketDescription as string) || "")}\``
-          );
-          inputParams.push("apiKey: process.env.LINEAR_API_KEY!");
-          if (config.teamId) {
-            inputParams.push(`teamId: "${config.teamId}"`);
-          }
-          break;
-
-        case "Generate Text": {
-          imports.add("import { generateText } from 'ai';");
-          const modelId = (config.aiModel as string) || "gpt-4o-mini";
-          const provider =
-            modelId.startsWith("gpt-") || modelId.startsWith("o1-")
-              ? "openai"
-              : "anthropic";
-          inputParams.push(`model: "${provider}/${modelId}"`);
-          inputParams.push(
-            `prompt: \`${convertTemplateToJS((config.aiPrompt as string) || "")}\``
-          );
-          inputParams.push("apiKey: process.env.OPENAI_API_KEY!");
-          break;
-        }
-
-        case "Generate Image": {
-          imports.add("import OpenAI from 'openai';");
-          const imageModel = (config.imageModel as string) || "dall-e-3";
-          inputParams.push(`model: "${imageModel}"`);
-          inputParams.push(
-            `prompt: \`${convertTemplateToJS((config.imagePrompt as string) || "")}\``
-          );
-          inputParams.push("apiKey: process.env.OPENAI_API_KEY!");
-          break;
-        }
-
-        case "Database Query":
-          inputParams.push(
-            `query: \`${convertTemplateToJS((config.dbQuery as string) || "SELECT 1")}\``
-          );
-          // Note: Uses app's existing database connection, no databaseUrl needed
-          break;
-
-        case "HTTP Request":
-          inputParams.push(
-            `url: "${config.endpoint || "https://api.example.com/endpoint"}"`
-          );
-          inputParams.push(`method: "${config.httpMethod || "POST"}"`);
-          inputParams.push(`headers: ${config.httpHeaders || "{}"}`);
-          if (config.httpBody) {
-            inputParams.push(`body: ${config.httpBody}`);
-          }
-          break;
-
-        case "Condition":
-          inputParams.push(
-            `condition: ${convertTemplateToJS((config.condition as string) || "true")}`
-          );
-          break;
-
-        default:
-          // Unknown action type - no special input params needed
-          break;
-      }
-
-      // Wrap the step body with proper input construction
+      const inputParams = buildStepInputParams(actionType, config);
       stepBody = `  // Call step function with constructed input
   const stepInput = {
     ${inputParams.join(",\n    ")}
@@ -557,7 +553,6 @@ export function generateWorkflowSDKCode(
   // Execute step implementation
   ${stepImplementation}`;
     } else {
-      // Fallback to default implementation
       stepBody = `  console.log('Executing ${label}');
   return { success: true };`;
     }

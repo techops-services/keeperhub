@@ -49,48 +49,82 @@ export function enrichStepInput(
 ): Record<string, unknown> {
   const enrichedInput = { ...input };
 
-  switch (actionType) {
-    case "Create Ticket":
-    case "Find Issues":
-      if (credentials.LINEAR_API_KEY) {
-        enrichedInput.apiKey = credentials.LINEAR_API_KEY;
-      }
-      if (credentials.LINEAR_TEAM_ID) {
-        enrichedInput.teamId = credentials.LINEAR_TEAM_ID;
-      }
-      break;
+  const actionHandlers: Record<string, () => void> = {
+    "Create Ticket": () => enrichLinearCredentials(enrichedInput, credentials),
+    "Find Issues": () => enrichLinearCredentials(enrichedInput, credentials),
+    "Send Email": () => enrichResendCredentials(enrichedInput, credentials),
+    "Send Slack Message": () =>
+      enrichSlackCredentials(enrichedInput, credentials),
+    "Generate Text": () => enrichAICredentials(enrichedInput, credentials),
+    "Generate Image": () => enrichAICredentials(enrichedInput, credentials),
+    "Database Query": () =>
+      enrichDatabaseCredentials(enrichedInput, credentials),
+  };
 
-    case "Send Email":
-      if (credentials.RESEND_API_KEY) {
-        enrichedInput.apiKey = credentials.RESEND_API_KEY;
-      }
-      break;
-
-    case "Send Slack Message":
-      if (credentials.SLACK_API_KEY) {
-        enrichedInput.apiKey = credentials.SLACK_API_KEY;
-      }
-      break;
-
-    case "Generate Text":
-    case "Generate Image":
-      console.log("[DEBUG enrichStepInput] AI_GATEWAY_API_KEY from credentials:", credentials.AI_GATEWAY_API_KEY ? `${credentials.AI_GATEWAY_API_KEY.substring(0, 10)}...` : "undefined");
-      if (credentials.AI_GATEWAY_API_KEY) {
-        enrichedInput.apiKey = credentials.AI_GATEWAY_API_KEY;
-      }
-      console.log("[DEBUG enrichStepInput] enrichedInput.apiKey after setting:", enrichedInput.apiKey ? `${(enrichedInput.apiKey as string).substring(0, 10)}...` : "undefined");
-      break;
-
-    case "Database Query":
-      if (credentials.DATABASE_URL) {
-        enrichedInput.databaseUrl = credentials.DATABASE_URL;
-      }
-      break;
-
-    // HTTP Request and Condition don't need credentials
-    default:
-      break;
+  const handler = actionHandlers[actionType];
+  if (handler) {
+    handler();
   }
 
   return enrichedInput;
+}
+
+function enrichLinearCredentials(
+  input: Record<string, unknown>,
+  credentials: EnvVarConfig
+): void {
+  if (credentials.LINEAR_API_KEY) {
+    input.apiKey = credentials.LINEAR_API_KEY;
+  }
+  if (credentials.LINEAR_TEAM_ID) {
+    input.teamId = credentials.LINEAR_TEAM_ID;
+  }
+}
+
+function enrichResendCredentials(
+  input: Record<string, unknown>,
+  credentials: EnvVarConfig
+): void {
+  if (credentials.RESEND_API_KEY) {
+    input.apiKey = credentials.RESEND_API_KEY;
+  }
+}
+
+function enrichSlackCredentials(
+  input: Record<string, unknown>,
+  credentials: EnvVarConfig
+): void {
+  if (credentials.SLACK_API_KEY) {
+    input.apiKey = credentials.SLACK_API_KEY;
+  }
+}
+
+function enrichAICredentials(
+  input: Record<string, unknown>,
+  credentials: EnvVarConfig
+): void {
+  console.log(
+    "[DEBUG enrichStepInput] AI_GATEWAY_API_KEY from credentials:",
+    credentials.AI_GATEWAY_API_KEY
+      ? `${credentials.AI_GATEWAY_API_KEY.substring(0, 10)}...`
+      : "undefined"
+  );
+  if (credentials.AI_GATEWAY_API_KEY) {
+    input.apiKey = credentials.AI_GATEWAY_API_KEY;
+  }
+  console.log(
+    "[DEBUG enrichStepInput] enrichedInput.apiKey after setting:",
+    input.apiKey
+      ? `${(input.apiKey as string).substring(0, 10)}...`
+      : "undefined"
+  );
+}
+
+function enrichDatabaseCredentials(
+  input: Record<string, unknown>,
+  credentials: EnvVarConfig
+): void {
+  if (credentials.DATABASE_URL) {
+    input.databaseUrl = credentials.DATABASE_URL;
+  }
 }

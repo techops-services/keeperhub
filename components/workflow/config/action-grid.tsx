@@ -138,7 +138,7 @@ export function ActionGrid({ onSelectAction, disabled }: ActionGridProps) {
           <button
             className={cn(
               "flex flex-col items-center justify-center gap-3 rounded-lg border bg-card p-4 transition-colors hover:border-primary hover:bg-accent",
-              disabled && "pointer-events-none opacity-50",
+              disabled && "pointer-events-none opacity-50"
             )}
             disabled={disabled}
             key={action.id}
