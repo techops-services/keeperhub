@@ -58,12 +58,33 @@ class WorkflowExecutor {
       let result: ExecutionResult = { success: true };
 
       switch (node.data.type) {
-        case "trigger":
+        case "trigger": {
+          // For webhook triggers, use mock request if provided
+          const nodeConfig = node.data.config || {};
+          const triggerType = nodeConfig.triggerType as string;
+          let triggerData: Record<string, unknown> = {
+            triggered: true,
+            timestamp: Date.now(),
+          };
+
+          if (triggerType === "Webhook" && nodeConfig.webhookMockRequest) {
+            try {
+              // Parse the mock request JSON
+              const mockData = JSON.parse(
+                nodeConfig.webhookMockRequest as string
+              );
+              triggerData = { ...triggerData, ...mockData };
+            } catch {
+              // If parsing fails, use default data
+            }
+          }
+
           result = {
             success: true,
-            data: { triggered: true, timestamp: Date.now() },
+            data: triggerData,
           };
           break;
+        }
 
         case "action": {
           const actionType = node.data.config?.actionType as string;

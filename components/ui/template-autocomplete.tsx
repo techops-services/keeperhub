@@ -165,6 +165,22 @@ const getCommonFields = (node: WorkflowNode) => {
     ];
   }
   if (node.data.type === "trigger") {
+    const triggerType = node.data.config?.triggerType as string | undefined;
+    const webhookSchema = node.data.config?.webhookSchema as string | undefined;
+
+    // If it's a webhook trigger with a schema, show schema fields
+    if (triggerType === "Webhook" && webhookSchema) {
+      try {
+        const schema = JSON.parse(webhookSchema) as SchemaField[];
+        if (schema.length > 0) {
+          return schemaToFields(schema);
+        }
+      } catch {
+        // If schema parsing fails, fall through to default fields
+      }
+    }
+
+    // Default trigger fields
     return [
       { field: "triggered", description: "Trigger status" },
       { field: "timestamp", description: "Trigger timestamp" },

@@ -1,6 +1,7 @@
 "use client";
 
 import { Settings, Webhook } from "lucide-react";
+import { CodeEditor } from "@/components/ui/code-editor";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -13,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TimezoneSelect } from "@/components/ui/timezone-select";
+import { SchemaBuilder, type SchemaField } from "./schema-builder";
 
 type TriggerConfigProps = {
   config: Record<string, unknown>;
@@ -92,6 +94,49 @@ export function TriggerConfig({
                 <SelectItem value="PUT">PUT</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Request Schema (Optional)</Label>
+            <SchemaBuilder
+              disabled={disabled}
+              onChange={(schema) =>
+                onUpdateConfig("webhookSchema", JSON.stringify(schema))
+              }
+              schema={
+                config?.webhookSchema
+                  ? (JSON.parse(
+                      config.webhookSchema as string
+                    ) as SchemaField[])
+                  : []
+              }
+            />
+            <p className="text-muted-foreground text-xs">
+              Define the expected structure of the incoming webhook payload.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="webhookMockRequest">Mock Request (Optional)</Label>
+            <div className="overflow-hidden rounded-md border">
+              <CodeEditor
+                defaultLanguage="json"
+                height="150px"
+                onChange={(value) =>
+                  onUpdateConfig("webhookMockRequest", value || "")
+                }
+                options={{
+                  minimap: { enabled: false },
+                  lineNumbers: "on",
+                  scrollBeyondLastLine: false,
+                  fontSize: 12,
+                  readOnly: disabled,
+                  wordWrap: "on",
+                }}
+                value={(config?.webhookMockRequest as string) || ""}
+              />
+            </div>
+            <p className="text-muted-foreground text-xs">
+              Enter a sample JSON payload to test the webhook trigger.
+            </p>
           </div>
         </>
       )}

@@ -1,7 +1,9 @@
 /**
  * Executable step function for Database Query action
  */
-import { executeQuery } from "../integrations/database";
+import postgres from "postgres";
+import { drizzle } from "drizzle-orm/postgres-js";
+import { sql } from "drizzle-orm";
 
 export async function databaseQueryStep(input: {
   dbQuery?: string;
@@ -9,8 +11,8 @@ export async function databaseQueryStep(input: {
   databaseUrl?: string;
 }): Promise<{
   status: string;
-  data?: unknown;
-  rowCount?: number;
+  rows?: unknown;
+  count?: number;
   error?: string;
 }> {
   // Accept either dbQuery or query field name
@@ -23,13 +25,29 @@ export async function databaseQueryStep(input: {
     };
   }
 
-  try {
-    // Execute the query using our database integration
-    const result = await executeQuery({
-      query: queryString,
-    });
+  if (!input.databaseUrl || input.databaseUrl.trim() === "") {
+    return {
+      status: "error",
+      error: "Database URL is required. Please configure it in Project Integrations.",
+    };
+  }
 
-    return result;
+  try {
+    // Create a connection to the custom database
+    const client = postgres(input.databaseUrl, { max: 1 });
+    const db = drizzle(client);
+
+    // Execute the query
+    const result = await db.execute(sql.raw(queryString));
+
+    // Close the connection
+    await client.end();
+
+    return {
+      status: "success",
+      rows: result,
+      count: Array.isArray(result) ? result.length : 0,
+    };
   } catch (error) {
     return {
       status: "error",

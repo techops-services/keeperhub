@@ -529,6 +529,35 @@ class ServerWorkflowExecutor {
     return processedConfig;
   }
 
+  private executeTriggerNode(
+    nodeConfig: Record<string, unknown>
+  ): ExecutionResult {
+    const triggerType = nodeConfig.triggerType as string;
+    let triggerData: Record<string, unknown> = {
+      triggered: true,
+      timestamp: Date.now(),
+    };
+
+    if (triggerType === "Webhook" && nodeConfig.webhookMockRequest) {
+      try {
+        // Parse the mock request JSON
+        const mockData = JSON.parse(nodeConfig.webhookMockRequest as string);
+        triggerData = { ...triggerData, ...mockData };
+      } catch {
+        // If parsing fails, fall back to default behavior
+        triggerData.input = this.context.input;
+      }
+    } else if (this.context.input) {
+      // For other trigger types or when no mock request, use context input
+      triggerData = { ...triggerData, ...this.context.input };
+    }
+
+    return {
+      success: true,
+      data: triggerData,
+    };
+  }
+
   private async executeNode(node: WorkflowNode): Promise<ExecutionResult> {
     try {
       const nodeConfig = node.data.config || {};
@@ -542,14 +571,7 @@ class ServerWorkflowExecutor {
 
       switch (node.data.type) {
         case "trigger":
-          result = {
-            success: true,
-            data: {
-              triggered: true,
-              timestamp: Date.now(),
-              input: this.context.input,
-            },
-          };
+          result = this.executeTriggerNode(nodeConfig);
           break;
 
         case "action":
