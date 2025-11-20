@@ -3,6 +3,13 @@
 import { useSetAtom } from "jotai";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+  testAiGatewayConnection,
+  testDatabaseConnection,
+  testLinearConnection,
+  testResendConnection,
+  testSlackConnection,
+} from "@/app/actions/integration/test-connection";
 import { getProjectIntegrations } from "@/app/actions/vercel-project/get-integrations";
 import { updateProjectIntegrations } from "@/app/actions/vercel-project/update-integrations";
 import {
@@ -17,6 +24,7 @@ import { projectIntegrationsAtom } from "@/lib/integrations-store";
 import { Spinner } from "../ui/spinner";
 import { AiGatewaySettings } from "./ai-gateway-settings";
 import { DatabaseSettings } from "./database-settings";
+import { ImportIntegrationsDialog } from "./import-integrations-dialog";
 import { IntegrationTabContent } from "./integration-tab-content";
 import { LinearSettings } from "./linear-settings";
 import { ResendSettings } from "./resend-settings";
@@ -188,6 +196,11 @@ export function ProjectIntegrationsDialog({
   const [aiGatewayApiKey, setAiGatewayApiKey] = useState("");
   const [databaseUrl, setDatabaseUrl] = useState("");
   const [savingIntegrations, setSavingIntegrations] = useState(false);
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importIntegrationType, setImportIntegrationType] = useState<
+    "resend" | "linear" | "slack" | "ai-gateway" | "database"
+  >("resend");
 
   const loadIntegrations = useCallback(async () => {
     if (!workflowId) {
@@ -300,7 +313,57 @@ export function ProjectIntegrationsDialog({
     if (copiedIntegrations.databaseUrl) {
       setDatabaseUrl(copiedIntegrations.databaseUrl);
     }
-    toast.success("Integrations copied successfully");
+    toast.success("Integration imported successfully");
+  };
+
+  const handleOpenImportDialog = (
+    type: "resend" | "linear" | "slack" | "ai-gateway" | "database"
+  ) => {
+    setImportIntegrationType(type);
+    setImportDialogOpen(true);
+  };
+
+  const handleTestConnection = async (type: string) => {
+    if (!workflowId) {
+      toast.error("No workflow selected");
+      return;
+    }
+
+    setTestingConnection(true);
+    try {
+      let result: Awaited<ReturnType<typeof testResendConnection>>;
+
+      switch (type) {
+        case "resend":
+          result = await testResendConnection(workflowId);
+          break;
+        case "linear":
+          result = await testLinearConnection(workflowId);
+          break;
+        case "slack":
+          result = await testSlackConnection(workflowId);
+          break;
+        case "ai-gateway":
+          result = await testAiGatewayConnection(workflowId);
+          break;
+        case "database":
+          result = await testDatabaseConnection(workflowId);
+          break;
+        default:
+          throw new Error("Unknown integration type");
+      }
+
+      if (result.status === "success") {
+        toast.success(result.message);
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      console.error("Failed to test connection:", error);
+      toast.error("Failed to test connection");
+    } finally {
+      setTestingConnection(false);
+    }
   };
 
   // Get the integration title and description based on active tab
@@ -384,11 +447,12 @@ export function ProjectIntegrationsDialog({
             <TabsContent value="resend">
               <IntegrationTabContent
                 hasKey={integrations?.hasResendKey}
-                onCopyIntegrations={handleCopyIntegrations}
+                onImport={() => handleOpenImportDialog("resend")}
                 onRemove={() => handleRemoveIntegration("resend")}
                 onSave={() => handleSaveIntegrations("resend")}
+                onTestConnection={() => handleTestConnection("resend")}
                 saving={savingIntegrations}
-                workflowId={workflowId}
+                testing={testingConnection}
               >
                 <ResendSettings
                   apiKey={resendApiKey}
@@ -404,11 +468,12 @@ export function ProjectIntegrationsDialog({
             <TabsContent value="linear">
               <IntegrationTabContent
                 hasKey={integrations?.hasLinearKey}
-                onCopyIntegrations={handleCopyIntegrations}
+                onImport={() => handleOpenImportDialog("linear")}
                 onRemove={() => handleRemoveIntegration("linear")}
                 onSave={() => handleSaveIntegrations("linear")}
+                onTestConnection={() => handleTestConnection("linear")}
                 saving={savingIntegrations}
-                workflowId={workflowId}
+                testing={testingConnection}
               >
                 <LinearSettings
                   apiKey={linearApiKey}
@@ -422,11 +487,12 @@ export function ProjectIntegrationsDialog({
             <TabsContent value="slack">
               <IntegrationTabContent
                 hasKey={integrations?.hasSlackKey}
-                onCopyIntegrations={handleCopyIntegrations}
+                onImport={() => handleOpenImportDialog("slack")}
                 onRemove={() => handleRemoveIntegration("slack")}
                 onSave={() => handleSaveIntegrations("slack")}
+                onTestConnection={() => handleTestConnection("slack")}
                 saving={savingIntegrations}
-                workflowId={workflowId}
+                testing={testingConnection}
               >
                 <SlackSettings
                   apiKey={slackApiKey}
@@ -440,11 +506,12 @@ export function ProjectIntegrationsDialog({
             <TabsContent value="ai-gateway">
               <IntegrationTabContent
                 hasKey={integrations?.hasAiGatewayKey}
-                onCopyIntegrations={handleCopyIntegrations}
+                onImport={() => handleOpenImportDialog("ai-gateway")}
                 onRemove={() => handleRemoveIntegration("ai-gateway")}
                 onSave={() => handleSaveIntegrations("ai-gateway")}
+                onTestConnection={() => handleTestConnection("ai-gateway")}
                 saving={savingIntegrations}
-                workflowId={workflowId}
+                testing={testingConnection}
               >
                 <AiGatewaySettings
                   apiKey={aiGatewayApiKey}
@@ -458,11 +525,12 @@ export function ProjectIntegrationsDialog({
             <TabsContent value="database">
               <IntegrationTabContent
                 hasKey={integrations?.hasDatabaseUrl}
-                onCopyIntegrations={handleCopyIntegrations}
+                onImport={() => handleOpenImportDialog("database")}
                 onRemove={() => handleRemoveIntegration("database")}
                 onSave={() => handleSaveIntegrations("database")}
+                onTestConnection={() => handleTestConnection("database")}
                 saving={savingIntegrations}
-                workflowId={workflowId}
+                testing={testingConnection}
               >
                 <DatabaseSettings
                   databaseUrl={databaseUrl}
@@ -475,6 +543,14 @@ export function ProjectIntegrationsDialog({
           </Tabs>
         )}
       </DialogContent>
+
+      <ImportIntegrationsDialog
+        currentWorkflowId={workflowId}
+        integrationType={importIntegrationType}
+        onImport={handleCopyIntegrations}
+        onOpenChange={setImportDialogOpen}
+        open={importDialogOpen}
+      />
     </Dialog>
   );
 }

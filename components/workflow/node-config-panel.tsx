@@ -25,7 +25,6 @@ import { CodeEditor } from "@/components/ui/code-editor";
 import { Input } from "@/components/ui/input";
 import { IntegrationIcon } from "@/components/ui/integration-icon";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { projectIntegrationsAtom } from "@/lib/integrations-store";
 import { workflowApi } from "@/lib/workflow-api";
 import { generateWorkflowCode } from "@/lib/workflow-codegen";
@@ -409,8 +408,6 @@ const PanelInner = () => {
                   value={currentWorkflowId || "Not saved"}
                 />
               </div>
-
-              <Separator />
 
               <div className="space-y-3">
                 <Label>Integrations</Label>

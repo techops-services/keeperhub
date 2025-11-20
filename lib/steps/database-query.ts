@@ -6,43 +6,101 @@ import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
-export async function databaseQueryStep(input: {
+type DatabaseQueryInput = {
   dbQuery?: string;
   query?: string;
   databaseUrl?: string;
-}): Promise<{
+};
+
+type DatabaseQueryResult = {
   status: string;
   rows?: unknown;
   count?: number;
   error?: string;
-}> {
-  // Accept either dbQuery or query field name
+};
+
+function validateInput(input: DatabaseQueryInput): string | null {
   const queryString = input.dbQuery || input.query;
 
   if (!queryString || queryString.trim() === "") {
-    return {
-      status: "error",
-      error: "SQL query is required",
-    };
+    return "SQL query is required";
   }
 
   if (!input.databaseUrl || input.databaseUrl.trim() === "") {
+    return "Database URL is required. Please configure it in Project Integrations.";
+  }
+
+  return null;
+}
+
+function createDatabaseClient(databaseUrl: string): postgres.Sql {
+  return postgres(databaseUrl, {
+    max: 1,
+    connect_timeout: 10,
+    idle_timeout: 20,
+  });
+}
+
+async function executeQuery(
+  client: postgres.Sql,
+  queryString: string
+): Promise<unknown> {
+  const db = drizzle(client);
+  return await db.execute(sql.raw(queryString));
+}
+
+function getErrorMessage(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return "Unknown database error";
+  }
+
+  const errorMessage = error.message;
+
+  if (errorMessage.includes("ECONNREFUSED")) {
+    return "Connection refused. Please check your database URL and ensure the database is running.";
+  }
+  if (errorMessage.includes("ENOTFOUND")) {
+    return "Database host not found. Please check your database URL.";
+  }
+  if (errorMessage.includes("authentication failed")) {
+    return "Authentication failed. Please check your database credentials.";
+  }
+  if (errorMessage.includes("does not exist")) {
+    return `Database error: ${errorMessage}`;
+  }
+
+  return errorMessage;
+}
+
+async function cleanupClient(client: postgres.Sql | null): Promise<void> {
+  if (client) {
+    try {
+      await client.end();
+    } catch {
+      // Ignore errors during cleanup
+    }
+  }
+}
+
+export async function databaseQueryStep(
+  input: DatabaseQueryInput
+): Promise<DatabaseQueryResult> {
+  const validationError = validateInput(input);
+  if (validationError) {
     return {
       status: "error",
-      error:
-        "Database URL is required. Please configure it in Project Integrations.",
+      error: validationError,
     };
   }
 
+  // At this point, validation ensures these are defined
+  const queryString = (input.dbQuery || input.query) as string;
+  const databaseUrl = input.databaseUrl as string;
+  let client: postgres.Sql | null = null;
+
   try {
-    // Create a connection to the custom database
-    const client = postgres(input.databaseUrl, { max: 1 });
-    const db = drizzle(client);
-
-    // Execute the query
-    const result = await db.execute(sql.raw(queryString));
-
-    // Close the connection
+    client = createDatabaseClient(databaseUrl);
+    const result = await executeQuery(client, queryString);
     await client.end();
 
     return {
@@ -51,9 +109,10 @@ export async function databaseQueryStep(input: {
       count: Array.isArray(result) ? result.length : 0,
     };
   } catch (error) {
+    await cleanupClient(client);
     return {
       status: "error",
-      error: error instanceof Error ? error.message : "Unknown database error",
+      error: getErrorMessage(error),
     };
   }
 }

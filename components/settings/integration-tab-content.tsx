@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { CopyFromWorkflowSelect } from "./copy-from-workflow-select";
 
 type IntegrationTabContentProps = {
   children: React.ReactNode;
@@ -7,15 +6,9 @@ type IntegrationTabContentProps = {
   saving: boolean;
   onSave: () => void;
   onRemove: () => void;
-  workflowId: string | null;
-  onCopyIntegrations: (integrations: {
-    resendApiKey: string | null;
-    resendFromEmail: string | null;
-    linearApiKey: string | null;
-    slackApiKey: string | null;
-    aiGatewayApiKey: string | null;
-    databaseUrl: string | null;
-  }) => void;
+  onTestConnection?: () => void;
+  onImport?: () => void;
+  testing?: boolean;
 };
 
 export function IntegrationTabContent({
@@ -24,25 +17,40 @@ export function IntegrationTabContent({
   saving,
   onSave,
   onRemove,
-  workflowId,
-  onCopyIntegrations,
+  onTestConnection,
+  onImport,
+  testing = false,
 }: IntegrationTabContentProps) {
   return (
     <>
-      <CopyFromWorkflowSelect
-        currentWorkflowId={workflowId}
-        onCopyIntegrations={onCopyIntegrations}
-      />
       {children}
-      <div className="mt-4 flex justify-end gap-2">
-        {hasKey && (
-          <Button disabled={saving} onClick={onRemove} variant="outline">
-            Remove
+      <div className="mt-4 flex justify-between gap-2">
+        <div className="flex gap-2">
+          {onImport && (
+            <Button disabled={saving} onClick={onImport} variant="outline">
+              Import
+            </Button>
+          )}
+          {onTestConnection && (
+            <Button
+              disabled={saving || testing}
+              onClick={onTestConnection}
+              variant="outline"
+            >
+              {testing ? "Testing..." : "Test Connection"}
+            </Button>
+          )}
+        </div>
+        <div className="flex gap-2">
+          {hasKey && (
+            <Button disabled={saving} onClick={onRemove} variant="outline">
+              Remove
+            </Button>
+          )}
+          <Button disabled={saving} onClick={onSave}>
+            {saving ? "Saving..." : "Save"}
           </Button>
-        )}
-        <Button disabled={saving} onClick={onSave}>
-          {saving ? "Saving..." : "Save"}
-        </Button>
+        </div>
       </div>
     </>
   );
