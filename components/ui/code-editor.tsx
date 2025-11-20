@@ -5,11 +5,11 @@ import { useTheme } from "next-themes";
 import { vercelDarkTheme } from "@/lib/monaco-theme";
 
 export function CodeEditor(props: EditorProps) {
-  const { theme } = useTheme();
+  const { resolvedTheme } = useTheme();
 
   const handleEditorMount: OnMount = (editor, monaco) => {
     monaco.editor.defineTheme("vercel-dark", vercelDarkTheme);
-    monaco.editor.setTheme(theme === "dark" ? "vercel-dark" : "light");
+    monaco.editor.setTheme(resolvedTheme === "dark" ? "vercel-dark" : "light");
 
     if (props.onMount) {
       props.onMount(editor, monaco);
@@ -20,7 +20,7 @@ export function CodeEditor(props: EditorProps) {
     <MonacoEditor
       {...props}
       onMount={handleEditorMount}
-      theme={theme === "dark" ? "vercel-dark" : "light"}
+      theme={resolvedTheme === "dark" ? "vercel-dark" : "light"}
     />
   );
 }
