@@ -1,0 +1,124 @@
+import { eq } from "drizzle-orm";
+import { nanoid } from "nanoid";
+import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { workflows } from "@/lib/db/schema";
+import { createProject } from "@/lib/integrations/vercel";
+import { generateId } from "@/lib/utils/id";
+
+// Helper function to create a default trigger node
+function createDefaultTriggerNode() {
+  return {
+    id: nanoid(),
+    type: "trigger" as const,
+    position: { x: 0, y: 0 },
+    data: {
+      label: "Trigger",
+      description: "Start your workflow",
+      type: "trigger" as const,
+      config: { triggerType: "Manual" },
+      status: "idle" as const,
+    },
+  };
+}
+
+export async function POST(request: Request) {
+  try {
+    const session = await auth.api.getSession({
+      headers: request.headers,
+    });
+
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await request.json();
+
+    if (!(body.name && body.nodes && body.edges)) {
+      return NextResponse.json(
+        { error: "Name, nodes, and edges are required" },
+        { status: 400 }
+      );
+    }
+
+    // Ensure there's always a trigger node (only add one if nodes array is empty)
+    let nodes = body.nodes;
+    if (nodes.length === 0) {
+      nodes = [createDefaultTriggerNode()];
+    }
+
+    // Generate "Untitled N" name if the provided name is "Untitled Workflow"
+    let workflowName = body.name;
+    if (body.name === "Untitled Workflow") {
+      const userWorkflows = await db.query.workflows.findMany({
+        where: eq(workflows.userId, session.user.id),
+      });
+      const count = userWorkflows.length + 1;
+      workflowName = `Untitled ${count}`;
+    }
+
+    // Generate workflow ID first
+    const workflowId = generateId();
+
+    // Get app-level Vercel credentials from env vars
+    const vercelApiToken = process.env.VERCEL_API_TOKEN;
+    const vercelTeamId = process.env.VERCEL_TEAM_ID;
+
+    if (!vercelApiToken) {
+      return NextResponse.json(
+        { error: "Vercel API token not configured" },
+        { status: 500 }
+      );
+    }
+
+    // Create Vercel project with workflow-builder-[workflowId] format
+    const vercelProjectName = `workflow-builder-${workflowId}`;
+    const result = await createProject({
+      name: vercelProjectName,
+      apiToken: vercelApiToken,
+      teamId: vercelTeamId,
+    });
+
+    if (result.status === "error") {
+      return NextResponse.json({ error: result.error }, { status: 500 });
+    }
+
+    if (!result.project) {
+      return NextResponse.json(
+        { error: "Failed to create project on Vercel" },
+        { status: 500 }
+      );
+    }
+
+    const [newWorkflow] = await db
+      .insert(workflows)
+      .values({
+        id: workflowId,
+        name: workflowName,
+        description: body.description,
+        nodes,
+        edges: body.edges,
+        userId: session.user.id,
+        vercelProjectId: result.project.id,
+        vercelProjectName,
+      })
+      .returning();
+
+    return NextResponse.json({
+      ...newWorkflow,
+      createdAt: newWorkflow.createdAt.toISOString(),
+      updatedAt: newWorkflow.updatedAt.toISOString(),
+      lastDeployedAt: newWorkflow.lastDeployedAt?.toISOString() || null,
+    });
+  } catch (error) {
+    console.error("Failed to create workflow:", error);
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to create workflow",
+      },
+      { status: 500 }
+    );
+  }
+}

@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { deleteExecutions } from "@/app/actions/workflow/delete-executions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,8 +24,8 @@ import { CodeEditor } from "@/components/ui/code-editor";
 import { Input } from "@/components/ui/input";
 import { IntegrationIcon } from "@/components/ui/integration-icon";
 import { Label } from "@/components/ui/label";
+import { api } from "@/lib/api-client";
 import { projectIntegrationsAtom } from "@/lib/integrations-store";
-import { workflowApi } from "@/lib/workflow-api";
 import { generateWorkflowCode } from "@/lib/workflow-codegen";
 import {
   currentWorkflowIdAtom,
@@ -217,7 +216,7 @@ const PanelInner = () => {
     }
 
     try {
-      await deleteExecutions(currentWorkflowId);
+      await api.workflow.deleteExecutions(currentWorkflowId);
       toast.success("All runs deleted");
       setShowDeleteRunsAlert(false);
     } catch (error) {
@@ -253,7 +252,7 @@ const PanelInner = () => {
     // Save to database if workflow exists
     if (currentWorkflowId) {
       try {
-        await workflowApi.update(currentWorkflowId, {
+        await api.workflow.update(currentWorkflowId, {
           name: newName,
           nodes,
           edges,

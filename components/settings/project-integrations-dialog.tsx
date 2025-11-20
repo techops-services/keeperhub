@@ -4,15 +4,6 @@ import { useSetAtom } from "jotai";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
-  testAiGatewayConnection,
-  testDatabaseConnection,
-  testLinearConnection,
-  testResendConnection,
-  testSlackConnection,
-} from "@/app/actions/integration/test-connection";
-import { getProjectIntegrations } from "@/app/actions/vercel-project/get-integrations";
-import { updateProjectIntegrations } from "@/app/actions/vercel-project/update-integrations";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -20,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { api } from "@/lib/api-client";
 import { projectIntegrationsAtom } from "@/lib/integrations-store";
 import { Spinner } from "../ui/spinner";
 import { AiGatewaySettings } from "./ai-gateway-settings";
@@ -208,7 +200,7 @@ export function ProjectIntegrationsDialog({
     }
 
     try {
-      const data = await getProjectIntegrations(workflowId);
+      const data = await api.vercelProject.getIntegrations(workflowId);
       setIntegrations(data);
       setProjectIntegrations(data);
 
@@ -248,7 +240,7 @@ export function ProjectIntegrationsDialog({
         aiGatewayApiKey,
         databaseUrl,
       });
-      await updateProjectIntegrations(workflowId, updates);
+      await api.vercelProject.updateIntegrations(workflowId, updates);
       await loadIntegrations();
       toast.success("Integrations updated successfully");
       onOpenChange(false);
@@ -268,7 +260,7 @@ export function ProjectIntegrationsDialog({
     setSavingIntegrations(true);
     try {
       const updates = buildUpdatesForRemove(type);
-      await updateProjectIntegrations(workflowId, updates);
+      await api.vercelProject.updateIntegrations(workflowId, updates);
       await loadIntegrations();
       clearFormFields(type, {
         setResendApiKey,
@@ -331,27 +323,7 @@ export function ProjectIntegrationsDialog({
 
     setTestingConnection(true);
     try {
-      let result: Awaited<ReturnType<typeof testResendConnection>>;
-
-      switch (type) {
-        case "resend":
-          result = await testResendConnection(workflowId);
-          break;
-        case "linear":
-          result = await testLinearConnection(workflowId);
-          break;
-        case "slack":
-          result = await testSlackConnection(workflowId);
-          break;
-        case "ai-gateway":
-          result = await testAiGatewayConnection(workflowId);
-          break;
-        case "database":
-          result = await testDatabaseConnection(workflowId);
-          break;
-        default:
-          throw new Error("Unknown integration type");
-      }
+      const result = await api.integration.testConnection(workflowId, type);
 
       if (result.status === "success") {
         toast.success(result.message);

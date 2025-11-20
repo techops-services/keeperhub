@@ -3,10 +3,11 @@
 import { HistoryIcon } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import type { SavedWorkflow } from "@/lib/api-client";
+import { api } from "@/lib/api-client";
 import { useSession } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 import { getRelativeTime } from "@/lib/utils/time";
-import { type SavedWorkflow, workflowApi } from "@/lib/workflow-api";
 import { Skeleton } from "../ui/skeleton";
 import { WorkflowsDialog } from "./workflows-dialog";
 
@@ -29,7 +30,7 @@ export const Recents = ({ limit }: RecentsProps = {}) => {
 
     try {
       setLoading(true);
-      const data = await workflowApi.getAll();
+      const data = await api.workflow.getAll();
       // Filter out the auto-save workflow
       const filtered = data.filter((w) => w.name !== "__current__");
       setWorkflows(filtered);

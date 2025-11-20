@@ -13,8 +13,7 @@ import {
 } from "lucide-react";
 import type { JSX } from "react";
 import { useCallback, useEffect, useState } from "react";
-import { getExecutionLogs } from "@/app/actions/workflow/get-execution-logs";
-import { getExecutions } from "@/app/actions/workflow/get-executions";
+import { api } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { getRelativeTime } from "@/lib/utils/time";
 import { currentWorkflowIdAtom } from "@/lib/workflow-store";
@@ -267,8 +266,8 @@ export function WorkflowRuns({
         if (showLoading) {
           setLoading(true);
         }
-        const data = await getExecutions(currentWorkflowId);
-        setExecutions(Array.isArray(data) ? data : []);
+        const data = await api.workflow.getExecutions(currentWorkflowId);
+        setExecutions(data as WorkflowExecution[]);
       } catch (error) {
         console.error("Failed to load executions:", error);
         setExecutions([]);
@@ -300,16 +299,28 @@ export function WorkflowRuns({
 
     const pollExecutions = async () => {
       try {
-        const data = await getExecutions(currentWorkflowId);
-        setExecutions(Array.isArray(data) ? data : []);
+        const data = await api.workflow.getExecutions(currentWorkflowId);
+        setExecutions(data as WorkflowExecution[]);
 
         // Also refresh logs for expanded runs
         for (const executionId of expandedRuns) {
           try {
-            const logsData = await getExecutionLogs(executionId);
+            const logsData = await api.workflow.getExecutionLogs(executionId);
             setLogs((prev) => ({
               ...prev,
-              [executionId]: Array.isArray(logsData.logs) ? logsData.logs : [],
+              [executionId]: logsData.logs.map((log) => ({
+                id: log.id,
+                nodeId: log.nodeId,
+                nodeName: log.nodeId,
+                nodeType: "action",
+                status: log.status,
+                startedAt: new Date(log.timestamp),
+                completedAt: null,
+                duration: null,
+                input: log.data,
+                output: log.data,
+                error: log.error,
+              })),
             }));
           } catch (error) {
             console.error(`Failed to refresh logs for ${executionId}:`, error);
@@ -326,10 +337,22 @@ export function WorkflowRuns({
 
   const loadExecutionLogs = async (executionId: string) => {
     try {
-      const data = await getExecutionLogs(executionId);
+      const data = await api.workflow.getExecutionLogs(executionId);
       setLogs((prev) => ({
         ...prev,
-        [executionId]: Array.isArray(data.logs) ? data.logs : [],
+        [executionId]: data.logs.map((log) => ({
+          id: log.id,
+          nodeId: log.nodeId,
+          nodeName: log.nodeId,
+          nodeType: "action",
+          status: log.status,
+          startedAt: new Date(log.timestamp),
+          completedAt: null,
+          duration: null,
+          input: log.data,
+          output: log.data,
+          error: log.error,
+        })),
       }));
     } catch (error) {
       console.error("Failed to load execution logs:", error);

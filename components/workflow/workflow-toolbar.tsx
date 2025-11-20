@@ -17,10 +17,6 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { deploy } from "@/app/actions/workflow/deploy";
-import { prepareWorkflowDownload } from "@/app/actions/workflow/download";
-import { getDeploymentStatus } from "@/app/actions/workflow/get-deployment-status";
-import { getExecutionStatus } from "@/app/actions/workflow/get-execution-status";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -49,9 +45,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { api } from "@/lib/api-client";
 import { useSession } from "@/lib/auth-client";
 import { VERCEL_DEPLOY_URL } from "@/lib/constants";
-import { workflowApi } from "@/lib/workflow-api";
 import {
   canRedoAtom,
   canUndoAtom,
@@ -166,7 +162,9 @@ async function executeTestWorkflow({
     // Poll for execution status updates
     const pollInterval = setInterval(async () => {
       try {
-        const statusData = await getExecutionStatus(result.executionId);
+        const statusData = await api.workflow.getExecutionStatus(
+          result.executionId
+        );
 
         // Update node statuses based on the execution logs
         for (const nodeStatus of statusData.nodeStatuses) {
@@ -284,7 +282,7 @@ function useWorkflowHandlers({
 
     setIsSaving(true);
     try {
-      await workflowApi.update(currentWorkflowId, { nodes, edges });
+      await api.workflow.update(currentWorkflowId, { nodes, edges });
       setHasUnsavedChanges(false);
     } catch (error) {
       console.error("Failed to save workflow:", error);
@@ -399,7 +397,8 @@ function useWorkflowState() {
       return;
     }
 
-    getDeploymentStatus(currentWorkflowId)
+    api.workflow
+      .getDeploymentStatus(currentWorkflowId)
       .then((data) => setDeploymentUrl(data.deploymentUrl || null))
       .catch((error) =>
         console.error("Failed to load deployment status:", error)
@@ -415,7 +414,7 @@ function useWorkflowState() {
   useEffect(() => {
     const loadAllWorkflows = async () => {
       try {
-        const workflows = await workflowApi.getAll();
+        const workflows = await api.workflow.getAll();
         setAllWorkflows(workflows);
       } catch (error) {
         console.error("Failed to load workflows:", error);
@@ -534,7 +533,7 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     }
 
     try {
-      await workflowApi.delete(currentWorkflowId);
+      await api.workflow.delete(currentWorkflowId);
       setShowDeleteDialog(false);
       toast.success("Workflow deleted successfully");
       router.push("/");
@@ -555,13 +554,13 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     }
 
     try {
-      await workflowApi.update(currentWorkflowId, {
+      await api.workflow.update(currentWorkflowId, {
         name: newWorkflowName,
       });
       setShowRenameDialog(false);
       setCurrentWorkflowName(newWorkflowName);
       toast.success("Workflow renamed successfully");
-      const workflows = await workflowApi.getAll();
+      const workflows = await api.workflow.getAll();
       setAllWorkflows(workflows);
     } catch (error) {
       console.error("Failed to rename workflow:", error);
@@ -575,7 +574,7 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     }
 
     try {
-      await workflowApi.update(currentWorkflowId, { nodes, edges });
+      await api.workflow.update(currentWorkflowId, { nodes, edges });
       return true;
     } catch {
       toast.error("Failed to save workflow before deployment");
@@ -584,7 +583,7 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
   };
 
   const executeDeployment = async (workflowIdParam: string) => {
-    const result = await deploy(workflowIdParam);
+    const result = await api.workflow.deploy(workflowIdParam);
 
     if (!result.success) {
       throw new Error(result.error || "Deployment failed");
@@ -634,7 +633,7 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     toast.info("Preparing workflow files for download...");
 
     try {
-      const result = await prepareWorkflowDownload(currentWorkflowId);
+      const result = await api.workflow.download(currentWorkflowId);
 
       if (!result.success) {
         throw new Error(result.error || "Failed to prepare download");
@@ -678,7 +677,7 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
 
   const loadWorkflows = async () => {
     try {
-      const workflows = await workflowApi.getAll();
+      const workflows = await api.workflow.getAll();
       setAllWorkflows(workflows);
     } catch (error) {
       console.error("Failed to load workflows:", error);

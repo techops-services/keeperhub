@@ -1,9 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getProjectIntegrations } from "@/app/actions/vercel-project/get-integrations";
-import { getAll } from "@/app/actions/workflow/get-all";
-import type { SavedWorkflow } from "@/app/actions/workflow/types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,6 +17,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { SavedWorkflow } from "@/lib/api-client";
+import { api } from "@/lib/api-client";
 
 type IntegrationType =
   | "resend"
@@ -68,7 +67,7 @@ export function ImportIntegrationsDialog({
       const loadWorkflows = async () => {
         setLoading(true);
         try {
-          const allWorkflows = await getAll();
+          const allWorkflows = await api.workflow.getAll();
           const filteredWorkflows = allWorkflows.filter(
             (w) => w.id !== currentWorkflowId
           );
@@ -85,7 +84,7 @@ export function ImportIntegrationsDialog({
   }, [open, currentWorkflowId]);
 
   const buildFilteredIntegrations = (
-    integrations: Awaited<ReturnType<typeof getProjectIntegrations>>
+    integrations: Awaited<ReturnType<typeof api.vercelProject.getIntegrations>>
   ) => ({
     resendApiKey:
       integrationType === "resend" ? integrations.resendApiKey : null,
@@ -107,7 +106,8 @@ export function ImportIntegrationsDialog({
 
     setImporting(true);
     try {
-      const integrations = await getProjectIntegrations(selectedWorkflowId);
+      const integrations =
+        await api.vercelProject.getIntegrations(selectedWorkflowId);
       const filteredIntegrations = buildFilteredIntegrations(integrations);
 
       onImport(filteredIntegrations);

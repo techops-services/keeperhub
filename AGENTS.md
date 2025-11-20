@@ -65,3 +65,16 @@ If any of the above commands fail or show errors:
   - `useSetAtom(atom)` - Use when you only need the setter function
   - Never use `useAtom` if you're only using one part (getter or setter)
 
+## API Architecture
+- **Use API Routes**: This project uses API routes instead of Next.js server actions
+- **API Client**: Always use the type-safe API client from `@/lib/api-client` for all backend calls
+- **No Server Actions**: Do not create or use server actions (files with `"use server"` directive)
+- **Import Pattern**: Import the API client as `import { api } from "@/lib/api-client"`
+- **Available APIs**:
+  - `api.ai.*` - AI operations (generate workflows)
+  - `api.integration.*` - Test integration connections
+  - `api.user.*` - User operations (get, update)
+  - `api.vercelProject.*` - Vercel project integrations
+  - `api.workflow.*` - Workflow CRUD and operations (create, update, delete, deploy, execute, etc.)
+- **No Barrel Files**: Do not create barrel/index files that re-export from other files
+

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { workflowApi } from "@/lib/workflow-api";
+import { api } from "@/lib/api-client";
 
 export default function WorkflowsPage() {
   const router = useRouter();
@@ -10,7 +10,7 @@ export default function WorkflowsPage() {
   useEffect(() => {
     const redirectToWorkflow = async () => {
       try {
-        const workflows = await workflowApi.getAll();
+        const workflows = await api.workflow.getAll();
         // Filter out the auto-save workflow
         const filtered = workflows.filter((w) => w.name !== "__current__");
 

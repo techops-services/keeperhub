@@ -1,9 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getProjectIntegrations } from "@/app/actions/vercel-project/get-integrations";
-import { getAll } from "@/app/actions/workflow/get-all";
-import type { SavedWorkflow } from "@/app/actions/workflow/types";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -12,6 +9,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { SavedWorkflow } from "@/lib/api-client";
+import { api } from "@/lib/api-client";
 
 type CopyFromWorkflowSelectProps = {
   currentWorkflowId: string | null;
@@ -36,7 +35,7 @@ export function CopyFromWorkflowSelect({
   useEffect(() => {
     const loadWorkflows = async () => {
       try {
-        const allWorkflows = await getAll();
+        const allWorkflows = await api.workflow.getAll();
         const filteredWorkflows = allWorkflows.filter(
           (w) => w.id !== currentWorkflowId
         );
@@ -58,7 +57,7 @@ export function CopyFromWorkflowSelect({
 
     setCopying(true);
     try {
-      const integrations = await getProjectIntegrations(workflowId);
+      const integrations = await api.vercelProject.getIntegrations(workflowId);
       onCopyIntegrations({
         resendApiKey: integrations.resendApiKey,
         resendFromEmail: integrations.resendFromEmail,

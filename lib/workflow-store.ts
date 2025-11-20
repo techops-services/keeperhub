@@ -1,7 +1,7 @@
 import type { Edge, EdgeChange, Node, NodeChange } from "@xyflow/react";
 import { applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
 import { atom } from "jotai";
-import { workflowApi } from "./workflow-api";
+import { api } from "./api-client";
 
 export type WorkflowNodeType = "trigger" | "action" | "add";
 
@@ -328,7 +328,7 @@ export const clearWorkflowAtom = atom(null, (get, set) => {
 export const loadWorkflowAtom = atom(null, async (_get, set) => {
   try {
     set(isLoadingAtom, true);
-    const workflow = await workflowApi.getCurrent();
+    const workflow = await api.workflow.getCurrent();
     set(nodesAtom, workflow.nodes);
     set(edgesAtom, workflow.edges);
     if (workflow.id) {
@@ -353,7 +353,7 @@ export const saveWorkflowAsAtom = atom(
     const edges = get(edgesAtom);
 
     try {
-      const workflow = await workflowApi.create({
+      const workflow = await api.workflow.create({
         name,
         description,
         nodes,

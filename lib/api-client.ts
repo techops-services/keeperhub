@@ -1,0 +1,352 @@
+/**
+ * API Client for making type-safe API calls to the backend
+ * Replaces server actions with API endpoints
+ */
+
+import type { WorkflowEdge, WorkflowNode } from "./workflow-store";
+
+// Workflow data types
+export type WorkflowData = {
+  id?: string;
+  name?: string;
+  description?: string;
+  nodes: WorkflowNode[];
+  edges: WorkflowEdge[];
+  vercelProjectId?: string | null;
+};
+
+export type SavedWorkflow = WorkflowData & {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  vercelProject?: {
+    id: string;
+    name: string;
+    vercelProjectId: string;
+  } | null;
+};
+
+// API error class
+export class ApiError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+    this.name = "ApiError";
+  }
+}
+
+// Helper function to make API calls
+async function apiCall<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(endpoint, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
+    throw new ApiError(response.status, error.error || "Request failed");
+  }
+
+  return response.json();
+}
+
+// AI API
+export const aiApi = {
+  generate: (prompt: string) =>
+    apiCall<WorkflowData>("/api/ai/generate", {
+      method: "POST",
+      body: JSON.stringify({ prompt }),
+    }),
+};
+
+// Integration API
+export const integrationApi = {
+  testConnection: (workflowId: string, integrationType: string) =>
+    apiCall<{ status: "success" | "error"; message: string }>(
+      "/api/integration/test-connection",
+      {
+        method: "POST",
+        body: JSON.stringify({ workflowId, integrationType }),
+      }
+    ),
+};
+
+// User API
+export const userApi = {
+  get: () =>
+    apiCall<{
+      id: string;
+      name: string | null;
+      email: string;
+      image: string | null;
+      isAnonymous: boolean | null;
+    }>("/api/user"),
+
+  update: (data: { name?: string; email?: string }) =>
+    apiCall<{ success: boolean }>("/api/user", {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+};
+
+// Vercel Project API
+export const vercelProjectApi = {
+  getIntegrations: (workflowId: string) =>
+    apiCall<{
+      resendApiKey: string | null;
+      resendFromEmail: string | null;
+      linearApiKey: string | null;
+      slackApiKey: string | null;
+      aiGatewayApiKey: string | null;
+      databaseUrl: string | null;
+      hasResendKey: boolean;
+      hasLinearKey: boolean;
+      hasSlackKey: boolean;
+      hasAiGatewayKey: boolean;
+      hasDatabaseUrl: boolean;
+    }>(`/api/vercel-project/${workflowId}/integrations`),
+
+  updateIntegrations: (
+    workflowId: string,
+    data: {
+      resendApiKey?: string | null;
+      resendFromEmail?: string | null;
+      linearApiKey?: string | null;
+      slackApiKey?: string | null;
+      aiGatewayApiKey?: string | null;
+      databaseUrl?: string | null;
+    }
+  ) =>
+    apiCall<{ success: boolean }>(
+      `/api/vercel-project/${workflowId}/integrations/update`,
+      {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }
+    ),
+};
+
+// Workflow API
+export const workflowApi = {
+  // Get all workflows
+  getAll: () => apiCall<SavedWorkflow[]>("/api/workflows"),
+
+  // Get a specific workflow
+  getById: (id: string) => apiCall<SavedWorkflow>(`/api/workflows/${id}`),
+
+  // Create a new workflow
+  create: (workflow: Omit<WorkflowData, "id">) =>
+    apiCall<SavedWorkflow>("/api/workflows/create", {
+      method: "POST",
+      body: JSON.stringify(workflow),
+    }),
+
+  // Update a workflow
+  update: (id: string, workflow: Partial<WorkflowData>) =>
+    apiCall<SavedWorkflow>(`/api/workflows/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(workflow),
+    }),
+
+  // Delete a workflow
+  delete: (id: string) =>
+    apiCall<{ success: boolean }>(`/api/workflows/${id}`, {
+      method: "DELETE",
+    }),
+
+  // Get current workflow state
+  getCurrent: () => apiCall<WorkflowData>("/api/workflows/current"),
+
+  // Save current workflow state
+  saveCurrent: (nodes: WorkflowNode[], edges: WorkflowEdge[]) =>
+    apiCall<WorkflowData>("/api/workflows/current", {
+      method: "POST",
+      body: JSON.stringify({ nodes, edges }),
+    }),
+
+  // Deploy workflow
+  deploy: (id: string) =>
+    apiCall<{
+      success: boolean;
+      deploymentUrl?: string;
+      error?: string;
+      logs?: string[];
+    }>(`/api/workflows/${id}/deploy`, {
+      method: "POST",
+    }),
+
+  // Execute workflow
+  execute: (id: string, input: Record<string, unknown> = {}) =>
+    apiCall<{
+      executionId: string;
+      status: string;
+      output?: unknown;
+      error?: string;
+      duration?: number;
+    }>(`/api/workflow/${id}/execute`, {
+      method: "POST",
+      body: JSON.stringify({ input }),
+    }),
+
+  // Get workflow code
+  getCode: (id: string) =>
+    apiCall<{ code: string; workflowName: string }>(
+      `/api/workflows/${id}/code`
+    ),
+
+  // Get deployment status
+  getDeploymentStatus: (id: string) =>
+    apiCall<{
+      id: string;
+      name: string;
+      deploymentStatus: string;
+      deploymentUrl?: string | null;
+      lastDeployedAt?: Date | null;
+    }>(`/api/workflows/${id}/deployment-status`),
+
+  // Get executions
+  getExecutions: (id: string) =>
+    apiCall<
+      Array<{
+        id: string;
+        workflowId: string;
+        userId: string;
+        status: string;
+        input: unknown;
+        output: unknown;
+        error: string | null;
+        startedAt: Date;
+        completedAt: Date | null;
+        duration: string | null;
+      }>
+    >(`/api/workflows/${id}/executions`),
+
+  // Delete executions
+  deleteExecutions: (id: string) =>
+    apiCall<{ success: boolean; deletedCount: number }>(
+      `/api/workflows/${id}/executions`,
+      {
+        method: "DELETE",
+      }
+    ),
+
+  // Get execution logs
+  getExecutionLogs: (executionId: string) =>
+    apiCall<{
+      execution: {
+        id: string;
+        workflowId: string;
+        userId: string;
+        status: string;
+        input: unknown;
+        output: unknown;
+        error: string | null;
+        startedAt: Date;
+        completedAt: Date | null;
+        duration: string | null;
+      };
+      logs: Array<{
+        id: string;
+        executionId: string;
+        nodeId: string;
+        status: "pending" | "running" | "success" | "error";
+        data: unknown;
+        error: string | null;
+        timestamp: Date;
+      }>;
+    }>(`/api/workflows/executions/${executionId}/logs`),
+
+  // Get execution status
+  getExecutionStatus: (executionId: string) =>
+    apiCall<{
+      status: string;
+      nodeStatuses: Array<{
+        nodeId: string;
+        status: "pending" | "running" | "success" | "error";
+      }>;
+    }>(`/api/workflows/executions/${executionId}/status`),
+
+  // Download workflow
+  download: (id: string) =>
+    apiCall<{
+      success: boolean;
+      files?: Record<string, string>;
+      error?: string;
+    }>(`/api/workflows/${id}/download`),
+
+  // Auto-save with debouncing (kept for backwards compatibility)
+  autoSaveCurrent: (() => {
+    let autosaveTimeout: NodeJS.Timeout | null = null;
+    const AUTOSAVE_DELAY = 2000;
+
+    return (nodes: WorkflowNode[], edges: WorkflowEdge[]): void => {
+      if (autosaveTimeout) {
+        clearTimeout(autosaveTimeout);
+      }
+
+      autosaveTimeout = setTimeout(() => {
+        workflowApi.saveCurrent(nodes, edges).catch((error) => {
+          console.error("Auto-save failed:", error);
+        });
+      }, AUTOSAVE_DELAY);
+    };
+  })(),
+
+  // Auto-save specific workflow with debouncing
+  autoSaveWorkflow: (() => {
+    let autosaveTimeout: NodeJS.Timeout | null = null;
+    const AUTOSAVE_DELAY = 2000;
+
+    return (
+      id: string,
+      data: Partial<WorkflowData>,
+      debounce = true
+    ): Promise<SavedWorkflow> | undefined => {
+      if (!debounce) {
+        return workflowApi.update(id, data);
+      }
+
+      if (autosaveTimeout) {
+        clearTimeout(autosaveTimeout);
+      }
+
+      autosaveTimeout = setTimeout(() => {
+        workflowApi.update(id, data).catch((error) => {
+          console.error("Auto-save failed:", error);
+        });
+      }, AUTOSAVE_DELAY);
+    };
+  })(),
+};
+
+// Export all APIs as a single object
+export const api = {
+  ai: aiApi,
+  integration: integrationApi,
+  user: userApi,
+  vercelProject: vercelProjectApi,
+  workflow: workflowApi,
+};
+
+// Export ProjectIntegrations type
+export type ProjectIntegrations = {
+  resendApiKey: string | null;
+  resendFromEmail: string | null;
+  linearApiKey: string | null;
+  slackApiKey: string | null;
+  aiGatewayApiKey: string | null;
+  databaseUrl: string | null;
+  hasResendKey: boolean;
+  hasLinearKey: boolean;
+  hasSlackKey: boolean;
+  hasAiGatewayKey: boolean;
+  hasDatabaseUrl: boolean;
+};

@@ -6,9 +6,6 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { use, useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { generate } from "@/app/actions/ai/generate";
-import { getProjectIntegrations } from "@/app/actions/vercel-project/get-integrations";
-import { getExecutionStatus } from "@/app/actions/workflow/get-execution-status";
 import { Button } from "@/components/ui/button";
 import {
   ResizableHandle,
@@ -18,8 +15,8 @@ import {
 import { NodeConfigPanel } from "@/components/workflow/node-config-panel";
 import { WorkflowCanvas } from "@/components/workflow/workflow-canvas";
 import { WorkflowToolbar } from "@/components/workflow/workflow-toolbar";
+import { api } from "@/lib/api-client";
 import { projectIntegrationsAtom } from "@/lib/integrations-store";
-import { workflowApi } from "@/lib/workflow-api";
 import {
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
@@ -65,7 +62,8 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   useEffect(() => {
     const loadIntegrations = async () => {
       try {
-        const integrations = await getProjectIntegrations(workflowId);
+        const integrations =
+          await api.vercelProject.getIntegrations(workflowId);
         setProjectIntegrations(integrations);
       } catch (error) {
         console.error("Failed to load integrations:", error);
@@ -83,7 +81,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
       setCurrentWorkflowName("AI Generated Workflow");
 
       try {
-        const workflowData = await generate(prompt);
+        const workflowData = await api.ai.generate(prompt);
 
         setNodes(workflowData.nodes || []);
         setEdges(workflowData.edges || []);
@@ -96,7 +94,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
           setSelectedNodeId(selectedNode.id);
         }
 
-        await workflowApi.update(workflowId, {
+        await api.workflow.update(workflowId, {
           name: workflowData.name,
           description: workflowData.description,
           nodes: workflowData.nodes,
@@ -123,7 +121,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   // Helper function to load existing workflow
   const loadExistingWorkflow = useCallback(async () => {
     try {
-      const workflow = await workflowApi.getById(workflowId);
+      const workflow = await api.workflow.getById(workflowId);
 
       if (!workflow) {
         setWorkflowNotFound(true);
@@ -198,7 +196,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
     }
     setIsSaving(true);
     try {
-      await workflowApi.update(currentWorkflowId, { nodes, edges });
+      await api.workflow.update(currentWorkflowId, { nodes, edges });
       setHasUnsavedChanges(false);
     } catch (error) {
       console.error("Failed to save workflow:", error);
@@ -229,7 +227,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   const pollExecutionStatus = useCallback(
     async (executionId: string) => {
       try {
-        const statusData = await getExecutionStatus(executionId);
+        const statusData = await api.workflow.getExecutionStatus(executionId);
 
         // Update node statuses based on the execution logs
         for (const nodeStatus of statusData.nodeStatuses) {

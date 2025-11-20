@@ -21,9 +21,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import type { SavedWorkflow } from "@/lib/api-client";
+import { api } from "@/lib/api-client";
 import { useSession } from "@/lib/auth-client";
 import { getRelativeTime } from "@/lib/utils/time";
-import { type SavedWorkflow, workflowApi } from "@/lib/workflow-api";
 import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";
 
@@ -46,7 +47,7 @@ export const WorkflowsDialog = () => {
 
     try {
       setLoading(true);
-      const data = await workflowApi.getAll();
+      const data = await api.workflow.getAll();
       // Filter out the auto-save workflow
       const filtered = data.filter((w) => w.name !== "__current__");
       setWorkflows(filtered);
@@ -88,7 +89,7 @@ export const WorkflowsDialog = () => {
     setDeleting(true);
     try {
       await Promise.all(
-        Array.from(selectedIds).map((id) => workflowApi.delete(id))
+        Array.from(selectedIds).map((id) => api.workflow.delete(id))
       );
       setSelectedIds(new Set());
       await loadWorkflows();

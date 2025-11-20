@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { WorkflowPrompt } from "@/components/workflows/workflow-prompt";
+import { api } from "@/lib/api-client";
 import { useSession } from "@/lib/auth-client";
-import { workflowApi } from "@/lib/workflow-api";
 
 export const WorkflowIndexPrompt = () => {
   const { data: session } = useSession();
@@ -21,7 +21,7 @@ export const WorkflowIndexPrompt = () => {
 
     try {
       // Create workflow with empty nodes/edges - trigger will be added automatically
-      const newWorkflow = await workflowApi.create({
+      const newWorkflow = await api.workflow.create({
         name: "Untitled Workflow",
         description: "",
         nodes: [],

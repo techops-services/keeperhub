@@ -1,8 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { get as getUser } from "@/app/actions/user/get";
-import { update as updateUser } from "@/app/actions/user/update";
 import {
   Dialog,
   DialogContent,
@@ -10,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { api } from "@/lib/api-client";
 import { Spinner } from "../ui/spinner";
 import { AccountSettings } from "./account-settings";
 
@@ -27,7 +26,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
   const loadAccount = useCallback(async () => {
     try {
-      const data = await getUser();
+      const data = await api.user.get();
       setAccountName(data.name || "");
       setAccountEmail(data.email || "");
     } catch (error) {
@@ -52,7 +51,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
   const saveAccount = async () => {
     try {
-      await updateUser({ name: accountName, email: accountEmail });
+      await api.user.update({ name: accountName, email: accountEmail });
       await loadAccount();
     } catch (error) {
       console.error("Failed to save account:", error);

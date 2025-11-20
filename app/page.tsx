@@ -8,8 +8,8 @@ import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { WorkflowCanvas } from "@/components/workflow/workflow-canvas";
 import { WorkflowToolbar } from "@/components/workflow/workflow-toolbar";
+import { api } from "@/lib/api-client";
 import { authClient, useSession } from "@/lib/auth-client";
-import { workflowApi } from "@/lib/workflow-api";
 import {
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
@@ -102,7 +102,7 @@ const Home = () => {
         await ensureSession();
 
         // Create workflow with all real nodes
-        const newWorkflow = await workflowApi.create({
+        const newWorkflow = await api.workflow.create({
           name: "Untitled Workflow",
           description: "",
           nodes: realNodes,

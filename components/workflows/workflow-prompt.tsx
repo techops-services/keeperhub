@@ -12,8 +12,8 @@ import {
   PromptInputSubmit,
   PromptInputTextarea,
 } from "@/components/ai-elements/prompt-input";
+import { api } from "@/lib/api-client";
 import { useSession } from "@/lib/auth-client";
-import { workflowApi } from "@/lib/workflow-api";
 
 export function WorkflowPrompt() {
   const [prompt, setPrompt] = useState("");
@@ -38,7 +38,7 @@ export function WorkflowPrompt() {
 
     try {
       // Create a new workflow (project will be auto-created with it)
-      const workflow = await workflowApi.create({
+      const workflow = await api.workflow.create({
         name: "Untitled Workflow",
         nodes: [],
         edges: [],
