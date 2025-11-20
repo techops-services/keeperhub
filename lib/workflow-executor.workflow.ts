@@ -383,7 +383,10 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
 
       // Store results
       results[nodeId] = result;
-      outputs[nodeId] = {
+
+      // Store outputs with sanitized nodeId for template variable lookup
+      const sanitizedNodeId = nodeId.replace(/[^a-zA-Z0-9]/g, "_");
+      outputs[sanitizedNodeId] = {
         label: node.data.label || nodeId,
         data: result.data,
       };
