@@ -26,6 +26,7 @@ export type WorkflowExecutionInput = {
  * IMPORTANT: Steps receive only the workflow ID as a reference to fetch credentials.
  * This prevents credentials from being logged in Vercel's workflow observability.
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Action type dispatch requires branching logic
 async function executeActionStep(input: {
   actionType: string;
   config: Record<string, unknown>;
@@ -33,6 +34,51 @@ async function executeActionStep(input: {
   workflowId?: string;
 }) {
   const { actionType, config, workflowId } = input;
+
+  // Helper to replace template variables in conditions
+  // biome-ignore lint/nursery/useMaxParams: Helper function needs all parameters for template replacement
+  function replaceTemplateVariable(
+    match: string,
+    nodeId: string,
+    rest: string,
+    evalContext: Record<string, unknown>,
+    varCounter: { value: number }
+  ): string {
+    const sanitizedNodeId = nodeId.replace(/[^a-zA-Z0-9]/g, "_");
+    const output = input.outputs[sanitizedNodeId];
+
+    if (!output) {
+      console.log("[Condition] Output not found for node:", sanitizedNodeId);
+      return match;
+    }
+
+    const dotIndex = rest.indexOf(".");
+    let value: unknown;
+
+    if (dotIndex === -1) {
+      value = output.data;
+    } else {
+      const fieldPath = rest.substring(dotIndex + 1);
+      const fields = fieldPath.split(".");
+      // biome-ignore lint/suspicious/noExplicitAny: Dynamic data traversal
+      let current: any = output.data;
+
+      for (const field of fields) {
+        if (current && typeof current === "object") {
+          current = current[field];
+        } else {
+          console.log("[Condition] Field access failed:", fieldPath);
+          return match;
+        }
+      }
+      value = current;
+    }
+
+    const varName = `__v${varCounter.value}`;
+    varCounter.value += 1;
+    evalContext[varName] = value;
+    return varName;
+  }
 
   // Build step input WITHOUT credentials, but WITH workflowId reference
   // Steps will fetch credentials internally using this reference
@@ -83,8 +129,58 @@ async function executeActionStep(input: {
     }
     if (actionType === "Condition") {
       const { conditionStep } = await import("./steps/condition");
+      // Special handling for condition: process templates and evaluate as JavaScript
+      // The condition field is kept as original template string for proper evaluation
+      const conditionExpression = stepInput.condition;
+      let evaluatedCondition: boolean;
+
+      console.log("[Condition] Original expression:", conditionExpression);
+
+      if (typeof conditionExpression === "boolean") {
+        evaluatedCondition = conditionExpression;
+      } else if (typeof conditionExpression === "string") {
+        try {
+          const evalContext: Record<string, unknown> = {};
+          let transformedExpression = conditionExpression;
+          const templatePattern = /\{\{@([^:]+):([^}]+)\}\}/g;
+          const varCounter = { value: 0 };
+
+          transformedExpression = transformedExpression.replace(
+            templatePattern,
+            (match, nodeId, rest) =>
+              replaceTemplateVariable(
+                match,
+                nodeId,
+                rest,
+                evalContext,
+                varCounter
+              )
+          );
+
+          const varNames = Object.keys(evalContext);
+          const varValues = Object.values(evalContext);
+
+          const evalFunc = new Function(
+            ...varNames,
+            `return (${transformedExpression});`
+          );
+          const result = evalFunc(...varValues);
+          evaluatedCondition = Boolean(result);
+        } catch (error) {
+          console.error("[Condition] Failed to evaluate condition:", error);
+          console.error("[Condition] Expression was:", conditionExpression);
+          // If evaluation fails, treat as false to be safe
+          evaluatedCondition = false;
+        }
+      } else {
+        // Coerce to boolean for other types
+        evaluatedCondition = Boolean(conditionExpression);
+      }
+
+      console.log("[Condition] Final result:", evaluatedCondition);
+
       // biome-ignore lint/suspicious/noExplicitAny: Dynamic step input type
-      return await conditionStep(stepInput as any);
+      return await conditionStep({ condition: evaluatedCondition } as any);
     }
 
     // Fallback for unknown action types
@@ -126,7 +222,15 @@ function processTemplates(
 
           const dotIndex = rest.indexOf(".");
           if (dotIndex === -1) {
-            return String(output.data);
+            // No field path, return the entire output data
+            const data = output.data;
+            if (data === null || data === undefined) {
+              return match;
+            }
+            if (typeof data === "object") {
+              return JSON.stringify(data);
+            }
+            return String(data);
           }
 
           const fieldPath = rest.substring(dotIndex + 1);
@@ -142,7 +246,14 @@ function processTemplates(
             }
           }
 
-          return String(current ?? match);
+          // Convert value to string, using JSON.stringify for objects/arrays
+          if (current === null || current === undefined) {
+            return match;
+          }
+          if (typeof current === "object") {
+            return JSON.stringify(current);
+          }
+          return String(current);
         }
       );
 
@@ -294,12 +405,40 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
 
       if (node.data.type === "trigger") {
         console.log("[Workflow Executor] Executing trigger node");
-        logInfo = await logNodeStart(node, triggerInput);
 
-        // Trigger nodes just pass through the input
+        const config = node.data.config || {};
+        const triggerType = config.triggerType as string;
+        let triggerData: Record<string, unknown> = {
+          triggered: true,
+          timestamp: Date.now(),
+        };
+
+        // Handle webhook mock request for test runs
+        if (triggerType === "Webhook" && config.webhookMockRequest) {
+          try {
+            const mockData = JSON.parse(config.webhookMockRequest as string);
+            triggerData = { ...triggerData, ...mockData };
+            console.log(
+              "[Workflow Executor] Using webhook mock request data:",
+              mockData
+            );
+          } catch (error) {
+            console.error(
+              "[Workflow Executor] Failed to parse webhook mock request:",
+              error
+            );
+            triggerData = { ...triggerData, ...triggerInput };
+          }
+        } else if (triggerInput && Object.keys(triggerInput).length > 0) {
+          // Use provided trigger input
+          triggerData = { ...triggerData, ...triggerInput };
+        }
+
+        logInfo = await logNodeStart(node, triggerData);
+
         result = {
           success: true,
-          data: { ...triggerInput, triggered: true, timestamp: Date.now() },
+          data: triggerData,
         };
 
         await logNodeComplete({
@@ -314,8 +453,20 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
 
         console.log("[Workflow Executor] Executing action node:", actionType);
 
-        // Process templates in config
-        const processedConfig = processTemplates(config, outputs);
+        // Process templates in config, but keep condition unprocessed for special handling
+        const configWithoutCondition = { ...config };
+        const originalCondition = config.condition;
+        configWithoutCondition.condition = undefined;
+
+        const processedConfig = processTemplates(
+          configWithoutCondition,
+          outputs
+        );
+
+        // Add back the original condition (unprocessed)
+        if (originalCondition !== undefined) {
+          processedConfig.condition = originalCondition;
+        }
 
         // Log the input BEFORE enriching with credentials
         // This ensures API keys are never stored in logs
@@ -380,14 +531,46 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
 
       // Execute next nodes
       if (result.success) {
-        const nextNodes = edgesBySource.get(nodeId) || [];
-        console.log(
-          "[Workflow Executor] Executing",
-          nextNodes.length,
-          "next nodes"
-        );
-        for (const nextNodeId of nextNodes) {
-          await executeNode(nextNodeId, visited);
+        // Check if this is a condition node
+        const isConditionNode =
+          node.data.type === "action" &&
+          node.data.config?.actionType === "Condition";
+
+        if (isConditionNode) {
+          // For condition nodes, only execute next nodes if condition is true
+          const conditionResult = (result.data as { condition?: boolean })
+            ?.condition;
+          console.log(
+            "[Workflow Executor] Condition node result:",
+            conditionResult
+          );
+
+          if (conditionResult === true) {
+            const nextNodes = edgesBySource.get(nodeId) || [];
+            console.log(
+              "[Workflow Executor] Condition is true, executing",
+              nextNodes.length,
+              "next nodes"
+            );
+            for (const nextNodeId of nextNodes) {
+              await executeNode(nextNodeId, visited);
+            }
+          } else {
+            console.log(
+              "[Workflow Executor] Condition is false, skipping next nodes"
+            );
+          }
+        } else {
+          // For non-condition nodes, execute all next nodes
+          const nextNodes = edgesBySource.get(nodeId) || [];
+          console.log(
+            "[Workflow Executor] Executing",
+            nextNodes.length,
+            "next nodes"
+          );
+          for (const nextNodeId of nextNodes) {
+            await executeNode(nextNodeId, visited);
+          }
         }
       }
     } catch (error) {

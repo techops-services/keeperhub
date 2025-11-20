@@ -191,8 +191,17 @@
   height: 12px !important;
   border: 2px solid var(--border) !important;
   background: var(--primary) !important;
-  cursor: pointer !important;
+  cursor: crosshair !important;
   z-index: 20 !important;
+}
+
+/* Make handles bigger on mobile for easier interaction */
+@media (max-width: 768px) {
+  .react-flow__handle {
+    width: 20px !important;
+    height: 20px !important;
+    border: 3px solid var(--border) !important;
+  }
 }
 
 .react-flow__handle-left {
