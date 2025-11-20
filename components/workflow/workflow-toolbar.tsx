@@ -195,10 +195,10 @@ async function executeTestWorkflow({
 
           setIsExecuting(false);
 
-          // Reset node statuses after 2 seconds
+          // Reset node statuses after 5 seconds
           setTimeout(() => {
             updateNodesStatus(nodes, updateNodeData, "idle");
-          }, 2000);
+          }, 5000);
         }
       } catch (error) {
         console.error("Failed to poll execution status:", error);

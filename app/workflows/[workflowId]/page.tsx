@@ -314,10 +314,10 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
 
           setIsExecuting(false);
 
-          // Reset node statuses after 2 seconds
+          // Reset node statuses after 5 seconds
           setTimeout(() => {
             updateAllNodeStatuses("idle");
-          }, 2000);
+          }, 5000);
         }
       }, 500); // Poll every 500ms
 
