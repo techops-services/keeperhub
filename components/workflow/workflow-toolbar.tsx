@@ -59,7 +59,9 @@ import {
   isGeneratingAtom,
   isSavingAtom,
   nodesAtom,
+  propertiesPanelActiveTabAtom,
   redoAtom,
+  selectedNodeAtom,
   showClearDialogAtom,
   showDeleteDialogAtom,
   undoAtom,
@@ -247,6 +249,10 @@ type WorkflowHandlerParams = {
   setIsSaving: (value: boolean) => void;
   setHasUnsavedChanges: (value: boolean) => void;
   deploymentUrl: string | null;
+  setActiveTab: (value: string) => void;
+  setNodes: (nodes: WorkflowNode[]) => void;
+  setEdges: (edges: WorkflowEdge[]) => void;
+  setSelectedNodeId: (id: string | null) => void;
 };
 
 function useWorkflowHandlers({
@@ -259,6 +265,10 @@ function useWorkflowHandlers({
   setIsSaving,
   setHasUnsavedChanges,
   deploymentUrl,
+  setActiveTab,
+  setNodes,
+  setEdges,
+  setSelectedNodeId,
 }: WorkflowHandlerParams) {
   const [runMode, setRunMode] = useState<"test" | "production">("test");
   const [showUnsavedRunDialog, setShowUnsavedRunDialog] = useState(false);
@@ -325,6 +335,14 @@ function useWorkflowHandlers({
       return;
     }
 
+    // Switch to Runs tab when starting a test run
+    setActiveTab("runs");
+
+    // Deselect all nodes and edges
+    setNodes(nodes.map((node) => ({ ...node, selected: false })));
+    setEdges(edges.map((edge) => ({ ...edge, selected: false })));
+    setSelectedNodeId(null);
+
     setIsExecuting(true);
     await executeTestWorkflow({
       workflowId: currentWorkflowId,
@@ -352,8 +370,8 @@ function useWorkflowHandlers({
 
 // Hook for workflow state management
 function useWorkflowState() {
-  const [nodes] = useAtom(nodesAtom);
-  const [edges] = useAtom(edgesAtom);
+  const [nodes, setNodes] = useAtom(nodesAtom);
+  const [edges, setEdges] = useAtom(edgesAtom);
   const [isExecuting, setIsExecuting] = useAtom(isExecutingAtom);
   const [isGenerating] = useAtom(isGeneratingAtom);
   const clearWorkflow = useSetAtom(clearWorkflowAtom);
@@ -374,6 +392,8 @@ function useWorkflowState() {
   const [canUndo] = useAtom(canUndoAtom);
   const [canRedo] = useAtom(canRedoAtom);
   const { data: session } = useSession();
+  const setActiveTab = useSetAtom(propertiesPanelActiveTabAtom);
+  const setSelectedNodeId = useSetAtom(selectedNodeAtom);
 
   const [isDeploying, setIsDeploying] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -462,6 +482,10 @@ function useWorkflowState() {
     setShowRenameDialog,
     newWorkflowName,
     setNewWorkflowName,
+    setActiveTab,
+    setNodes,
+    setEdges,
+    setSelectedNodeId,
   };
 }
 
@@ -489,6 +513,10 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     setIsDownloading,
     setDeploymentUrl,
     generatedCode,
+    setActiveTab,
+    setNodes,
+    setEdges,
+    setSelectedNodeId,
   } = state;
 
   const {
@@ -508,6 +536,10 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     setIsSaving,
     setHasUnsavedChanges,
     deploymentUrl,
+    setActiveTab,
+    setNodes,
+    setEdges,
+    setSelectedNodeId,
   });
 
   const handleSaveAndRun = async () => {

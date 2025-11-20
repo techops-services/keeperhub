@@ -36,6 +36,7 @@ import {
   edgesAtom,
   isGeneratingAtom,
   nodesAtom,
+  propertiesPanelActiveTabAtom,
   selectedEdgeAtom,
   selectedNodeAtom,
   showClearDialogAtom,
@@ -155,7 +156,7 @@ const PanelInner = () => {
   const [selectedIntegration, setSelectedIntegration] =
     useState<string>("resend");
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState("properties");
+  const [activeTab, setActiveTab] = useAtom(propertiesPanelActiveTabAtom);
   const refreshRunsRef = useRef<(() => Promise<void>) | null>(null);
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
   const selectedEdge = edges.find((edge) => edge.id === selectedEdgeId);

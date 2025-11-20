@@ -4,7 +4,7 @@ import { ReactFlowProvider } from "@xyflow/react";
 import { useAtom, useSetAtom } from "jotai";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { use, useCallback, useEffect, useRef } from "react";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +26,7 @@ import {
   isGeneratingAtom,
   isSavingAtom,
   nodesAtom,
+  propertiesPanelActiveTabAtom,
   selectedNodeAtom,
   updateNodeDataAtom,
   type WorkflowNode,
@@ -54,22 +55,30 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   const setHasUnsavedChanges = useSetAtom(hasUnsavedChangesAtom);
   const [workflowNotFound, setWorkflowNotFound] = useAtom(workflowNotFoundAtom);
   const setProjectIntegrations = useSetAtom(projectIntegrationsAtom);
+  const setActiveTab = useSetAtom(propertiesPanelActiveTabAtom);
+
+  // Track if integrations have been loaded
+  const [integrationsLoaded, setIntegrationsLoaded] = useState(false);
 
   // Ref to track polling interval
   const executionPollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load project integrations
+  // Load project integrations first before loading workflow
   useEffect(() => {
     const loadIntegrations = async () => {
       try {
         const integrations =
           await api.vercelProject.getIntegrations(workflowId);
         setProjectIntegrations(integrations);
+        setIntegrationsLoaded(true);
       } catch (error) {
         console.error("Failed to load integrations:", error);
+        // Still mark as loaded even on error to prevent blocking workflow load
+        setIntegrationsLoaded(true);
       }
     };
 
+    setIntegrationsLoaded(false);
     loadIntegrations();
   }, [workflowId, setProjectIntegrations]);
 
@@ -128,7 +137,16 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
         return;
       }
 
-      setNodes(workflow.nodes);
+      // Reset all node statuses to idle when loading from database
+      const nodesWithIdleStatus = workflow.nodes.map((node: WorkflowNode) => ({
+        ...node,
+        data: {
+          ...node.data,
+          status: "idle" as const,
+        },
+      }));
+
+      setNodes(nodesWithIdleStatus);
       setEdges(workflow.edges);
       setCurrentWorkflowId(workflow.id);
       setCurrentWorkflowName(workflow.name);
@@ -165,6 +183,11 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
         return;
       }
 
+      // Wait for integrations to load first to prevent flash of warning indicators
+      if (!integrationsLoaded) {
+        return;
+      }
+
       // Check if we should generate from AI
       if (
         isGeneratingParam &&
@@ -187,6 +210,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
     nodes.length,
     generateWorkflowFromAI,
     loadExistingWorkflow,
+    integrationsLoaded,
   ]);
 
   // Keyboard shortcuts
@@ -266,6 +290,14 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
       return;
     }
 
+    // Switch to Runs tab when starting a test run
+    setActiveTab("runs");
+
+    // Deselect all nodes and edges
+    setNodes(nodes.map((node) => ({ ...node, selected: false })));
+    setEdges(edges.map((edge) => ({ ...edge, selected: false })));
+    setSelectedNodeId(null);
+
     setIsExecuting(true);
 
     // Set all nodes to idle first
@@ -335,14 +367,18 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
     }
   }, [
     isExecuting,
-    nodes.length,
+    nodes,
+    edges,
     isGenerating,
     currentWorkflowId,
     setIsExecuting,
     updateAllNodeStatuses,
     pollExecutionStatus,
-    nodes,
     updateNodeData,
+    setActiveTab,
+    setNodes,
+    setEdges,
+    setSelectedNodeId,
   ]);
 
   // Helper to check if target is an input element
