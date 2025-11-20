@@ -3,18 +3,19 @@
 import { useAtom } from "jotai";
 import {
   Check,
-  CheckCircle2,
   ChevronDown,
   ChevronRight,
   Clock,
   Copy,
   Loader2,
-  XCircle,
+  Play,
+  X,
 } from "lucide-react";
 import type { JSX } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { getExecutionLogs } from "@/app/actions/workflow/get-execution-logs";
 import { getExecutions } from "@/app/actions/workflow/get-executions";
+import { cn } from "@/lib/utils";
 import { getRelativeTime } from "@/lib/utils/time";
 import { currentWorkflowIdAtom } from "@/lib/workflow-store";
 import { Button } from "../ui/button";
@@ -55,74 +56,111 @@ function ExecutionLogEntry({
   isExpanded,
   onToggle,
   getStatusIcon,
+  getStatusDotClass,
+  isFirst,
+  isLast,
 }: {
   log: ExecutionLog;
   isExpanded: boolean;
   onToggle: () => void;
   getStatusIcon: (status: string) => JSX.Element;
+  getStatusDotClass: (status: string) => string;
+  isFirst: boolean;
+  isLast: boolean;
 }) {
   const [copiedInput, setCopiedInput] = useState(false);
   const [copiedOutput, setCopiedOutput] = useState(false);
+  const [copiedError, setCopiedError] = useState(false);
 
-  const copyToClipboard = async (data: unknown, type: "input" | "output") => {
+  const copyToClipboard = async (
+    data: unknown,
+    type: "input" | "output" | "error"
+  ) => {
     try {
-      await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+      const text =
+        type === "error" ? String(data) : JSON.stringify(data, null, 2);
+      await navigator.clipboard.writeText(text);
       if (type === "input") {
         setCopiedInput(true);
         setTimeout(() => setCopiedInput(false), 2000);
-      } else {
+      } else if (type === "output") {
         setCopiedOutput(true);
         setTimeout(() => setCopiedOutput(false), 2000);
+      } else {
+        setCopiedError(true);
+        setTimeout(() => setCopiedError(false), 2000);
       }
     } catch (error) {
       console.error("Failed to copy:", error);
     }
   };
+
   return (
-    <div className="rounded border" key={log.id}>
-      <button
-        className="w-full cursor-pointer px-2 py-1.5 text-left hover:bg-muted/30"
-        onClick={onToggle}
-        type="button"
-      >
-        <div className="flex items-center gap-2">
-          {isExpanded ? (
-            <ChevronDown className="h-3 w-3" />
-          ) : (
-            <ChevronRight className="h-3 w-3" />
+    <div className="relative flex gap-3" key={log.id}>
+      {/* Timeline connector */}
+      <div className="-ml-px relative flex flex-col items-center pt-2">
+        {!isFirst && (
+          <div className="absolute bottom-full h-2 w-px bg-border" />
+        )}
+        <div
+          className={cn(
+            "z-10 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-0",
+            getStatusDotClass(log.status)
           )}
+        >
           {getStatusIcon(log.status)}
-          <div className="flex-1">
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-medium text-xs">
-                {log.nodeName || log.nodeType}
-              </span>
-              {log.duration && (
-                <span className="text-muted-foreground text-xs">
-                  {Number.parseInt(log.duration, 10) < 1000
-                    ? `${log.duration}ms`
-                    : `${(Number.parseInt(log.duration, 10) / 1000).toFixed(2)}s`}
+        </div>
+        {!isLast && (
+          <div className="absolute top-[calc(0.5rem+1.25rem)] bottom-0 w-px bg-border" />
+        )}
+      </div>
+
+      {/* Step content */}
+      <div className="min-w-0 flex-1">
+        <button
+          className="group w-full rounded-lg py-2 text-left transition-colors hover:bg-muted/50"
+          onClick={onToggle}
+          type="button"
+        >
+          <div className="flex items-center gap-3">
+            {/* Step content */}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                {isExpanded ? (
+                  <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                )}
+                <span className="truncate font-medium text-sm transition-colors group-hover:text-foreground">
+                  {log.nodeName || log.nodeType}
                 </span>
-              )}
+              </div>
             </div>
-            <div className="text-muted-foreground text-xs">{log.nodeType}</div>
-            {log.error && (
-              <div className="mt-1 text-red-600 text-xs">{log.error}</div>
+
+            {log.duration && (
+              <span className="shrink-0 font-mono text-muted-foreground text-xs tabular-nums">
+                {Number.parseInt(log.duration, 10) < 1000
+                  ? `${log.duration}ms`
+                  : `${(Number.parseInt(log.duration, 10) / 1000).toFixed(2)}s`}
+              </span>
             )}
           </div>
-        </div>
-      </button>
+        </button>
 
-      {isExpanded && (
-        <div className="border-t bg-muted/20 p-2">
-          <div className="space-y-2">
+        {isExpanded && (
+          <div className="mt-2 mb-2 space-y-3 px-3">
             {log.input !== null && log.input !== undefined && (
               <div>
-                <div className="mb-1 flex items-center justify-between">
-                  <div className="font-semibold text-xs">Input</div>
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                    Input
+                  </div>
                   <Button
-                    className="h-6 px-2"
-                    onClick={() => copyToClipboard(log.input, "input")}
+                    className="h-7 px-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      copyToClipboard(log.input, "input");
+                    }}
                     size="sm"
                     type="button"
                     variant="ghost"
@@ -134,18 +172,23 @@ function ExecutionLogEntry({
                     )}
                   </Button>
                 </div>
-                <pre className="overflow-auto rounded bg-background p-2 text-xs">
+                <pre className="overflow-auto rounded-lg border bg-muted/50 p-3 font-mono text-xs leading-relaxed">
                   {JSON.stringify(log.input, null, 2)}
                 </pre>
               </div>
             )}
             {log.output !== null && log.output !== undefined && (
               <div>
-                <div className="mb-1 flex items-center justify-between">
-                  <div className="font-semibold text-xs">Output</div>
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                    Output
+                  </div>
                   <Button
-                    className="h-6 px-2"
-                    onClick={() => copyToClipboard(log.output, "output")}
+                    className="h-7 px-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      copyToClipboard(log.output, "output");
+                    }}
                     size="sm"
                     type="button"
                     variant="ghost"
@@ -157,19 +200,47 @@ function ExecutionLogEntry({
                     )}
                   </Button>
                 </div>
-                <pre className="overflow-auto rounded bg-background p-2 text-xs">
+                <pre className="overflow-auto rounded-lg border bg-muted/50 p-3 font-mono text-xs leading-relaxed">
                   {JSON.stringify(log.output, null, 2)}
                 </pre>
               </div>
             )}
+            {log.error && (
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                    Error
+                  </div>
+                  <Button
+                    className="h-7 px-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      copyToClipboard(log.error, "error");
+                    }}
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                  >
+                    {copiedError ? (
+                      <Check className="h-3 w-3 text-green-600" />
+                    ) : (
+                      <Copy className="h-3 w-3" />
+                    )}
+                  </Button>
+                </div>
+                <pre className="overflow-auto rounded-lg border border-red-500/20 bg-red-500/5 p-3 font-mono text-red-600 text-xs leading-relaxed">
+                  {log.error}
+                </pre>
+              </div>
+            )}
             {!(log.input || log.output || log.error) && (
-              <div className="text-muted-foreground text-xs">
+              <div className="rounded-lg border bg-muted/30 py-4 text-center text-muted-foreground text-xs">
                 No data recorded
               </div>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -185,27 +256,30 @@ export function WorkflowRuns({
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
-  const loadExecutions = useCallback(async (showLoading = true) => {
-    if (!currentWorkflowId) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      if (showLoading) {
-        setLoading(true);
-      }
-      const data = await getExecutions(currentWorkflowId);
-      setExecutions(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error("Failed to load executions:", error);
-      setExecutions([]);
-    } finally {
-      if (showLoading) {
+  const loadExecutions = useCallback(
+    async (showLoading = true) => {
+      if (!currentWorkflowId) {
         setLoading(false);
+        return;
       }
-    }
-  }, [currentWorkflowId]);
+
+      try {
+        if (showLoading) {
+          setLoading(true);
+        }
+        const data = await getExecutions(currentWorkflowId);
+        setExecutions(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error("Failed to load executions:", error);
+        setExecutions([]);
+      } finally {
+        if (showLoading) {
+          setLoading(false);
+        }
+      }
+    },
+    [currentWorkflowId]
+  );
 
   // Expose refresh function via ref
   useEffect(() => {
@@ -228,7 +302,7 @@ export function WorkflowRuns({
       try {
         const data = await getExecutions(currentWorkflowId);
         setExecutions(Array.isArray(data) ? data : []);
-        
+
         // Also refresh logs for expanded runs
         for (const executionId of expandedRuns) {
           try {
@@ -287,19 +361,32 @@ export function WorkflowRuns({
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "success":
-        return <CheckCircle2 className="h-3 w-3 text-green-600" />;
+        return <Check className="h-3 w-3 text-primary" />;
       case "error":
-        return <XCircle className="h-3 w-3 text-red-600" />;
+        return <X className="h-3 w-3 text-primary" />;
       case "running":
-        return <Loader2 className="h-3 w-3 animate-spin text-blue-600" />;
+        return <Loader2 className="h-3 w-3 animate-spin text-primary" />;
       default:
-        return <Clock className="h-3 w-3 text-muted-foreground" />;
+        return <Clock className="h-3 w-3 text-primary" />;
+    }
+  };
+
+  const getStatusDotClass = (status: string) => {
+    switch (status) {
+      case "success":
+        return "bg-green-600";
+      case "error":
+        return "bg-red-600";
+      case "running":
+        return "bg-blue-600";
+      default:
+        return "bg-muted-foreground";
     }
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center">
+      <div className="flex items-center justify-center py-12">
         <Spinner />
       </div>
     );
@@ -307,64 +394,100 @@ export function WorkflowRuns({
 
   if (executions.length === 0) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <div className="text-muted-foreground text-xs">No runs yet</div>
+      <div className="flex flex-col items-center justify-center py-16">
+        <div className="mb-3 rounded-lg border border-dashed p-4">
+          <Play className="h-6 w-6 text-muted-foreground" />
+        </div>
+        <div className="font-medium text-foreground text-sm">No runs yet</div>
+        <div className="mt-1 text-muted-foreground text-xs">
+          Execute your workflow to see runs here
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-2">
-      {executions.map((execution) => {
+    <div className="space-y-3">
+      {executions.map((execution, index) => {
         const isExpanded = expandedRuns.has(execution.id);
-        const executionLogs = logs[execution.id] || [];
+        const executionLogs = (logs[execution.id] || []).sort((a, b) => {
+          // Sort by startedAt to ensure first to last order
+          return (
+            new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime()
+          );
+        });
 
         return (
-          <div className="rounded-lg border border-muted" key={execution.id}>
+          <div
+            className="overflow-hidden rounded-lg border bg-card"
+            key={execution.id}
+          >
             <button
-              className="flex w-full cursor-pointer items-center gap-2 p-2 text-left transition-colors hover:bg-muted/50"
+              className="flex w-full items-center gap-3 p-4 text-left transition-colors hover:bg-muted/50"
               onClick={() => toggleRun(execution.id)}
               type="button"
             >
-              {isExpanded ? (
-                <ChevronDown className="h-3 w-3" />
-              ) : (
-                <ChevronRight className="h-3 w-3" />
-              )}
-              {getStatusIcon(execution.status)}
-              <div className="flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium text-xs">
-                    {getRelativeTime(execution.startedAt)}
+              <div
+                className={cn(
+                  "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-0",
+                  getStatusDotClass(execution.status)
+                )}
+              >
+                {getStatusIcon(execution.status)}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="mb-1 flex items-center gap-2">
+                  <span className="font-semibold text-sm">
+                    Run #{executions.length - index}
                   </span>
+                </div>
+                <div className="flex items-center gap-2 font-mono text-muted-foreground text-xs">
+                  <span>{getRelativeTime(execution.startedAt)}</span>
                   {execution.duration && (
-                    <span className="text-muted-foreground text-xs">
-                      {Number.parseInt(execution.duration, 10) < 1000
-                        ? `${execution.duration}ms`
-                        : `${(Number.parseInt(execution.duration, 10) / 1000).toFixed(2)}s`}
-                    </span>
+                    <>
+                      <span>•</span>
+                      <span className="tabular-nums">
+                        {Number.parseInt(execution.duration, 10) < 1000
+                          ? `${execution.duration}ms`
+                          : `${(Number.parseInt(execution.duration, 10) / 1000).toFixed(2)}s`}
+                      </span>
+                    </>
+                  )}
+                  {executionLogs.length > 0 && (
+                    <>
+                      <span>•</span>
+                      <span>
+                        {executionLogs.length}{" "}
+                        {executionLogs.length === 1 ? "step" : "steps"}
+                      </span>
+                    </>
                   )}
                 </div>
-                {execution.error && (
-                  <div className="truncate text-red-600 text-xs">
-                    {execution.error}
-                  </div>
-                )}
               </div>
+
+              {isExpanded ? (
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+              )}
             </button>
 
             {isExpanded && (
-              <div className="border-muted border-t">
+              <div className="border-t bg-muted/20">
                 {executionLogs.length === 0 ? (
-                  <div className="px-2 py-2 text-muted-foreground text-xs">
+                  <div className="py-8 text-center text-muted-foreground text-xs">
                     No steps recorded
                   </div>
                 ) : (
-                  <div className="space-y-1 p-2">
-                    {executionLogs.map((log) => (
+                  <div className="p-4">
+                    {executionLogs.map((log, logIndex) => (
                       <ExecutionLogEntry
+                        getStatusDotClass={getStatusDotClass}
                         getStatusIcon={getStatusIcon}
                         isExpanded={expandedLogs.has(log.id)}
+                        isFirst={logIndex === 0}
+                        isLast={logIndex === executionLogs.length - 1}
                         key={log.id}
                         log={log}
                         onToggle={() => toggleLog(log.id)}

@@ -245,11 +245,14 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
           });
         }
 
-        // Return true if execution is complete
-        return statusData.status !== "running";
+        // Return status and whether execution is complete
+        return {
+          isComplete: statusData.status !== "running",
+          status: statusData.status,
+        };
       } catch (error) {
         console.error("Failed to poll execution status:", error);
-        return false;
+        return { isComplete: false, status: "running" };
       }
     },
     [updateNodeData]
@@ -298,7 +301,9 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
 
       // Poll for execution status updates
       const pollInterval = setInterval(async () => {
-        const isComplete = await pollExecutionStatus(result.executionId);
+        const { isComplete, status } = await pollExecutionStatus(
+          result.executionId
+        );
 
         if (isComplete) {
           if (executionPollingIntervalRef.current) {
@@ -306,8 +311,8 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
             executionPollingIntervalRef.current = null;
           }
 
-          if (result.status === "error") {
-            toast.error(result.error || "Workflow execution failed");
+          if (status === "error") {
+            toast.error("Test run failed");
           } else {
             toast.success("Test run completed successfully");
           }

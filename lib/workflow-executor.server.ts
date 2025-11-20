@@ -598,7 +598,12 @@ class ServerWorkflowExecutor {
         data: result.data,
       };
 
-      await this.completeNodeExecution(node, "success", result.data);
+      await this.completeNodeExecution(
+        node,
+        result.success ? "success" : "error",
+        result.data,
+        result.error
+      );
 
       return result;
     } catch (error) {
