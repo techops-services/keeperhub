@@ -306,13 +306,18 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
             executionPollingIntervalRef.current = null;
           }
 
-      if (result.status === "error") {
-        toast.error(result.error || "Workflow execution failed");
-      } else {
-        toast.success("Test run completed successfully");
-      }
+          if (result.status === "error") {
+            toast.error(result.error || "Workflow execution failed");
+          } else {
+            toast.success("Test run completed successfully");
+          }
 
           setIsExecuting(false);
+
+          // Reset node statuses after 2 seconds
+          setTimeout(() => {
+            updateAllNodeStatuses("idle");
+          }, 2000);
         }
       }, 500); // Poll every 500ms
 

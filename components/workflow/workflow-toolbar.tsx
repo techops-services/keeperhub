@@ -188,12 +188,17 @@ async function executeTestWorkflow({
           }
 
           if (statusData.status === "error") {
-      toast.error(result.error || "Workflow execution failed");
-    } else {
-      toast.success("Test run completed successfully");
-    }
+            toast.error(result.error || "Workflow execution failed");
+          } else {
+            toast.success("Test run completed successfully");
+          }
 
           setIsExecuting(false);
+
+          // Reset node statuses after 2 seconds
+          setTimeout(() => {
+            updateNodesStatus(nodes, updateNodeData, "idle");
+          }, 2000);
         }
       } catch (error) {
         console.error("Failed to poll execution status:", error);
