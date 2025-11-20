@@ -157,6 +157,7 @@ const PanelInner = () => {
   const [selectedIntegration, setSelectedIntegration] =
     useState<string>("resend");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState("properties");
   const refreshRunsRef = useRef<(() => Promise<void>) | null>(null);
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
   const selectedEdge = edges.find((edge) => edge.id === selectedEdgeId);
@@ -357,7 +358,7 @@ const PanelInner = () => {
   if (!selectedNode) {
     return (
       <>
-        <Tabs className="size-full" defaultValue="properties">
+        <Tabs className="size-full" defaultValue="properties" onValueChange={setActiveTab} value={activeTab}>
           <TabsList className="h-14 w-full rounded-none border-b bg-transparent px-4 py-2.5">
             <TabsTrigger
               className="bg-transparent text-muted-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none"
@@ -524,7 +525,7 @@ const PanelInner = () => {
           </TabsContent>
           <TabsContent className="flex flex-col overflow-hidden" value="runs">
             <div className="flex-1 space-y-4 overflow-y-auto p-4">
-              <WorkflowRuns onRefreshRef={refreshRunsRef} />
+              <WorkflowRuns isActive={activeTab === "runs"} onRefreshRef={refreshRunsRef} />
             </div>
             <div className="flex shrink-0 items-center gap-2 border-t p-4">
               <Button
@@ -624,7 +625,7 @@ const PanelInner = () => {
 
   return (
     <>
-      <Tabs className="size-full" defaultValue="properties">
+      <Tabs className="size-full" defaultValue="properties" onValueChange={setActiveTab} value={activeTab}>
         <TabsList className="h-auto w-full rounded-none border-b bg-transparent p-4">
           <TabsTrigger
             className="bg-transparent text-muted-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none"
@@ -788,7 +789,7 @@ const PanelInner = () => {
         </TabsContent>
         <TabsContent className="flex flex-col overflow-hidden" value="runs">
           <div className="flex-1 space-y-4 overflow-y-auto p-4">
-            <WorkflowRuns isActive onRefreshRef={refreshRunsRef} />
+            <WorkflowRuns isActive={activeTab === "runs"} onRefreshRef={refreshRunsRef} />
           </div>
           <div className="flex shrink-0 items-center gap-2 border-t p-4">
             <Button

@@ -185,28 +185,32 @@ export function WorkflowRuns({
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
-  const loadExecutions = useCallback(async () => {
+  const loadExecutions = useCallback(async (showLoading = true) => {
     if (!currentWorkflowId) {
       setLoading(false);
       return;
     }
 
     try {
-      setLoading(true);
+      if (showLoading) {
+        setLoading(true);
+      }
       const data = await getExecutions(currentWorkflowId);
       setExecutions(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Failed to load executions:", error);
       setExecutions([]);
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   }, [currentWorkflowId]);
 
   // Expose refresh function via ref
   useEffect(() => {
     if (onRefreshRef) {
-      onRefreshRef.current = loadExecutions;
+      onRefreshRef.current = () => loadExecutions(false);
     }
   }, [loadExecutions, onRefreshRef]);
 
@@ -224,20 +228,29 @@ export function WorkflowRuns({
       try {
         const data = await getExecutions(currentWorkflowId);
         setExecutions(Array.isArray(data) ? data : []);
+        
+        // Also refresh logs for expanded runs
+        for (const executionId of expandedRuns) {
+          try {
+            const logsData = await getExecutionLogs(executionId);
+            setLogs((prev) => ({
+              ...prev,
+              [executionId]: Array.isArray(logsData.logs) ? logsData.logs : [],
+            }));
+          } catch (error) {
+            console.error(`Failed to refresh logs for ${executionId}:`, error);
+          }
+        }
       } catch (error) {
         console.error("Failed to poll executions:", error);
       }
     };
 
-    const interval = setInterval(pollExecutions, 5000);
+    const interval = setInterval(pollExecutions, 2000);
     return () => clearInterval(interval);
-  }, [isActive, currentWorkflowId]);
+  }, [isActive, currentWorkflowId, expandedRuns]);
 
   const loadExecutionLogs = async (executionId: string) => {
-    if (logs[executionId]) {
-      return;
-    }
-
     try {
       const data = await getExecutionLogs(executionId);
       setLogs((prev) => ({
