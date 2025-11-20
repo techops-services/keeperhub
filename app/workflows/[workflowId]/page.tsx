@@ -343,8 +343,6 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
 
           if (status === "error") {
             toast.error("Test run failed");
-          } else {
-            toast.success("Test run completed successfully");
           }
 
           setIsExecuting(false);
