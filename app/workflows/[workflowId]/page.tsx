@@ -270,6 +270,13 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
     // Set all nodes to idle first
     updateAllNodeStatuses("idle");
 
+    // Immediately set trigger nodes to running for instant visual feedback
+    for (const node of nodes) {
+      if (node.data.type === "trigger") {
+        updateNodeData({ id: node.id, data: { status: "running" } });
+      }
+    }
+
     try {
       // Start the execution via API
       const response = await fetch(
@@ -326,6 +333,8 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
     setIsExecuting,
     updateAllNodeStatuses,
     pollExecutionStatus,
+    nodes,
+    updateNodeData,
   ]);
 
   // Helper to check if target is an input element

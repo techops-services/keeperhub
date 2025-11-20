@@ -138,6 +138,13 @@ async function executeTestWorkflow({
   // Set all nodes to idle first
   updateNodesStatus(nodes, updateNodeData, "idle");
 
+  // Immediately set trigger nodes to running for instant visual feedback
+  for (const node of nodes) {
+    if (node.data.type === "trigger") {
+      updateNodeData({ id: node.id, data: { status: "running" } });
+    }
+  }
+
   try {
     // Start the execution via API
     const response = await fetch(`/api/workflow/${workflowId}/execute`, {
