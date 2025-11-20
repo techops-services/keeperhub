@@ -10,6 +10,7 @@ import type { databaseQueryStep } from "./database-query";
 import type { generateImageStep } from "./generate-image";
 import type { generateTextStep } from "./generate-text";
 import type { httpRequestStep } from "./http-request";
+import type { logNodeCompleteStep, logNodeStartStep } from "./logging";
 import type { sendEmailStep } from "./send-email";
 import type { sendSlackMessageStep } from "./send-slack-message";
 
@@ -53,6 +54,14 @@ export const stepRegistry: Record<string, StepFunction> = {
   "Generate Image": async (input) =>
     (await import("./generate-image")).generateImageStep(
       input as Parameters<typeof generateImageStep>[0]
+    ),
+  "Log Node Start": async (input) =>
+    (await import("./logging")).logNodeStartStep(
+      input as Parameters<typeof logNodeStartStep>[0]
+    ),
+  "Log Node Complete": async (input) =>
+    (await import("./logging")).logNodeCompleteStep(
+      input as Parameters<typeof logNodeCompleteStep>[0]
     ),
 };
 

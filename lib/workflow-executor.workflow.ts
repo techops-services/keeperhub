@@ -18,6 +18,7 @@ export type WorkflowExecutionInput = {
   edges: WorkflowEdge[];
   triggerInput?: Record<string, unknown>;
   credentials?: Record<string, string>;
+  executionId?: string;
 };
 
 /**
@@ -174,10 +175,27 @@ function processTemplates(
 /**
  * Main workflow executor function
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Workflow execution requires complex orchestration
 export async function executeWorkflow(input: WorkflowExecutionInput) {
   "use workflow";
 
-  const { nodes, edges, triggerInput = {}, credentials = {} } = input;
+  console.log("[Workflow Executor] Starting workflow execution");
+
+  const {
+    nodes,
+    edges,
+    triggerInput = {},
+    credentials = {},
+    executionId,
+  } = input;
+
+  console.log("[Workflow Executor] Input:", {
+    nodeCount: nodes.length,
+    edgeCount: edges.length,
+    hasExecutionId: !!executionId,
+    credentialKeys: Object.keys(credentials),
+  });
+
   const outputs: NodeOutputs = {};
   const results: Record<string, ExecutionResult> = {};
 
@@ -196,36 +214,135 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
     (node) => node.data.type === "trigger" && !nodesWithIncoming.has(node.id)
   );
 
+  console.log(
+    "[Workflow Executor] Found",
+    triggerNodes.length,
+    "trigger nodes"
+  );
+
+  // Helper to log node start
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Node name derivation requires type checking
+  async function logNodeStart(
+    node: WorkflowNode,
+    nodeInput?: unknown
+  ): Promise<{ logId: string; startTime: number }> {
+    if (!executionId) {
+      return { logId: "", startTime: Date.now() };
+    }
+
+    try {
+      // Get a meaningful node name
+      let nodeName = node.data.label;
+      if (!nodeName) {
+        if (node.data.type === "action") {
+          nodeName = (node.data.config?.actionType as string) || "Action";
+        } else if (node.data.type === "trigger") {
+          nodeName = (node.data.config?.triggerType as string) || "Trigger";
+        } else {
+          nodeName = node.data.type;
+        }
+      }
+
+      const { logStep } = await import("./steps/log-step");
+      const result = await logStep({
+        action: "start",
+        executionId,
+        nodeId: node.id,
+        nodeName,
+        nodeType: node.data.type,
+        nodeInput,
+      });
+
+      return {
+        logId: result.logId || "",
+        startTime: result.startTime || Date.now(),
+      };
+    } catch (error) {
+      console.error("[Workflow Executor] Failed to log node start:", error);
+      return { logId: "", startTime: Date.now() };
+    }
+  }
+
+  // Helper to log node completion
+  async function logNodeComplete(options: {
+    logId: string;
+    startTime: number;
+    status: "success" | "error";
+    output?: unknown;
+    error?: string;
+  }): Promise<void> {
+    if (!(executionId && options.logId)) {
+      return;
+    }
+
+    try {
+      const { logStep } = await import("./steps/log-step");
+      await logStep({
+        action: "complete",
+        logId: options.logId,
+        startTime: options.startTime,
+        status: options.status,
+        output: options.output,
+        error: options.error,
+      });
+    } catch (logError) {
+      console.error(
+        "[Workflow Executor] Failed to log node completion:",
+        logError
+      );
+    }
+  }
+
   // Helper to execute a single node
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Node execution requires type checking and error handling
   async function executeNode(nodeId: string, visited: Set<string> = new Set()) {
+    console.log("[Workflow Executor] Executing node:", nodeId);
+
     if (visited.has(nodeId)) {
+      console.log("[Workflow Executor] Node already visited, skipping");
       return; // Prevent cycles
     }
     visited.add(nodeId);
 
     const node = nodeMap.get(nodeId);
     if (!node) {
+      console.log("[Workflow Executor] Node not found:", nodeId);
       return;
     }
+
+    let logInfo = { logId: "", startTime: Date.now() };
 
     try {
       let result: ExecutionResult;
 
       if (node.data.type === "trigger") {
+        console.log("[Workflow Executor] Executing trigger node");
+        logInfo = await logNodeStart(node, triggerInput);
+
         // Trigger nodes just pass through the input
         result = {
           success: true,
           data: { ...triggerInput, triggered: true, timestamp: Date.now() },
         };
+
+        await logNodeComplete({
+          logId: logInfo.logId,
+          startTime: logInfo.startTime,
+          status: "success",
+          output: result.data,
+        });
       } else if (node.data.type === "action") {
         const config = node.data.config || {};
         const actionType = config.actionType as string;
 
+        console.log("[Workflow Executor] Executing action node:", actionType);
+
         // Process templates in config
         const processedConfig = processTemplates(config, outputs);
+        logInfo = await logNodeStart(node, processedConfig);
 
         // Execute the action step
+        console.log("[Workflow Executor] Calling executeActionStep");
         const stepResult = await executeActionStep({
           actionType,
           config: processedConfig,
@@ -233,15 +350,35 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
           credentials,
         });
 
+        console.log("[Workflow Executor] Step result received:", {
+          hasResult: !!stepResult,
+          resultType: typeof stepResult,
+        });
+
         result = {
           success: true,
           data: stepResult,
         };
+
+        await logNodeComplete({
+          logId: logInfo.logId,
+          startTime: logInfo.startTime,
+          status: "success",
+          output: result.data,
+        });
       } else {
+        console.log("[Workflow Executor] Unknown node type:", node.data.type);
         result = {
           success: false,
           error: `Unknown node type: ${node.data.type}`,
         };
+
+        await logNodeComplete({
+          logId: logInfo.logId,
+          startTime: logInfo.startTime,
+          status: "error",
+          error: result.error,
+        });
       }
 
       // Store results
@@ -251,29 +388,111 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
         data: result.data,
       };
 
+      console.log("[Workflow Executor] Node execution completed:", {
+        nodeId,
+        success: result.success,
+      });
+
       // Execute next nodes
       if (result.success) {
         const nextNodes = edgesBySource.get(nodeId) || [];
+        console.log(
+          "[Workflow Executor] Executing",
+          nextNodes.length,
+          "next nodes"
+        );
         for (const nextNodeId of nextNodes) {
           await executeNode(nextNodeId, visited);
         }
       }
     } catch (error) {
-      results[nodeId] = {
+      console.error("[Workflow Executor] Error executing node:", nodeId, error);
+      const errorResult = {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
       };
+      results[nodeId] = errorResult;
+
+      await logNodeComplete({
+        logId: logInfo.logId,
+        startTime: logInfo.startTime,
+        status: "error",
+        error: errorResult.error,
+      });
     }
   }
 
   // Execute from each trigger node
-  for (const trigger of triggerNodes) {
-    await executeNode(trigger.id);
-  }
+  try {
+    console.log("[Workflow Executor] Starting execution from trigger nodes");
+    const workflowStartTime = Date.now();
 
-  return {
-    success: Object.values(results).every((r) => r.success),
-    results,
-    outputs,
-  };
+    for (const trigger of triggerNodes) {
+      await executeNode(trigger.id);
+    }
+
+    const finalSuccess = Object.values(results).every((r) => r.success);
+    const duration = Date.now() - workflowStartTime;
+
+    console.log("[Workflow Executor] Workflow execution completed:", {
+      success: finalSuccess,
+      resultCount: Object.keys(results).length,
+      duration,
+    });
+
+    // Update execution record if we have an executionId
+    if (executionId) {
+      try {
+        const { logStep } = await import("./steps/log-step");
+        await logStep({
+          action: "complete",
+          executionId,
+          status: finalSuccess ? "success" : "error",
+          output: Object.values(results).at(-1)?.data,
+          error: Object.values(results).find((r) => !r.success)?.error,
+          startTime: workflowStartTime,
+        });
+        console.log("[Workflow Executor] Updated execution record");
+      } catch (error) {
+        console.error(
+          "[Workflow Executor] Failed to update execution record:",
+          error
+        );
+      }
+    }
+
+    return {
+      success: finalSuccess,
+      results,
+      outputs,
+    };
+  } catch (error) {
+    console.error(
+      "[Workflow Executor] Fatal error during workflow execution:",
+      error
+    );
+
+    // Update execution record with error if we have an executionId
+    if (executionId) {
+      try {
+        const { logStep } = await import("./steps/log-step");
+        await logStep({
+          action: "complete",
+          executionId,
+          status: "error",
+          error: error instanceof Error ? error.message : "Unknown error",
+          startTime: Date.now(),
+        });
+      } catch (logError) {
+        console.error("[Workflow Executor] Failed to log error:", logError);
+      }
+    }
+
+    return {
+      success: false,
+      results,
+      outputs,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
 }
