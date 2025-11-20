@@ -1,0 +1,4 @@
+{
+  "ignore": ["lib/next-boilerplate/**"],
+  "ignoreDependencies": []
+}
