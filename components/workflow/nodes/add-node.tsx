@@ -58,7 +58,7 @@ export function AddNode({ data }: NodeProps & { data?: AddNodeData }) {
         size="lg"
       >
         <Plus className="size-5.5" />
-        Add a Node
+        Add a Step
       </Button>
     </div>
   );
