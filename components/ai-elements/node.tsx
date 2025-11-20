@@ -24,9 +24,9 @@ export const Node = ({ handles, className, status, ...props }: NodeProps) => (
   <Card
     className={cn(
       "node-container relative size-full h-auto w-sm gap-0 rounded-md bg-card p-0 transition-all duration-200",
-      status === "running" && "ring-2 ring-blue-500 ring-offset-2 ring-offset-background",
-      status === "success" && "ring-2 ring-green-500 ring-offset-2 ring-offset-background",
-      status === "error" && "ring-2 ring-red-500 ring-offset-2 ring-offset-background",
+      status === "running" && "border-blue-500 border-2",
+      status === "success" && "border-green-500 border-2",
+      status === "error" && "border-red-500 border-2",
       className
     )}
     {...props}

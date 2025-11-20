@@ -1,7 +1,7 @@
 "use client";
 
 import type { NodeProps } from "@xyflow/react";
-import { Check, Loader2, PlayCircle, XCircle } from "lucide-react";
+import { Check, PlayCircle, XCircle } from "lucide-react";
 import { memo } from "react";
 import {
   Node,
@@ -35,21 +35,14 @@ export const TriggerNode = memo(({ data, selected }: TriggerNodeProps) => {
       status={status}
     >
       {/* Status indicator badge in top right */}
-      {status && status !== "idle" && (
+      {status && status !== "idle" && status !== "running" && (
         <div
           className={cn(
             "absolute top-2 right-2 rounded-full p-1",
-            status === "running" && "bg-blue-500/50",
             status === "success" && "bg-green-500/50",
             status === "error" && "bg-red-500/50"
           )}
         >
-          {status === "running" && (
-            <Loader2
-              className="size-3.5 animate-spin text-white"
-              strokeWidth={2.5}
-            />
-          )}
           {status === "success" && (
             <Check className="size-3.5 text-white" strokeWidth={2.5} />
           )}

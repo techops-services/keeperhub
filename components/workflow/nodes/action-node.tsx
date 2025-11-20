@@ -8,7 +8,6 @@ import {
   Code,
   Database,
   GitBranch,
-  Loader2,
   XCircle,
   Zap,
 } from "lucide-react";
@@ -114,7 +113,8 @@ const StatusBadge = ({
 }: {
   status?: "idle" | "running" | "success" | "error";
 }) => {
-  if (!status || status === "idle") {
+  // Don't show badge for idle or running (running has BorderBeam animation)
+  if (!status || status === "idle" || status === "running") {
     return null;
   }
 
@@ -122,17 +122,10 @@ const StatusBadge = ({
     <div
       className={cn(
         "absolute top-2 right-2 rounded-full p-1",
-        status === "running" && "bg-blue-500/50",
         status === "success" && "bg-green-500/50",
         status === "error" && "bg-red-500/50"
       )}
     >
-      {status === "running" && (
-        <Loader2
-          className="size-3.5 animate-spin text-white"
-          strokeWidth={2.5}
-        />
-      )}
       {status === "success" && (
         <Check className="size-3.5 text-white" strokeWidth={2.5} />
       )}
