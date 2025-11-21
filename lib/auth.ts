@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { anonymous } from "better-auth/plugins";
+import { anonymous, genericOAuth } from "better-auth/plugins";
 import { db } from "./db";
 import {
   accounts,
@@ -49,6 +49,45 @@ function getBaseURL() {
   return "http://localhost:3000";
 }
 
+// Build plugins array conditionally
+const plugins = [
+  anonymous(),
+  ...(process.env.VERCEL_CLIENT_ID
+    ? [
+        genericOAuth({
+          config: [
+            {
+              providerId: "vercel",
+              clientId: process.env.VERCEL_CLIENT_ID,
+              clientSecret: process.env.VERCEL_CLIENT_SECRET || "",
+              authorizationUrl: "https://vercel.com/oauth/authorize",
+              tokenUrl: "https://vercel.com/oauth/access_token",
+              userInfoUrl: "https://api.vercel.com/v2/user",
+              scopes: [],
+              discoveryUrl: undefined,
+              pkce: false,
+              getUserInfo: async (tokens) => {
+                const response = await fetch("https://api.vercel.com/v2/user", {
+                  headers: {
+                    Authorization: `Bearer ${tokens.accessToken}`,
+                  },
+                });
+                const data = await response.json();
+                return {
+                  id: data.user.id,
+                  email: data.user.email,
+                  name: data.user.name,
+                  emailVerified: true,
+                  image: `https://vercel.com/api/www/avatar/?u=${data.user.username}`,
+                };
+              },
+            },
+          ],
+        }),
+      ]
+    : []),
+];
+
 export const auth = betterAuth({
   baseURL: getBaseURL(),
   database: drizzleAdapter(db, {
@@ -71,5 +110,5 @@ export const auth = betterAuth({
       enabled: !!process.env.GOOGLE_CLIENT_ID,
     },
   },
-  plugins: [anonymous()],
+  plugins,
 });

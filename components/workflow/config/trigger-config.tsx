@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, Settings, Webhook } from "lucide-react";
+import { Clock, Copy, Play, Webhook } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { CodeEditor } from "@/components/ui/code-editor";
@@ -9,9 +9,7 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -57,21 +55,24 @@ export function TriggerConfig({
             <SelectValue placeholder="Select trigger type" />
           </SelectTrigger>
           <SelectContent>
-            <SelectGroup>
-              <SelectLabel className="flex items-center gap-2">
-                <Settings className="h-3 w-3" />
-                System
-              </SelectLabel>
-              <SelectItem value="Manual">Manual</SelectItem>
-              <SelectItem value="Schedule">Schedule</SelectItem>
-            </SelectGroup>
-            <SelectGroup>
-              <SelectLabel className="flex items-center gap-2">
-                <Webhook className="h-3 w-3" />
-                Webhooks
-              </SelectLabel>
-              <SelectItem value="Webhook">Webhook</SelectItem>
-            </SelectGroup>
+            <SelectItem value="Manual">
+              <div className="flex items-center gap-2">
+                <Play className="h-4 w-4" />
+                Manual
+              </div>
+            </SelectItem>
+            <SelectItem value="Schedule">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Schedule
+              </div>
+            </SelectItem>
+            <SelectItem value="Webhook">
+              <div className="flex items-center gap-2">
+                <Webhook className="h-4 w-4" />
+                Webhook
+              </div>
+            </SelectItem>
           </SelectContent>
         </Select>
       </div>

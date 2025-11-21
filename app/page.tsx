@@ -25,8 +25,8 @@ function createDefaultTriggerNode() {
     type: "trigger" as const,
     position: { x: 0, y: 0 },
     data: {
-      label: "Trigger",
-      description: "Start your workflow",
+      label: "",
+      description: "",
       type: "trigger" as const,
       config: { triggerType: "Manual" },
       status: "idle" as const,
@@ -82,7 +82,7 @@ const Home = () => {
     };
     setNodes([addNodePlaceholder]);
     setEdges([]);
-    setCurrentWorkflowName("Untitled Workflow");
+    setCurrentWorkflowName("New Workflow");
     hasCreatedWorkflowRef.current = false;
   }, [setNodes, setEdges, setCurrentWorkflowName, handleAddNode]);
 

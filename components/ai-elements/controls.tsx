@@ -1,7 +1,7 @@
 "use client";
 
 import { useReactFlow } from "@xyflow/react";
-import { Minus, Plus, Maximize2, MapPin, MapPinXInside } from "lucide-react";
+import { ZoomIn, ZoomOut, Maximize2, MapPin, MapPinXInside } from "lucide-react";
 import { useAtom } from "jotai";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
@@ -36,7 +36,7 @@ export const Controls = () => {
         title="Zoom in"
         variant="secondary"
       >
-        <Plus className="size-4" />
+        <ZoomIn className="size-4" />
       </Button>
       <Button
         className="border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
@@ -45,7 +45,7 @@ export const Controls = () => {
         title="Zoom out"
         variant="secondary"
       >
-        <Minus className="size-4" />
+        <ZoomOut className="size-4" />
       </Button>
       <Button
         className="border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"

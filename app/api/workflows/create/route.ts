@@ -13,8 +13,8 @@ function createDefaultTriggerNode() {
     type: "trigger" as const,
     position: { x: 0, y: 0 },
     data: {
-      label: "Trigger",
-      description: "Start your workflow",
+      label: "",
+      description: "",
       type: "trigger" as const,
       config: { triggerType: "Manual" },
       status: "idle" as const,

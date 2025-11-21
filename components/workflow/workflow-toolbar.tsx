@@ -1,5 +1,6 @@
 "use client";
 
+import { useReactFlow } from "@xyflow/react";
 import { useAtom, useSetAtom } from "jotai";
 import {
   Check,
@@ -7,10 +8,12 @@ import {
   Download,
   Loader2,
   Play,
+  Plus,
   Redo2,
   Save,
   Undo2,
 } from "lucide-react";
+import { nanoid } from "nanoid";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -45,6 +48,7 @@ import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api-client";
 import { useSession } from "@/lib/auth-client";
 import {
+  addNodeAtom,
   canRedoAtom,
   canUndoAtom,
   clearWorkflowAtom,
@@ -307,6 +311,7 @@ function useWorkflowState() {
   );
   const undo = useSetAtom(undoAtom);
   const redo = useSetAtom(redoAtom);
+  const addNode = useSetAtom(addNodeAtom);
   const [canUndo] = useAtom(canUndoAtom);
   const [canRedo] = useAtom(canRedoAtom);
   const { data: session } = useSession();
@@ -366,6 +371,7 @@ function useWorkflowState() {
     setHasUnsavedChanges,
     undo,
     redo,
+    addNode,
     canUndo,
     canRedo,
     session,
@@ -401,7 +407,6 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     setShowClearDialog,
     clearWorkflow,
     setShowDeleteDialog,
-    router,
     setCurrentWorkflowName,
     setAllWorkflows,
     newWorkflowName,
@@ -458,16 +463,11 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
       await api.workflow.delete(currentWorkflowId);
       setShowDeleteDialog(false);
       toast.success("Workflow deleted successfully");
-      router.push("/");
+      window.location.href = "/";
     } catch (error) {
       console.error("Failed to delete workflow:", error);
       toast.error("Failed to delete workflow. Please try again.");
     }
-  };
-
-  const handleNewWorkflow = () => {
-    clearWorkflow();
-    router.push("/");
   };
 
   const handleRenameWorkflow = async () => {
@@ -565,7 +565,6 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     handleRunWithoutSaving,
     handleClearWorkflow,
     handleDeleteWorkflow,
-    handleNewWorkflow,
     handleRenameWorkflow,
     handleDownload,
     loadWorkflows,
@@ -573,7 +572,7 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
   };
 }
 
-// Toolbar Actions Component - handles undo/redo, save, and run buttons
+// Toolbar Actions Component - handles add step, undo/redo, save, and run buttons
 function ToolbarActions({
   workflowId,
   state,
@@ -583,12 +582,105 @@ function ToolbarActions({
   state: ReturnType<typeof useWorkflowState>;
   actions: ReturnType<typeof useWorkflowActions>;
 }) {
+  const { screenToFlowPosition } = useReactFlow();
+
   if (!workflowId) {
     return null;
   }
 
+  const handleAddStep = () => {
+    // Get the ReactFlow wrapper (the visible canvas container)
+    const flowWrapper = document.querySelector(".react-flow");
+    if (!flowWrapper) {
+      return;
+    }
+
+    const rect = flowWrapper.getBoundingClientRect();
+    // Calculate center in absolute screen coordinates
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    // Convert to flow coordinates
+    const position = screenToFlowPosition({ x: centerX, y: centerY });
+
+    // Adjust for node dimensions to center it properly
+    // Action node is 192px wide and 192px tall (w-48 h-48 in Tailwind)
+    const nodeWidth = 192;
+    const nodeHeight = 192;
+    position.x -= nodeWidth / 2;
+    position.y -= nodeHeight / 2;
+
+    // Check if there's already a node at this position
+    const offset = 20; // Offset distance in pixels
+    const threshold = 20; // How close nodes need to be to be considered overlapping
+
+    const finalPosition = { ...position };
+    let hasOverlap = true;
+    let attempts = 0;
+    const maxAttempts = 20; // Prevent infinite loop
+
+    while (hasOverlap && attempts < maxAttempts) {
+      hasOverlap = state.nodes.some((node) => {
+        const dx = Math.abs(node.position.x - finalPosition.x);
+        const dy = Math.abs(node.position.y - finalPosition.y);
+        return dx < threshold && dy < threshold;
+      });
+
+      if (hasOverlap) {
+        // Offset diagonally down-right
+        finalPosition.x += offset;
+        finalPosition.y += offset;
+        attempts += 1;
+      }
+    }
+
+    // Create new action node
+    const newNode: WorkflowNode = {
+      id: nanoid(),
+      type: "action",
+      position: finalPosition,
+      data: {
+        label: "",
+        description: "",
+        type: "action",
+        config: {},
+        status: "idle",
+      },
+    };
+
+    state.addNode(newNode);
+  };
+
   return (
     <>
+      {/* Add Step - Mobile Vertical */}
+      <ButtonGroup className="flex lg:hidden" orientation="vertical">
+        <Button
+          className="border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
+          disabled={state.isGenerating}
+          onClick={handleAddStep}
+          size="icon"
+          title="Add Step"
+          variant="secondary"
+        >
+          <Plus className="size-4" />
+        </Button>
+      </ButtonGroup>
+
+      {/* Add Step - Desktop Horizontal */}
+      <ButtonGroup className="hidden lg:flex" orientation="horizontal">
+        <Button
+          className="border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
+          disabled={state.isGenerating}
+          onClick={handleAddStep}
+          size="icon"
+          title="Add Step"
+          variant="secondary"
+        >
+          <Plus className="size-4" />
+        </Button>
+      </ButtonGroup>
+
       {/* Undo/Redo - Mobile Vertical */}
       <ButtonGroup className="flex lg:hidden" orientation="vertical">
         <Button
@@ -679,7 +771,7 @@ function SaveButton({
         <Save className="size-4" />
       )}
       {state.hasUnsavedChanges && !state.isSaving && (
-        <div className="-top-0.5 -right-0.5 absolute size-2 rounded-full bg-primary" />
+        <div className="absolute top-1.5 right-1.5 size-2 rounded-full bg-primary" />
       )}
     </Button>
   );
@@ -769,11 +861,8 @@ function WorkflowMenuComponent({
           <ChevronDown className="size-3 opacity-50" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-64">
-          <DropdownMenuItem
-            className="flex items-center justify-between"
-            onClick={actions.handleNewWorkflow}
-          >
-            <span>New Workflow</span>
+          <DropdownMenuItem className="flex items-center justify-between">
+            <a href="/">New Workflow</a>
             {!workflowId && <Check className="size-4 shrink-0" />}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
