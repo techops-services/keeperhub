@@ -232,65 +232,96 @@ type SocialButtonsProps = {
     google: boolean;
   };
   onSignIn: (provider: "github" | "google" | "vercel") => void;
+  loadingProvider: "github" | "google" | "vercel" | null;
 };
 
-const SocialButtons = ({ enabledProviders, onSignIn }: SocialButtonsProps) => (
+const SocialButtons = ({
+  enabledProviders,
+  onSignIn,
+  loadingProvider,
+}: SocialButtonsProps) => (
   <div className="flex flex-col gap-2">
     {enabledProviders.vercel && (
       <Button
         className="w-full"
+        disabled={loadingProvider !== null}
         onClick={() => onSignIn("vercel")}
         type="button"
         variant="outline"
       >
         <VercelIcon />
-        Continue with Vercel
+        {loadingProvider === "vercel" ? "Loading..." : "Sign In with Vercel"}
       </Button>
     )}
     {enabledProviders.github && (
       <Button
         className="w-full"
+        disabled={loadingProvider !== null}
         onClick={() => onSignIn("github")}
         type="button"
         variant="outline"
       >
         <GitHubIcon />
-        Continue with GitHub
+        {loadingProvider === "github" ? "Loading..." : "Sign In with GitHub"}
       </Button>
     )}
     {enabledProviders.google && (
       <Button
         className="w-full"
+        disabled={loadingProvider !== null}
         onClick={() => onSignIn("google")}
         type="button"
         variant="outline"
       >
         <GoogleIcon />
-        Continue with Google
+        {loadingProvider === "google" ? "Loading..." : "Sign In with Google"}
       </Button>
     )}
   </div>
 );
 
-export const AuthDialog = ({ children }: AuthDialogProps) => {
-  const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+type UseAuthHandlers = {
+  handleSocialSignIn: (
+    provider: "github" | "google" | "vercel"
+  ) => Promise<void>;
+  handleEmailAuth: (e: React.FormEvent) => Promise<void>;
+  toggleMode: () => void;
+};
 
-  const enabledProviders = getEnabledAuthProviders();
-  const singleProvider = getSingleProvider();
+type AuthHandlersOptions = {
+  mode: "signin" | "signup";
+  setMode: (newMode: "signin" | "signup") => void;
+  email: string;
+  password: string;
+  name: string;
+  setError: (error: string) => void;
+  setLoading: (loading: boolean) => void;
+  setLoadingProvider: (provider: "github" | "google" | "vercel" | null) => void;
+  setOpen: (open: boolean) => void;
+};
+
+const useAuthHandlers = (options: AuthHandlersOptions): UseAuthHandlers => {
+  const {
+    mode,
+    setMode,
+    email,
+    password,
+    name,
+    setError,
+    setLoading,
+    setLoadingProvider,
+    setOpen,
+  } = options;
 
   const handleSocialSignIn = async (
     provider: "github" | "google" | "vercel"
   ) => {
     try {
+      setLoadingProvider(provider);
       await signIn.social({ provider, callbackURL: "/" });
     } catch {
       toast.error(`Failed to sign in with ${getProviderLabel(provider)}`);
+      setLoadingProvider(null);
     }
   };
 
@@ -310,7 +341,6 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
       return false;
     }
 
-    // Automatically sign in after successful sign-up
     const signInResponse = await signIn.email({
       email,
       password,
@@ -356,71 +386,144 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
     }
   };
 
+  return {
+    handleSocialSignIn,
+    handleEmailAuth,
+    toggleMode,
+  };
+};
+
+type SingleProviderButtonProps = {
+  provider: Provider;
+  loadingProvider: "github" | "google" | "vercel" | null;
+  onSignIn: (provider: "github" | "google" | "vercel") => Promise<void>;
+};
+
+const SingleProviderButton = ({
+  provider,
+  loadingProvider,
+  onSignIn,
+}: SingleProviderButtonProps) => (
+  <Button
+    disabled={loadingProvider !== null}
+    onClick={() => onSignIn(provider as "github" | "google" | "vercel")}
+    size="sm"
+    variant="default"
+  >
+    {getProviderIcon(provider)}
+    {loadingProvider === provider
+      ? "Loading..."
+      : `Sign in with ${getProviderLabel(provider)}`}
+  </Button>
+);
+
+type EmailOnlyDialogProps = {
+  children: ReactNode;
+  open: boolean;
+  mode: "signin" | "signup";
+  name: string;
+  email: string;
+  password: string;
+  error: string;
+  loading: boolean;
+  onOpenChange: (open: boolean) => void;
+  onNameChange: (name: string) => void;
+  onEmailChange: (email: string) => void;
+  onPasswordChange: (password: string) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  onToggleMode: () => void;
+};
+
+const EmailOnlyDialog = ({
+  children,
+  open,
+  mode,
+  name,
+  email,
+  password,
+  error,
+  loading,
+  onOpenChange,
+  onNameChange,
+  onEmailChange,
+  onPasswordChange,
+  onSubmit,
+  onToggleMode,
+}: EmailOnlyDialogProps) => (
+  <Dialog onOpenChange={onOpenChange} open={open}>
+    <DialogTrigger asChild>
+      {children || (
+        <Button size="sm" variant="default">
+          Sign In
+        </Button>
+      )}
+    </DialogTrigger>
+    <DialogContent className="sm:max-w-md">
+      <DialogHeader>
+        <DialogTitle>
+          {mode === "signin" ? "Sign In" : "Create Account"}
+        </DialogTitle>
+        <DialogDescription>
+          {mode === "signin"
+            ? "Sign in to your account to continue"
+            : "Create a new account to get started"}
+        </DialogDescription>
+      </DialogHeader>
+
+      <EmailForm
+        email={email}
+        error={error}
+        loading={loading}
+        mode={mode}
+        name={name}
+        onEmailChange={onEmailChange}
+        onNameChange={onNameChange}
+        onPasswordChange={onPasswordChange}
+        onSubmit={onSubmit}
+        onToggleMode={onToggleMode}
+        password={password}
+      />
+    </DialogContent>
+  </Dialog>
+);
+
+type MultiProviderDialogProps = EmailOnlyDialogProps & {
+  enabledProviders: {
+    vercel: boolean;
+    github: boolean;
+    google: boolean;
+    email: boolean;
+  };
+  loadingProvider: "github" | "google" | "vercel" | null;
+  onSignIn: (provider: "github" | "google" | "vercel") => Promise<void>;
+};
+
+const MultiProviderDialog = ({
+  children,
+  open,
+  mode,
+  name,
+  email,
+  password,
+  error,
+  loading,
+  enabledProviders,
+  loadingProvider,
+  onOpenChange,
+  onNameChange,
+  onEmailChange,
+  onPasswordChange,
+  onSubmit,
+  onToggleMode,
+  onSignIn,
+}: MultiProviderDialogProps) => {
   const hasSocialProviders =
     enabledProviders.vercel ||
     enabledProviders.github ||
     enabledProviders.google;
 
-  // Single provider: Direct sign-in button
-  if (singleProvider && singleProvider !== "email") {
-    return (
-      <Button
-        onClick={() =>
-          handleSocialSignIn(singleProvider as "github" | "google" | "vercel")
-        }
-        size="sm"
-        variant="default"
-      >
-        {getProviderIcon(singleProvider)}
-        Sign in with {getProviderLabel(singleProvider)}
-      </Button>
-    );
-  }
-
-  // Single email provider: Show dialog immediately
-  if (singleProvider === "email") {
-    return (
-      <Dialog onOpenChange={setOpen} open={open}>
-        <DialogTrigger asChild>
-          {children || (
-            <Button size="sm" variant="default">
-              Sign In
-            </Button>
-          )}
-        </DialogTrigger>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {mode === "signin" ? "Sign In" : "Create Account"}
-            </DialogTitle>
-            <DialogDescription>
-              {mode === "signin"
-                ? "Sign in to your account to continue"
-                : "Create a new account to get started"}
-            </DialogDescription>
-          </DialogHeader>
-
-          <EmailForm
-            email={email}
-            error={error}
-            loading={loading}
-            mode={mode}
-            name={name}
-            onEmailChange={setEmail}
-            onNameChange={setName}
-            onPasswordChange={setPassword}
-            onSubmit={handleEmailAuth}
-            onToggleMode={toggleMode}
-            password={password}
-          />
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  // Multiple providers: Show dialog with all options
   return (
-    <Dialog onOpenChange={setOpen} open={open}>
+    <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogTrigger asChild>
         {children || (
           <Button size="sm" variant="default">
@@ -444,7 +547,8 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
           {hasSocialProviders && (
             <SocialButtons
               enabledProviders={enabledProviders}
-              onSignIn={handleSocialSignIn}
+              loadingProvider={loadingProvider}
+              onSignIn={onSignIn}
             />
           )}
 
@@ -455,7 +559,7 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
               </div>
               <div className="relative flex justify-center text-xs uppercase">
                 <span className="bg-background px-2 text-muted-foreground">
-                  Or continue with email
+                  Or Sign In with email
                 </span>
               </div>
             </div>
@@ -468,16 +572,99 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
               loading={loading}
               mode={mode}
               name={name}
-              onEmailChange={setEmail}
-              onNameChange={setName}
-              onPasswordChange={setPassword}
-              onSubmit={handleEmailAuth}
-              onToggleMode={toggleMode}
+              onEmailChange={onEmailChange}
+              onNameChange={onNameChange}
+              onPasswordChange={onPasswordChange}
+              onSubmit={onSubmit}
+              onToggleMode={onToggleMode}
               password={password}
             />
           )}
         </div>
       </DialogContent>
     </Dialog>
+  );
+};
+
+export const AuthDialog = ({ children }: AuthDialogProps) => {
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [loadingProvider, setLoadingProvider] = useState<
+    "github" | "google" | "vercel" | null
+  >(null);
+
+  const enabledProviders = getEnabledAuthProviders();
+  const singleProvider = getSingleProvider();
+
+  const { handleSocialSignIn, handleEmailAuth, toggleMode } = useAuthHandlers({
+    mode,
+    setMode,
+    email,
+    password,
+    name,
+    setError,
+    setLoading,
+    setLoadingProvider,
+    setOpen,
+  });
+
+  if (singleProvider && singleProvider !== "email") {
+    return (
+      <SingleProviderButton
+        loadingProvider={loadingProvider}
+        onSignIn={handleSocialSignIn}
+        provider={singleProvider}
+      />
+    );
+  }
+
+  if (singleProvider === "email") {
+    return (
+      <EmailOnlyDialog
+        email={email}
+        error={error}
+        loading={loading}
+        mode={mode}
+        name={name}
+        onEmailChange={setEmail}
+        onNameChange={setName}
+        onOpenChange={setOpen}
+        onPasswordChange={setPassword}
+        onSubmit={handleEmailAuth}
+        onToggleMode={toggleMode}
+        open={open}
+        password={password}
+      >
+        {children}
+      </EmailOnlyDialog>
+    );
+  }
+
+  return (
+    <MultiProviderDialog
+      email={email}
+      enabledProviders={enabledProviders}
+      error={error}
+      loading={loading}
+      loadingProvider={loadingProvider}
+      mode={mode}
+      name={name}
+      onEmailChange={setEmail}
+      onNameChange={setName}
+      onOpenChange={setOpen}
+      onPasswordChange={setPassword}
+      onSignIn={handleSocialSignIn}
+      onSubmit={handleEmailAuth}
+      onToggleMode={toggleMode}
+      open={open}
+      password={password}
+    >
+      {children}
+    </MultiProviderDialog>
   );
 };
