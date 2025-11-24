@@ -34,22 +34,8 @@ DATABASE_URL=postgresql://user:password@localhost:5432/workflow_builder
 BETTER_AUTH_SECRET=your-secret-key
 BETTER_AUTH_URL=http://localhost:3000
 
-# OpenAI (for AI workflow generation)
-OPENAI_API_KEY=your-openai-api-key
-
-# Vercel (for deploying workflows)
-VERCEL_API_TOKEN=your-vercel-api-token
-VERCEL_TEAM_ID=team_xxxxxxxxxxxxx  # Optional, for team projects
-
-# Resend (for sending emails)
-RESEND_API_KEY=your-resend-api-key
-RESEND_FROM_EMAIL=onboarding@yourdomain.com
-
-# Linear (for creating tickets)
-LINEAR_API_KEY=your-linear-api-key
-
-# Slack (for sending messages)
-SLACK_BOT_TOKEN=xoxb-your-slack-bot-token
+# AI Gateway (for AI workflow generation)
+AI_GATEWAY_API_KEY=your-openai-api-key
 ```
 
 ### Installation
