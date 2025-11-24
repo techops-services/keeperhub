@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { GitHubIcon } from "@/components/icons/github-icon";
 import { Button } from "@/components/ui/button";
 import { formatAbbreviatedNumber } from "@/lib/utils/format-number";
@@ -7,11 +8,16 @@ import { formatAbbreviatedNumber } from "@/lib/utils/format-number";
 const GITHUB_REPO_URL =
   "https://github.com/vercel-labs/workflow-builder-template";
 
-type GitHubStarsButtonProps = {
-  initialStars?: number | null;
-};
+export function GitHubStarsButton() {
+  const [stars, setStars] = useState<number | null>(null);
 
-export function GitHubStarsButton({ initialStars }: GitHubStarsButtonProps) {
+  useEffect(() => {
+    fetch("https://api.github.com/repos/vercel-labs/workflow-builder-template")
+      .then((res) => res.json())
+      .then((data) => setStars(data.stargazers_count))
+      .catch(() => setStars(null));
+  }, []);
+
   return (
     <Button
       asChild
@@ -26,9 +32,9 @@ export function GitHubStarsButton({ initialStars }: GitHubStarsButtonProps) {
         target="_blank"
       >
         <GitHubIcon className="size-4.5" />
-        {initialStars && (
+        {stars !== null && (
           <span className="text-sm">
-            {formatAbbreviatedNumber(initialStars)}
+            {formatAbbreviatedNumber(stars)} stars
           </span>
         )}
       </a>

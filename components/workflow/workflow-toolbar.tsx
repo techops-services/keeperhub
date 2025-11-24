@@ -951,7 +951,14 @@ function WorkflowMenuComponent({
         <DropdownMenuTrigger className="flex h-full cursor-pointer items-center gap-2 px-3 font-medium text-sm transition-all hover:bg-black/5 dark:hover:bg-white/5">
           <WorkflowIcon className="size-4" />
           <p className="font-medium text-sm">
-            {workflowId ? state.workflowName : "New Workflow"}
+            {workflowId ? (
+              state.workflowName
+            ) : (
+              <>
+                <span className="sm:hidden">New</span>
+                <span className="hidden sm:inline">New Workflow</span>
+              </>
+            )}
           </p>
           <ChevronDown className="size-3 opacity-50" />
         </DropdownMenuTrigger>
@@ -1181,9 +1188,15 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
           state={state}
           workflowId={workflowId}
         />
-        <GitHubStarsButton />
-        <DeployButton />
-        <UserMenu />
+        <div className="flex items-center gap-2">
+          {!workflowId && (
+            <>
+              <GitHubStarsButton />
+              <DeployButton />
+            </>
+          )}
+          <UserMenu />
+        </div>
       </Panel>
 
       <WorkflowDialogsComponent actions={actions} state={state} />

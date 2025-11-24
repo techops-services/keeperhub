@@ -21,6 +21,7 @@ export function DeployButton() {
           <title>Vercel logomark</title>
           <path d="m38 0 38 66H0z" />
         </svg>
+        <span className="text-sm sm:hidden">Deploy</span>
         <span className="hidden text-sm sm:inline">Deploy Your Own</span>
       </a>
     </Button>
