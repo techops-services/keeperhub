@@ -151,16 +151,6 @@ export const workflowExecutionsRelations = relations(
   })
 );
 
-export const workflowExecutionLogsRelations = relations(
-  workflowExecutionLogs,
-  ({ one }) => ({
-    execution: one(workflowExecutions, {
-      fields: [workflowExecutionLogs.executionId],
-      references: [workflowExecutions.id],
-    }),
-  })
-);
-
 export type User = typeof users.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type Workflow = typeof workflows.$inferSelect;
