@@ -75,6 +75,7 @@ export function TemplateBadgeInput({
   const [autocompletePosition, setAutocompletePosition] = useState({ top: 0, left: 0 });
   const [autocompleteFilter, setAutocompleteFilter] = useState("");
   const [atSignPosition, setAtSignPosition] = useState<number | null>(null);
+  const pendingCursorPosition = useRef<number | null>(null);
 
   // Update internal value when prop changes from outside
   useEffect(() => {
@@ -213,6 +214,7 @@ export function TemplateBadgeInput({
         range.collapse(true);
         selection?.removeAllRanges();
         selection?.addRange(range);
+        contentRef.current.focus();
         console.log("[Input] restoreCursorPosition: Cursor restored successfully");
       } catch (e) {
         console.log("[Input] restoreCursorPosition: Error setting range:", e);
@@ -234,7 +236,13 @@ export function TemplateBadgeInput({
     console.log("[Input] updateDisplay: isFocused:", isFocused, "text:", text);
     
     // Save cursor position before updating
-    const cursorPos = isFocused ? saveCursorPosition() : null;
+    let cursorPos = isFocused ? saveCursorPosition() : null;
+
+    // If we have a pending cursor position (from autocomplete), use that instead
+    if (pendingCursorPosition.current !== null) {
+      cursorPos = { offset: pendingCursorPosition.current };
+      pendingCursorPosition.current = null;
+    }
 
     // Clear current content
     console.log("[Input] updateDisplay: Clearing innerHTML");
@@ -496,83 +504,12 @@ export function TemplateBadgeInput({
     
     setShowAutocomplete(false);
     setAtSignPosition(null);
+
+    // Set pending cursor position for the next update
+    pendingCursorPosition.current = targetCursorPosition;
     
-    // Force immediate display update and restore cursor to correct position
-    requestAnimationFrame(() => {
-      updateDisplay();
-      
-      // After display updates, position cursor after the newly inserted badge
-      requestAnimationFrame(() => {
-        if (!contentRef.current) return;
-        
-        // Find the position to place cursor
-        let offset = 0;
-        const walker = document.createTreeWalker(
-          contentRef.current,
-          NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
-          null
-        );
-        
-        let node;
-        let targetNode: Node | null = null;
-        
-        while ((node = walker.nextNode())) {
-          if (node.nodeType === Node.TEXT_NODE) {
-            const parent = node.parentElement;
-            let isInsideBadge = false;
-            while (parent && parent !== contentRef.current) {
-              if (parent.getAttribute("data-template")) {
-                isInsideBadge = true;
-                break;
-              }
-            }
-            
-            if (!isInsideBadge) {
-              const textLength = (node.textContent || "").length;
-              if (offset + textLength >= targetCursorPosition) {
-                // Found the target text node
-                targetNode = node;
-                const nodeOffset = targetCursorPosition - offset;
-                const range = document.createRange();
-                const selection = window.getSelection();
-                range.setStart(node, nodeOffset);
-                range.collapse(true);
-                selection?.removeAllRanges();
-                selection?.addRange(range);
-                console.log("[Input] Cursor positioned at offset", nodeOffset, "in text node");
-                break;
-              }
-              offset += textLength;
-            }
-          } else if (node.nodeType === Node.ELEMENT_NODE) {
-            const element = node as HTMLElement;
-            const template = element.getAttribute("data-template");
-            if (template) {
-              if (offset + template.length >= targetCursorPosition) {
-                // Cursor should be right after this badge
-                targetNode = element.nextSibling;
-                if (!targetNode) {
-                  // Create a text node after the badge
-                  targetNode = document.createTextNode("");
-                  element.parentNode?.appendChild(targetNode);
-                }
-                const range = document.createRange();
-                const selection = window.getSelection();
-                range.setStart(targetNode, 0);
-                range.collapse(true);
-                selection?.removeAllRanges();
-                selection?.addRange(range);
-                console.log("[Input] Cursor positioned after badge");
-                break;
-              }
-              offset += template.length;
-            }
-          }
-        }
-        
-        contentRef.current.focus();
-      });
-    });
+    // Ensure we focus the input so the display update and cursor restoration works
+    contentRef.current.focus();
   };
 
   const handleFocus = () => {
@@ -583,6 +520,9 @@ export function TemplateBadgeInput({
   const handleBlur = () => {
     // Delay to allow autocomplete click to register
     setTimeout(() => {
+      if (document.activeElement === contentRef.current) {
+        return;
+      }
       setIsFocused(false);
       // Don't extract value on blur - it's already in sync from handleInput
       // Just trigger a display update to ensure everything renders correctly

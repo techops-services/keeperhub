@@ -6,6 +6,12 @@ import { workflowExecutions, workflows } from "@/lib/db/schema";
 import { executeWorkflow } from "@/lib/workflow-executor.workflow";
 import type { WorkflowEdge, WorkflowNode } from "@/lib/workflow-store";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
 // biome-ignore lint/nursery/useMaxParams: Background execution requires all workflow context
 async function executeWorkflowBackground(
   executionId: string,
@@ -53,6 +59,10 @@ async function executeWorkflowBackground(
   }
 }
 
+export function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ workflowId: string }> }
@@ -68,7 +78,7 @@ export async function POST(
     if (!workflow) {
       return NextResponse.json(
         { error: "Workflow not found" },
-        { status: 404 }
+        { status: 404, headers: corsHeaders }
       );
     }
 
@@ -80,7 +90,7 @@ export async function POST(
     if (!triggerNode || triggerNode.data.config?.triggerType !== "Webhook") {
       return NextResponse.json(
         { error: "This workflow is not configured for webhook triggers" },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -110,10 +120,13 @@ export async function POST(
     );
 
     // Return immediately with the execution ID
-    return NextResponse.json({
-      executionId: execution.id,
-      status: "running",
-    });
+    return NextResponse.json(
+      {
+        executionId: execution.id,
+        status: "running",
+      },
+      { headers: corsHeaders }
+    );
   } catch (error) {
     console.error("[Webhook] Failed to start workflow execution:", error);
     return NextResponse.json(
@@ -121,7 +134,7 @@ export async function POST(
         error:
           error instanceof Error ? error.message : "Failed to execute workflow",
       },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
