@@ -79,6 +79,7 @@ import {
   type WorkflowNode,
 } from "@/lib/workflow-store";
 import { Panel } from "../ai-elements/panel";
+import { DeployButton } from "../deploy-button";
 import { GitHubStarsButton } from "../github-stars-button";
 import { WorkflowIcon } from "../ui/workflow-icon";
 import { UserMenu } from "../workflows/user-menu";
@@ -1181,6 +1182,7 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
           workflowId={workflowId}
         />
         <GitHubStarsButton />
+        <DeployButton />
         <UserMenu />
       </Panel>
 

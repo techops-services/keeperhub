@@ -12,10 +12,6 @@ type GitHubStarsButtonProps = {
 };
 
 export function GitHubStarsButton({ initialStars }: GitHubStarsButtonProps) {
-  if (!initialStars) {
-    return null;
-  }
-
   return (
     <Button
       asChild
@@ -29,8 +25,12 @@ export function GitHubStarsButton({ initialStars }: GitHubStarsButtonProps) {
         rel="noopener noreferrer"
         target="_blank"
       >
-        <GitHubIcon className="size-3.5" />
-        <span className="text-sm">{formatAbbreviatedNumber(initialStars)}</span>
+        <GitHubIcon className="size-4.5" />
+        {initialStars && (
+          <span className="text-sm">
+            {formatAbbreviatedNumber(initialStars)}
+          </span>
+        )}
       </a>
     </Button>
   );

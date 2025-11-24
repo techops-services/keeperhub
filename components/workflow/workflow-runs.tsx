@@ -458,13 +458,13 @@ export function WorkflowRuns({
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "success":
-        return <Check className="h-3 w-3 text-primary" />;
+        return <Check className="h-3 w-3 text-white" />;
       case "error":
-        return <X className="h-3 w-3 text-primary" />;
+        return <X className="h-3 w-3 text-white" />;
       case "running":
-        return <Loader2 className="h-3 w-3 animate-spin text-primary" />;
+        return <Loader2 className="h-3 w-3 animate-spin text-white" />;
       default:
-        return <Clock className="h-3 w-3 text-primary" />;
+        return <Clock className="h-3 w-3 text-white" />;
     }
   };
 
