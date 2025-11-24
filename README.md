@@ -4,6 +4,18 @@ A template for building your own workflow automation platform. Built on top of W
 
 ![Workflow Builder Screenshot](screenshot.png)
 
+## Deploy Your Own
+
+You can deploy your own version of the workflow builder to Vercel with one click:
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel-labs%2Fworkflow-builder-template&project-name=workflow-builder&repository-name=workflow-builder&demo-title=Workflow%20Builder&demo-description=A%20free%2C%20open-source%20template%20for%20building%20visual%20workflow%20automation%20platforms%20with%20real%20integrations%20and%20code%20generation&demo-url=https%3A%2F%2Fworkflow-builder-template.vercel.app&demo-image=https%3A%2F%2Fraw.githubusercontent.com%2Fvercel-labs%2Fworkflow-builder-template%2Fmain%2Fscreenshot.png&env=BETTER_AUTH_SECRET,INTEGRATION_ENCRYPTION_KEY,AI_GATEWAY_API_KEY&envDescription=BETTER_AUTH_SECRET+and+INTEGRATION_ENCRYPTION_KEY+are+required+secrets.+AI_GATEWAY_API_KEY+is+optional.&stores=%5B%7B%22type%22%3A%22postgres%22%7D%5D)
+
+**What happens during deployment:**
+
+- **Automatic Database Setup**: A Neon Postgres database is automatically created and connected to your project
+- **Environment Configuration**: You'll be prompted to provide required environment variables (Better Auth credentials and AI Gateway API key)
+- **Ready to Use**: After deployment, you can start building workflows immediately
+
 ## What's Included
 
 - **Visual Workflow Builder** - Drag-and-drop interface powered by React Flow
@@ -70,14 +82,6 @@ Visit [http://localhost:3000](http://localhost:3000) to get started.
 - **Create Ticket** - Create Linear tickets
 - **Database Query** - Query or update PostgreSQL
 - **HTTP Request** - Call external APIs
-
-### Condition Nodes
-
-- Conditional branching based on data
-
-### Transform Nodes
-
-- Data transformation and mapping
 
 ## Code Generation
 
