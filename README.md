@@ -2,6 +2,8 @@
 
 A template for building your own workflow automation platform. Built on top of Workflow DevKit, this template provides a complete visual workflow builder with real integrations and code generation capabilities.
 
+![Workflow Builder Screenshot](screenshot.png)
+
 ## What's Included
 
 - **Visual Workflow Builder** - Drag-and-drop interface powered by React Flow
