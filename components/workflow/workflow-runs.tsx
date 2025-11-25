@@ -11,6 +11,7 @@ import {
   Play,
   X,
 } from "lucide-react";
+import Image from "next/image";
 import type { JSX } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api-client";
@@ -53,6 +54,56 @@ type WorkflowRunsProps = {
   onStartRun?: (executionId: string) => void;
 };
 
+// Helper to detect if output is a base64 image from generateImage step
+function isBase64ImageOutput(output: unknown): output is { base64: string } {
+  return (
+    typeof output === "object" &&
+    output !== null &&
+    "base64" in output &&
+    typeof (output as { base64: unknown }).base64 === "string" &&
+    (output as { base64: string }).base64.length > 100 // Base64 images are large
+  );
+}
+
+// Reusable copy button component
+function CopyButton({
+  data,
+  isError = false,
+}: {
+  data: unknown;
+  isError?: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const text = isError ? String(data) : JSON.stringify(data, null, 2);
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      console.error("Failed to copy:", error);
+    }
+  };
+
+  return (
+    <Button
+      className="h-7 px-2"
+      onClick={handleCopy}
+      size="sm"
+      type="button"
+      variant="ghost"
+    >
+      {copied ? (
+        <Check className="h-3 w-3 text-green-600" />
+      ) : (
+        <Copy className="h-3 w-3" />
+      )}
+    </Button>
+  );
+}
+
 // Component for rendering individual execution log entries
 function ExecutionLogEntry({
   log,
@@ -71,33 +122,6 @@ function ExecutionLogEntry({
   isFirst: boolean;
   isLast: boolean;
 }) {
-  const [copiedInput, setCopiedInput] = useState(false);
-  const [copiedOutput, setCopiedOutput] = useState(false);
-  const [copiedError, setCopiedError] = useState(false);
-
-  const copyToClipboard = async (
-    data: unknown,
-    type: "input" | "output" | "error"
-  ) => {
-    try {
-      const text =
-        type === "error" ? String(data) : JSON.stringify(data, null, 2);
-      await navigator.clipboard.writeText(text);
-      if (type === "input") {
-        setCopiedInput(true);
-        setTimeout(() => setCopiedInput(false), 2000);
-      } else if (type === "output") {
-        setCopiedOutput(true);
-        setTimeout(() => setCopiedOutput(false), 2000);
-      } else {
-        setCopiedError(true);
-        setTimeout(() => setCopiedError(false), 2000);
-      }
-    } catch (error) {
-      console.error("Failed to copy:", error);
-    }
-  };
-
   return (
     <div className="relative flex gap-3" key={log.id}>
       {/* Timeline connector */}
@@ -158,22 +182,7 @@ function ExecutionLogEntry({
                   <div className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
                     Input
                   </div>
-                  <Button
-                    className="h-7 px-2"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      copyToClipboard(log.input, "input");
-                    }}
-                    size="sm"
-                    type="button"
-                    variant="ghost"
-                  >
-                    {copiedInput ? (
-                      <Check className="h-3 w-3 text-green-600" />
-                    ) : (
-                      <Copy className="h-3 w-3" />
-                    )}
-                  </Button>
+                  <CopyButton data={log.input} />
                 </div>
                 <pre className="overflow-auto rounded-lg border bg-muted/50 p-3 font-mono text-xs leading-relaxed">
                   {JSON.stringify(log.input, null, 2)}
@@ -186,26 +195,24 @@ function ExecutionLogEntry({
                   <div className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
                     Output
                   </div>
-                  <Button
-                    className="h-7 px-2"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      copyToClipboard(log.output, "output");
-                    }}
-                    size="sm"
-                    type="button"
-                    variant="ghost"
-                  >
-                    {copiedOutput ? (
-                      <Check className="h-3 w-3 text-green-600" />
-                    ) : (
-                      <Copy className="h-3 w-3" />
-                    )}
-                  </Button>
+                  <CopyButton data={log.output} />
                 </div>
-                <pre className="overflow-auto rounded-lg border bg-muted/50 p-3 font-mono text-xs leading-relaxed">
-                  {JSON.stringify(log.output, null, 2)}
-                </pre>
+                {isBase64ImageOutput(log.output) ? (
+                  <div className="overflow-hidden rounded-lg border bg-muted/50 p-3">
+                    <Image
+                      alt="AI generated output"
+                      className="max-h-96 w-auto rounded"
+                      height={384}
+                      src={`data:image/png;base64,${(log.output as { base64: string }).base64}`}
+                      unoptimized
+                      width={384}
+                    />
+                  </div>
+                ) : (
+                  <pre className="overflow-auto rounded-lg border bg-muted/50 p-3 font-mono text-xs leading-relaxed">
+                    {JSON.stringify(log.output, null, 2)}
+                  </pre>
+                )}
               </div>
             )}
             {log.error && (
@@ -214,22 +221,7 @@ function ExecutionLogEntry({
                   <div className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
                     Error
                   </div>
-                  <Button
-                    className="h-7 px-2"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      copyToClipboard(log.error, "error");
-                    }}
-                    size="sm"
-                    type="button"
-                    variant="ghost"
-                  >
-                    {copiedError ? (
-                      <Check className="h-3 w-3 text-green-600" />
-                    ) : (
-                      <Copy className="h-3 w-3" />
-                    )}
-                  </Button>
+                  <CopyButton data={log.error} isError />
                 </div>
                 <pre className="overflow-auto rounded-lg border border-red-500/20 bg-red-500/5 p-3 font-mono text-red-600 text-xs leading-relaxed">
                   {log.error}

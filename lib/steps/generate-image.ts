@@ -56,8 +56,8 @@ export async function generateImageStep(input: {
       };
     }
 
-    // Convert the GeneratedFile to base64 string
-    const base64 = result.image.toString();
+    // Extract base64 string from the GeneratedFile object
+    const base64 = result.image.base64;
 
     return { success: true, base64 };
   } catch (error) {
