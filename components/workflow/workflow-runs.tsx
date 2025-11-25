@@ -486,6 +486,13 @@ export function WorkflowRuns({
   };
 
   const selectRun = (executionId: string) => {
+    // If already selected, deselect it
+    if (selectedExecutionId === executionId) {
+      setSelectedExecutionId(null);
+      setExecutionLogs({});
+      return;
+    }
+
     // Select the run without toggling expansion
     setSelectedExecutionId(executionId);
 
