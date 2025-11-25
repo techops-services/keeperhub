@@ -10,11 +10,17 @@ import "server-only";
 import { generateObject, generateText } from "ai";
 import { z } from "zod";
 import { fetchCredentials } from "../credential-fetcher";
+import { getErrorMessageAsync } from "../utils";
 
 type SchemaField = {
   name: string;
   type: string;
 };
+
+type GenerateTextResult =
+  | { success: true; text: string }
+  | { success: true; object: Record<string, unknown> }
+  | { success: false; error: string };
 
 /**
  * Determines the provider from the model ID
@@ -56,7 +62,7 @@ export async function generateTextStep(input: {
   aiPrompt?: string;
   aiFormat?: string;
   aiSchema?: string;
-}): Promise<{ text: string } | Record<string, unknown>> {
+}): Promise<GenerateTextResult> {
   "use step";
 
   const credentials = input.integrationId
@@ -66,23 +72,28 @@ export async function generateTextStep(input: {
   const apiKey = credentials.AI_GATEWAY_API_KEY;
 
   if (!apiKey) {
-    throw new Error(
-      "AI_GATEWAY_API_KEY is not configured. Please add it in Project Integrations."
-    );
+    return {
+      success: false,
+      error:
+        "AI_GATEWAY_API_KEY is not configured. Please add it in Project Integrations.",
+    };
   }
 
   const modelId = input.aiModel || "gpt-5";
   const promptText = input.aiPrompt || "";
 
   if (!promptText || promptText.trim() === "") {
-    throw new Error("Prompt is required for text generation");
+    return {
+      success: false,
+      error: "Prompt is required for text generation",
+    };
   }
 
   const providerName = getProviderFromModel(modelId);
   const modelString = `${providerName}/${modelId}`;
 
-  if (input.aiFormat === "object" && input.aiSchema) {
-    try {
+  try {
+    if (input.aiFormat === "object" && input.aiSchema) {
       const schema = JSON.parse(input.aiSchema) as SchemaField[];
       const zodSchema = buildZodSchema(schema);
 
@@ -95,19 +106,24 @@ export async function generateTextStep(input: {
         },
       });
 
-      return object;
-    } catch {
-      // If structured output fails, fall back to text generation
+      return { success: true, object };
     }
+
+    const { text } = await generateText({
+      model: modelString,
+      prompt: promptText,
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+      },
+    });
+
+    return { success: true, text };
+  } catch (error) {
+    // Extract meaningful error message from AI SDK errors
+    const message = await getErrorMessageAsync(error);
+    return {
+      success: false,
+      error: `Text generation failed: ${message}`,
+    };
   }
-
-  const { text } = await generateText({
-    model: modelString,
-    prompt: promptText,
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-    },
-  });
-
-  return { text };
 }

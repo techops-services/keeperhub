@@ -6,14 +6,20 @@
  */
 import "server-only";
 
-import { experimental_generateImage as generateImage } from "ai";
+import type { ImageModelV2 } from "@ai-sdk/provider";
+import { createGateway, experimental_generateImage as generateImage } from "ai";
 import { fetchCredentials } from "../credential-fetcher";
+import { getErrorMessageAsync } from "../utils";
+
+type GenerateImageResult =
+  | { success: true; base64: string }
+  | { success: false; error: string };
 
 export async function generateImageStep(input: {
   integrationId?: string;
-  model: string;
-  prompt: string;
-}): Promise<{ base64: string | undefined }> {
+  imageModel: ImageModelV2;
+  imagePrompt: string;
+}): Promise<GenerateImageResult> {
   "use step";
 
   const credentials = input.integrationId
@@ -23,29 +29,43 @@ export async function generateImageStep(input: {
   const apiKey = credentials.AI_GATEWAY_API_KEY;
 
   if (!apiKey) {
-    throw new Error(
-      "AI_GATEWAY_API_KEY is not configured. Please add it in Project Integrations."
-    );
+    return {
+      success: false,
+      error:
+        "AI_GATEWAY_API_KEY is not configured. Please add it in Project Integrations.",
+    };
   }
 
-  const result = await generateImage({
-    // biome-ignore lint/suspicious/noExplicitAny: model string needs type coercion for ai package
-    model: input.model as any,
-    prompt: input.prompt,
-    size: "1024x1024",
-    providerOptions: {
-      openai: {
-        apiKey,
-      },
-    },
-  });
+  try {
+    const gateway = createGateway({
+      apiKey,
+    });
 
-  if (!result.image) {
-    throw new Error("Failed to generate image");
+    // biome-ignore lint/suspicious/noExplicitAny: AI gateway model ID is dynamic
+    const modelId = (input.imageModel ?? "bfl/flux-2-pro") as any;
+    const result = await generateImage({
+      model: gateway.imageModel(modelId),
+      prompt: input.imagePrompt,
+      size: "1024x1024",
+    });
+
+    if (!result.image) {
+      return {
+        success: false,
+        error: "Failed to generate image: No image returned",
+      };
+    }
+
+    // Convert the GeneratedFile to base64 string
+    const base64 = result.image.toString();
+
+    return { success: true, base64 };
+  } catch (error) {
+    // Extract meaningful error message from AI SDK errors
+    const message = await getErrorMessageAsync(error);
+    return {
+      success: false,
+      error: `Image generation failed: ${message}`,
+    };
   }
-
-  // Convert the GeneratedFile to base64 string
-  const base64 = result.image.toString();
-
-  return { base64 };
 }

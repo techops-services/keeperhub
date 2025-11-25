@@ -3,6 +3,7 @@
  * This executor captures step executions through the workflow SDK for better observability
  */
 
+import { getErrorMessageAsync } from "./utils";
 import type { WorkflowEdge, WorkflowNode } from "./workflow-store";
 
 type ExecutionResult = {
@@ -88,111 +89,102 @@ async function executeActionStep(input: {
 
   // Import and execute the appropriate step function
   // Step functions load credentials from process.env themselves
-  try {
-    if (actionType === "Send Email") {
-      const { sendEmailStep } = await import("./steps/send-email");
-      // biome-ignore lint/suspicious/noExplicitAny: Dynamic step input type
-      return await sendEmailStep(stepInput as any);
-    }
-    if (actionType === "Send Slack Message") {
-      const { sendSlackMessageStep } = await import(
-        "./steps/send-slack-message"
-      );
-      // biome-ignore lint/suspicious/noExplicitAny: Dynamic step input type
-      return await sendSlackMessageStep(stepInput as any);
-    }
-    if (actionType === "Create Ticket") {
-      const { createTicketStep } = await import("./steps/create-ticket");
-      // biome-ignore lint/suspicious/noExplicitAny: Dynamic step input type
-      return await createTicketStep(stepInput as any);
-    }
-    if (actionType === "Generate Text") {
-      const { generateTextStep } = await import("./steps/generate-text");
-      // biome-ignore lint/suspicious/noExplicitAny: Dynamic step input type
-      return await generateTextStep(stepInput as any);
-    }
-    if (actionType === "Generate Image") {
-      const { generateImageStep } = await import("./steps/generate-image");
-      // biome-ignore lint/suspicious/noExplicitAny: Dynamic step input type
-      return await generateImageStep(stepInput as any);
-    }
-    if (actionType === "Database Query") {
-      const { databaseQueryStep } = await import("./steps/database-query");
-      // biome-ignore lint/suspicious/noExplicitAny: Dynamic step input type
-      return await databaseQueryStep(stepInput as any);
-    }
-    if (actionType === "HTTP Request") {
-      const { httpRequestStep } = await import("./steps/http-request");
-      // biome-ignore lint/suspicious/noExplicitAny: Dynamic step input type
-      return await httpRequestStep(stepInput as any);
-    }
-    if (actionType === "Condition") {
-      const { conditionStep } = await import("./steps/condition");
-      // Special handling for condition: process templates and evaluate as JavaScript
-      // The condition field is kept as original template string for proper evaluation
-      const conditionExpression = stepInput.condition;
-      let evaluatedCondition: boolean;
-
-      console.log("[Condition] Original expression:", conditionExpression);
-
-      if (typeof conditionExpression === "boolean") {
-        evaluatedCondition = conditionExpression;
-      } else if (typeof conditionExpression === "string") {
-        try {
-          const evalContext: Record<string, unknown> = {};
-          let transformedExpression = conditionExpression;
-          const templatePattern = /\{\{@([^:]+):([^}]+)\}\}/g;
-          const varCounter = { value: 0 };
-
-          transformedExpression = transformedExpression.replace(
-            templatePattern,
-            (match, nodeId, rest) =>
-              replaceTemplateVariable(
-                match,
-                nodeId,
-                rest,
-                evalContext,
-                varCounter
-              )
-          );
-
-          const varNames = Object.keys(evalContext);
-          const varValues = Object.values(evalContext);
-
-          const evalFunc = new Function(
-            ...varNames,
-            `return (${transformedExpression});`
-          );
-          const result = evalFunc(...varValues);
-          evaluatedCondition = Boolean(result);
-        } catch (error) {
-          console.error("[Condition] Failed to evaluate condition:", error);
-          console.error("[Condition] Expression was:", conditionExpression);
-          // If evaluation fails, treat as false to be safe
-          evaluatedCondition = false;
-        }
-      } else {
-        // Coerce to boolean for other types
-        evaluatedCondition = Boolean(conditionExpression);
-      }
-
-      console.log("[Condition] Final result:", evaluatedCondition);
-
-      // biome-ignore lint/suspicious/noExplicitAny: Dynamic step input type
-      return await conditionStep({ condition: evaluatedCondition } as any);
-    }
-
-    // Fallback for unknown action types
-    return {
-      success: false,
-      error: `Unknown action type: ${actionType}`,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
+  if (actionType === "Send Email") {
+    const { sendEmailStep } = await import("./steps/send-email");
+    // biome-ignore lint/suspicious/noExplicitAny: Dynamic step input type
+    return await sendEmailStep(stepInput as any);
   }
+  if (actionType === "Send Slack Message") {
+    const { sendSlackMessageStep } = await import("./steps/send-slack-message");
+    // biome-ignore lint/suspicious/noExplicitAny: Dynamic step input type
+    return await sendSlackMessageStep(stepInput as any);
+  }
+  if (actionType === "Create Ticket") {
+    const { createTicketStep } = await import("./steps/create-ticket");
+    // biome-ignore lint/suspicious/noExplicitAny: Dynamic step input type
+    return await createTicketStep(stepInput as any);
+  }
+  if (actionType === "Generate Text") {
+    const { generateTextStep } = await import("./steps/generate-text");
+    // biome-ignore lint/suspicious/noExplicitAny: Dynamic step input type
+    return await generateTextStep(stepInput as any);
+  }
+  if (actionType === "Generate Image") {
+    const { generateImageStep } = await import("./steps/generate-image");
+    // biome-ignore lint/suspicious/noExplicitAny: Dynamic step input type
+    return await generateImageStep(stepInput as any);
+  }
+  if (actionType === "Database Query") {
+    const { databaseQueryStep } = await import("./steps/database-query");
+    // biome-ignore lint/suspicious/noExplicitAny: Dynamic step input type
+    return await databaseQueryStep(stepInput as any);
+  }
+  if (actionType === "HTTP Request") {
+    const { httpRequestStep } = await import("./steps/http-request");
+    // biome-ignore lint/suspicious/noExplicitAny: Dynamic step input type
+    return await httpRequestStep(stepInput as any);
+  }
+  if (actionType === "Condition") {
+    const { conditionStep } = await import("./steps/condition");
+    // Special handling for condition: process templates and evaluate as JavaScript
+    // The condition field is kept as original template string for proper evaluation
+    const conditionExpression = stepInput.condition;
+    let evaluatedCondition: boolean;
+
+    console.log("[Condition] Original expression:", conditionExpression);
+
+    if (typeof conditionExpression === "boolean") {
+      evaluatedCondition = conditionExpression;
+    } else if (typeof conditionExpression === "string") {
+      try {
+        const evalContext: Record<string, unknown> = {};
+        let transformedExpression = conditionExpression;
+        const templatePattern = /\{\{@([^:]+):([^}]+)\}\}/g;
+        const varCounter = { value: 0 };
+
+        transformedExpression = transformedExpression.replace(
+          templatePattern,
+          (match, nodeId, rest) =>
+            replaceTemplateVariable(
+              match,
+              nodeId,
+              rest,
+              evalContext,
+              varCounter
+            )
+        );
+
+        const varNames = Object.keys(evalContext);
+        const varValues = Object.values(evalContext);
+
+        const evalFunc = new Function(
+          ...varNames,
+          `return (${transformedExpression});`
+        );
+        const result = evalFunc(...varValues);
+        evaluatedCondition = Boolean(result);
+      } catch (error) {
+        console.error("[Condition] Failed to evaluate condition:", error);
+        console.error("[Condition] Expression was:", conditionExpression);
+        // If evaluation fails, treat as false to be safe
+        evaluatedCondition = false;
+      }
+    } else {
+      // Coerce to boolean for other types
+      evaluatedCondition = Boolean(conditionExpression);
+    }
+
+    console.log("[Condition] Final result:", evaluatedCondition);
+
+    // biome-ignore lint/suspicious/noExplicitAny: Dynamic step input type
+    return await conditionStep({ condition: evaluatedCondition } as any);
+  }
+
+  // Fallback for unknown action types
+  return {
+    success: false,
+    error: `Unknown action type: ${actionType}`,
+  };
 }
 
 /**
@@ -268,7 +260,6 @@ function processTemplates(
 /**
  * Main workflow executor function
  */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Workflow execution requires complex orchestration
 export async function executeWorkflow(input: WorkflowExecutionInput) {
   "use workflow";
 
@@ -451,9 +442,27 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
         });
       } else if (node.data.type === "action") {
         const config = node.data.config || {};
-        const actionType = config.actionType as string;
+        const actionType = config.actionType as string | undefined;
 
         console.log("[Workflow Executor] Executing action node:", actionType);
+
+        // Check if action type is defined
+        if (!actionType) {
+          result = {
+            success: false,
+            error: `Action node "${node.data.label || node.id}" has no action type configured`,
+          };
+
+          await logNodeComplete({
+            logId: logInfo.logId,
+            startTime: logInfo.startTime,
+            status: "error",
+            error: result.error,
+          });
+
+          results[nodeId] = result;
+          return;
+        }
 
         // Process templates in config, but keep condition unprocessed for special handling
         const configWithoutCondition = { ...config };
@@ -489,17 +498,40 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
           resultType: typeof stepResult,
         });
 
-        result = {
-          success: true,
-          data: stepResult,
-        };
+        // Check if the step returned an error result
+        const isErrorResult =
+          stepResult &&
+          typeof stepResult === "object" &&
+          "success" in stepResult &&
+          (stepResult as { success: boolean }).success === false;
 
-        await logNodeComplete({
-          logId: logInfo.logId,
-          startTime: logInfo.startTime,
-          status: "success",
-          output: result.data,
-        });
+        if (isErrorResult) {
+          const errorResult = stepResult as { success: false; error?: string };
+          result = {
+            success: false,
+            error: errorResult.error || "Step execution failed",
+          };
+
+          await logNodeComplete({
+            logId: logInfo.logId,
+            startTime: logInfo.startTime,
+            status: "error",
+            output: stepResult,
+            error: result.error,
+          });
+        } else {
+          result = {
+            success: true,
+            data: stepResult,
+          };
+
+          await logNodeComplete({
+            logId: logInfo.logId,
+            startTime: logInfo.startTime,
+            status: "success",
+            output: result.data,
+          });
+        }
       } else {
         console.log("[Workflow Executor] Unknown node type:", node.data.type);
         result = {
@@ -576,9 +608,10 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
       }
     } catch (error) {
       console.error("[Workflow Executor] Error executing node:", nodeId, error);
+      const errorMessage = await getErrorMessageAsync(error);
       const errorResult = {
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: errorMessage,
       };
       results[nodeId] = errorResult;
 
@@ -641,6 +674,8 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
       error
     );
 
+    const errorMessage = await getErrorMessageAsync(error);
+
     // Update execution record with error if we have an executionId
     if (executionId) {
       try {
@@ -649,7 +684,7 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
           action: "complete",
           executionId,
           status: "error",
-          error: error instanceof Error ? error.message : "Unknown error",
+          error: errorMessage,
           startTime: Date.now(),
         });
       } catch (logError) {
@@ -661,7 +696,7 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
       success: false,
       results,
       outputs,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: errorMessage,
     };
   }
 }

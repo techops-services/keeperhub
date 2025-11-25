@@ -17,12 +17,9 @@ type DatabaseQueryInput = {
   query?: string;
 };
 
-type DatabaseQueryResult = {
-  status: string;
-  rows?: unknown;
-  count?: number;
-  error?: string;
-};
+type DatabaseQueryResult =
+  | { success: true; rows: unknown; count: number }
+  | { success: false; error: string };
 
 function validateInput(input: DatabaseQueryInput): string | null {
   const queryString = input.dbQuery || input.query;
@@ -50,7 +47,7 @@ async function executeQuery(
   return await db.execute(sql.raw(queryString));
 }
 
-function getErrorMessage(error: unknown): string {
+function getDatabaseErrorMessage(error: unknown): string {
   if (!(error instanceof Error)) {
     return "Unknown database error";
   }
@@ -90,10 +87,7 @@ export async function databaseQueryStep(
 
   const validationError = validateInput(input);
   if (validationError) {
-    return {
-      status: "error",
-      error: validationError,
-    };
+    return { success: false, error: validationError };
   }
 
   const credentials = input.integrationId
@@ -104,7 +98,7 @@ export async function databaseQueryStep(
 
   if (!databaseUrl) {
     return {
-      status: "error",
+      success: false,
       error:
         "DATABASE_URL is not configured. Please add it in Project Integrations.",
     };
@@ -119,15 +113,15 @@ export async function databaseQueryStep(
     await client.end();
 
     return {
-      status: "success",
+      success: true,
       rows: result,
       count: Array.isArray(result) ? result.length : 0,
     };
   } catch (error) {
     await cleanupClient(client);
     return {
-      status: "error",
-      error: getErrorMessage(error),
+      success: false,
+      error: `Database query failed: ${getDatabaseErrorMessage(error)}`,
     };
   }
 }

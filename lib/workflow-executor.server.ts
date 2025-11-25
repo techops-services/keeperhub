@@ -6,6 +6,7 @@ import type { SchemaField } from "../components/workflow/config/schema-builder";
 import { db } from "./db";
 import { workflowExecutionLogs } from "./db/schema";
 import { getStep, hasStep } from "./steps";
+import { getErrorMessage, getErrorMessageAsync } from "./utils";
 import { redactSensitiveData } from "./utils/redact";
 import { type NodeOutputs, processConfigTemplates } from "./utils/template";
 import type { WorkflowEdge, WorkflowNode } from "./workflow-store";
@@ -260,7 +261,7 @@ class ServerWorkflowExecutor {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: getErrorMessage(error),
       };
     }
   }
@@ -357,7 +358,7 @@ class ServerWorkflowExecutor {
     } catch (error) {
       return {
         success: false,
-        error: `Failed to evaluate condition: ${error instanceof Error ? error.message : "Unknown error"}`,
+        error: `Failed to evaluate condition: ${getErrorMessage(error)}`,
       };
     }
   }
@@ -520,9 +521,10 @@ class ServerWorkflowExecutor {
 
       return result;
     } catch (error) {
+      const errorMessage = await getErrorMessageAsync(error);
       const errorResult = {
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: errorMessage,
       };
       this.results.set(node.id, errorResult);
       await this.completeNodeExecution(

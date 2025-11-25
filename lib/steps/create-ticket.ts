@@ -8,12 +8,17 @@ import "server-only";
 
 import { LinearClient } from "@linear/sdk";
 import { fetchCredentials } from "../credential-fetcher";
+import { getErrorMessage } from "../utils";
+
+type CreateTicketResult =
+  | { success: true; id: string; url: string; title: string }
+  | { success: false; error: string };
 
 export async function createTicketStep(input: {
   integrationId?: string;
   ticketTitle: string;
   ticketDescription: string;
-}) {
+}): Promise<CreateTicketResult> {
   "use step";
 
   const credentials = input.integrationId
@@ -24,38 +29,54 @@ export async function createTicketStep(input: {
   const teamId = credentials.LINEAR_TEAM_ID;
 
   if (!apiKey) {
-    throw new Error(
-      "LINEAR_API_KEY is not configured. Please add it in Project Integrations."
-    );
+    return {
+      success: false,
+      error:
+        "LINEAR_API_KEY is not configured. Please add it in Project Integrations.",
+    };
   }
 
-  const linear = new LinearClient({ apiKey });
+  try {
+    const linear = new LinearClient({ apiKey });
 
-  let targetTeamId = teamId;
-  if (!targetTeamId) {
-    const teams = await linear.teams();
-    const firstTeam = teams.nodes[0];
-    if (!firstTeam) {
-      throw new Error("No teams found in Linear workspace");
+    let targetTeamId = teamId;
+    if (!targetTeamId) {
+      const teams = await linear.teams();
+      const firstTeam = teams.nodes[0];
+      if (!firstTeam) {
+        return {
+          success: false,
+          error: "No teams found in Linear workspace",
+        };
+      }
+      targetTeamId = firstTeam.id;
     }
-    targetTeamId = firstTeam.id;
+
+    const issuePayload = await linear.createIssue({
+      title: input.ticketTitle,
+      description: input.ticketDescription,
+      teamId: targetTeamId,
+    });
+
+    const issue = await issuePayload.issue;
+
+    if (!issue) {
+      return {
+        success: false,
+        error: "Failed to create issue",
+      };
+    }
+
+    return {
+      success: true,
+      id: issue.id,
+      url: issue.url,
+      title: issue.title,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: `Failed to create ticket: ${getErrorMessage(error)}`,
+    };
   }
-
-  const issuePayload = await linear.createIssue({
-    title: input.ticketTitle,
-    description: input.ticketDescription,
-    teamId: targetTeamId,
-  });
-
-  const issue = await issuePayload.issue;
-
-  if (!issue) {
-    throw new Error("Failed to create issue");
-  }
-
-  return {
-    id: issue.id,
-    url: issue.url,
-    title: issue.title,
-  };
 }
