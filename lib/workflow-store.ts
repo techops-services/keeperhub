@@ -520,3 +520,13 @@ export const redoAtom = atom(null, (get, set) => {
 // Can undo/redo atoms
 export const canUndoAtom = atom((get) => get(historyAtom).length > 0);
 export const canRedoAtom = atom((get) => get(futureAtom).length > 0);
+
+// Clear all node statuses (used when clearing runs)
+export const clearNodeStatusesAtom = atom(null, (get, set) => {
+  const currentNodes = get(nodesAtom);
+  const newNodes = currentNodes.map((node) => ({
+    ...node,
+    data: { ...node.data, status: "idle" as const },
+  }));
+  set(nodesAtom, newNodes);
+});

@@ -26,6 +26,7 @@ import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api-client";
 import { generateWorkflowCode } from "@/lib/workflow-codegen";
 import {
+  clearNodeStatusesAtom,
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
   deleteEdgeAtom,
@@ -148,6 +149,7 @@ export const PanelInner = () => {
   const deleteSelectedItems = useSetAtom(deleteSelectedItemsAtom);
   const setShowClearDialog = useSetAtom(showClearDialogAtom);
   const setShowDeleteDialog = useSetAtom(showDeleteDialogAtom);
+  const clearNodeStatuses = useSetAtom(clearNodeStatusesAtom);
   const [showDeleteNodeAlert, setShowDeleteNodeAlert] = useState(false);
   const [showDeleteEdgeAlert, setShowDeleteEdgeAlert] = useState(false);
   const [showDeleteRunsAlert, setShowDeleteRunsAlert] = useState(false);
@@ -215,7 +217,7 @@ export const PanelInner = () => {
 
     try {
       await api.workflow.deleteExecutions(currentWorkflowId);
-      toast.success("All runs deleted");
+      clearNodeStatuses();
       setShowDeleteRunsAlert(false);
     } catch (error) {
       console.error("Failed to delete runs:", error);
