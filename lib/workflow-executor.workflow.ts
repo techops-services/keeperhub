@@ -583,27 +583,29 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
             console.log(
               "[Workflow Executor] Condition is true, executing",
               nextNodes.length,
-              "next nodes"
+              "next nodes in parallel"
             );
-            for (const nextNodeId of nextNodes) {
-              await executeNode(nextNodeId, visited);
-            }
+            // Execute all next nodes in parallel
+            await Promise.all(
+              nextNodes.map((nextNodeId) => executeNode(nextNodeId, visited))
+            );
           } else {
             console.log(
               "[Workflow Executor] Condition is false, skipping next nodes"
             );
           }
         } else {
-          // For non-condition nodes, execute all next nodes
+          // For non-condition nodes, execute all next nodes in parallel
           const nextNodes = edgesBySource.get(nodeId) || [];
           console.log(
             "[Workflow Executor] Executing",
             nextNodes.length,
-            "next nodes"
+            "next nodes in parallel"
           );
-          for (const nextNodeId of nextNodes) {
-            await executeNode(nextNodeId, visited);
-          }
+          // Execute all next nodes in parallel
+          await Promise.all(
+            nextNodes.map((nextNodeId) => executeNode(nextNodeId, visited))
+          );
         }
       }
     } catch (error) {
@@ -624,14 +626,12 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
     }
   }
 
-  // Execute from each trigger node
+  // Execute from each trigger node in parallel
   try {
     console.log("[Workflow Executor] Starting execution from trigger nodes");
     const workflowStartTime = Date.now();
 
-    for (const trigger of triggerNodes) {
-      await executeNode(trigger.id);
-    }
+    await Promise.all(triggerNodes.map((trigger) => executeNode(trigger.id)));
 
     const finalSuccess = Object.values(results).every((r) => r.success);
     const duration = Date.now() - workflowStartTime;
