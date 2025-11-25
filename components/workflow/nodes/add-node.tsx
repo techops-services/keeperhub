@@ -12,7 +12,9 @@ export function AddNode({ data }: NodeProps & { data?: AddNodeData }) {
   return (
     <div className="flex flex-col items-center justify-center gap-8 rounded-lg border border-border border-dashed bg-background/50 p-8 backdrop-blur-sm">
       <div className="text-center">
-        <h1 className="mb-2 font-bold text-3xl">Workflow Builder Template</h1>
+        <h1 className="mb-2 font-bold text-3xl">
+          AI Workflow Builder Template
+        </h1>
         <p className="text-muted-foreground text-sm">
           Powered by{" "}
           <a

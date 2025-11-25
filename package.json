@@ -1,9 +1,9 @@
 {
-  "name": "workflow-builder-template",
+  "name": "ai-workflow-builder-template",
   "version": "0.1.0",
   "private": true,
   "license": "Apache-2.0",
-  "description": "A template for building your own workflow automation platform",
+  "description": "A template for building your own AI-driven workflow automation platform",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
