@@ -408,7 +408,7 @@ export function generateWorkflowCode(
 
     const config = node.data.config || {};
     const aiPrompt = (config.aiPrompt as string) || "Generate a summary";
-    const aiModel = (config.aiModel as string) || "gpt-5";
+    const aiModel = (config.aiModel as string) || "meta/llama-4-scout";
     const aiFormat = (config.aiFormat as string) || "text";
     const aiSchema = config.aiSchema as string | undefined;
 
@@ -444,7 +444,7 @@ export function generateWorkflowCode(
     const imagePrompt =
       (node.data.config?.imagePrompt as string) || "A beautiful landscape";
     const imageModel =
-      (node.data.config?.imageModel as string) || "bfl/flux-2-pro";
+      (node.data.config?.imageModel as string) || "google/imagen-4.0-generate";
 
     return [
       `${indent}// Generate image using AI`,

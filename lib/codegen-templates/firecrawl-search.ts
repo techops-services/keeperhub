@@ -1,5 +1,5 @@
 /**
- * Code template for Firecrawl Search action
+ * Code template for Search action
  * This is a string template used for code generation - keep as string export
  */
 export default `import FirecrawlApp from '@mendable/firecrawl-js';

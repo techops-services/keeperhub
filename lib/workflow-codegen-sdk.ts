@@ -314,7 +314,7 @@ function _generateGenerateImageStepBody(
   const finalPrompt = (input.imagePrompt as string) || imagePrompt;
   
   const response = await openai.images.generate({
-    model: '${config.imageModel || "bfl/flux-2-pro"}',
+    model: '${config.imageModel || "google/imagen-4.0-generate"}',
     prompt: finalPrompt,
     n: 1,
     response_format: 'b64_json',
@@ -493,13 +493,28 @@ export function generateWorkflowSDKCode(
 
   function buildAITextParams(config: Record<string, unknown>): string[] {
     imports.add("import { generateText } from 'ai';");
-    const modelId = (config.aiModel as string) || "gpt-4o-mini";
-    const provider =
-      modelId.startsWith("gpt-") || modelId.startsWith("o1-")
-        ? "openai"
-        : "anthropic";
+    const modelId = (config.aiModel as string) || "meta/llama-4-scout";
+
+    // Determine the full model string with provider
+    // If the model already contains a "/", it already has a provider prefix, so use as-is
+    let modelString: string;
+    if (modelId.includes("/")) {
+      modelString = modelId;
+    } else {
+      // Infer provider from model name for models without provider prefix
+      let provider: string;
+      if (modelId.startsWith("gpt-") || modelId.startsWith("o1-")) {
+        provider = "openai";
+      } else if (modelId.startsWith("claude-")) {
+        provider = "anthropic";
+      } else {
+        provider = "openai"; // default to openai
+      }
+      modelString = `${provider}/${modelId}`;
+    }
+
     return [
-      `model: "${provider}/${modelId}"`,
+      `model: "${modelString}"`,
       `prompt: \`${convertTemplateToJS((config.aiPrompt as string) || "")}\``,
       "apiKey: process.env.OPENAI_API_KEY!",
     ];
@@ -509,7 +524,8 @@ export function generateWorkflowSDKCode(
     imports.add(
       "import { experimental_generateImage as generateImage } from 'ai';"
     );
-    const imageModel = (config.imageModel as string) || "bfl/flux-2-pro";
+    const imageModel =
+      (config.imageModel as string) || "google/imagen-4.0-generate";
     return [
       `model: "${imageModel}"`,
       `prompt: \`${convertTemplateToJS((config.imagePrompt as string) || "")}\``,

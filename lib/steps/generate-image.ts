@@ -42,7 +42,7 @@ export async function generateImageStep(input: {
     });
 
     // biome-ignore lint/suspicious/noExplicitAny: AI gateway model ID is dynamic
-    const modelId = (input.imageModel ?? "bfl/flux-2-pro") as any;
+    const modelId = (input.imageModel ?? "google/imagen-4.0-generate") as any;
     const result = await generateImage({
       model: gateway.imageModel(modelId),
       prompt: input.imagePrompt,

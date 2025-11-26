@@ -87,7 +87,7 @@ export async function generateTextStep(input: {
     };
   }
 
-  const modelId = input.aiModel || "gpt-5";
+  const modelId = input.aiModel || "meta/llama-4-scout";
   const promptText = input.aiPrompt || "";
 
   if (!promptText || promptText.trim() === "") {

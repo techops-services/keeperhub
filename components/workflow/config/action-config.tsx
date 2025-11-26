@@ -435,7 +435,7 @@ function GenerateTextFields({
         <Select
           disabled={disabled}
           onValueChange={(value) => onUpdateConfig("aiModel", value)}
-          value={(config?.aiModel as string) || "gpt-5"}
+          value={(config?.aiModel as string) || "meta/llama-4-scout"}
         >
           <SelectTrigger className="w-full" id="aiModel">
             <SelectValue placeholder="Select model" />
@@ -447,7 +447,31 @@ function GenerateTextFields({
             <SelectItem value="anthropic/claude-sonnet-4.5">
               Claude Sonnet 4.5
             </SelectItem>
+            <SelectItem value="anthropic/claude-haiku-4.5">
+              Claude Haiku 4.5
+            </SelectItem>
+            <SelectItem value="google/gemini-3-pro-preview">
+              Gemini 3 Pro Preview
+            </SelectItem>
+            <SelectItem value="google/gemini-2.5-pro">
+              Gemini 2.5 Pro
+            </SelectItem>
+            <SelectItem value="google/gemini-2.5-flash">
+              Gemini 2.5 Flash
+            </SelectItem>
+            <SelectItem value="google/gemini-2.5-flash-lite">
+              Gemini 2.5 Flash Lite
+            </SelectItem>
+            <SelectItem value="meta/llama-4-scout">Llama 4 Scout</SelectItem>
+            <SelectItem value="meta/llama-3.3-70b">Llama 3.3 70B</SelectItem>
+            <SelectItem value="meta/llama-3.1-8b">Llama 3.1 8B</SelectItem>
+            <SelectItem value="moonshotai/kimi-k2-0905">Kimi K2</SelectItem>
             <SelectItem value="gpt-5">GPT-5</SelectItem>
+            <SelectItem value="openai/gpt-oss-120b">GPT OSS 120B</SelectItem>
+            <SelectItem value="openai/gpt-oss-safeguard-20b">
+              GPT OSS Safeguard 20B
+            </SelectItem>
+            <SelectItem value="openai/gpt-oss-20b">GPT OSS 20B</SelectItem>
             <SelectItem value="openai/gpt-5.1-instant">
               GPT-5.1 Instant
             </SelectItem>
@@ -509,7 +533,7 @@ function GenerateImageFields({
         <Select
           disabled={disabled}
           onValueChange={(value) => onUpdateConfig("imageModel", value)}
-          value={(config?.imageModel as string) || "bfl/flux-2-pro"}
+          value={(config?.imageModel as string) || "google/imagen-4.0-generate"}
         >
           <SelectTrigger className="w-full" id="imageModel">
             <SelectValue placeholder="Select model" />
