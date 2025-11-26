@@ -320,7 +320,7 @@ const useAuthHandlers = (options: AuthHandlersOptions): UseAuthHandlers => {
   ) => {
     try {
       setLoadingProvider(provider);
-      await signIn.social({ provider, callbackURL: "/" });
+      await signIn.social({ provider, callbackURL: window.location.pathname });
     } catch {
       toast.error(`Failed to sign in with ${getProviderLabel(provider)}`);
       setLoadingProvider(null);

@@ -1,9 +1,11 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { anonymous, genericOAuth } from "better-auth/plugins";
+import { eq } from "drizzle-orm";
 import { db } from "./db";
 import {
   accounts,
+  integrations,
   sessions,
   users,
   verifications,
@@ -51,7 +53,47 @@ function getBaseURL() {
 
 // Build plugins array conditionally
 const plugins = [
-  anonymous(),
+  anonymous({
+    async onLinkAccount(data) {
+      // When an anonymous user links to a real account, migrate their data
+      const fromUserId = data.anonymousUser.user.id;
+      const toUserId = data.newUser.user.id;
+
+      console.log(
+        `[Anonymous Migration] Migrating from user ${fromUserId} to ${toUserId}`
+      );
+
+      try {
+        // Migrate workflows
+        await db
+          .update(workflows)
+          .set({ userId: toUserId })
+          .where(eq(workflows.userId, fromUserId));
+
+        // Migrate workflow executions
+        await db
+          .update(workflowExecutions)
+          .set({ userId: toUserId })
+          .where(eq(workflowExecutions.userId, fromUserId));
+
+        // Migrate integrations
+        await db
+          .update(integrations)
+          .set({ userId: toUserId })
+          .where(eq(integrations.userId, fromUserId));
+
+        console.log(
+          `[Anonymous Migration] Successfully migrated data from ${fromUserId} to ${toUserId}`
+        );
+      } catch (error) {
+        console.error(
+          "[Anonymous Migration] Error migrating user data:",
+          error
+        );
+        throw error;
+      }
+    },
+  }),
   ...(process.env.VERCEL_CLIENT_ID
     ? [
         genericOAuth({
