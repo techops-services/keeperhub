@@ -644,8 +644,8 @@ export const PanelInner = () => {
                   "Generate Text": "ai-gateway",
                   "Generate Image": "ai-gateway",
                   "Database Query": "database",
-                  "Firecrawl Scrape": "firecrawl",
-                  "Firecrawl Search": "firecrawl",
+                  Scrape: "firecrawl",
+                  Search: "firecrawl",
                 } as const;
 
                 const integrationType =

@@ -164,6 +164,19 @@ const getCommonFields = (node: WorkflowNode) => {
       { field: "model", description: "Model used" },
     ];
   }
+  if (actionType === "Scrape") {
+    return [
+      { field: "markdown", description: "Scraped content as markdown" },
+      { field: "metadata.url", description: "Page URL" },
+      { field: "metadata.title", description: "Page title" },
+      { field: "metadata.description", description: "Page description" },
+      { field: "metadata.language", description: "Page language" },
+      { field: "metadata.favicon", description: "Favicon URL" },
+    ];
+  }
+  if (actionType === "Search") {
+    return [{ field: "web", description: "Array of search results" }];
+  }
   if (node.data.type === "trigger") {
     const triggerType = node.data.config?.triggerType as string | undefined;
     const webhookSchema = node.data.config?.webhookSchema as string | undefined;

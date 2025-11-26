@@ -498,6 +498,15 @@ export function generateWorkflowCode(
     ];
   }
 
+  function formatTemplateValue(value: string): string {
+    const converted = convertTemplateToJS(value);
+    const hasTemplateRefs = converted.includes("${");
+    const escaped = converted.replace(/\$\{/g, "$${").replace(/`/g, "\\`");
+    return hasTemplateRefs
+      ? `\`${escaped}\``
+      : `\`${value.replace(/`/g, "\\`")}\``;
+  }
+
   function generateFirecrawlActionCode(
     node: WorkflowNode,
     indent: string,
@@ -519,27 +528,11 @@ export function generateWorkflowCode(
     ];
 
     if (url) {
-      const convertedUrl = convertTemplateToJS(url);
-      const hasTemplateRefs = convertedUrl.includes("${");
-      const escapeForOuterTemplate = (str: string) =>
-        str.replace(/\$\{/g, "$${");
-      const urlValue = hasTemplateRefs
-        ? `\`${escapeForOuterTemplate(convertedUrl).replace(/`/g, "\\`")}\``
-        : `\`${url.replace(/`/g, "\\`")}\``;
-      lines.push(`${indent}  url: ${urlValue},`);
+      lines.push(`${indent}  url: ${formatTemplateValue(url)},`);
     }
-
     if (query) {
-      const convertedQuery = convertTemplateToJS(query);
-      const hasTemplateRefs = convertedQuery.includes("${");
-      const escapeForOuterTemplate = (str: string) =>
-        str.replace(/\$\{/g, "$${");
-      const queryValue = hasTemplateRefs
-        ? `\`${escapeForOuterTemplate(convertedQuery).replace(/`/g, "\\`")}\``
-        : `\`${query.replace(/`/g, "\\`")}\``;
-      lines.push(`${indent}  query: ${queryValue},`);
+      lines.push(`${indent}  query: ${formatTemplateValue(query)},`);
     }
-
     if (limit) {
       lines.push(`${indent}  limit: ${limit},`);
     }
@@ -641,7 +634,7 @@ export function generateWorkflowCode(
       lines.push(
         ...wrapActionCall(generateFindIssuesActionCode(indent, varName))
       );
-    } else if (actionType === "Firecrawl Scrape" || actionType === "Firecrawl Search") {
+    } else if (actionType === "Scrape" || actionType === "Search") {
       lines.push(
         ...wrapActionCall(generateFirecrawlActionCode(node, indent, varName))
       );

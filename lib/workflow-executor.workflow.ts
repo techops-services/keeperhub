@@ -180,12 +180,12 @@ async function executeActionStep(input: {
     return await conditionStep({ condition: evaluatedCondition } as any);
   }
 
-  if (actionType === "Firecrawl Scrape") {
+  if (actionType === "Scrape") {
     const { firecrawlScrapeStep } = await import("./steps/firecrawl");
     // biome-ignore lint/suspicious/noExplicitAny: Dynamic step input type
     return await firecrawlScrapeStep(stepInput as any);
   }
-  if (actionType === "Firecrawl Search") {
+  if (actionType === "Search") {
     const { firecrawlSearchStep } = await import("./steps/firecrawl");
     // biome-ignore lint/suspicious/noExplicitAny: Dynamic step input type
     return await firecrawlSearchStep(stepInput as any);

@@ -565,8 +565,8 @@ function ConditionFields({
   );
 }
 
-// Firecrawl fields component
-function FirecrawlFields({
+// Scrape fields component
+function ScrapeFields({
   config,
   onUpdateConfig,
   disabled,
@@ -575,49 +575,53 @@ function FirecrawlFields({
   onUpdateConfig: (key: string, value: string) => void;
   disabled: boolean;
 }) {
-  const actionType = config.actionType as string;
+  return (
+    <div className="space-y-2">
+      <Label htmlFor="url">URL</Label>
+      <TemplateBadgeInput
+        disabled={disabled}
+        id="url"
+        onChange={(value) => onUpdateConfig("url", value)}
+        placeholder="https://example.com or {{NodeName.url}}"
+        value={(config?.url as string) || ""}
+      />
+    </div>
+  );
+}
 
+// Search fields component
+function SearchFields({
+  config,
+  onUpdateConfig,
+  disabled,
+}: {
+  config: Record<string, unknown>;
+  onUpdateConfig: (key: string, value: string) => void;
+  disabled: boolean;
+}) {
   return (
     <>
-      {actionType !== "Firecrawl Search" && (
-        <div className="space-y-2">
-          <Label htmlFor="url">URL</Label>
-          <TemplateBadgeInput
-            disabled={disabled}
-            id="url"
-            onChange={(value) => onUpdateConfig("url", value)}
-            placeholder="https://example.com"
-            value={(config?.url as string) || ""}
-          />
-        </div>
-      )}
-
-      {actionType === "Firecrawl Search" && (
-        <div className="space-y-2">
-          <Label htmlFor="query">Search Query</Label>
-          <TemplateBadgeInput
-            disabled={disabled}
-            id="query"
-            onChange={(value) => onUpdateConfig("query", value)}
-            placeholder="e.g. latest AI news"
-            value={(config?.query as string) || ""}
-          />
-        </div>
-      )}
-
-      {actionType === "Firecrawl Search" && (
-        <div className="space-y-2">
-          <Label htmlFor="limit">Limit</Label>
-          <Input
-            disabled={disabled}
-            id="limit"
-            onChange={(e) => onUpdateConfig("limit", e.target.value)}
-            placeholder="e.g. 10"
-            type="number"
-            value={(config?.limit as string) || ""}
-          />
-        </div>
-      )}
+      <div className="space-y-2">
+        <Label htmlFor="query">Search Query</Label>
+        <TemplateBadgeInput
+          disabled={disabled}
+          id="query"
+          onChange={(value) => onUpdateConfig("query", value)}
+          placeholder="Search query or {{NodeName.query}}"
+          value={(config?.query as string) || ""}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="limit">Result Limit</Label>
+        <Input
+          disabled={disabled}
+          id="limit"
+          onChange={(e) => onUpdateConfig("limit", e.target.value)}
+          placeholder="10"
+          type="number"
+          value={(config?.limit as string) || ""}
+        />
+      </div>
     </>
   );
 }
@@ -626,10 +630,10 @@ function FirecrawlFields({
 const ACTION_CATEGORIES = {
   System: ["HTTP Request", "Database Query", "Condition"],
   "AI Gateway": ["Generate Text", "Generate Image"],
+  Firecrawl: ["Scrape", "Search"],
   Linear: ["Create Ticket", "Find Issues"],
   Resend: ["Send Email"],
   Slack: ["Send Slack Message"],
-  Firecrawl: ["Firecrawl Scrape", "Firecrawl Search"],
 } as const;
 
 type ActionCategory = keyof typeof ACTION_CATEGORIES;
@@ -839,10 +843,18 @@ export function ActionConfig({
         />
       )}
 
-      {/* Firecrawl fields */}
-      {(config?.actionType === "Firecrawl Scrape" ||
-        config?.actionType === "Firecrawl Search") && (
-        <FirecrawlFields
+      {/* Scrape fields */}
+      {config?.actionType === "Scrape" && (
+        <ScrapeFields
+          config={config}
+          disabled={disabled}
+          onUpdateConfig={onUpdateConfig}
+        />
+      )}
+
+      {/* Search fields */}
+      {config?.actionType === "Search" && (
+        <SearchFields
           config={config}
           disabled={disabled}
           onUpdateConfig={onUpdateConfig}

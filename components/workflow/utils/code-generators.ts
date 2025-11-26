@@ -5,6 +5,8 @@
 import conditionTemplate from "@/lib/codegen-templates/condition";
 import createTicketTemplate from "@/lib/codegen-templates/create-ticket";
 import databaseQueryTemplate from "@/lib/codegen-templates/database-query";
+import firecrawlScrapeTemplate from "@/lib/codegen-templates/firecrawl-scrape";
+import firecrawlSearchTemplate from "@/lib/codegen-templates/firecrawl-search";
 import generateImageTemplate from "@/lib/codegen-templates/generate-image";
 import generateTextTemplate from "@/lib/codegen-templates/generate-text";
 import httpRequestTemplate from "@/lib/codegen-templates/http-request";
@@ -78,6 +80,10 @@ export async function POST(request: NextRequest) {
         return httpRequestTemplate;
       case "Condition":
         return conditionTemplate;
+      case "Scrape":
+        return firecrawlScrapeTemplate;
+      case "Search":
+        return firecrawlSearchTemplate;
       default:
         return `async function actionStep(input: Record<string, unknown>) {
   "use step";

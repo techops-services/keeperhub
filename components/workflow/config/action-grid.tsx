@@ -97,7 +97,7 @@ const actions: ActionType[] = [
     integration: "vercel",
   },
   {
-    id: "Firecrawl Scrape",
+    id: "Scrape",
     label: "Scrape URL",
     description: "Scrape content from a URL",
     category: "Firecrawl",
@@ -105,7 +105,7 @@ const actions: ActionType[] = [
     integration: "firecrawl",
   },
   {
-    id: "Firecrawl Search",
+    id: "Search",
     label: "Search Web",
     description: "Search the web with Firecrawl",
     category: "Firecrawl",

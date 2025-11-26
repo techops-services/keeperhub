@@ -37,8 +37,8 @@ function loadStepImplementation(actionType: string): string | null {
     "Generate Text": generateTextTemplate,
     "Generate Image": generateImageTemplate,
     "Database Query": databaseQueryTemplate,
-    "Firecrawl Scrape": firecrawlTemplate,
-    "Firecrawl Search": firecrawlTemplate,
+    Scrape: firecrawlTemplate,
+    Search: firecrawlTemplate,
     "HTTP Request": httpRequestTemplate,
     Condition: conditionTemplate,
   };
@@ -548,12 +548,15 @@ export function generateWorkflowSDKCode(
   ): string[] {
     imports.add("import FirecrawlApp from '@mendable/firecrawl-js';");
 
-    let mode = "scrape";
-    if (actionType === "Firecrawl Search") mode = "search";
+    const mode = actionType === "Search" ? "search" : "scrape";
+    const formats = config.formats
+      ? JSON.stringify(config.formats)
+      : "['markdown']";
 
     const params = [
       `mode: '${mode}'`,
       "apiKey: process.env.FIRECRAWL_API_KEY!",
+      `formats: ${formats}`,
     ];
 
     if (config.url) {
@@ -561,24 +564,13 @@ export function generateWorkflowSDKCode(
         `url: \`${convertTemplateToJS((config.url as string) || "")}\``
       );
     }
-
     if (config.query) {
       params.push(
         `query: \`${convertTemplateToJS((config.query as string) || "")}\``
       );
     }
-
     if (config.limit) {
       params.push(`limit: ${config.limit}`);
-    }
-
-    // Default formats for scrape and search
-    if (mode === "scrape" || mode === "search") {
-      // Assuming formats are passed as array in config, or we default
-      const formats = config.formats
-        ? JSON.stringify(config.formats)
-        : "['markdown']";
-      params.push(`formats: ${formats}`);
     }
 
     return params;
@@ -596,8 +588,8 @@ export function generateWorkflowSDKCode(
       "Database Query": () => buildDatabaseParams(config),
       "HTTP Request": () => buildHttpParams(config),
       Condition: () => buildConditionParams(config),
-      "Firecrawl Scrape": () => buildFirecrawlParams(actionType, config),
-      "Firecrawl Search": () => buildFirecrawlParams(actionType, config),
+      Scrape: () => buildFirecrawlParams(actionType, config),
+      Search: () => buildFirecrawlParams(actionType, config),
     };
 
     const builder = paramBuilders[actionType];

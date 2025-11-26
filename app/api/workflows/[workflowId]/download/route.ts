@@ -160,10 +160,7 @@ function getIntegrationDependencies(
       deps.openai = "^6.8.0";
       deps["@google/genai"] = "^1.28.0";
       deps.zod = "^4.1.12";
-    } else if (
-      actionType === "Firecrawl Scrape" ||
-      actionType === "Firecrawl Search"
-    ) {
+    } else if (actionType === "Scrape" || actionType === "Search") {
       deps["@mendable/firecrawl-js"] = "^4.6.2";
     }
   }

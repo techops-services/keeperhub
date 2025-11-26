@@ -63,10 +63,8 @@ export function enrichStepInput(
     "Generate Image": () => enrichAICredentials(enrichedInput, credentials),
     "Database Query": () =>
       enrichDatabaseCredentials(enrichedInput, credentials),
-    "Firecrawl Scrape": () =>
-      enrichFirecrawlCredentials(enrichedInput, credentials),
-    "Firecrawl Search": () =>
-      enrichFirecrawlCredentials(enrichedInput, credentials),
+    Scrape: () => enrichFirecrawlCredentials(enrichedInput, credentials),
+    Search: () => enrichFirecrawlCredentials(enrichedInput, credentials),
   };
 
   const handler = actionHandlers[actionType];

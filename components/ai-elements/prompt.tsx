@@ -186,7 +186,7 @@ export function AIPrompt({ workflowId, onWorkflowCreated }: AIPromptProps) {
             JSON.stringify(workflowData, null, 2)
           );
           throw new Error(
-            `Cannot create workflow: The AI tried to create ${incompleteNodes.length} incomplete node(s). The requested action type may not be supported. Please try a different description using supported actions: Send Email, Send Slack Message, Create Ticket, Database Query, HTTP Request, Generate Text, Generate Image, Firecrawl Scrape, or Firecrawl Search.`
+            `Cannot create workflow: The AI tried to create ${incompleteNodes.length} incomplete node(s). The requested action type may not be supported. Please try a different description using supported actions: Send Email, Send Slack Message, Create Ticket, Database Query, HTTP Request, Generate Text, Generate Image, Scrape, or Search.`
           );
         }
 

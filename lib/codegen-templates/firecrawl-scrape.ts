@@ -1,10 +1,8 @@
 /**
- * Code template for Firecrawl actions
+ * Code template for Firecrawl Scrape action
  * This is a string template used for code generation - keep as string export
  */
 export default `import FirecrawlApp from '@mendable/firecrawl-js';
-
-// --- Scrape ---
 
 export async function firecrawlScrapeStep(input: {
   url: string;
@@ -20,23 +18,5 @@ export async function firecrawlScrapeStep(input: {
   return {
     markdown: result.markdown,
     metadata: result.metadata,
-  };
-}
-
-// --- Search ---
-
-export async function firecrawlSearchStep(input: {
-  query: string;
-  limit?: number;
-}) {
-  "use step";
-
-  const firecrawl = new FirecrawlApp({ apiKey: process.env.FIRECRAWL_API_KEY! });
-  const result = await firecrawl.search(input.query, {
-    limit: input.limit ? Number(input.limit) : undefined,
-  });
-
-  return {
-    web: result.web,
   };
 }`;

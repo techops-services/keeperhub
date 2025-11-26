@@ -321,11 +321,11 @@ export function getStepInfo(actionType: string): {
         functionName: "httpRequestStep",
         importPath: "./steps/http-request-step",
       },
-      "Firecrawl Scrape": {
+      Scrape: {
         functionName: "firecrawlScrapeStep",
         importPath: "./steps/firecrawl",
       },
-      "Firecrawl Search": {
+      Search: {
         functionName: "firecrawlSearchStep",
         importPath: "./steps/firecrawl",
       },

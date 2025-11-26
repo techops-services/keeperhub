@@ -32,12 +32,14 @@ export async function firecrawlScrapeStep(input: {
       formats: input.formats || ["markdown"],
     });
 
-    return { success: true, data: result };
-  } catch (error) {
+    // Return markdown and metadata directly for easier access
+    // e.g., {{Scrape.markdown}}, {{Scrape.metadata.title}}
     return {
-      success: false,
-      error: `Failed to scrape: ${getErrorMessage(error)}`,
+      markdown: result.markdown,
+      metadata: result.metadata,
     };
+  } catch (error) {
+    throw new Error(`Failed to scrape: ${getErrorMessage(error)}`);
   }
 }
 
@@ -73,12 +75,12 @@ export async function firecrawlSearchStep(input: {
       scrapeOptions: input.scrapeOptions,
     });
 
-    return { success: true, data: result };
-  } catch (error) {
+    // Return web results directly for easier access
+    // e.g., {{Search.web[0].title}}, {{Search.web[0].url}}
     return {
-      success: false,
-      error: `Failed to search: ${getErrorMessage(error)}`,
+      web: result.web,
     };
+  } catch (error) {
+    throw new Error(`Failed to search: ${getErrorMessage(error)}`);
   }
 }
-
