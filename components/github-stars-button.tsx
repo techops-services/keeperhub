@@ -1,22 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { GitHubIcon } from "@/components/icons/github-icon";
 import { Button } from "@/components/ui/button";
 import { formatAbbreviatedNumber } from "@/lib/utils/format-number";
+import { useGitHubStars } from "./github-stars-provider";
 
 const GITHUB_REPO_URL =
   "https://github.com/vercel-labs/workflow-builder-template";
 
 export function GitHubStarsButton() {
-  const [stars, setStars] = useState<number | null>(null);
-
-  useEffect(() => {
-    fetch("https://api.github.com/repos/vercel-labs/workflow-builder-template")
-      .then((res) => res.json())
-      .then((data) => setStars(data.stargazers_count))
-      .catch(() => setStars(null));
-  }, []);
+  const stars = useGitHubStars();
 
   return (
     <Button
