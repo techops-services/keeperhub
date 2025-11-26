@@ -30,8 +30,8 @@ There are many ways to contribute to Workflow Builder:
 1. **Fork the repository** on GitHub
 2. **Clone your fork** locally:
    ```bash
-   git clone https://github.com/your-username/v8-workflow.git
-   cd v8-workflow
+   git clone https://github.com/your-username/workflow-builder-template.git
+   cd workflow-builder-template
    ```
 3. **Install dependencies**:
    ```bash
