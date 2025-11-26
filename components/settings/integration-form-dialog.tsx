@@ -45,6 +45,7 @@ const INTEGRATION_TYPES: IntegrationType[] = [
   "linear",
   "resend",
   "slack",
+  "firecrawl",
 ];
 
 const INTEGRATION_LABELS: Record<IntegrationType, string> = {
@@ -53,6 +54,7 @@ const INTEGRATION_LABELS: Record<IntegrationType, string> = {
   slack: "Slack",
   database: "Database",
   "ai-gateway": "AI Gateway",
+  firecrawl: "Firecrawl",
 };
 
 export function IntegrationFormDialog({
@@ -260,6 +262,30 @@ export function IntegrationFormDialog({
                 target="_blank"
               >
                 vercel.com/ai-gateway
+              </a>
+            </p>
+          </div>
+        );
+      case "firecrawl":
+        return (
+          <div className="space-y-2">
+            <Label htmlFor="firecrawlApiKey">API Key</Label>
+            <Input
+              id="firecrawlApiKey"
+              onChange={(e) => updateConfig("firecrawlApiKey", e.target.value)}
+              placeholder="fc-..."
+              type="password"
+              value={formData.config.firecrawlApiKey || ""}
+            />
+            <p className="text-muted-foreground text-xs">
+              Get your API key from{" "}
+              <a
+                className="underline hover:text-foreground"
+                href="https://firecrawl.dev/app/api-keys"
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                firecrawl.dev
               </a>
             </p>
           </div>

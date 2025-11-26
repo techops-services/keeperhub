@@ -316,7 +316,8 @@ export type IntegrationType =
   | "linear"
   | "slack"
   | "database"
-  | "ai-gateway";
+  | "ai-gateway"
+  | "firecrawl";
 
 export type IntegrationConfig = {
   apiKey?: string;
@@ -324,6 +325,7 @@ export type IntegrationConfig = {
   teamId?: string;
   url?: string;
   openaiApiKey?: string;
+  firecrawlApiKey?: string;
 };
 
 export type Integration = {

@@ -1,4 +1,5 @@
 import { LinearClient } from "@linear/sdk";
+import FirecrawlApp from "@mendable/firecrawl-js";
 import { WebClient } from "@slack/web-api";
 import { createGateway } from "ai";
 import { NextResponse } from "next/server";
@@ -61,6 +62,11 @@ export async function POST(
         break;
       case "database":
         result = await testDatabaseConnection(integration.config.url);
+        break;
+      case "firecrawl":
+        result = await testFirecrawlConnection(
+          integration.config.firecrawlApiKey
+        );
         break;
       default:
         return NextResponse.json(
@@ -238,5 +244,40 @@ async function testDatabaseConnection(
     if (connection) {
       await connection.end();
     }
+  }
+}
+
+async function testFirecrawlConnection(
+  apiKey?: string
+): Promise<TestConnectionResult> {
+  try {
+    if (!apiKey) {
+      return {
+        status: "error",
+        message: "Firecrawl API Key is not configured",
+      };
+    }
+
+    const app = new FirecrawlApp({ apiKey });
+    const result = await app.scrape("https://firecrawl.dev", {
+      formats: ["markdown"],
+    });
+
+    if (!result) {
+      return {
+        status: "error",
+        message: "Authentication or scrape failed",
+      };
+    }
+
+    return {
+      status: "success",
+      message: "Connected successfully",
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message: error instanceof Error ? error.message : "Connection failed",
+    };
   }
 }

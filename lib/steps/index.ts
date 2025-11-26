@@ -7,6 +7,7 @@
 import type { conditionStep } from "./condition";
 import type { createTicketStep } from "./create-ticket";
 import type { databaseQueryStep } from "./database-query";
+import type {firecrawlScrapeStep, firecrawlSearchStep} from "./firecrawl";
 import type { generateImageStep } from "./generate-image";
 import type { generateTextStep } from "./generate-text";
 import type { httpRequestStep } from "./http-request";
@@ -62,6 +63,14 @@ export const stepRegistry: Record<string, StepFunction> = {
   "Log Node Complete": async (input) =>
     (await import("./logging")).logNodeCompleteStep(
       input as Parameters<typeof logNodeCompleteStep>[0]
+    ),
+  "Firecrawl Scrape": async (input) =>
+    (await import("./firecrawl")).firecrawlScrapeStep(
+      input as Parameters<typeof firecrawlScrapeStep>[0]
+    ),
+  "Firecrawl Search": async (input) =>
+    (await import("./firecrawl")).firecrawlSearchStep(
+      input as Parameters<typeof firecrawlSearchStep>[0]
     ),
 };
 

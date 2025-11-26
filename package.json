@@ -19,6 +19,7 @@
   "dependencies": {
     "@ai-sdk/provider": "^2.0.0",
     "@linear/sdk": "^63.2.0",
+    "@mendable/firecrawl-js": "^4.6.2",
     "@monaco-editor/react": "^4.7.0",
     "@radix-ui/react-context-menu": "^2.2.16",
     "@radix-ui/react-dialog": "^1.1.15",

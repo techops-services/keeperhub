@@ -25,6 +25,7 @@ const INTEGRATION_TYPE_LABELS: Record<IntegrationType, string> = {
   slack: "Slack",
   database: "Database",
   "ai-gateway": "AI Gateway",
+  firecrawl: "Firecrawl",
 };
 
 type IntegrationsManagerProps = {

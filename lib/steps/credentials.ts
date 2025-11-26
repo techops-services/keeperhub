@@ -15,6 +15,7 @@ export type EnvVarConfig = {
   OPENAI_API_KEY?: string;
   AI_GATEWAY_API_KEY?: string;
   DATABASE_URL?: string;
+  FIRECRAWL_API_KEY?: string;
 };
 
 /**
@@ -38,6 +39,7 @@ export function getCredentials(
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     AI_GATEWAY_API_KEY: process.env.AI_GATEWAY_API_KEY,
     DATABASE_URL: process.env.DATABASE_URL,
+    FIRECRAWL_API_KEY: process.env.FIRECRAWL_API_KEY,
   };
 }
 
@@ -61,6 +63,10 @@ export function enrichStepInput(
     "Generate Image": () => enrichAICredentials(enrichedInput, credentials),
     "Database Query": () =>
       enrichDatabaseCredentials(enrichedInput, credentials),
+    "Firecrawl Scrape": () =>
+      enrichFirecrawlCredentials(enrichedInput, credentials),
+    "Firecrawl Search": () =>
+      enrichFirecrawlCredentials(enrichedInput, credentials),
   };
 
   const handler = actionHandlers[actionType];
@@ -119,5 +125,14 @@ function enrichDatabaseCredentials(
 ): void {
   if (credentials.DATABASE_URL) {
     input.databaseUrl = credentials.DATABASE_URL;
+  }
+}
+
+function enrichFirecrawlCredentials(
+  input: Record<string, unknown>,
+  credentials: EnvVarConfig
+): void {
+  if (credentials.FIRECRAWL_API_KEY) {
+    input.apiKey = credentials.FIRECRAWL_API_KEY;
   }
 }

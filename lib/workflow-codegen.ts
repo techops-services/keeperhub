@@ -498,6 +498,56 @@ export function generateWorkflowCode(
     ];
   }
 
+  function generateFirecrawlActionCode(
+    node: WorkflowNode,
+    indent: string,
+    varName: string
+  ): string[] {
+    const actionType = node.data.config?.actionType as string;
+    const stepInfo = getStepInfo(actionType);
+    imports.add(
+      `import { ${stepInfo.functionName} } from '${stepInfo.importPath}';`
+    );
+
+    const config = node.data.config || {};
+    const url = (config.url as string) || "";
+    const query = (config.query as string) || "";
+    const limit = config.limit ? Number(config.limit) : undefined;
+
+    const lines = [
+      `${indent}const ${varName} = await ${stepInfo.functionName}({`,
+    ];
+
+    if (url) {
+      const convertedUrl = convertTemplateToJS(url);
+      const hasTemplateRefs = convertedUrl.includes("${");
+      const escapeForOuterTemplate = (str: string) =>
+        str.replace(/\$\{/g, "$${");
+      const urlValue = hasTemplateRefs
+        ? `\`${escapeForOuterTemplate(convertedUrl).replace(/`/g, "\\`")}\``
+        : `\`${url.replace(/`/g, "\\`")}\``;
+      lines.push(`${indent}  url: ${urlValue},`);
+    }
+
+    if (query) {
+      const convertedQuery = convertTemplateToJS(query);
+      const hasTemplateRefs = convertedQuery.includes("${");
+      const escapeForOuterTemplate = (str: string) =>
+        str.replace(/\$\{/g, "$${");
+      const queryValue = hasTemplateRefs
+        ? `\`${escapeForOuterTemplate(convertedQuery).replace(/`/g, "\\`")}\``
+        : `\`${query.replace(/`/g, "\\`")}\``;
+      lines.push(`${indent}  query: ${queryValue},`);
+    }
+
+    if (limit) {
+      lines.push(`${indent}  limit: ${limit},`);
+    }
+
+    lines.push(`${indent}});`);
+    return lines;
+  }
+
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Action type routing requires many conditionals
   function generateActionNodeCode(
     node: WorkflowNode,
@@ -590,6 +640,10 @@ export function generateWorkflowCode(
     } else if (actionType === "Find Issues") {
       lines.push(
         ...wrapActionCall(generateFindIssuesActionCode(indent, varName))
+      );
+    } else if (actionType === "Firecrawl Scrape" || actionType === "Firecrawl Search") {
+      lines.push(
+        ...wrapActionCall(generateFirecrawlActionCode(node, indent, varName))
       );
     } else if (actionType === "Database Query") {
       lines.push(

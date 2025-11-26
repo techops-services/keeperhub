@@ -99,7 +99,8 @@ export type IntegrationType =
   | "linear"
   | "slack"
   | "database"
-  | "ai-gateway";
+  | "ai-gateway"
+  | "firecrawl";
 
 export type IntegrationConfig = {
   // Resend
@@ -112,6 +113,8 @@ export type IntegrationConfig = {
   url?: string;
   // AI Gateway
   openaiApiKey?: string;
+  // Firecrawl
+  firecrawlApiKey?: string;
 };
 
 export type DecryptedIntegration = {

@@ -4,6 +4,7 @@ import "server-only";
 import conditionTemplate from "./codegen-templates/condition";
 import createTicketTemplate from "./codegen-templates/create-ticket";
 import databaseQueryTemplate from "./codegen-templates/database-query";
+import firecrawlTemplate from "./codegen-templates/firecrawl";
 import generateImageTemplate from "./codegen-templates/generate-image";
 import generateTextTemplate from "./codegen-templates/generate-text";
 import httpRequestTemplate from "./codegen-templates/http-request";
@@ -36,6 +37,8 @@ function loadStepImplementation(actionType: string): string | null {
     "Generate Text": generateTextTemplate,
     "Generate Image": generateImageTemplate,
     "Database Query": databaseQueryTemplate,
+    "Firecrawl Scrape": firecrawlTemplate,
+    "Firecrawl Search": firecrawlTemplate,
     "HTTP Request": httpRequestTemplate,
     Condition: conditionTemplate,
   };
@@ -539,6 +542,47 @@ export function generateWorkflowSDKCode(
     ];
   }
 
+  function buildFirecrawlParams(
+    actionType: string,
+    config: Record<string, unknown>
+  ): string[] {
+    imports.add("import FirecrawlApp from '@mendable/firecrawl-js';");
+
+    let mode = "scrape";
+    if (actionType === "Firecrawl Search") mode = "search";
+
+    const params = [
+      `mode: '${mode}'`,
+      "apiKey: process.env.FIRECRAWL_API_KEY!",
+    ];
+
+    if (config.url) {
+      params.push(
+        `url: \`${convertTemplateToJS((config.url as string) || "")}\``
+      );
+    }
+
+    if (config.query) {
+      params.push(
+        `query: \`${convertTemplateToJS((config.query as string) || "")}\``
+      );
+    }
+
+    if (config.limit) {
+      params.push(`limit: ${config.limit}`);
+    }
+
+    // Default formats for scrape and search
+    if (mode === "scrape" || mode === "search") {
+      // Assuming formats are passed as array in config, or we default
+      const formats = config.formats
+        ? JSON.stringify(config.formats)
+        : "['markdown']";
+      params.push(`formats: ${formats}`);
+    }
+
+    return params;
+  }
   function buildStepInputParams(
     actionType: string,
     config: Record<string, unknown>
@@ -552,6 +596,8 @@ export function generateWorkflowSDKCode(
       "Database Query": () => buildDatabaseParams(config),
       "HTTP Request": () => buildHttpParams(config),
       Condition: () => buildConditionParams(config),
+      "Firecrawl Scrape": () => buildFirecrawlParams(actionType, config),
+      "Firecrawl Search": () => buildFirecrawlParams(actionType, config),
     };
 
     const builder = paramBuilders[actionType];

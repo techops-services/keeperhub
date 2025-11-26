@@ -63,6 +63,8 @@ const getIntegrationFromActionType = (actionType: string): string => {
     "Database Query": "Database",
     "Generate Text": "AI Gateway",
     "Generate Image": "AI Gateway",
+    "Firecrawl Scrape": "Firecrawl",
+    "Firecrawl Search": "Firecrawl",
     Condition: "Condition",
   };
   return integrationMap[actionType] || "System";
@@ -89,6 +91,8 @@ const requiresIntegration = (actionType: string): boolean => {
     "Generate Text",
     "Generate Image",
     "Database Query",
+    "Firecrawl Scrape",
+    "Firecrawl Search",
   ];
   return requiresIntegrationActions.includes(actionType);
 };
@@ -115,6 +119,9 @@ const getProviderLogo = (actionType: string) => {
     case "Generate Text":
     case "Generate Image":
       return <IntegrationIcon className="size-12" integration="vercel" />;
+    case "Firecrawl Scrape":
+    case "Firecrawl Search":
+      return <IntegrationIcon className="size-12" integration="firecrawl" />;
     case "Execute Code":
       return <Code className="size-12 text-green-300" strokeWidth={1.5} />;
     case "Condition":

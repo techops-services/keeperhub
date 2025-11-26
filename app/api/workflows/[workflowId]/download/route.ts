@@ -160,6 +160,11 @@ function getIntegrationDependencies(
       deps.openai = "^6.8.0";
       deps["@google/genai"] = "^1.28.0";
       deps.zod = "^4.1.12";
+    } else if (
+      actionType === "Firecrawl Scrape" ||
+      actionType === "Firecrawl Search"
+    ) {
+      deps["@mendable/firecrawl-js"] = "^4.6.2";
     }
   }
 
@@ -318,6 +323,9 @@ GOOGLE_AI_API_KEY=your_google_ai_api_key
 
 # For database integrations
 DATABASE_URL=your_database_url
+
+# For Firecrawl integration
+FIRECRAWL_API_KEY=your_firecrawl_api_key
 `;
 
     return NextResponse.json({

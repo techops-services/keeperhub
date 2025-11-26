@@ -2,6 +2,7 @@
 
 import {
   Database,
+  Flame,
   Mail,
   MessageSquare,
   Search,
@@ -22,7 +23,7 @@ type ActionType = {
   description: string;
   category: string;
   icon: React.ComponentType<{ className?: string }>;
-  integration?: "linear" | "resend" | "slack" | "vercel";
+  integration?: "linear" | "resend" | "slack" | "vercel" | "firecrawl";
 };
 
 const actions: ActionType[] = [
@@ -94,6 +95,22 @@ const actions: ActionType[] = [
     category: "AI Gateway",
     icon: Sparkles,
     integration: "vercel",
+  },
+  {
+    id: "Firecrawl Scrape",
+    label: "Scrape URL",
+    description: "Scrape content from a URL",
+    category: "Firecrawl",
+    icon: Flame,
+    integration: "firecrawl",
+  },
+  {
+    id: "Firecrawl Search",
+    label: "Search Web",
+    description: "Search the web with Firecrawl",
+    category: "Firecrawl",
+    icon: Search,
+    integration: "firecrawl",
   },
 ];
 

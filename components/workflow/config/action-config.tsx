@@ -4,6 +4,7 @@ import { useAtom } from "jotai";
 import { Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { CodeEditor } from "@/components/ui/code-editor";
+import { Input } from "@/components/ui/input";
 import { IntegrationIcon } from "@/components/ui/integration-icon";
 import { Label } from "@/components/ui/label";
 import {
@@ -564,6 +565,63 @@ function ConditionFields({
   );
 }
 
+// Firecrawl fields component
+function FirecrawlFields({
+  config,
+  onUpdateConfig,
+  disabled,
+}: {
+  config: Record<string, unknown>;
+  onUpdateConfig: (key: string, value: string) => void;
+  disabled: boolean;
+}) {
+  const actionType = config.actionType as string;
+
+  return (
+    <>
+      {actionType !== "Firecrawl Search" && (
+        <div className="space-y-2">
+          <Label htmlFor="url">URL</Label>
+          <TemplateBadgeInput
+            disabled={disabled}
+            id="url"
+            onChange={(value) => onUpdateConfig("url", value)}
+            placeholder="https://example.com"
+            value={(config?.url as string) || ""}
+          />
+        </div>
+      )}
+
+      {actionType === "Firecrawl Search" && (
+        <div className="space-y-2">
+          <Label htmlFor="query">Search Query</Label>
+          <TemplateBadgeInput
+            disabled={disabled}
+            id="query"
+            onChange={(value) => onUpdateConfig("query", value)}
+            placeholder="e.g. latest AI news"
+            value={(config?.query as string) || ""}
+          />
+        </div>
+      )}
+
+      {actionType === "Firecrawl Search" && (
+        <div className="space-y-2">
+          <Label htmlFor="limit">Limit</Label>
+          <Input
+            disabled={disabled}
+            id="limit"
+            onChange={(e) => onUpdateConfig("limit", e.target.value)}
+            placeholder="e.g. 10"
+            type="number"
+            value={(config?.limit as string) || ""}
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
 // Action categories and their actions
 const ACTION_CATEGORIES = {
   System: ["HTTP Request", "Database Query", "Condition"],
@@ -571,6 +629,7 @@ const ACTION_CATEGORIES = {
   Linear: ["Create Ticket", "Find Issues"],
   Resend: ["Send Email"],
   Slack: ["Send Slack Message"],
+  Firecrawl: ["Firecrawl Scrape", "Firecrawl Search"],
 } as const;
 
 type ActionCategory = keyof typeof ACTION_CATEGORIES;
@@ -663,6 +722,12 @@ export function ActionConfig({
                 <div className="flex items-center gap-2">
                   <IntegrationIcon className="size-4" integration="slack" />
                   <span>Slack</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="Firecrawl">
+                <div className="flex items-center gap-2">
+                  <IntegrationIcon className="size-4" integration="firecrawl" />
+                  <span>Firecrawl</span>
                 </div>
               </SelectItem>
             </SelectContent>
@@ -768,6 +833,16 @@ export function ActionConfig({
       {/* Condition fields */}
       {config?.actionType === "Condition" && (
         <ConditionFields
+          config={config}
+          disabled={disabled}
+          onUpdateConfig={onUpdateConfig}
+        />
+      )}
+
+      {/* Firecrawl fields */}
+      {(config?.actionType === "Firecrawl Scrape" ||
+        config?.actionType === "Firecrawl Search") && (
+        <FirecrawlFields
           config={config}
           disabled={disabled}
           onUpdateConfig={onUpdateConfig}
