@@ -25,7 +25,7 @@ import { api } from "@/lib/api-client";
 import { signOut, useSession } from "@/lib/auth-client";
 
 export const UserMenu = () => {
-  const { data: session } = useSession();
+  const { data: session, isPending } = useSession();
   const { theme, setTheme } = useTheme();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [integrationsOpen, setIntegrationsOpen] = useState(false);
@@ -65,6 +65,13 @@ export const UserMenu = () => {
     }
     return "U";
   };
+
+  // Don't render anything while session is loading to prevent flash
+  if (isPending) {
+    return (
+      <div className="h-9 w-9" /> // Placeholder to maintain layout
+    );
+  }
 
   // Check if user is anonymous
   // Better Auth anonymous plugin creates users with name "Anonymous" and temp- email

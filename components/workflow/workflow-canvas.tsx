@@ -8,7 +8,6 @@ import {
   type OnConnect,
   type OnConnectStartParams,
   useReactFlow,
-  type Viewport,
   type Connection as XYFlowConnection,
   type Edge as XYFlowEdge,
 } from "@xyflow/react";
@@ -18,6 +17,7 @@ import { Canvas } from "@/components/ai-elements/canvas";
 import { Connection } from "@/components/ai-elements/connection";
 import { Controls } from "@/components/ai-elements/controls";
 import { AIPrompt } from "@/components/ai-elements/prompt";
+import { WorkflowToolbar } from "@/components/workflow/workflow-toolbar";
 import "@xyflow/react/dist/style.css";
 
 import { PlayCircle, Zap } from "lucide-react";
@@ -29,9 +29,12 @@ import {
   edgesAtom,
   hasUnsavedChangesAtom,
   isGeneratingAtom,
+  isPanelAnimatingAtom,
+  isTransitioningFromHomepageAtom,
   nodesAtom,
   onEdgesChangeAtom,
   onNodesChangeAtom,
+  rightPanelWidthAtom,
   selectedEdgeAtom,
   selectedNodeAtom,
   showMinimapAtom,
@@ -73,16 +76,18 @@ const edgeTypes = {
   temporary: Edge.Temporary,
 };
 
-type WorkflowCanvasProps = {
-  showMinimap?: boolean;
-};
-
-export function WorkflowCanvas(_props: WorkflowCanvasProps) {
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: React Flow canvas requires complex setup
+export function WorkflowCanvas() {
   const [nodes, setNodes] = useAtom(nodesAtom);
   const [edges, setEdges] = useAtom(edgesAtom);
   const [isGenerating] = useAtom(isGeneratingAtom);
   const currentWorkflowId = useAtomValue(currentWorkflowIdAtom);
   const [showMinimap] = useAtom(showMinimapAtom);
+  const rightPanelWidth = useAtomValue(rightPanelWidthAtom);
+  const isPanelAnimating = useAtomValue(isPanelAnimatingAtom);
+  const [isTransitioningFromHomepage, setIsTransitioningFromHomepage] = useAtom(
+    isTransitioningFromHomepageAtom
+  );
   const onNodesChange = useSetAtom(onNodesChangeAtom);
   const onEdgesChange = useSetAtom(onEdgesChangeAtom);
   const setSelectedNode = useSetAtom(selectedNodeAtom);
@@ -90,16 +95,13 @@ export function WorkflowCanvas(_props: WorkflowCanvasProps) {
   const addNode = useSetAtom(addNodeAtom);
   const setHasUnsavedChanges = useSetAtom(hasUnsavedChangesAtom);
   const triggerAutosave = useSetAtom(autosaveAtom);
-  const { screenToFlowPosition, setViewport } = useReactFlow();
+  const { screenToFlowPosition, fitView, getViewport, setViewport } =
+    useReactFlow();
 
   const connectingNodeId = useRef<string | null>(null);
   const justCreatedNodeFromConnection = useRef(false);
-  const [defaultViewport, setDefaultViewport] = useState<Viewport | undefined>(
-    undefined
-  );
-  const [viewportReady, setViewportReady] = useState(false);
-  const [shouldFitView, setShouldFitView] = useState(false);
   const viewportInitialized = useRef(false);
+  const [isCanvasReady, setIsCanvasReady] = useState(false);
   const [contextMenuState, setContextMenuState] =
     useState<ContextMenuState>(null);
 
@@ -111,64 +113,92 @@ export function WorkflowCanvas(_props: WorkflowCanvasProps) {
     setContextMenuState(null);
   }, []);
 
-  // Load saved viewport when workflow changes
+  // Track which workflow we've fitted view for to prevent re-running
+  const fittedViewForWorkflowRef = useRef<string | null | undefined>(undefined);
+  // Track if we have real nodes (not just placeholder "add" node)
+  const hasRealNodes = nodes.some((n) => n.type !== "add");
+  const hadRealNodesRef = useRef(false);
+  // Pre-shift viewport when transitioning from homepage (before sidebar animates)
+  const hasPreShiftedRef = useRef(false);
   useEffect(() => {
-    if (!currentWorkflowId) {
-      setViewportReady(true);
-      setDefaultViewport(undefined);
-      setShouldFitView(true);
-      viewportInitialized.current = true;
+    if (isTransitioningFromHomepage && !hasPreShiftedRef.current) {
+      hasPreShiftedRef.current = true;
+
+      // Check if sidebar is collapsed from cookie (atom may not be initialized yet)
+      const collapsedCookie = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("sidebar-collapsed="));
+      const isCollapsed = collapsedCookie?.split("=")[1] === "true";
+
+      // Skip if sidebar is collapsed - content should stay centered
+      if (isCollapsed) {
+        return;
+      }
+
+      // Shift viewport left to center content in the future visible area
+      // Default sidebar is 30%, so shift by 15% of window width
+      const viewport = getViewport();
+      const defaultSidebarPercent = 0.3;
+      const shiftPixels = (window.innerWidth * defaultSidebarPercent) / 2;
+      setViewport(
+        { ...viewport, x: viewport.x - shiftPixels },
+        { duration: 0 }
+      );
+    }
+  }, [isTransitioningFromHomepage, getViewport, setViewport]);
+
+  // Fit view when workflow changes (only on initial load, not home -> workflow)
+  useEffect(() => {
+    // Skip if we've already fitted view for this workflow
+    if (fittedViewForWorkflowRef.current === currentWorkflowId) {
       return;
     }
 
-    setViewportReady(false);
-    const saved = localStorage.getItem(
-      `workflow-viewport-${currentWorkflowId}`
-    );
-    if (saved) {
-      try {
-        const viewport = JSON.parse(saved) as Viewport;
-        setDefaultViewport(viewport);
-        setShouldFitView(false);
-        // Mark viewport as ready immediately to prevent flash
-        setViewportReady(true);
-        // Set viewport after a brief delay to ensure ReactFlow is ready
-        setTimeout(() => {
-          setViewport(viewport, { duration: 0 });
-          viewportInitialized.current = true;
-        }, 50);
-      } catch (error) {
-        console.error("Failed to load viewport:", error);
-        setDefaultViewport(undefined);
-        setShouldFitView(true);
-        setViewportReady(true);
-        viewportInitialized.current = true;
-      }
-    } else {
-      setDefaultViewport(undefined);
-      setShouldFitView(true);
-      setViewportReady(true);
-      // Allow saving viewport after fitView completes
-      setTimeout(() => {
-        viewportInitialized.current = true;
-        setShouldFitView(false);
-      }, 500);
+    // Skip fitView for homepage -> workflow transition (viewport already set from homepage)
+    if (isTransitioningFromHomepage && viewportInitialized.current) {
+      fittedViewForWorkflowRef.current = currentWorkflowId;
+      setIsCanvasReady(true);
+      // Clear the flag after using it
+      setIsTransitioningFromHomepage(false);
+      return;
     }
-  }, [currentWorkflowId, setViewport]);
 
-  // Save viewport changes
-  const onMoveEnd = useCallback(
-    (_event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
-      if (!(currentWorkflowId && viewportInitialized.current)) {
-        return;
-      }
-      localStorage.setItem(
-        `workflow-viewport-${currentWorkflowId}`,
-        JSON.stringify(viewport)
-      );
-    },
-    [currentWorkflowId]
-  );
+    // Use fitView after a brief delay to ensure React Flow and nodes are ready
+    setTimeout(() => {
+      fitView({ maxZoom: 1, minZoom: 0.5, padding: 0.2, duration: 0 });
+      fittedViewForWorkflowRef.current = currentWorkflowId;
+      viewportInitialized.current = true;
+      // Show canvas immediately so width animation can be seen
+      setIsCanvasReady(true);
+      // Clear the flag
+      setIsTransitioningFromHomepage(false);
+    }, 0);
+  }, [
+    currentWorkflowId,
+    fitView,
+    isTransitioningFromHomepage,
+    setIsTransitioningFromHomepage,
+  ]);
+
+  // Fit view when first real node is added on homepage
+  useEffect(() => {
+    if (currentWorkflowId) {
+      return; // Only for homepage
+    }
+    // Check if we just got our first real node
+    if (hasRealNodes && !hadRealNodesRef.current) {
+      hadRealNodesRef.current = true;
+      // Fit view to center the new node
+      setTimeout(() => {
+        fitView({ maxZoom: 1, minZoom: 0.5, padding: 0.2, duration: 0 });
+        viewportInitialized.current = true;
+        setIsCanvasReady(true);
+      }, 0);
+    } else if (!hasRealNodes) {
+      // Reset when back to placeholder only
+      hadRealNodesRef.current = false;
+    }
+  }, [currentWorkflowId, hasRealNodes, fitView]);
 
   const nodeTypes = useMemo(
     () => ({
@@ -396,25 +426,32 @@ export function WorkflowCanvas(_props: WorkflowCanvasProps) {
     [setSelectedNode]
   );
 
+  console.log("[Viewport] Render", { currentWorkflowId, isCanvasReady });
+
   return (
-    <div className="relative h-full w-full">
-      {!viewportReady && (
-        <div className="absolute inset-0 z-40 bg-secondary transition-opacity duration-100" />
-      )}
+    <div
+      className="relative h-full bg-background"
+      style={{
+        opacity: isCanvasReady ? 1 : 0,
+        width: rightPanelWidth ? `calc(100% - ${rightPanelWidth})` : "100%",
+        transition: isPanelAnimating
+          ? "width 300ms ease-out, opacity 300ms"
+          : "opacity 300ms",
+      }}
+    >
+      {/* Toolbar */}
+      <div className="pointer-events-auto">
+        <WorkflowToolbar workflowId={currentWorkflowId ?? undefined} />
+      </div>
+
+      {/* React Flow Canvas */}
       <Canvas
         className="bg-background"
         connectionLineComponent={Connection}
         connectionMode={ConnectionMode.Strict}
-        defaultViewport={defaultViewport}
         edges={edges}
         edgeTypes={edgeTypes}
         elementsSelectable={!isGenerating}
-        fitView={shouldFitView}
-        fitViewOptions={{
-          maxZoom: 1,
-          minZoom: 0.5,
-          padding: 0.2,
-        }}
         isValidConnection={isValidConnection}
         nodes={nodes}
         nodesConnectable={!isGenerating}
@@ -425,7 +462,6 @@ export function WorkflowCanvas(_props: WorkflowCanvasProps) {
         onConnectStart={isGenerating ? undefined : onConnectStart}
         onEdgeContextMenu={isGenerating ? undefined : onEdgeContextMenu}
         onEdgesChange={isGenerating ? undefined : onEdgesChange}
-        onMoveEnd={onMoveEnd}
         onNodeClick={isGenerating ? undefined : onNodeClick}
         onNodeContextMenu={isGenerating ? undefined : onNodeContextMenu}
         onNodesChange={isGenerating ? undefined : onNodesChange}

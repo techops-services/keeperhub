@@ -279,7 +279,7 @@ export function AIPrompt({ workflowId, onWorkflowCreated }: AIPromptProps) {
       {/* Always visible prompt input */}
       <div 
         ref={containerRef}
-        className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2 px-4"
+        className="pointer-events-auto absolute bottom-4 left-1/2 z-10 -translate-x-1/2 px-4"
         style={{
           width: isExpanded ? "min(100%, 42rem)" : "20rem",
           transition: "width 150ms ease-out",

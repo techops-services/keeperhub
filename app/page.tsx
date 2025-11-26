@@ -1,19 +1,17 @@
 "use client";
 
-import { ReactFlowProvider } from "@xyflow/react";
 import { useAtomValue, useSetAtom } from "jotai";
 import { nanoid } from "nanoid";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { WorkflowCanvas } from "@/components/workflow/workflow-canvas";
-import { WorkflowToolbar } from "@/components/workflow/workflow-toolbar";
 import { api } from "@/lib/api-client";
 import { authClient, useSession } from "@/lib/auth-client";
 import {
-  currentWorkflowIdAtom,
   currentWorkflowNameAtom,
   edgesAtom,
+  hasSidebarBeenShownAtom,
+  isTransitioningFromHomepageAtom,
   nodesAtom,
   type WorkflowNode,
 } from "@/lib/workflow-store";
@@ -39,12 +37,20 @@ const Home = () => {
   const { data: session } = useSession();
   const nodes = useAtomValue(nodesAtom);
   const edges = useAtomValue(edgesAtom);
-  const currentWorkflowId = useAtomValue(currentWorkflowIdAtom);
   const setNodes = useSetAtom(nodesAtom);
   const setEdges = useSetAtom(edgesAtom);
   const setCurrentWorkflowName = useSetAtom(currentWorkflowNameAtom);
+  const setHasSidebarBeenShown = useSetAtom(hasSidebarBeenShownAtom);
+  const setIsTransitioningFromHomepage = useSetAtom(
+    isTransitioningFromHomepageAtom
+  );
   const hasCreatedWorkflowRef = useRef(false);
   const currentWorkflowName = useAtomValue(currentWorkflowNameAtom);
+
+  // Reset sidebar animation state when on homepage
+  useEffect(() => {
+    setHasSidebarBeenShown(false);
+  }, [setHasSidebarBeenShown]);
 
   // Update page title when workflow name changes
   useEffect(() => {
@@ -109,7 +115,12 @@ const Home = () => {
           edges,
         });
 
+        // Set flags to indicate we're coming from homepage (for sidebar animation)
+        sessionStorage.setItem("animate-sidebar", "true");
+        setIsTransitioningFromHomepage(true);
+
         // Redirect to the workflow page
+        console.log("[Homepage] Navigating to workflow page");
         router.replace(`/workflows/${newWorkflow.id}`);
       } catch (error) {
         console.error("Failed to create workflow:", error);
@@ -118,20 +129,10 @@ const Home = () => {
     };
 
     createWorkflowAndRedirect();
-  }, [nodes, edges, router, ensureSession]);
+  }, [nodes, edges, router, ensureSession, setIsTransitioningFromHomepage]);
 
-  return (
-    <div className="flex h-screen w-full flex-col overflow-hidden">
-      <main className="relative flex size-full overflow-hidden">
-        <ReactFlowProvider>
-          <div className="relative flex-1 overflow-hidden">
-            <WorkflowToolbar workflowId={currentWorkflowId ?? undefined} />
-            <WorkflowCanvas showMinimap={false} />
-          </div>
-        </ReactFlowProvider>
-      </main>
-    </div>
-  );
+  // Canvas and toolbar are rendered by PersistentCanvas in the layout
+  return null;
 };
 
 export default Home;
