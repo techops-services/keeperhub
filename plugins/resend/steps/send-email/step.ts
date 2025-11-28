@@ -2,24 +2,24 @@ import "server-only";
 
 import { Resend } from "resend";
 import { fetchCredentials } from "@/lib/credential-fetcher";
+import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
 
 type SendEmailResult =
   | { success: true; id: string }
   | { success: false; error: string };
 
-/**
- * Send Email Step
- * Sends an email using Resend
- */
-export async function sendEmailStep(input: {
+export type SendEmailInput = StepInput & {
   integrationId?: string;
   emailTo: string;
   emailSubject: string;
   emailBody: string;
-}): Promise<SendEmailResult> {
-  "use step";
+};
 
+/**
+ * Send email logic - separated for clarity and testability
+ */
+async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
   const credentials = input.integrationId
     ? await fetchCredentials(input.integrationId)
     : {};
@@ -69,3 +69,13 @@ export async function sendEmailStep(input: {
   }
 }
 
+/**
+ * Send Email Step
+ * Sends an email using Resend
+ */
+export async function sendEmailStep(
+  input: SendEmailInput
+): Promise<SendEmailResult> {
+  "use step";
+  return withStepLogging(input, () => sendEmail(input));
+}

@@ -6,23 +6,25 @@ import {
   experimental_generateImage as generateImage,
 } from "ai";
 import { fetchCredentials } from "@/lib/credential-fetcher";
+import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessageAsync } from "@/lib/utils";
 
 type GenerateImageResult =
   | { success: true; base64: string }
   | { success: false; error: string };
 
-/**
- * Generate Image Step
- * Uses AI Gateway to generate images
- */
-export async function generateImageStep(input: {
+export type GenerateImageInput = StepInput & {
   integrationId?: string;
   imageModel: ImageModelV2;
   imagePrompt: string;
-}): Promise<GenerateImageResult> {
-  "use step";
+};
 
+/**
+ * Generate image logic
+ */
+async function generateImageLogic(
+  input: GenerateImageInput
+): Promise<GenerateImageResult> {
   const credentials = input.integrationId
     ? await fetchCredentials(input.integrationId)
     : {};
@@ -69,3 +71,13 @@ export async function generateImageStep(input: {
   }
 }
 
+/**
+ * Generate Image Step
+ * Uses AI Gateway to generate images
+ */
+export async function generateImageStep(
+  input: GenerateImageInput
+): Promise<GenerateImageResult> {
+  "use step";
+  return withStepLogging(input, () => generateImageLogic(input));
+}

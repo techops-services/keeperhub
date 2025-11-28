@@ -2,23 +2,25 @@ import "server-only";
 
 import { WebClient } from "@slack/web-api";
 import { fetchCredentials } from "@/lib/credential-fetcher";
+import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
 
 type SendSlackMessageResult =
   | { success: true; ts: string; channel: string }
   | { success: false; error: string };
 
-/**
- * Send Slack Message Step
- * Sends a message to a Slack channel
- */
-export async function sendSlackMessageStep(input: {
+export type SendSlackMessageInput = StepInput & {
   integrationId?: string;
   slackChannel: string;
   slackMessage: string;
-}): Promise<SendSlackMessageResult> {
-  "use step";
+};
 
+/**
+ * Send Slack message logic
+ */
+async function sendSlackMessage(
+  input: SendSlackMessageInput
+): Promise<SendSlackMessageResult> {
   const credentials = input.integrationId
     ? await fetchCredentials(input.integrationId)
     : {};
@@ -61,3 +63,13 @@ export async function sendSlackMessageStep(input: {
   }
 }
 
+/**
+ * Send Slack Message Step
+ * Sends a message to a Slack channel
+ */
+export async function sendSlackMessageStep(
+  input: SendSlackMessageInput
+): Promise<SendSlackMessageResult> {
+  "use step";
+  return withStepLogging(input, () => sendSlackMessage(input));
+}

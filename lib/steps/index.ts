@@ -14,7 +14,6 @@ import type { sendSlackMessageStep } from "../../plugins/slack/steps/send-slack-
 import type { conditionStep } from "./condition";
 import type { databaseQueryStep } from "./database-query";
 import type { httpRequestStep } from "./http-request";
-import type { logNodeCompleteStep, logNodeStartStep } from "./logging";
 
 // Step function type
 export type StepFunction = (input: Record<string, unknown>) => Promise<unknown>;
@@ -57,14 +56,6 @@ export const stepRegistry: Record<string, StepFunction> = {
     (
       await import("../../plugins/ai-gateway/steps/generate-image/step")
     ).generateImageStep(input as Parameters<typeof generateImageStep>[0]),
-  "Log Node Start": async (input) =>
-    (await import("./logging")).logNodeStartStep(
-      input as Parameters<typeof logNodeStartStep>[0]
-    ),
-  "Log Node Complete": async (input) =>
-    (await import("./logging")).logNodeCompleteStep(
-      input as Parameters<typeof logNodeCompleteStep>[0]
-    ),
   Scrape: async (input) =>
     (
       await import("../../plugins/firecrawl/steps/scrape/step")

@@ -2,19 +2,24 @@ import "server-only";
 
 import FirecrawlApp from "@mendable/firecrawl-js";
 import { fetchCredentials } from "@/lib/credential-fetcher";
+import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
 
-/**
- * Firecrawl Scrape Step
- * Scrapes content from a URL using Firecrawl
- */
-export async function firecrawlScrapeStep(input: {
+type ScrapeResult = {
+  markdown?: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type FirecrawlScrapeInput = StepInput & {
   integrationId?: string;
   url: string;
   formats?: ("markdown" | "html" | "rawHtml" | "links" | "screenshot")[];
-}) {
-  "use step";
+};
 
+/**
+ * Scrape logic
+ */
+async function scrape(input: FirecrawlScrapeInput): Promise<ScrapeResult> {
   const credentials = input.integrationId
     ? await fetchCredentials(input.integrationId)
     : {};
@@ -22,10 +27,7 @@ export async function firecrawlScrapeStep(input: {
   const apiKey = credentials.FIRECRAWL_API_KEY;
 
   if (!apiKey) {
-    return {
-      success: false,
-      error: "Firecrawl API Key is not configured.",
-    };
+    throw new Error("Firecrawl API Key is not configured.");
   }
 
   try {
@@ -34,8 +36,6 @@ export async function firecrawlScrapeStep(input: {
       formats: input.formats || ["markdown"],
     });
 
-    // Return markdown and metadata directly for easier access
-    // e.g., {{Scrape.markdown}}, {{Scrape.metadata.title}}
     return {
       markdown: result.markdown,
       metadata: result.metadata,
@@ -45,3 +45,13 @@ export async function firecrawlScrapeStep(input: {
   }
 }
 
+/**
+ * Firecrawl Scrape Step
+ * Scrapes content from a URL using Firecrawl
+ */
+export async function firecrawlScrapeStep(
+  input: FirecrawlScrapeInput
+): Promise<ScrapeResult> {
+  "use step";
+  return withStepLogging(input, () => scrape(input));
+}

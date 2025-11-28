@@ -2,6 +2,7 @@ import "server-only";
 
 import { LinearClient } from "@linear/sdk";
 import { fetchCredentials } from "@/lib/credential-fetcher";
+import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
 
 type LinearIssue = {
@@ -17,19 +18,18 @@ type FindIssuesResult =
   | { success: true; issues: LinearIssue[]; count: number }
   | { success: false; error: string };
 
-/**
- * Find Issues Step
- * Searches for issues in Linear based on filters
- */
-export async function findIssuesStep(input: {
+export type FindIssuesInput = StepInput & {
   integrationId?: string;
   linearAssigneeId?: string;
   linearTeamId?: string;
   linearStatus?: string;
   linearLabel?: string;
-}): Promise<FindIssuesResult> {
-  "use step";
+};
 
+/**
+ * Find issues logic
+ */
+async function findIssues(input: FindIssuesInput): Promise<FindIssuesResult> {
   const credentials = input.integrationId
     ? await fetchCredentials(input.integrationId)
     : {};
@@ -95,3 +95,13 @@ export async function findIssuesStep(input: {
   }
 }
 
+/**
+ * Find Issues Step
+ * Searches for issues in Linear based on filters
+ */
+export async function findIssuesStep(
+  input: FindIssuesInput
+): Promise<FindIssuesResult> {
+  "use step";
+  return withStepLogging(input, () => findIssues(input));
+}

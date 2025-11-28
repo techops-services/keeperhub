@@ -3,6 +3,7 @@ import "server-only";
 import { createGateway, generateObject, generateText } from "ai";
 import { z } from "zod";
 import { fetchCredentials } from "@/lib/credential-fetcher";
+import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessageAsync } from "@/lib/utils";
 
 type SchemaField = {
@@ -14,6 +15,14 @@ type GenerateTextResult =
   | { success: true; text: string }
   | { success: true; object: Record<string, unknown> }
   | { success: false; error: string };
+
+export type GenerateTextInput = StepInput & {
+  integrationId?: string;
+  aiModel?: string;
+  aiPrompt?: string;
+  aiFormat?: string;
+  aiSchema?: string;
+};
 
 /**
  * Gets the full model string in provider/model format.
@@ -54,18 +63,11 @@ function buildZodSchema(
 }
 
 /**
- * Generate Text Step
- * Uses AI Gateway to generate text with various models
+ * Generate text logic
  */
-export async function generateTextStep(input: {
-  integrationId?: string;
-  aiModel?: string;
-  aiPrompt?: string;
-  aiFormat?: string;
-  aiSchema?: string;
-}): Promise<GenerateTextResult> {
-  "use step";
-
+async function generateTextLogic(
+  input: GenerateTextInput
+): Promise<GenerateTextResult> {
   const credentials = input.integrationId
     ? await fetchCredentials(input.integrationId)
     : {};
@@ -125,3 +127,13 @@ export async function generateTextStep(input: {
   }
 }
 
+/**
+ * Generate Text Step
+ * Uses AI Gateway to generate text with various models
+ */
+export async function generateTextStep(
+  input: GenerateTextInput
+): Promise<GenerateTextResult> {
+  "use step";
+  return withStepLogging(input, () => generateTextLogic(input));
+}

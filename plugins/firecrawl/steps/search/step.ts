@@ -2,22 +2,26 @@ import "server-only";
 
 import FirecrawlApp from "@mendable/firecrawl-js";
 import { fetchCredentials } from "@/lib/credential-fetcher";
+import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
 
-/**
- * Firecrawl Search Step
- * Searches the web using Firecrawl
- */
-export async function firecrawlSearchStep(input: {
+type SearchResult = {
+  web?: unknown[];
+};
+
+export type FirecrawlSearchInput = StepInput & {
   integrationId?: string;
   query: string;
   limit?: number;
   scrapeOptions?: {
     formats?: ("markdown" | "html" | "rawHtml" | "links" | "screenshot")[];
   };
-}) {
-  "use step";
+};
 
+/**
+ * Search logic
+ */
+async function search(input: FirecrawlSearchInput): Promise<SearchResult> {
   const credentials = input.integrationId
     ? await fetchCredentials(input.integrationId)
     : {};
@@ -25,10 +29,7 @@ export async function firecrawlSearchStep(input: {
   const apiKey = credentials.FIRECRAWL_API_KEY;
 
   if (!apiKey) {
-    return {
-      success: false,
-      error: "Firecrawl API Key is not configured.",
-    };
+    throw new Error("Firecrawl API Key is not configured.");
   }
 
   try {
@@ -38,8 +39,6 @@ export async function firecrawlSearchStep(input: {
       scrapeOptions: input.scrapeOptions,
     });
 
-    // Return web results directly for easier access
-    // e.g., {{Search.web[0].title}}, {{Search.web[0].url}}
     return {
       web: result.web,
     };
@@ -48,3 +47,13 @@ export async function firecrawlSearchStep(input: {
   }
 }
 
+/**
+ * Firecrawl Search Step
+ * Searches the web using Firecrawl
+ */
+export async function firecrawlSearchStep(
+  input: FirecrawlSearchInput
+): Promise<SearchResult> {
+  "use step";
+  return withStepLogging(input, () => search(input));
+}

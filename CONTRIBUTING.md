@@ -361,25 +361,30 @@ export async function testMyIntegration(credentials: Record<string, string>) {
 
 **File:** `plugins/my-integration/steps/send-message/step.ts`
 
-This runs on the server during workflow execution:
+This runs on the server during workflow execution. Steps use the `withStepLogging` wrapper to automatically log execution for the workflow builder UI:
 
 ```typescript
 import "server-only";
 
 import { fetchCredentials } from "@/lib/credential-fetcher";
+import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
 
-/**
- * Send Message Step
- * Sends a message using My Integration API
- */
-export async function sendMessageStep(input: {
+type SendMessageResult =
+  | { success: true; id: string; url: string }
+  | { success: false; error: string };
+
+// Extend StepInput to get automatic logging context
+export type SendMessageInput = StepInput & {
   integrationId?: string;
   message: string;
   channel: string;
-}) {
-  "use step";
+};
 
+/**
+ * Send message logic - separated for clarity and testability
+ */
+async function sendMessage(input: SendMessageInput): Promise<SendMessageResult> {
   const credentials = input.integrationId
     ? await fetchCredentials(input.integrationId)
     : {};
@@ -414,9 +419,9 @@ export async function sendMessageStep(input: {
     const result = await response.json();
 
     return {
+      success: true,
       id: result.id,
       url: result.url,
-      success: true,
     };
   } catch (error) {
     return {
@@ -425,7 +430,25 @@ export async function sendMessageStep(input: {
     };
   }
 }
+
+/**
+ * Send Message Step
+ * Sends a message using My Integration API
+ */
+export async function sendMessageStep(
+  input: SendMessageInput
+): Promise<SendMessageResult> {
+  "use step";
+  return withStepLogging(input, () => sendMessage(input));
+}
 ```
+
+**Key Points:**
+
+1. **Extend `StepInput`**: Your input type should extend `StepInput` to include the optional `_context` for logging
+2. **Separate logic function**: Keep the actual logic in a separate function for clarity and testability
+3. **Wrap with `withStepLogging`**: The step function just wraps the logic with `withStepLogging(input, () => logic(input))`
+4. **Return success/error objects**: Steps should return `{ success: true, ... }` or `{ success: false, error: "..." }`
 
 #### Step 6: Create Config UI Component
 
@@ -756,21 +779,42 @@ Use `TemplateBadgeInput` to allow users to reference outputs from other workflow
 />
 ```
 
-### Pattern 2: Step Function Error Handling
+### Pattern 2: Step Function Structure
+
+Steps follow a consistent structure with logging:
 
 ```typescript
-try {
-  const response = await fetch(/* ... */);
-  if (!response.ok) {
-    throw new Error(`API error: ${response.statusText}`);
+import "server-only";
+
+import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
+
+type MyResult = { success: true; data: string } | { success: false; error: string };
+
+export type MyInput = StepInput & {
+  field1: string;
+};
+
+// 1. Logic function (no "use step" needed)
+async function myLogic(input: MyInput): Promise<MyResult> {
+  try {
+    const response = await fetch(/* ... */);
+    if (!response.ok) {
+      throw new Error(`API error: ${response.statusText}`);
+    }
+    const result = await response.json();
+    return { success: true, data: result };
+  } catch (error) {
+    return {
+      success: false,
+      error: `Failed to execute: ${getErrorMessage(error)}`,
+    };
   }
-  const result = await response.json();
-  return { success: true, ...result };
-} catch (error) {
-  return {
-    success: false,
-    error: `Failed to execute: ${getErrorMessage(error)}`,
-  };
+}
+
+// 2. Step wrapper (has "use step", wraps with logging)
+export async function myStep(input: MyInput): Promise<MyResult> {
+  "use step";
+  return withStepLogging(input, () => myLogic(input));
 }
 ```
 

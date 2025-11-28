@@ -2,23 +2,23 @@ import "server-only";
 
 import { createClient, type ChatsCreateResponse } from "v0-sdk";
 import { fetchCredentials } from "@/lib/credential-fetcher";
+import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
 
 type CreateChatResult =
   | { success: true; chatId: string; url: string; demoUrl?: string }
   | { success: false; error: string };
 
-/**
- * Create Chat Step
- * Creates a new chat in v0
- */
-export async function createChatStep(input: {
+export type CreateChatInput = StepInput & {
   integrationId?: string;
   message: string;
   system?: string;
-}): Promise<CreateChatResult> {
-  "use step";
+};
 
+/**
+ * Create chat logic
+ */
+async function createChat(input: CreateChatInput): Promise<CreateChatResult> {
   const credentials = input.integrationId
     ? await fetchCredentials(input.integrationId)
     : {};
@@ -55,3 +55,13 @@ export async function createChatStep(input: {
   }
 }
 
+/**
+ * Create Chat Step
+ * Creates a new chat in v0
+ */
+export async function createChatStep(
+  input: CreateChatInput
+): Promise<CreateChatResult> {
+  "use step";
+  return withStepLogging(input, () => createChat(input));
+}

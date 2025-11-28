@@ -2,23 +2,23 @@ import "server-only";
 
 import { createClient, type ChatsSendMessageResponse } from "v0-sdk";
 import { fetchCredentials } from "@/lib/credential-fetcher";
+import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
 
 type SendMessageResult =
   | { success: true; chatId: string; demoUrl?: string }
   | { success: false; error: string };
 
-/**
- * Send Message Step
- * Sends a message to an existing v0 chat
- */
-export async function sendMessageStep(input: {
+export type SendMessageInput = StepInput & {
   integrationId?: string;
   chatId: string;
   message: string;
-}): Promise<SendMessageResult> {
-  "use step";
+};
 
+/**
+ * Send message logic
+ */
+async function sendMessage(input: SendMessageInput): Promise<SendMessageResult> {
   const credentials = input.integrationId
     ? await fetchCredentials(input.integrationId)
     : {};
@@ -54,3 +54,13 @@ export async function sendMessageStep(input: {
   }
 }
 
+/**
+ * Send Message Step
+ * Sends a message to an existing v0 chat
+ */
+export async function sendMessageStep(
+  input: SendMessageInput
+): Promise<SendMessageResult> {
+  "use step";
+  return withStepLogging(input, () => sendMessage(input));
+}

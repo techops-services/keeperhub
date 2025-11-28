@@ -2,23 +2,23 @@ import "server-only";
 
 import { LinearClient } from "@linear/sdk";
 import { fetchCredentials } from "@/lib/credential-fetcher";
+import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
 
 type CreateTicketResult =
   | { success: true; id: string; url: string; title: string }
   | { success: false; error: string };
 
-/**
- * Create Ticket Step
- * Creates a ticket/issue in Linear
- */
-export async function createTicketStep(input: {
+export type CreateTicketInput = StepInput & {
   integrationId?: string;
   ticketTitle: string;
   ticketDescription: string;
-}): Promise<CreateTicketResult> {
-  "use step";
+};
 
+/**
+ * Create ticket logic
+ */
+async function createTicket(input: CreateTicketInput): Promise<CreateTicketResult> {
   const credentials = input.integrationId
     ? await fetchCredentials(input.integrationId)
     : {};
@@ -79,3 +79,13 @@ export async function createTicketStep(input: {
   }
 }
 
+/**
+ * Create Ticket Step
+ * Creates a ticket/issue in Linear
+ */
+export async function createTicketStep(
+  input: CreateTicketInput
+): Promise<CreateTicketResult> {
+  "use step";
+  return withStepLogging(input, () => createTicket(input));
+}
