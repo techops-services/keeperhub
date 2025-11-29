@@ -1,8 +1,9 @@
 "use client";
 
 import { useReactFlow } from "@xyflow/react";
-import { useAtom, useSetAtom } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import {
+  AlertTriangle,
   Check,
   ChevronDown,
   Download,
@@ -49,8 +50,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { api } from "@/lib/api-client";
+import { api, type IntegrationType } from "@/lib/api-client";
 import { useSession } from "@/lib/auth-client";
+import { integrationsAtom } from "@/lib/integrations-store";
 import {
   addNodeAtom,
   canRedoAtom,
@@ -73,14 +75,18 @@ import {
   selectedNodeAtom,
   showClearDialogAtom,
   showDeleteDialogAtom,
+  triggerExecuteAtom,
   undoAtom,
   updateNodeDataAtom,
   type WorkflowEdge,
   type WorkflowNode,
 } from "@/lib/workflow-store";
+import { findActionById, getIntegrationLabels } from "@/plugins";
 import { Panel } from "../ai-elements/panel";
 import { DeployButton } from "../deploy-button";
 import { GitHubStarsButton } from "../github-stars-button";
+import { IntegrationsDialog } from "../settings/integrations-dialog";
+import { IntegrationIcon } from "../ui/integration-icon";
 import { WorkflowIcon } from "../ui/workflow-icon";
 import { UserMenu } from "../workflows/user-menu";
 import { PanelInner } from "./node-config-panel";
@@ -101,6 +107,80 @@ function updateNodesStatus(
   for (const node of nodes) {
     updateNodeData({ id: node.id, data: { status } });
   }
+}
+
+type MissingIntegrationInfo = {
+  integrationType: IntegrationType;
+  integrationLabel: string;
+  nodeNames: string[];
+};
+
+// Built-in actions that require integrations but aren't in the plugin registry
+const BUILTIN_ACTION_INTEGRATIONS: Record<string, IntegrationType> = {
+  "Database Query": "database",
+};
+
+// Labels for built-in integration types that don't have plugins
+const BUILTIN_INTEGRATION_LABELS: Record<string, string> = {
+  database: "Database",
+};
+
+// Get missing integrations for workflow nodes
+// Uses the plugin registry to determine which integrations are required
+// Also handles built-in actions that aren't in the plugin registry
+function getMissingIntegrations(
+  nodes: WorkflowNode[],
+  userIntegrations: Array<{ type: IntegrationType }>
+): MissingIntegrationInfo[] {
+  const userIntegrationTypes = new Set(userIntegrations.map((i) => i.type));
+  const missingByType = new Map<IntegrationType, string[]>();
+  const integrationLabels = getIntegrationLabels();
+
+  for (const node of nodes) {
+    // Skip disabled nodes
+    if (node.data.enabled === false) {
+      continue;
+    }
+
+    const actionType = node.data.config?.actionType as string | undefined;
+    if (!actionType) {
+      continue;
+    }
+
+    // Look up the integration type from the plugin registry first
+    const action = findActionById(actionType);
+    // Fall back to built-in action integrations for actions not in the registry
+    const requiredIntegrationType =
+      action?.integration || BUILTIN_ACTION_INTEGRATIONS[actionType];
+
+    if (!requiredIntegrationType) {
+      continue;
+    }
+
+    // Check if this node has an integrationId configured
+    const hasIntegrationConfigured = Boolean(node.data.config?.integrationId);
+    if (hasIntegrationConfigured) {
+      continue;
+    }
+
+    // Check if user has any integration of this type
+    if (!userIntegrationTypes.has(requiredIntegrationType)) {
+      const existing = missingByType.get(requiredIntegrationType) || [];
+      existing.push(node.data.label || actionType);
+      missingByType.set(requiredIntegrationType, existing);
+    }
+  }
+
+  return Array.from(missingByType.entries()).map(
+    ([integrationType, nodeNames]) => ({
+      integrationType,
+      integrationLabel:
+        integrationLabels[integrationType] ||
+        BUILTIN_INTEGRATION_LABELS[integrationType] ||
+        integrationType,
+      nodeNames,
+    })
+  );
 }
 
 type ExecuteTestWorkflowParams = {
@@ -210,6 +290,7 @@ type WorkflowHandlerParams = {
     id: string;
     data: { status?: "idle" | "running" | "success" | "error" };
   }) => void;
+  isExecuting: boolean;
   setIsExecuting: (value: boolean) => void;
   setIsSaving: (value: boolean) => void;
   setHasUnsavedChanges: (value: boolean) => void;
@@ -218,6 +299,7 @@ type WorkflowHandlerParams = {
   setEdges: (edges: WorkflowEdge[]) => void;
   setSelectedNodeId: (id: string | null) => void;
   setSelectedExecutionId: (id: string | null) => void;
+  userIntegrations: Array<{ type: IntegrationType }>;
 };
 
 function useWorkflowHandlers({
@@ -225,6 +307,7 @@ function useWorkflowHandlers({
   nodes,
   edges,
   updateNodeData,
+  isExecuting,
   setIsExecuting,
   setIsSaving,
   setHasUnsavedChanges,
@@ -233,8 +316,14 @@ function useWorkflowHandlers({
   setEdges,
   setSelectedNodeId,
   setSelectedExecutionId,
+  userIntegrations,
 }: WorkflowHandlerParams) {
   const [showUnsavedRunDialog, setShowUnsavedRunDialog] = useState(false);
+  const [showMissingIntegrationsDialog, setShowMissingIntegrationsDialog] =
+    useState(false);
+  const [missingIntegrations, setMissingIntegrations] = useState<
+    MissingIntegrationInfo[]
+  >([]);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Cleanup polling interval on unmount
@@ -291,14 +380,40 @@ function useWorkflowHandlers({
   };
 
   const handleExecute = async () => {
+    // Guard against concurrent executions
+    if (isExecuting) {
+      return;
+    }
+
+    // Check for missing integrations before executing
+    const missing = getMissingIntegrations(nodes, userIntegrations);
+    if (missing.length > 0) {
+      setMissingIntegrations(missing);
+      setShowMissingIntegrationsDialog(true);
+      return;
+    }
+    await executeWorkflow();
+  };
+
+  const handleExecuteAnyway = async () => {
+    // Guard against concurrent executions
+    if (isExecuting) {
+      return;
+    }
+
+    setShowMissingIntegrationsDialog(false);
     await executeWorkflow();
   };
 
   return {
     showUnsavedRunDialog,
     setShowUnsavedRunDialog,
+    showMissingIntegrationsDialog,
+    setShowMissingIntegrationsDialog,
+    missingIntegrations,
     handleSave,
     handleExecute,
+    handleExecuteAnyway,
   };
 }
 
@@ -330,6 +445,8 @@ function useWorkflowState() {
   const setActiveTab = useSetAtom(propertiesPanelActiveTabAtom);
   const setSelectedNodeId = useSetAtom(selectedNodeAtom);
   const setSelectedExecutionId = useSetAtom(selectedExecutionIdAtom);
+  const userIntegrations = useAtomValue(integrationsAtom);
+  const [triggerExecute, setTriggerExecute] = useAtom(triggerExecuteAtom);
 
   const [isDownloading, setIsDownloading] = useState(false);
   const [showCodeDialog, setShowCodeDialog] = useState(false);
@@ -404,6 +521,9 @@ function useWorkflowState() {
     setEdges,
     setSelectedNodeId,
     setSelectedExecutionId,
+    userIntegrations,
+    triggerExecute,
+    setTriggerExecute,
   };
 }
 
@@ -415,6 +535,7 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     nodes,
     edges,
     updateNodeData,
+    isExecuting,
     setIsExecuting,
     setIsSaving,
     setHasUnsavedChanges,
@@ -432,18 +553,26 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     setEdges,
     setSelectedNodeId,
     setSelectedExecutionId,
+    userIntegrations,
+    triggerExecute,
+    setTriggerExecute,
   } = state;
 
   const {
     showUnsavedRunDialog,
     setShowUnsavedRunDialog,
+    showMissingIntegrationsDialog,
+    setShowMissingIntegrationsDialog,
+    missingIntegrations,
     handleSave,
     handleExecute,
+    handleExecuteAnyway,
   } = useWorkflowHandlers({
     currentWorkflowId,
     nodes,
     edges,
     updateNodeData,
+    isExecuting,
     setIsExecuting,
     setIsSaving,
     setHasUnsavedChanges,
@@ -452,7 +581,16 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     setEdges,
     setSelectedNodeId,
     setSelectedExecutionId,
+    userIntegrations,
   });
+
+  // Listen for execute trigger from keyboard shortcut
+  useEffect(() => {
+    if (triggerExecute) {
+      setTriggerExecute(false);
+      handleExecute();
+    }
+  }, [triggerExecute, setTriggerExecute, handleExecute]);
 
   const handleSaveAndRun = async () => {
     await handleSave();
@@ -575,8 +713,12 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
   return {
     showUnsavedRunDialog,
     setShowUnsavedRunDialog,
+    showMissingIntegrationsDialog,
+    setShowMissingIntegrationsDialog,
+    missingIntegrations,
     handleSave,
     handleExecute,
+    handleExecuteAnyway,
     handleSaveAndRun,
     handleRunWithoutSaving,
     handleClearWorkflow,
@@ -995,6 +1137,82 @@ function WorkflowMenuComponent({
   );
 }
 
+// Missing Integrations Dialog Component
+function MissingIntegrationsDialog({
+  actions,
+}: {
+  actions: ReturnType<typeof useWorkflowActions>;
+}) {
+  const [showIntegrationsDialog, setShowIntegrationsDialog] = useState(false);
+
+  const handleAddIntegrations = () => {
+    actions.setShowMissingIntegrationsDialog(false);
+    setShowIntegrationsDialog(true);
+  };
+
+  return (
+    <>
+      <AlertDialog
+        onOpenChange={actions.setShowMissingIntegrationsDialog}
+        open={actions.showMissingIntegrationsDialog}
+      >
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="size-5 text-orange-500" />
+              Missing Integrations
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  This workflow has steps that require integrations which are
+                  not configured. The workflow will likely fail without them.
+                </p>
+                <div className="space-y-2">
+                  {actions.missingIntegrations.map((missing) => (
+                    <div
+                      className="flex items-start gap-3 rounded-lg border bg-muted/50 p-3"
+                      key={missing.integrationType}
+                    >
+                      <IntegrationIcon
+                        className="mt-0.5 size-5 shrink-0"
+                        integration={missing.integrationType}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-foreground text-sm">
+                          {missing.integrationLabel}
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                          Used by:{" "}
+                          {missing.nodeNames.length > 3
+                            ? `${missing.nodeNames.slice(0, 3).join(", ")} and ${missing.nodeNames.length - 3} more`
+                            : missing.nodeNames.join(", ")}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button onClick={actions.handleExecuteAnyway} variant="outline">
+              Run Anyway
+            </Button>
+            <Button onClick={handleAddIntegrations}>Add Integrations</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <IntegrationsDialog
+        onOpenChange={setShowIntegrationsDialog}
+        open={showIntegrationsDialog}
+      />
+    </>
+  );
+}
+
 // Workflow Dialogs Component
 function WorkflowDialogsComponent({
   state,
@@ -1156,6 +1374,8 @@ function WorkflowDialogsComponent({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <MissingIntegrationsDialog actions={actions} />
     </>
   );
 }
