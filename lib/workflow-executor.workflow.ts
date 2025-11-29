@@ -3,6 +3,10 @@
  * This executor captures step executions through the workflow SDK for better observability
  */
 
+import {
+  preValidateConditionExpression,
+  validateConditionExpression,
+} from "@/lib/condition-validator";
 import { getStepImporter, type StepImporter } from "./step-registry";
 import type { StepContext } from "./steps/step-handler";
 import { triggerStep } from "./steps/trigger";
@@ -100,6 +104,9 @@ function replaceTemplateVariable(
 /**
  * Evaluate condition expression with template variable replacement
  * Uses Function constructor to evaluate user-defined conditions dynamically
+ *
+ * Security: Expressions are validated before evaluation to prevent code injection.
+ * Only comparison operators, logical operators, and whitelisted methods are allowed.
  */
 function evaluateConditionExpression(
   conditionExpression: unknown,
@@ -112,6 +119,14 @@ function evaluateConditionExpression(
   }
 
   if (typeof conditionExpression === "string") {
+    // Pre-validate the expression before any processing
+    const preValidation = preValidateConditionExpression(conditionExpression);
+    if (!preValidation.valid) {
+      console.error("[Condition] Pre-validation failed:", preValidation.error);
+      console.error("[Condition] Expression was:", conditionExpression);
+      return false;
+    }
+
     try {
       const evalContext: Record<string, unknown> = {};
       let transformedExpression = conditionExpression;
@@ -131,11 +146,23 @@ function evaluateConditionExpression(
           )
       );
 
+      // Validate the transformed expression before evaluation
+      const validation = validateConditionExpression(transformedExpression);
+      if (!validation.valid) {
+        console.error("[Condition] Validation failed:", validation.error);
+        console.error("[Condition] Original expression:", conditionExpression);
+        console.error(
+          "[Condition] Transformed expression:",
+          transformedExpression
+        );
+        return false;
+      }
+
       const varNames = Object.keys(evalContext);
       const varValues = Object.values(evalContext);
 
-      // Note: Function constructor is used here to evaluate user-defined workflow conditions
-      // This is an intentional feature for dynamic condition evaluation in workflows
+      // Safe to evaluate - expression has been validated
+      // Only contains: variables (__v0, __v1), operators, literals, and whitelisted methods
       const evalFunc = new Function(
         ...varNames,
         `return (${transformedExpression});`
