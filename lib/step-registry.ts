@@ -7,7 +7,7 @@
  * This registry enables dynamic step imports that are statically analyzable
  * by the bundler. Each action type maps to its step importer function.
  *
- * Generated entries: 10
+ * Generated entries: 12
  */
 
 import "server-only";
@@ -93,6 +93,14 @@ export const PLUGIN_STEP_IMPORTERS: Record<string, StepImporter> = {
     importer: () => import("@/plugins/slack/steps/send-slack-message"),
     stepFunction: "sendSlackMessageStep",
   },
+  "superagent/guard": {
+    importer: () => import("@/plugins/superagent/steps/guard"),
+    stepFunction: "superagentGuardStep",
+  },
+  "superagent/redact": {
+    importer: () => import("@/plugins/superagent/steps/redact"),
+    stepFunction: "superagentRedactStep",
+  },
   "v0/create-chat": {
     importer: () => import("@/plugins/v0/steps/create-chat"),
     stepFunction: "createChatStep",
@@ -124,6 +132,8 @@ export const ACTION_LABELS: Record<string, string> = {
   "linear/find-issues": "Find Issues",
   "resend/send-email": "Send Email",
   "slack/send-message": "Send Slack Message",
+  "superagent/guard": "Guard",
+  "superagent/redact": "Redact",
   "v0/create-chat": "Create Chat",
   "v0/send-message": "Send Message",
   Scrape: "Scrape URL",
