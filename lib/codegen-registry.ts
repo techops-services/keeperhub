@@ -7,7 +7,7 @@
  * Contains auto-generated codegen templates for steps with stepHandler.
  * These templates are used when exporting workflows to standalone projects.
  *
- * Generated templates: 10
+ * Generated templates: 12
  */
 
 /**
@@ -565,6 +565,162 @@ export async function sendSlackMessageStep(
       success: false,
       error: \`Failed to send Slack message: \${getErrorMessage(error)}\`,
     };
+  }
+}
+`,
+
+  "superagent/guard": `import { fetchCredentials } from "./lib/credential-helper";
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+type GuardResult = {
+  classification: GuardClassification;
+  violationTypes: string[];
+  cweCodes: string[];
+  reasoning?: string;
+};
+
+export type SuperagentGuardCoreInput = {
+  text: string;
+};
+
+export async function superagentGuardStep(
+  input: SuperagentGuardCoreInput,
+): Promise<GuardResult> {
+  "use step";
+  const credentials = await fetchCredentials("superagent");
+  const apiKey = credentials.SUPERAGENT_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("Superagent API Key is not configured.");
+  }
+
+  try {
+    const response = await fetch("https://app.superagent.sh/api/guard", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: \`Bearer \${apiKey}\`,
+      },
+      body: JSON.stringify({
+        text: input.text,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(\`Guard API error: \${error}\`);
+    }
+
+    const data = await response.json();
+    const choice = data.choices?.[0];
+    const content = choice?.message?.content;
+
+    if (!content || typeof content !== "object") {
+      throw new Error(
+        "Invalid Guard API response: missing or invalid content structure",
+      );
+    }
+
+    const classification = content.classification;
+    if (
+      !classification ||
+      (classification !== "allow" && classification !== "block")
+    ) {
+      throw new Error(
+        \`Invalid Guard API response: missing or invalid classification (received: \${JSON.stringify(classification)})\`,
+      );
+    }
+
+    return {
+      classification,
+      violationTypes: content?.violation_types || [],
+      cweCodes: content?.cwe_codes || [],
+      reasoning: choice?.message?.reasoning,
+    };
+  } catch (error) {
+    throw new Error(\`Failed to analyze text: \${getErrorMessage(error)}\`);
+  }
+}
+`,
+
+  "superagent/redact": `import { fetchCredentials } from "./lib/credential-helper";
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+type RedactResult = {
+  redactedText: string;
+  reasoning?: string;
+};
+
+export type SuperagentRedactCoreInput = {
+  text: string;
+  entities?: string[] | string;
+};
+
+export async function superagentRedactStep(
+  input: SuperagentRedactCoreInput,
+): Promise<RedactResult> {
+  "use step";
+  const credentials = await fetchCredentials("superagent");
+  const apiKey = credentials.SUPERAGENT_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("Superagent API Key is not configured.");
+  }
+
+  try {
+    const body: { text: string; entities?: string[] } = {
+      text: input.text,
+    };
+
+    if (input.entities) {
+      let entitiesArray: string[];
+
+      if (typeof input.entities === "string") {
+        entitiesArray = input.entities.split(",").map((e) => e.trim());
+      } else if (Array.isArray(input.entities)) {
+        entitiesArray = input.entities.map((e) => String(e).trim());
+      } else {
+        entitiesArray = [];
+      }
+
+      const validEntities = entitiesArray.filter((e) => e.length > 0);
+
+      if (validEntities.length > 0) {
+        body.entities = validEntities;
+      }
+    }
+
+    const response = await fetch("https://app.superagent.sh/api/redact", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: \`Bearer \${apiKey}\`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(\`Redact API error: \${error}\`);
+    }
+
+    const data = await response.json();
+    const choice = data.choices?.[0];
+
+    return {
+      redactedText: choice?.message?.content || input.text,
+      reasoning: choice?.message?.reasoning,
+    };
+  } catch (error) {
+    throw new Error(\`Failed to redact text: \${getErrorMessage(error)}\`);
   }
 }
 `,

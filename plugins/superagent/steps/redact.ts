@@ -3,26 +3,30 @@ import "server-only";
 import { fetchCredentials } from "@/lib/credential-fetcher";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
+import type { SuperagentCredentials } from "../credentials";
 
 type RedactResult = {
   redactedText: string;
   reasoning?: string;
 };
 
-export type SuperagentRedactInput = StepInput & {
-  integrationId?: string;
+export type SuperagentRedactCoreInput = {
   text: string;
   entities?: string[] | string;
 };
 
-/**
- * Redact logic - removes sensitive information from text
- */
-async function redact(input: SuperagentRedactInput): Promise<RedactResult> {
-  const credentials = input.integrationId
-    ? await fetchCredentials(input.integrationId)
-    : {};
+export type SuperagentRedactInput = StepInput &
+  SuperagentRedactCoreInput & {
+    integrationId?: string;
+  };
 
+/**
+ * Core logic
+ */
+async function stepHandler(
+  input: SuperagentRedactCoreInput,
+  credentials: SuperagentCredentials
+): Promise<RedactResult> {
   const apiKey = credentials.SUPERAGENT_API_KEY;
 
   if (!apiKey) {
@@ -34,22 +38,19 @@ async function redact(input: SuperagentRedactInput): Promise<RedactResult> {
       text: input.text,
     };
 
-    // Parse entities from string or array, filter out empty strings
     if (input.entities) {
       let entitiesArray: string[];
-      
+
       if (typeof input.entities === "string") {
-        // Parse comma-separated string
         entitiesArray = input.entities.split(",").map((e) => e.trim());
       } else if (Array.isArray(input.entities)) {
         entitiesArray = input.entities.map((e) => String(e).trim());
       } else {
         entitiesArray = [];
       }
-      
-      // Filter out empty strings and ensure we have valid entities
+
       const validEntities = entitiesArray.filter((e) => e.length > 0);
-      
+
       if (validEntities.length > 0) {
         body.entities = validEntities;
       }
@@ -82,12 +83,18 @@ async function redact(input: SuperagentRedactInput): Promise<RedactResult> {
 }
 
 /**
- * Superagent Redact Step
- * Removes sensitive information (PII/PHI) from text
+ * Step entry point
  */
 export async function superagentRedactStep(
   input: SuperagentRedactInput
 ): Promise<RedactResult> {
   "use step";
-  return withStepLogging(input, () => redact(input));
+
+  const credentials = input.integrationId
+    ? await fetchCredentials(input.integrationId)
+    : {};
+
+  return withStepLogging(input, () => stepHandler(input, credentials));
 }
+
+export const _integrationType = "superagent";

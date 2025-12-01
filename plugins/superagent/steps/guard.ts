@@ -3,6 +3,7 @@ import "server-only";
 import { fetchCredentials } from "@/lib/credential-fetcher";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
+import type { SuperagentCredentials } from "../credentials";
 
 type GuardClassification = "allow" | "block";
 
@@ -13,19 +14,22 @@ type GuardResult = {
   reasoning?: string;
 };
 
-export type SuperagentGuardInput = StepInput & {
-  integrationId?: string;
+export type SuperagentGuardCoreInput = {
   text: string;
 };
 
-/**
- * Guard logic - analyzes text for security threats
- */
-async function guard(input: SuperagentGuardInput): Promise<GuardResult> {
-  const credentials = input.integrationId
-    ? await fetchCredentials(input.integrationId)
-    : {};
+export type SuperagentGuardInput = StepInput &
+  SuperagentGuardCoreInput & {
+    integrationId?: string;
+  };
 
+/**
+ * Core logic
+ */
+async function stepHandler(
+  input: SuperagentGuardCoreInput,
+  credentials: SuperagentCredentials
+): Promise<GuardResult> {
   const apiKey = credentials.SUPERAGENT_API_KEY;
 
   if (!apiKey) {
@@ -53,7 +57,6 @@ async function guard(input: SuperagentGuardInput): Promise<GuardResult> {
     const choice = data.choices?.[0];
     const content = choice?.message?.content;
 
-    // Validate response structure - fail safe instead of defaulting to "allow"
     if (!content || typeof content !== "object") {
       throw new Error(
         "Invalid Guard API response: missing or invalid content structure"
@@ -61,7 +64,10 @@ async function guard(input: SuperagentGuardInput): Promise<GuardResult> {
     }
 
     const classification = content.classification;
-    if (!classification || (classification !== "allow" && classification !== "block")) {
+    if (
+      !classification ||
+      (classification !== "allow" && classification !== "block")
+    ) {
       throw new Error(
         `Invalid Guard API response: missing or invalid classification (received: ${JSON.stringify(classification)})`
       );
@@ -79,12 +85,18 @@ async function guard(input: SuperagentGuardInput): Promise<GuardResult> {
 }
 
 /**
- * Superagent Guard Step
- * Analyzes text for security threats like prompt injection
+ * Step entry point
  */
 export async function superagentGuardStep(
   input: SuperagentGuardInput
 ): Promise<GuardResult> {
   "use step";
-  return withStepLogging(input, () => guard(input));
+
+  const credentials = input.integrationId
+    ? await fetchCredentials(input.integrationId)
+    : {};
+
+  return withStepLogging(input, () => stepHandler(input, credentials));
 }
+
+export const _integrationType = "superagent";

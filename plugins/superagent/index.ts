@@ -1,7 +1,5 @@
 import type { IntegrationPlugin } from "../registry";
 import { registerIntegration } from "../registry";
-import { guardCodegenTemplate } from "./codegen/guard";
-import { redactCodegenTemplate } from "./codegen/redact";
 import { SuperagentIcon } from "./icon";
 
 const superagentPlugin: IntegrationPlugin = {
@@ -54,7 +52,6 @@ const superagentPlugin: IntegrationPlugin = {
           rows: 4,
         },
       ],
-      codegenTemplate: guardCodegenTemplate,
     },
     {
       slug: "redact",
@@ -82,7 +79,6 @@ const superagentPlugin: IntegrationPlugin = {
           example: "",
         },
       ],
-      codegenTemplate: redactCodegenTemplate,
     },
   ],
 };
