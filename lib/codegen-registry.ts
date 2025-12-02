@@ -7,7 +7,7 @@
  * Contains auto-generated codegen templates for steps with stepHandler.
  * These templates are used when exporting workflows to standalone projects.
  *
- * Generated templates: 14
+ * Generated templates: 18
  */
 
 /**
@@ -481,6 +481,455 @@ export async function firecrawlSearchStep(
     };
   } catch (error) {
     throw new Error(\`Failed to search: \${getErrorMessage(error)}\`);
+  }
+}
+`,
+
+  "github/create-issue": `import { fetchCredentials } from "./lib/credential-helper";
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+type CreateIssueResult =
+  | {
+      success: true;
+      id: number;
+      number: number;
+      title: string;
+      url: string;
+      state: string;
+    }
+  | { success: false; error: string };
+
+export type CreateIssueCoreInput = {
+  owner: string;
+  repo: string;
+  title: string;
+  body?: string;
+  labels?: string;
+  assignees?: string;
+};
+
+export async function createIssueStep(
+  input: CreateIssueCoreInput,
+): Promise<CreateIssueResult> {
+  "use step";
+  const credentials = await fetchCredentials("github");
+  const token = credentials.GITHUB_TOKEN;
+
+  if (!token) {
+    return {
+      success: false,
+      error:
+        "GITHUB_TOKEN is not configured. Please add it in Project Integrations.",
+    };
+  }
+
+  try {
+    const body: Record<string, unknown> = {
+      title: input.title,
+    };
+
+    if (input.body) {
+      body.body = input.body;
+    }
+
+    const labels = parseCommaSeparated(input.labels);
+    if (labels.length > 0) {
+      body.labels = labels;
+    }
+
+    const assignees = parseCommaSeparated(input.assignees);
+    if (assignees.length > 0) {
+      body.assignees = assignees;
+    }
+
+    const response = await fetch(
+      \`\${GITHUB_API_URL}/repos/\${input.owner}/\${input.repo}/issues\`,
+      {
+        method: "POST",
+        headers: {
+          Accept: "application/vnd.github+json",
+          Authorization: \`Bearer \${token}\`,
+          "X-GitHub-Api-Version": "2022-11-28",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      },
+    );
+
+    if (!response.ok) {
+      const errorData = (await response.json()) as { message?: string };
+      return {
+        success: false,
+        error: errorData.message || \`HTTP \${response.status}\`,
+      };
+    }
+
+    const issue = (await response.json()) as GitHubIssue;
+
+    return {
+      success: true,
+      id: issue.id,
+      number: issue.number,
+      title: issue.title,
+      url: issue.html_url,
+      state: issue.state,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: \`Failed to create issue: \${getErrorMessage(error)}\`,
+    };
+  }
+}
+`,
+
+  "github/list-issues": `import { fetchCredentials } from "./lib/credential-helper";
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+type ListIssuesResult =
+  | {
+      success: true;
+      issues: Array<{
+        id: number;
+        number: number;
+        title: string;
+        url: string;
+        state: string;
+        body?: string;
+        labels: string[];
+        assignees: string[];
+        createdAt: string;
+        updatedAt: string;
+      }>;
+      count: number;
+    }
+  | { success: false; error: string };
+
+export type ListIssuesCoreInput = {
+  owner: string;
+  repo: string;
+  state?: string;
+  labels?: string;
+  assignee?: string;
+  perPage?: number;
+};
+
+export async function listIssuesStep(
+  input: ListIssuesCoreInput,
+): Promise<ListIssuesResult> {
+  "use step";
+  const credentials = await fetchCredentials("github");
+  const token = credentials.GITHUB_TOKEN;
+
+  if (!token) {
+    return {
+      success: false,
+      error:
+        "GITHUB_TOKEN is not configured. Please add it in Project Integrations.",
+    };
+  }
+
+  try {
+    const params = new URLSearchParams();
+
+    if (input.state && input.state !== "open") {
+      params.set("state", input.state);
+    }
+
+    if (input.labels) {
+      params.set("labels", input.labels);
+    }
+
+    if (input.assignee) {
+      params.set("assignee", input.assignee);
+    }
+
+    if (input.perPage) {
+      params.set("per_page", String(input.perPage));
+    }
+
+    const url = \`\${GITHUB_API_URL}/repos/\${input.owner}/\${input.repo}/issues\${
+      params.toString() ? \`?\${params.toString()}\` : ""
+    }\`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: \`Bearer \${token}\`,
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = (await response.json()) as { message?: string };
+      return {
+        success: false,
+        error: errorData.message || \`HTTP \${response.status}\`,
+      };
+    }
+
+    const rawIssues = (await response.json()) as GitHubIssue[];
+
+    const issues = rawIssues.map((issue) => ({
+      id: issue.id,
+      number: issue.number,
+      title: issue.title,
+      url: issue.html_url,
+      state: issue.state,
+      body: issue.body,
+      labels: issue.labels.map((l) => l.name),
+      assignees: issue.assignees.map((a) => a.login),
+      createdAt: issue.created_at,
+      updatedAt: issue.updated_at,
+    }));
+
+    return {
+      success: true,
+      issues,
+      count: issues.length,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: \`Failed to list issues: \${getErrorMessage(error)}\`,
+    };
+  }
+}
+`,
+
+  "github/get-issue": `import { fetchCredentials } from "./lib/credential-helper";
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+type GetIssueResult =
+  | {
+      success: true;
+      id: number;
+      number: number;
+      title: string;
+      url: string;
+      state: string;
+      body?: string;
+      labels: string[];
+      assignees: string[];
+      author: string;
+      createdAt: string;
+      updatedAt: string;
+      closedAt?: string;
+      commentsCount: number;
+    }
+  | { success: false; error: string };
+
+export type GetIssueCoreInput = {
+  owner: string;
+  repo: string;
+  issueNumber: string;
+};
+
+export async function getIssueStep(
+  input: GetIssueCoreInput,
+): Promise<GetIssueResult> {
+  "use step";
+  const credentials = await fetchCredentials("github");
+  const token = credentials.GITHUB_TOKEN;
+
+  if (!token) {
+    return {
+      success: false,
+      error:
+        "GITHUB_TOKEN is not configured. Please add it in Project Integrations.",
+    };
+  }
+
+  try {
+    const issueNum = Number.parseInt(input.issueNumber, 10);
+    if (Number.isNaN(issueNum)) {
+      return {
+        success: false,
+        error: "Invalid issue number",
+      };
+    }
+
+    const response = await fetch(
+      \`\${GITHUB_API_URL}/repos/\${input.owner}/\${input.repo}/issues/\${issueNum}\`,
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/vnd.github+json",
+          Authorization: \`Bearer \${token}\`,
+          "X-GitHub-Api-Version": "2022-11-28",
+        },
+      },
+    );
+
+    if (!response.ok) {
+      const errorData = (await response.json()) as { message?: string };
+      return {
+        success: false,
+        error: errorData.message || \`HTTP \${response.status}\`,
+      };
+    }
+
+    const issue = (await response.json()) as GitHubIssue;
+
+    return {
+      success: true,
+      id: issue.id,
+      number: issue.number,
+      title: issue.title,
+      url: issue.html_url,
+      state: issue.state,
+      body: issue.body,
+      labels: issue.labels.map((l) => l.name),
+      assignees: issue.assignees.map((a) => a.login),
+      author: issue.user.login,
+      createdAt: issue.created_at,
+      updatedAt: issue.updated_at,
+      closedAt: issue.closed_at,
+      commentsCount: issue.comments,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: \`Failed to get issue: \${getErrorMessage(error)}\`,
+    };
+  }
+}
+`,
+
+  "github/update-issue": `import { fetchCredentials } from "./lib/credential-helper";
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+type UpdateIssueResult =
+  | {
+      success: true;
+      id: number;
+      number: number;
+      title: string;
+      url: string;
+      state: string;
+    }
+  | { success: false; error: string };
+
+export type UpdateIssueCoreInput = {
+  owner: string;
+  repo: string;
+  issueNumber: string;
+  title?: string;
+  body?: string;
+  state?: string;
+  labels?: string;
+  assignees?: string;
+};
+
+export async function updateIssueStep(
+  input: UpdateIssueCoreInput,
+): Promise<UpdateIssueResult> {
+  "use step";
+  const credentials = await fetchCredentials("github");
+  const token = credentials.GITHUB_TOKEN;
+
+  if (!token) {
+    return {
+      success: false,
+      error:
+        "GITHUB_TOKEN is not configured. Please add it in Project Integrations.",
+    };
+  }
+
+  try {
+    const issueNum = Number.parseInt(input.issueNumber, 10);
+    if (Number.isNaN(issueNum)) {
+      return {
+        success: false,
+        error: "Invalid issue number",
+      };
+    }
+
+    const body: Record<string, unknown> = {};
+
+    if (input.title) {
+      body.title = input.title;
+    }
+
+    if (input.body) {
+      body.body = input.body;
+    }
+
+    if (input.state && input.state !== "") {
+      body.state = input.state;
+    }
+
+    if (input.labels !== undefined) {
+      const labels = parseCommaSeparated(input.labels);
+      body.labels = labels;
+    }
+
+    if (input.assignees !== undefined) {
+      const assignees = parseCommaSeparated(input.assignees);
+      body.assignees = assignees;
+    }
+
+    if (Object.keys(body).length === 0) {
+      return {
+        success: false,
+        error: "No fields to update. Please provide at least one field.",
+      };
+    }
+
+    const response = await fetch(
+      \`\${GITHUB_API_URL}/repos/\${input.owner}/\${input.repo}/issues/\${issueNum}\`,
+      {
+        method: "PATCH",
+        headers: {
+          Accept: "application/vnd.github+json",
+          Authorization: \`Bearer \${token}\`,
+          "X-GitHub-Api-Version": "2022-11-28",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      },
+    );
+
+    if (!response.ok) {
+      const errorData = (await response.json()) as { message?: string };
+      return {
+        success: false,
+        error: errorData.message || \`HTTP \${response.status}\`,
+      };
+    }
+
+    const issue = (await response.json()) as GitHubIssue;
+
+    return {
+      success: true,
+      id: issue.id,
+      number: issue.number,
+      title: issue.title,
+      url: issue.html_url,
+      state: issue.state,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: \`Failed to update issue: \${getErrorMessage(error)}\`,
+    };
   }
 }
 `,

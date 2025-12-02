@@ -7,7 +7,7 @@
  * This registry enables dynamic step imports that are statically analyzable
  * by the bundler. Each action type maps to its step importer function.
  *
- * Generated entries: 14
+ * Generated entries: 18
  */
 
 import "server-only";
@@ -68,6 +68,22 @@ export const PLUGIN_STEP_IMPORTERS: Record<string, StepImporter> = {
   Search: {
     importer: () => import("@/plugins/firecrawl/steps/search"),
     stepFunction: "firecrawlSearchStep",
+  },
+  "github/create-issue": {
+    importer: () => import("@/plugins/github/steps/create-issue"),
+    stepFunction: "createIssueStep",
+  },
+  "github/list-issues": {
+    importer: () => import("@/plugins/github/steps/list-issues"),
+    stepFunction: "listIssuesStep",
+  },
+  "github/get-issue": {
+    importer: () => import("@/plugins/github/steps/get-issue"),
+    stepFunction: "getIssueStep",
+  },
+  "github/update-issue": {
+    importer: () => import("@/plugins/github/steps/update-issue"),
+    stepFunction: "updateIssueStep",
   },
   "linear/create-ticket": {
     importer: () => import("@/plugins/linear/steps/create-ticket"),
@@ -138,6 +154,10 @@ export const ACTION_LABELS: Record<string, string> = {
   "blob/list": "List Blobs",
   "firecrawl/scrape": "Scrape URL",
   "firecrawl/search": "Search Web",
+  "github/create-issue": "Create Issue",
+  "github/list-issues": "List Issues",
+  "github/get-issue": "Get Issue",
+  "github/update-issue": "Update Issue",
   "linear/create-ticket": "Create Ticket",
   "linear/find-issues": "Find Issues",
   "resend/send-email": "Send Email",
