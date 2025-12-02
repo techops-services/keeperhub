@@ -6,6 +6,20 @@ import { getErrorMessage } from "@/lib/utils";
 import type { FalCredentials } from "../credentials";
 
 const FAL_API_URL = "https://queue.fal.run";
+const POLL_INTERVAL_MS = 1000;
+const MAX_POLL_ATTEMPTS = 600; // 10 minutes max
+
+type FalQueueResponse = {
+  status: "IN_QUEUE" | "IN_PROGRESS" | "COMPLETED";
+  request_id: string;
+  response_url: string;
+  status_url: string;
+};
+
+type FalStatusResponse = {
+  status: "IN_QUEUE" | "IN_PROGRESS" | "COMPLETED";
+  response_url?: string;
+};
 
 type FalImageToImageResponse = {
   images?: Array<{
@@ -38,6 +52,42 @@ export type FalImageToImageInput = StepInput &
   FalImageToImageCoreInput & {
     integrationId?: string;
   };
+
+async function pollForResult(
+  statusUrl: string,
+  responseUrl: string,
+  apiKey: string
+): Promise<FalImageToImageResponse> {
+  for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
+    const statusResponse = await fetch(statusUrl, {
+      method: "GET",
+      headers: { Authorization: `Key ${apiKey}` },
+    });
+
+    if (!statusResponse.ok) {
+      throw new Error(`Failed to check status: HTTP ${statusResponse.status}`);
+    }
+
+    const status = (await statusResponse.json()) as FalStatusResponse;
+
+    if (status.status === "COMPLETED") {
+      const resultResponse = await fetch(responseUrl, {
+        method: "GET",
+        headers: { Authorization: `Key ${apiKey}` },
+      });
+
+      if (!resultResponse.ok) {
+        throw new Error(`Failed to fetch result: HTTP ${resultResponse.status}`);
+      }
+
+      return (await resultResponse.json()) as FalImageToImageResponse;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+  }
+
+  throw new Error("Request timed out waiting for fal.ai to complete");
+}
 
 /**
  * Core logic - portable between app and export
@@ -74,7 +124,18 @@ async function stepHandler(
       throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
 
-    const result = (await response.json()) as FalImageToImageResponse;
+    const queueResponse = (await response.json()) as FalQueueResponse;
+
+    let result: FalImageToImageResponse;
+    if (queueResponse.status === "IN_QUEUE" || queueResponse.status === "IN_PROGRESS") {
+      result = await pollForResult(
+        queueResponse.status_url,
+        queueResponse.response_url,
+        apiKey
+      );
+    } else {
+      result = queueResponse as unknown as FalImageToImageResponse;
+    }
 
     if (result.error) {
       throw new Error(result.error);
@@ -110,5 +171,6 @@ export async function falImageToImageStep(
 
   return withStepLogging(input, () => stepHandler(input, credentials));
 }
+falImageToImageStep.maxRetries = 0;
 
 export const _integrationType = "fal";

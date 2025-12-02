@@ -135,5 +135,6 @@ export async function perplexityResearchStep(
 
   return withStepLogging(input, () => stepHandler(input, credentials));
 }
+perplexityResearchStep.maxRetries = 0;
 
 export const _integrationType = "perplexity";

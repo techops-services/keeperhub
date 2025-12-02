@@ -124,6 +124,7 @@ export async function createCustomerStep(
 
   return withStepLogging(input, () => stepHandler(input, credentials));
 }
+createCustomerStep.maxRetries = 0;
 
 export const _integrationType = "stripe";
 

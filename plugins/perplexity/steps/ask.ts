@@ -133,5 +133,6 @@ export async function perplexityAskStep(
 
   return withStepLogging(input, () => stepHandler(input, credentials));
 }
+perplexityAskStep.maxRetries = 0;
 
 export const _integrationType = "perplexity";

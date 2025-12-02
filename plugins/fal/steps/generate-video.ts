@@ -6,6 +6,20 @@ import { getErrorMessage } from "@/lib/utils";
 import type { FalCredentials } from "../credentials";
 
 const FAL_API_URL = "https://queue.fal.run";
+const POLL_INTERVAL_MS = 2000;
+const MAX_POLL_ATTEMPTS = 300; // 10 minutes max for video
+
+type FalQueueResponse = {
+  status: "IN_QUEUE" | "IN_PROGRESS" | "COMPLETED";
+  request_id: string;
+  response_url: string;
+  status_url: string;
+};
+
+type FalStatusResponse = {
+  status: "IN_QUEUE" | "IN_PROGRESS" | "COMPLETED";
+  response_url?: string;
+};
 
 type FalVideoResponse = {
   video?: {
@@ -30,6 +44,49 @@ export type FalGenerateVideoInput = StepInput &
   };
 
 /**
+ * Poll fal.ai queue until the request is completed
+ */
+async function pollForResult(
+  statusUrl: string,
+  responseUrl: string,
+  apiKey: string
+): Promise<FalVideoResponse> {
+  for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
+    const statusResponse = await fetch(statusUrl, {
+      method: "GET",
+      headers: {
+        Authorization: `Key ${apiKey}`,
+      },
+    });
+
+    if (!statusResponse.ok) {
+      throw new Error(`Failed to check status: HTTP ${statusResponse.status}`);
+    }
+
+    const status = (await statusResponse.json()) as FalStatusResponse;
+
+    if (status.status === "COMPLETED") {
+      const resultResponse = await fetch(responseUrl, {
+        method: "GET",
+        headers: {
+          Authorization: `Key ${apiKey}`,
+        },
+      });
+
+      if (!resultResponse.ok) {
+        throw new Error(`Failed to fetch result: HTTP ${resultResponse.status}`);
+      }
+
+      return (await resultResponse.json()) as FalVideoResponse;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+  }
+
+  throw new Error("Request timed out waiting for fal.ai to complete");
+}
+
+/**
  * Core logic - portable between app and export
  */
 async function stepHandler(
@@ -45,7 +102,6 @@ async function stepHandler(
   try {
     const model = input.model || "fal-ai/minimax-video";
 
-    // Build request body based on whether it's text-to-video or image-to-video
     const requestBody: Record<string, unknown> = {
       prompt: input.prompt,
     };
@@ -68,7 +124,18 @@ async function stepHandler(
       throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
 
-    const result = (await response.json()) as FalVideoResponse;
+    const queueResponse = (await response.json()) as FalQueueResponse;
+
+    let result: FalVideoResponse;
+    if (queueResponse.status === "IN_QUEUE" || queueResponse.status === "IN_PROGRESS") {
+      result = await pollForResult(
+        queueResponse.status_url,
+        queueResponse.response_url,
+        apiKey
+      );
+    } else {
+      result = queueResponse as unknown as FalVideoResponse;
+    }
 
     if (result.error) {
       throw new Error(result.error);
@@ -100,5 +167,6 @@ export async function falGenerateVideoStep(
 
   return withStepLogging(input, () => stepHandler(input, credentials));
 }
+falGenerateVideoStep.maxRetries = 0;
 
 export const _integrationType = "fal";

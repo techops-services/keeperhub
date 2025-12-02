@@ -132,6 +132,7 @@ export async function createIssueStep(
 
   return withStepLogging(input, () => stepHandler(input, credentials));
 }
+createIssueStep.maxRetries = 0;
 
 export const _integrationType = "github";
 

@@ -119,6 +119,7 @@ export async function listBlobsStep(
 
   return withStepLogging(input, () => stepHandler(input, credentials));
 }
+listBlobsStep.maxRetries = 0;
 
 export const _integrationType = "blob";
 

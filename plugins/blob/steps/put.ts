@@ -123,6 +123,7 @@ export async function putBlobStep(input: PutBlobInput): Promise<PutBlobResult> {
 
   return withStepLogging(input, () => stepHandler(input, credentials));
 }
+putBlobStep.maxRetries = 0;
 
 export const _integrationType = "blob";
 
