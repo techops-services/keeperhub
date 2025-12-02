@@ -7,7 +7,7 @@
  * This registry enables dynamic step imports that are statically analyzable
  * by the bundler. Each action type maps to its step importer function.
  *
- * Generated entries: 12
+ * Generated entries: 14
  */
 
 import "server-only";
@@ -44,6 +44,14 @@ export const PLUGIN_STEP_IMPORTERS: Record<string, StepImporter> = {
   "Generate Image": {
     importer: () => import("@/plugins/ai-gateway/steps/generate-image"),
     stepFunction: "generateImageStep",
+  },
+  "blob/put": {
+    importer: () => import("@/plugins/blob/steps/put"),
+    stepFunction: "putBlobStep",
+  },
+  "blob/list": {
+    importer: () => import("@/plugins/blob/steps/list"),
+    stepFunction: "listBlobsStep",
   },
   "firecrawl/scrape": {
     importer: () => import("@/plugins/firecrawl/steps/scrape"),
@@ -126,6 +134,8 @@ export const PLUGIN_STEP_IMPORTERS: Record<string, StepImporter> = {
 export const ACTION_LABELS: Record<string, string> = {
   "ai-gateway/generate-text": "Generate Text",
   "ai-gateway/generate-image": "Generate Image",
+  "blob/put": "Put Blob",
+  "blob/list": "List Blobs",
   "firecrawl/scrape": "Scrape URL",
   "firecrawl/search": "Search Web",
   "linear/create-ticket": "Create Ticket",

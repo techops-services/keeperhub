@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { edgesAtom, nodesAtom, type WorkflowNode } from "@/lib/workflow-store";
+import { findActionById } from "@/plugins";
 
 type TemplateAutocompleteProps = {
   isOpen: boolean;
@@ -32,6 +33,13 @@ const getNodeDisplayName = (node: WorkflowNode): string => {
 
   if (node.data.type === "action") {
     const actionType = node.data.config?.actionType as string | undefined;
+    if (actionType) {
+      // Look up human-readable label from plugin registry
+      const action = findActionById(actionType);
+      if (action?.label) {
+        return action.label;
+      }
+    }
     return actionType || "HTTP Request";
   }
 
@@ -103,6 +111,15 @@ const isActionType = (
 const getCommonFields = (node: WorkflowNode) => {
   const actionType = node.data.config?.actionType as string | undefined;
 
+  // First, check if the plugin defines output fields
+  if (actionType) {
+    const action = findActionById(actionType);
+    if (action?.outputFields && action.outputFields.length > 0) {
+      return action.outputFields;
+    }
+  }
+
+  // Legacy hardcoded fields for backwards compatibility
   if (isActionType(actionType, "Find Issues", "linear/find-issues")) {
     return [
       { field: "issues", description: "Array of issues found" },
@@ -153,12 +170,12 @@ const getCommonFields = (node: WorkflowNode) => {
     const aiFormat = node.data.config?.aiFormat as string | undefined;
     const aiSchema = node.data.config?.aiSchema as string | undefined;
 
-    // If format is object and schema is defined, show schema fields
+    // If format is object and schema is defined, show schema fields under "object" prefix
     if (aiFormat === "object" && aiSchema) {
       try {
         const schema = JSON.parse(aiSchema) as SchemaField[];
         if (schema.length > 0) {
-          return schemaToFields(schema);
+          return schemaToFields(schema, "object");
         }
       } catch {
         // If schema parsing fails, fall through to default fields

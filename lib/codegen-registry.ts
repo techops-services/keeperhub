@@ -7,7 +7,7 @@
  * Contains auto-generated codegen templates for steps with stepHandler.
  * These templates are used when exporting workflows to standalone projects.
  *
- * Generated templates: 12
+ * Generated templates: 14
  */
 
 /**
@@ -163,8 +163,203 @@ export async function generateImageStep(
 }
 `,
 
-  "firecrawl/scrape": `import FirecrawlApp from "@mendable/firecrawl-js";
-import { fetchCredentials } from "./lib/credential-helper";
+  "blob/put": `import { fetchCredentials } from "./lib/credential-helper";
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+type PutBlobResult =
+  | { success: true; url: string; downloadUrl: string; pathname: string }
+  | { success: false; error: string };
+
+export type PutBlobCoreInput = {
+  pathname: string;
+  body: string;
+  contentType?: string;
+  access?: string;
+  addRandomSuffix?: string;
+};
+
+export async function putBlobStep(
+  input: PutBlobCoreInput,
+): Promise<PutBlobResult> {
+  "use step";
+  const credentials = await fetchCredentials("blob");
+  const token = credentials.BLOB_READ_WRITE_TOKEN;
+
+  if (!token) {
+    return {
+      success: false,
+      error:
+        "BLOB_READ_WRITE_TOKEN is not configured. Please add it in Project Integrations.",
+    };
+  }
+
+  if (!input.pathname) {
+    return {
+      success: false,
+      error: "Pathname is required",
+    };
+  }
+
+  if (!input.body) {
+    return {
+      success: false,
+      error: "Content body is required",
+    };
+  }
+
+  try {
+    const url = new URL(\`/\${input.pathname}\`, BLOB_API_URL);
+
+    // Add query parameters
+    const addRandomSuffix = input.addRandomSuffix !== "false";
+    if (!addRandomSuffix) {
+      url.searchParams.set("addRandomSuffix", "false");
+    }
+
+    const headers: Record<string, string> = {
+      Authorization: \`Bearer \${token}\`,
+      "x-api-version": "7",
+    };
+
+    if (input.contentType) {
+      headers["x-content-type"] = input.contentType;
+    }
+
+    const response = await fetch(url.toString(), {
+      method: "PUT",
+      headers,
+      body: input.body,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage: string;
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.error?.message || errorText;
+      } catch {
+        errorMessage = errorText || \`HTTP \${response.status}\`;
+      }
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+
+    const data = (await response.json()) as PutBlobResponse;
+    return {
+      success: true,
+      url: data.url,
+      downloadUrl: data.downloadUrl,
+      pathname: data.pathname,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      success: false,
+      error: \`Failed to upload blob: \${message}\`,
+    };
+  }
+}
+`,
+
+  "blob/list": `import { fetchCredentials } from "./lib/credential-helper";
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+type ListBlobsResult =
+  | {
+      success: true;
+      blobs: BlobItem[];
+      cursor?: string;
+      hasMore: boolean;
+    }
+  | { success: false; error: string };
+
+export type ListBlobsCoreInput = {
+  prefix?: string;
+  limit?: number;
+  cursor?: string;
+};
+
+export async function listBlobsStep(
+  input: ListBlobsCoreInput,
+): Promise<ListBlobsResult> {
+  "use step";
+  const credentials = await fetchCredentials("blob");
+  const token = credentials.BLOB_READ_WRITE_TOKEN;
+
+  if (!token) {
+    return {
+      success: false,
+      error:
+        "BLOB_READ_WRITE_TOKEN is not configured. Please add it in Project Integrations.",
+    };
+  }
+
+  try {
+    const url = new URL(BLOB_API_URL);
+
+    if (input.prefix) {
+      url.searchParams.set("prefix", input.prefix);
+    }
+
+    if (input.limit) {
+      url.searchParams.set("limit", String(input.limit));
+    }
+
+    if (input.cursor) {
+      url.searchParams.set("cursor", input.cursor);
+    }
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        Authorization: \`Bearer \${token}\`,
+        "x-api-version": "7",
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage: string;
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.error?.message || errorText;
+      } catch {
+        errorMessage = errorText || \`HTTP \${response.status}\`;
+      }
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+
+    const data = (await response.json()) as ListBlobsResponse;
+    return {
+      success: true,
+      blobs: data.blobs,
+      cursor: data.cursor,
+      hasMore: data.hasMore,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      success: false,
+      error: \`Failed to list blobs: \${message}\`,
+    };
+  }
+}
+`,
+
+  "firecrawl/scrape": `import { fetchCredentials } from "./lib/credential-helper";
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -193,14 +388,32 @@ export async function firecrawlScrapeStep(
   }
 
   try {
-    const firecrawl = new FirecrawlApp({ apiKey });
-    const result = await firecrawl.scrape(input.url, {
-      formats: input.formats || ["markdown"],
+    const response = await fetch(\`\${FIRECRAWL_API_URL}/scrape\`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: \`Bearer \${apiKey}\`,
+      },
+      body: JSON.stringify({
+        url: input.url,
+        formats: input.formats || ["markdown"],
+      }),
     });
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(\`HTTP \${response.status}: \${errorText}\`);
+    }
+
+    const result = (await response.json()) as FirecrawlScrapeResponse;
+
+    if (!result.success) {
+      throw new Error(result.error || "Scrape failed");
+    }
+
     return {
-      markdown: result.markdown,
-      metadata: result.metadata,
+      markdown: result.data?.markdown,
+      metadata: result.data?.metadata,
     };
   } catch (error) {
     throw new Error(\`Failed to scrape: \${getErrorMessage(error)}\`);
@@ -208,8 +421,7 @@ export async function firecrawlScrapeStep(
 }
 `,
 
-  "firecrawl/search": `import FirecrawlApp from "@mendable/firecrawl-js";
-import { fetchCredentials } from "./lib/credential-helper";
+  "firecrawl/search": `import { fetchCredentials } from "./lib/credential-helper";
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -217,7 +429,7 @@ function getErrorMessage(error: unknown): string {
 }
 
 type SearchResult = {
-  web?: unknown[];
+  data?: unknown[];
 };
 
 export type FirecrawlSearchCoreInput = {
@@ -240,14 +452,32 @@ export async function firecrawlSearchStep(
   }
 
   try {
-    const firecrawl = new FirecrawlApp({ apiKey });
-    const result = await firecrawl.search(input.query, {
-      limit: input.limit ? Number(input.limit) : undefined,
-      scrapeOptions: input.scrapeOptions,
+    const response = await fetch(\`\${FIRECRAWL_API_URL}/search\`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: \`Bearer \${apiKey}\`,
+      },
+      body: JSON.stringify({
+        query: input.query,
+        limit: input.limit ? Number(input.limit) : undefined,
+        scrapeOptions: input.scrapeOptions,
+      }),
     });
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(\`HTTP \${response.status}: \${errorText}\`);
+    }
+
+    const result = (await response.json()) as FirecrawlSearchResponse;
+
+    if (!result.success) {
+      throw new Error(result.error || "Search failed");
+    }
+
     return {
-      web: result.web,
+      data: result.data,
     };
   } catch (error) {
     throw new Error(\`Failed to search: \${getErrorMessage(error)}\`);
@@ -255,8 +485,7 @@ export async function firecrawlSearchStep(
 }
 `,
 
-  "linear/create-ticket": `import { LinearClient } from "@linear/sdk";
-import { fetchCredentials } from "./lib/credential-helper";
+  "linear/create-ticket": `import { fetchCredentials } from "./lib/credential-helper";
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -289,12 +518,22 @@ export async function createTicketStep(
   }
 
   try {
-    const linear = new LinearClient({ apiKey });
-
     let targetTeamId = teamId;
+
     if (!targetTeamId) {
-      const teams = await linear.teams();
-      const firstTeam = teams.nodes[0];
+      const teamsResult = await linearQuery<TeamsQueryResponse>(
+        apiKey,
+        \`query { teams { nodes { id name } } }\`,
+      );
+
+      if (teamsResult.errors?.length) {
+        return {
+          success: false,
+          error: teamsResult.errors[0].message,
+        };
+      }
+
+      const firstTeam = teamsResult.data?.teams.nodes[0];
       if (!firstTeam) {
         return {
           success: false,
@@ -304,14 +543,33 @@ export async function createTicketStep(
       targetTeamId = firstTeam.id;
     }
 
-    const issuePayload = await linear.createIssue({
-      title: input.ticketTitle,
-      description: input.ticketDescription,
-      teamId: targetTeamId,
-    });
+    const createResult = await linearQuery<CreateIssueMutationResponse>(
+      apiKey,
+      \`mutation CreateIssue($title: String!, $description: String, $teamId: String!) {
+        issueCreate(input: { title: $title, description: $description, teamId: $teamId }) {
+          success
+          issue {
+            id
+            title
+            url
+          }
+        }
+      }\`,
+      {
+        title: input.ticketTitle,
+        description: input.ticketDescription,
+        teamId: targetTeamId,
+      },
+    );
 
-    const issue = await issuePayload.issue;
+    if (createResult.errors?.length) {
+      return {
+        success: false,
+        error: createResult.errors[0].message,
+      };
+    }
 
+    const issue = createResult.data?.issueCreate.issue;
     if (!issue) {
       return {
         success: false,
@@ -334,8 +592,7 @@ export async function createTicketStep(
 }
 `,
 
-  "linear/find-issues": `import { LinearClient } from "@linear/sdk";
-import { fetchCredentials } from "./lib/credential-helper";
+  "linear/find-issues": `import { fetchCredentials } from "./lib/credential-helper";
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -369,8 +626,7 @@ export async function findIssuesStep(
   }
 
   try {
-    const linear = new LinearClient({ apiKey });
-
+    // Build filter object for Linear's GraphQL API
     const filter: Record<string, unknown> = {};
 
     if (input.linearAssigneeId) {
@@ -389,19 +645,40 @@ export async function findIssuesStep(
       filter.labels = { name: { eqIgnoreCase: input.linearLabel } };
     }
 
-    const issues = await linear.issues({ filter });
+    const result = await linearQuery<IssuesQueryResponse>(
+      apiKey,
+      \`query FindIssues($filter: IssueFilter) {
+        issues(filter: $filter) {
+          nodes {
+            id
+            title
+            url
+            priority
+            assigneeId
+            state {
+              name
+            }
+          }
+        }
+      }\`,
+      { filter: Object.keys(filter).length > 0 ? filter : undefined },
+    );
 
-    const mappedIssues: LinearIssue[] = await Promise.all(
-      issues.nodes.map(async (issue) => {
-        const state = await issue.state;
-        return {
-          id: issue.id,
-          title: issue.title,
-          url: issue.url,
-          state: state?.name || "Unknown",
-          priority: issue.priority,
-          assigneeId: issue.assigneeId || undefined,
-        };
+    if (result.errors?.length) {
+      return {
+        success: false,
+        error: result.errors[0].message,
+      };
+    }
+
+    const mappedIssues: LinearIssue[] = (result.data?.issues.nodes || []).map(
+      (issue) => ({
+        id: issue.id,
+        title: issue.title,
+        url: issue.url,
+        state: issue.state?.name || "Unknown",
+        priority: issue.priority,
+        assigneeId: issue.assigneeId || undefined,
       }),
     );
 
@@ -515,8 +792,7 @@ export async function sendEmailStep(
 }
 `,
 
-  "slack/send-message": `import { WebClient } from "@slack/web-api";
-import { fetchCredentials } from "./lib/credential-helper";
+  "slack/send-message": `import { fetchCredentials } from "./lib/credential-helper";
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -548,12 +824,26 @@ export async function sendSlackMessageStep(
   }
 
   try {
-    const slack = new WebClient(apiKey);
-
-    const result = await slack.chat.postMessage({
-      channel: input.slackChannel,
-      text: input.slackMessage,
+    const response = await fetch(\`\${SLACK_API_URL}/chat.postMessage\`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: \`Bearer \${apiKey}\`,
+      },
+      body: JSON.stringify({
+        channel: input.slackChannel,
+        text: input.slackMessage,
+      }),
     });
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: \`HTTP \${response.status}: Failed to send Slack message\`,
+      };
+    }
+
+    const result = (await response.json()) as SlackPostMessageResponse;
 
     if (!result.ok) {
       return {
