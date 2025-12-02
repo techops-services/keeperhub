@@ -45,6 +45,7 @@ const falPlugin: IntegrationPlugin = {
         { field: "width", description: "Width of the generated image" },
         { field: "height", description: "Height of the generated image" },
       ],
+      outputConfig: { type: "image", field: "imageUrl" },
       configFields: [
         {
           key: "model",
@@ -108,6 +109,7 @@ const falPlugin: IntegrationPlugin = {
       outputFields: [
         { field: "videoUrl", description: "URL of the generated video" },
       ],
+      outputConfig: { type: "video", field: "videoUrl" },
       configFields: [
         {
           key: "model",
@@ -153,6 +155,7 @@ const falPlugin: IntegrationPlugin = {
         { field: "width", description: "Width of the upscaled image" },
         { field: "height", description: "Height of the upscaled image" },
       ],
+      outputConfig: { type: "image", field: "imageUrl" },
       configFields: [
         {
           key: "model",
@@ -195,6 +198,7 @@ const falPlugin: IntegrationPlugin = {
       outputFields: [
         { field: "imageUrl", description: "URL of the image with background removed" },
       ],
+      outputConfig: { type: "image", field: "imageUrl" },
       configFields: [
         {
           key: "imageUrl",
@@ -218,6 +222,7 @@ const falPlugin: IntegrationPlugin = {
         { field: "width", description: "Width of the generated image" },
         { field: "height", description: "Height of the generated image" },
       ],
+      outputConfig: { type: "image", field: "imageUrl" },
       configFields: [
         {
           key: "model",
