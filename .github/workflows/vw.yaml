@@ -3,10 +3,6 @@ on:
     branches:
       - staging
       # - main
-    paths:
-      - ".github/workflows/vw.yml"
-      - "deploy/vw/**"
-      - "vw/**"
   workflow_dispatch:
 
 name: deploy-vw
