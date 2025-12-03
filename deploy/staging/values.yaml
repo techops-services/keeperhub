@@ -23,7 +23,8 @@ ingress:
 httpWwwRedirect:
   enabled: false
 httpBasicAuth:
-  enabled: false
+  enabled: true
+  usersList: techops:$apr1$5u9dBZtq$Azp1kuGz73nDUFBdisvo00
 image:
   repository: ${ECR_REGISTRY}/keeper-app-vw-staging
   tag: latest
