@@ -81,6 +81,20 @@ async function stepHandler(
     };
   }
 
+  // Find the selected function in the ABI to get output structure
+  const functionAbi = parsedAbi.find(
+    (item: { type: string; name: string }) =>
+      item.type === "function" && item.name === abiFunction
+  );
+
+  if (!functionAbi) {
+    console.error("[Read Contract] Function not found in ABI:", abiFunction);
+    return {
+      success: false,
+      error: `Function '${abiFunction}' not found in ABI`,
+    };
+  }
+
   // Parse function arguments
   let args: unknown[] = [];
   if (functionArgs && functionArgs.trim() !== "") {
@@ -161,9 +175,37 @@ async function stepHandler(
       )
     );
 
+    // Transform array results into named objects based on ABI outputs
+    let structuredResult = serializedResult;
+
+    // Check if function has outputs defined in ABI
+    const outputs = (functionAbi as { outputs?: Array<{ name?: string; type: string }> }).outputs;
+
+    if (outputs && outputs.length > 0) {
+      if (outputs.length === 1) {
+        // Single output: return the value directly if unnamed, or as object if named
+        const outputName = outputs[0].name?.trim();
+        if (outputName) {
+          // Named single output: wrap in object
+          structuredResult = { [outputName]: Array.isArray(serializedResult) ? serializedResult[0] : serializedResult };
+        } else {
+          // Unnamed single output: return raw value
+          structuredResult = Array.isArray(serializedResult) ? serializedResult[0] : serializedResult;
+        }
+      } else if (Array.isArray(serializedResult)) {
+        // Multiple outputs: always map to object with field names (named or generated)
+        structuredResult = {};
+        outputs.forEach((output, index) => {
+          const fieldName = output.name?.trim() || `unnamedOutput${index}`;
+          structuredResult[fieldName] = serializedResult[index];
+        });
+        console.log("[Read Contract] Structured result:", structuredResult);
+      }
+    }
+
     return {
       success: true,
-      result: serializedResult,
+      result: structuredResult,
     };
   } catch (error) {
     console.error("[Read Contract] Function call failed:", error);

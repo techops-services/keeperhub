@@ -59,6 +59,20 @@ const web3Plugin: IntegrationPlugin = {
       category: "Web3",
       stepFunction: "readContractStep",
       stepImportPath: "read-contract",
+      outputFields: [
+        {
+          field: "success",
+          description: "Whether the contract call succeeded",
+        },
+        {
+          field: "result",
+          description: "The contract function return value (structured based on ABI outputs)",
+        },
+        {
+          field: "error",
+          description: "Error message if the call failed",
+        },
+      ],
       configFields: [
         {
           key: "contractAddress",
