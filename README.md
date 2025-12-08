@@ -82,7 +82,8 @@ Visit [http://localhost:3000](http://localhost:3000) to get started.
 - **Resend**: Send Email
 - **Slack**: Send Slack Message
 - **v0**: Create Chat, Send Message
-- **Web3**: Transfer Funds, Read Contract
+- **Web3**: Transfer Funds, Read Contract, Write Contract
+- **Webflow**: List Sites, Get Site, Publish Site
 <!-- PLUGINS:END -->
 
 ## Code Generation

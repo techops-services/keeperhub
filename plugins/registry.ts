@@ -30,7 +30,8 @@ export type ActionConfigFieldBase = {
     | "select" // Dropdown select
     | "schema-builder" // Schema builder for structured output
     | "abi-function-select" // Dynamic dropdown that parses ABI and shows functions
-    | "abi-function-args"; // Dynamic inputs for function arguments based on selected ABI function
+    | "abi-function-args" // Dynamic inputs for function arguments based on selected ABI function
+    | "abi-with-auto-fetch"; // ABI textarea with automatic fetch from Etherscan
 
   // Placeholder text
   placeholder?: string;
@@ -62,8 +63,17 @@ export type ActionConfigFieldBase = {
   // For abi-function-select: which field contains the ABI JSON
   abiField?: string;
 
+  // For abi-function-select: filter functions by type ("read" or "write")
+  functionFilter?: "read" | "write";
+
   // For abi-function-args: which field contains the ABI JSON and selected function
   abiFunctionField?: string;
+
+  // For abi-with-auto-fetch: which field contains the contract address
+  contractAddressField?: string;
+
+  // For abi-with-auto-fetch: which field contains the network
+  networkField?: string;
 };
 
 /**
