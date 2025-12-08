@@ -18,6 +18,7 @@ import {
   type ActionConfigFieldBase,
   isFieldGroup,
 } from "@/plugins";
+import { AbiWithAutoFetchField } from "./abi-with-auto-fetch-field";
 import { SchemaBuilder, type SchemaField } from "./schema-builder";
 
 type FieldProps = {
@@ -116,6 +117,7 @@ function SchemaBuilderField(props: FieldProps) {
 
 type AbiFunctionSelectProps = FieldProps & {
   abiValue: string;
+  functionFilter?: "read" | "write";
 };
 
 function AbiFunctionSelectField({
@@ -124,6 +126,7 @@ function AbiFunctionSelectField({
   onChange,
   disabled,
   abiValue,
+  functionFilter = "read",
 }: AbiFunctionSelectProps) {
   // Parse ABI and extract functions
   const functions = React.useMemo(() => {
@@ -137,27 +140,36 @@ function AbiFunctionSelectField({
         return [];
       }
 
-      // Extract all functions from the ABI
-      return abi
-        .filter((item) => item.type === "function")
-        .map((func) => {
-          const inputs = func.inputs || [];
-          const params = inputs
-            .map(
-              (input: { name: string; type: string }) =>
-                `${input.type} ${input.name}`
-            )
-            .join(", ");
-          return {
-            name: func.name,
-            label: `${func.name}(${params})`,
-            stateMutability: func.stateMutability || "nonpayable",
-          };
-        });
+      // Filter functions based on functionFilter prop
+      const filterFn =
+        functionFilter === "write"
+          ? (item: { type: string; stateMutability?: string }) =>
+              item.type === "function" &&
+              item.stateMutability !== "view" &&
+              item.stateMutability !== "pure"
+          : (item: { type: string; stateMutability?: string }) =>
+              item.type === "function" &&
+              (item.stateMutability === "view" ||
+                item.stateMutability === "pure");
+
+      return abi.filter(filterFn).map((func) => {
+        const inputs = func.inputs || [];
+        const params = inputs
+          .map(
+            (input: { name: string; type: string }) =>
+              `${input.type} ${input.name}`
+          )
+          .join(", ");
+        return {
+          name: func.name,
+          label: `${func.name}(${params})`,
+          stateMutability: func.stateMutability || "nonpayable",
+        };
+      });
     } catch {
       return [];
     }
-  }, [abiValue]);
+  }, [abiValue, functionFilter]);
 
   if (functions.length === 0) {
     return (
@@ -177,7 +189,7 @@ function AbiFunctionSelectField({
       <SelectContent>
         {functions.map((func) => (
           <SelectItem key={func.name} value={func.name}>
-            <div className="flex flex-col">
+            <div className="flex flex-col items-start">
               <span>{func.label}</span>
               <span className="text-muted-foreground text-xs">
                 {func.stateMutability}
@@ -305,6 +317,102 @@ const FIELD_RENDERERS: Partial<
 };
 
 /**
+ * Helper: Render abi-function-select field
+ */
+function renderAbiFunctionSelect(
+  field: ActionConfigFieldBase,
+  config: Record<string, unknown>,
+  onUpdateConfig: (key: string, value: unknown) => void,
+  disabled?: boolean
+) {
+  const abiField = field.abiField || "abi";
+  const abiValue = (config[abiField] as string | undefined) || "";
+  const value =
+    (config[field.key] as string | undefined) || field.defaultValue || "";
+
+  return (
+    <div className="space-y-2" key={field.key}>
+      <Label className="ml-1" htmlFor={field.key}>
+        {field.label}
+      </Label>
+      <AbiFunctionSelectField
+        abiValue={abiValue}
+        disabled={disabled}
+        field={field}
+        functionFilter={field.functionFilter}
+        onChange={(val) => onUpdateConfig(field.key, val)}
+        value={value}
+      />
+    </div>
+  );
+}
+
+/**
+ * Helper: Render abi-function-args field
+ */
+function renderAbiFunctionArgs(
+  field: ActionConfigFieldBase,
+  config: Record<string, unknown>,
+  onUpdateConfig: (key: string, value: unknown) => void,
+  disabled?: boolean
+) {
+  const abiField = field.abiField || "abi";
+  const functionField = field.abiFunctionField || "abiFunction";
+  const abiValue = (config[abiField] as string | undefined) || "";
+  const functionValue = (config[functionField] as string | undefined) || "";
+  const value =
+    (config[field.key] as string | undefined) || field.defaultValue || "";
+
+  return (
+    <div className="space-y-2" key={field.key}>
+      <Label className="ml-1" htmlFor={field.key}>
+        {field.label}
+      </Label>
+      <AbiFunctionArgsField
+        abiValue={abiValue}
+        disabled={disabled}
+        field={field}
+        functionValue={functionValue}
+        onChange={(val) => onUpdateConfig(field.key, val)}
+        value={value}
+      />
+    </div>
+  );
+}
+
+/**
+ * Helper: Render abi-with-auto-fetch field
+ */
+function renderAbiWithAutoFetch(
+  field: ActionConfigFieldBase,
+  config: Record<string, unknown>,
+  onUpdateConfig: (key: string, value: unknown) => void,
+  disabled?: boolean
+) {
+  const contractAddressField = field.contractAddressField || "contractAddress";
+  const networkField = field.networkField || "network";
+  const value =
+    (config[field.key] as string | undefined) || field.defaultValue || "";
+
+  return (
+    <div className="space-y-2" key={field.key}>
+      <Label className="ml-1" htmlFor={field.key}>
+        {field.label}
+      </Label>
+      <AbiWithAutoFetchField
+        config={config}
+        contractAddressField={contractAddressField}
+        disabled={disabled}
+        field={field}
+        networkField={networkField}
+        onChange={(val: unknown) => onUpdateConfig(field.key, val)}
+        value={value}
+      />
+    </div>
+  );
+}
+
+/**
  * Renders a single base field
  */
 function renderField(
@@ -326,47 +434,17 @@ function renderField(
 
   // Special handling for abi-function-select
   if (field.type === "abi-function-select") {
-    const abiField = field.abiField || "abi";
-    const abiValue = (config[abiField] as string | undefined) || "";
-
-    return (
-      <div className="space-y-2" key={field.key}>
-        <Label className="ml-1" htmlFor={field.key}>
-          {field.label}
-        </Label>
-        <AbiFunctionSelectField
-          abiValue={abiValue}
-          disabled={disabled}
-          field={field}
-          onChange={(val) => onUpdateConfig(field.key, val)}
-          value={value}
-        />
-      </div>
-    );
+    return renderAbiFunctionSelect(field, config, onUpdateConfig, disabled);
   }
 
   // Special handling for abi-function-args
   if (field.type === "abi-function-args") {
-    const abiField = field.abiField || "abi";
-    const functionField = field.abiFunctionField || "abiFunction";
-    const abiValue = (config[abiField] as string | undefined) || "";
-    const functionValue = (config[functionField] as string | undefined) || "";
+    return renderAbiFunctionArgs(field, config, onUpdateConfig, disabled);
+  }
 
-    return (
-      <div className="space-y-2" key={field.key}>
-        <Label className="ml-1" htmlFor={field.key}>
-          {field.label}
-        </Label>
-        <AbiFunctionArgsField
-          abiValue={abiValue}
-          disabled={disabled}
-          field={field}
-          functionValue={functionValue}
-          onChange={(val) => onUpdateConfig(field.key, val)}
-          value={value}
-        />
-      </div>
-    );
+  // Special handling for abi-with-auto-fetch
+  if (field.type === "abi-with-auto-fetch") {
+    return renderAbiWithAutoFetch(field, config, onUpdateConfig, disabled);
   }
 
   const FieldRenderer = FIELD_RENDERERS[field.type];
