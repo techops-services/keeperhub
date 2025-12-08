@@ -1,21 +1,20 @@
-const WEBFLOW_API_URL = "https://api.webflow.com/v2";
+const SENDGRID_API_URL = "https://api.sendgrid.com";
 
-export async function testWebflow(credentials: Record<string, string>) {
+export async function testSendGrid(credentials: Record<string, string>) {
   try {
-    const apiKey = credentials.WEBFLOW_API_KEY;
+    const apiKey = credentials.SENDGRID_API_KEY;
 
     if (!apiKey) {
       return {
         success: false,
-        error: "WEBFLOW_API_KEY is required",
+        error: "SENDGRID_API_KEY is not configured",
       };
     }
 
-    // Use the list sites endpoint to validate the API key
-    const response = await fetch(`${WEBFLOW_API_URL}/sites`, {
+    // Validate API key by fetching user profile (lightweight read-only endpoint)
+    const response = await fetch(`${SENDGRID_API_URL}/v3/user/profile`, {
       method: "GET",
       headers: {
-        Accept: "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
     });
@@ -24,7 +23,7 @@ export async function testWebflow(credentials: Record<string, string>) {
       if (response.status === 401) {
         return {
           success: false,
-          error: "Invalid API key. Please check your Webflow API token.",
+          error: "Invalid API key. Please check your SendGrid API key.",
         };
       }
       return {
@@ -41,3 +40,4 @@ export async function testWebflow(credentials: Record<string, string>) {
     };
   }
 }
+
