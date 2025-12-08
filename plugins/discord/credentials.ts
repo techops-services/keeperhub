@@ -1,1 +1,1 @@
-export type DiscordCredentials = Record<string, never>;
+export type DiscordCredentials = Record<string, string | undefined>;

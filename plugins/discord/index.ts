@@ -49,7 +49,6 @@ const discordPlugin: IntegrationPlugin = {
           placeholder: "https://discord.com/api/webhooks/... or {{NodeName.webhookUrl}}",
           example: "https://discord.com/api/webhooks/123456789/abcdef",
           required: true,
-          helpText: "Create a webhook in Discord: Server Settings > Integrations > Webhooks",
         },
         {
           key: "discordMessage",
