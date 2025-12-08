@@ -15,19 +15,20 @@ const REQUIRED_VARS = [
   "NEXT_PUBLIC_API_URL",
 ];
 
-export async function GET() {
+export function GET() {
   const results: Record<string, string> = {};
 
-  REQUIRED_VARS.forEach((key) => {
+  for (const key of REQUIRED_VARS) {
     const value = process.env[key];
-    if (!value) {
-      results[key] = "❌ MISSING";
-    } else {
+    if (value) {
       // Show first 20 chars for verification
-      const preview = value.length > 20 ? `${value.substring(0, 20)}...` : value;
+      const preview =
+        value.length > 20 ? `${value.substring(0, 20)}...` : value;
       results[key] = `✓ ${preview}`;
+    } else {
+      results[key] = "❌ MISSING";
     }
-  });
+  }
 
   return NextResponse.json({
     nodeEnv: process.env.NODE_ENV,
