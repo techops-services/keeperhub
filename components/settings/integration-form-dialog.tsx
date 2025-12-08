@@ -191,6 +191,89 @@ export function IntegrationFormDialog({
     });
   };
 
+  const renderHelpText = (
+    helpText?: string,
+    helpLink?: { text: string; url: string }
+  ) => {
+    if (!(helpText || helpLink)) {
+      return null;
+    }
+    return (
+      <p className="text-muted-foreground text-xs">
+        {helpText}
+        {helpLink && (
+          <a
+            className="underline hover:text-foreground"
+            href={helpLink.url}
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            {helpLink.text}
+          </a>
+        )}
+      </p>
+    );
+  };
+
+  const renderCheckboxField = (field: {
+    id: string;
+    type: string;
+    label: string;
+    configKey: string;
+    defaultValue?: string | boolean;
+    helpText?: string;
+    helpLink?: { text: string; url: string };
+  }) => {
+    let checkboxValue: string | boolean | undefined =
+      formData.config[field.configKey];
+    if (checkboxValue === undefined) {
+      checkboxValue =
+        field.defaultValue !== undefined ? field.defaultValue : true;
+    }
+    const isChecked =
+      typeof checkboxValue === "boolean"
+        ? checkboxValue
+        : checkboxValue === "true";
+
+    return (
+      <div className="flex items-center space-x-2" key={field.id}>
+        <Checkbox
+          checked={isChecked}
+          id={field.id}
+          onCheckedChange={(checked) =>
+            updateConfig(field.configKey, checked === true)
+          }
+        />
+        <Label className="cursor-pointer font-normal" htmlFor={field.id}>
+          {field.label}
+        </Label>
+        {renderHelpText(field.helpText, field.helpLink)}
+      </div>
+    );
+  };
+
+  const renderInputField = (field: {
+    id: string;
+    type: string;
+    label: string;
+    configKey: string;
+    placeholder?: string;
+    helpText?: string;
+    helpLink?: { text: string; url: string };
+  }) => (
+    <div className="space-y-2" key={field.id}>
+      <Label htmlFor={field.id}>{field.label}</Label>
+      <Input
+        id={field.id}
+        onChange={(e) => updateConfig(field.configKey, e.target.value)}
+        placeholder={field.placeholder}
+        type={field.type}
+        value={(formData.config[field.configKey] as string) || ""}
+      />
+      {renderHelpText(field.helpText, field.helpLink)}
+    </div>
+  );
+
   const renderConfigFields = () => {
     // Handle system integrations with hardcoded fields
     if (formData.type === "database") {
@@ -237,75 +320,9 @@ export function IntegrationFormDialog({
     // Default rendering for other integrations
     return plugin.formFields.map((field) => {
       if (field.type === "checkbox") {
-        let checkboxValue: string | boolean | undefined =
-          formData.config[field.configKey];
-        if (checkboxValue === undefined) {
-          checkboxValue =
-            field.defaultValue !== undefined ? field.defaultValue : true;
-        }
-        const isChecked =
-          typeof checkboxValue === "boolean"
-            ? checkboxValue
-            : checkboxValue === "true";
-
-        return (
-          <div className="flex items-center space-x-2" key={field.id}>
-            <Checkbox
-              checked={isChecked}
-              id={field.id}
-              onCheckedChange={(checked) =>
-                updateConfig(field.configKey, checked === true)
-              }
-            />
-            <Label className="cursor-pointer font-normal" htmlFor={field.id}>
-              {field.label}
-            </Label>
-            {(field.helpText || field.helpLink) && (
-              <p className="text-muted-foreground text-xs">
-                {field.helpText}
-                {field.helpLink && (
-                  <a
-                    className="underline hover:text-foreground"
-                    href={field.helpLink.url}
-                    rel="noopener noreferrer"
-                    target="_blank"
-                  >
-                    {field.helpLink.text}
-                  </a>
-                )}
-              </p>
-            )}
-          </div>
-        );
+        return renderCheckboxField(field);
       }
-
-      return (
-        <div className="space-y-2" key={field.id}>
-          <Label htmlFor={field.id}>{field.label}</Label>
-          <Input
-            id={field.id}
-            onChange={(e) => updateConfig(field.configKey, e.target.value)}
-            placeholder={field.placeholder}
-            type={field.type}
-            value={(formData.config[field.configKey] as string) || ""}
-          />
-          {(field.helpText || field.helpLink) && (
-            <p className="text-muted-foreground text-xs">
-              {field.helpText}
-              {field.helpLink && (
-                <a
-                  className="underline hover:text-foreground"
-                  href={field.helpLink.url}
-                  rel="noopener noreferrer"
-                  target="_blank"
-                >
-                  {field.helpLink.text}
-                </a>
-              )}
-            </p>
-          )}
-        </div>
-      );
+      return renderInputField(field);
     });
   };
 
