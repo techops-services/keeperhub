@@ -30,13 +30,25 @@ const schema = {
 // Determine the base URL for authentication
 // This supports Vercel Preview deployments with dynamic URLs
 function getBaseURL() {
+  console.log("[Auth] Environment variables:", {
+    BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+    VERCEL_URL: process.env.VERCEL_URL,
+    NODE_ENV: process.env.NODE_ENV,
+  });
+
   // Priority 1: Explicit BETTER_AUTH_URL (set manually for production/dev)
   if (process.env.BETTER_AUTH_URL) {
+    console.log("[Auth] Using BETTER_AUTH_URL:", process.env.BETTER_AUTH_URL);
     return process.env.BETTER_AUTH_URL;
   }
 
   // Priority 2: NEXT_PUBLIC_APP_URL
   if (process.env.NEXT_PUBLIC_APP_URL) {
+    console.log(
+      "[Auth] Using NEXT_PUBLIC_APP_URL:",
+      process.env.NEXT_PUBLIC_APP_URL
+    );
     return process.env.NEXT_PUBLIC_APP_URL;
   }
 
@@ -44,10 +56,13 @@ function getBaseURL() {
   if (process.env.VERCEL_URL) {
     // VERCEL_URL doesn't include protocol, so add it
     // Use https for Vercel deployments (both production and preview)
-    return `https://${process.env.VERCEL_URL}`;
+    const url = `https://${process.env.VERCEL_URL}`;
+    console.log("[Auth] Using VERCEL_URL:", url);
+    return url;
   }
 
   // Fallback: Local development
+  console.log("[Auth] Using fallback: http://localhost:3000");
   return "http://localhost:3000";
 }
 
@@ -134,8 +149,28 @@ const plugins = [
     : []),
 ];
 
+const baseURL = getBaseURL();
+console.log("[Auth] Initializing better-auth with baseURL:", baseURL);
+console.log("[Auth] Database adapter config:", {
+  provider: "pg",
+  hasDb: !!db,
+});
+console.log("[Auth] Social providers config:", {
+  github: {
+    hasClientId: !!process.env.GITHUB_CLIENT_ID,
+    hasClientSecret: !!process.env.GITHUB_CLIENT_SECRET,
+    enabled: !!process.env.GITHUB_CLIENT_ID,
+  },
+  google: {
+    hasClientId: !!process.env.GOOGLE_CLIENT_ID,
+    hasClientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
+    enabled: !!process.env.GOOGLE_CLIENT_ID,
+  },
+});
+console.log("[Auth] Plugins count:", plugins.length);
+
 export const auth = betterAuth({
-  baseURL: getBaseURL(),
+  baseURL,
   database: drizzleAdapter(db, {
     provider: "pg",
     schema,
@@ -158,3 +193,5 @@ export const auth = betterAuth({
   },
   plugins,
 });
+
+console.log("[Auth] better-auth initialized successfully");
