@@ -72,6 +72,9 @@ env:
   PARA_ENVIRONMENT:
     type: kv
     value: "beta"
+  WORKFLOW_EMBEDDED_DATA_DIR:
+    type: kv
+    value: "/tmp/workflow-data"
   NEXT_PUBLIC_API_URL:
     type: kv
     value: "http://localhost:3000"
