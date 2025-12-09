@@ -90,11 +90,21 @@ async function logStepComplete(
 }
 
 /**
- * Strip _context from input for logging (we don't want to log internal metadata)
+ * Internal fields to strip from logged input
  */
-function stripContext<T extends StepInput>(input: T): Omit<T, "_context"> {
-  const { _context, ...rest } = input;
-  return rest as Omit<T, "_context">;
+const INTERNAL_FIELDS = ["_context", "actionType", "integrationId"] as const;
+
+/**
+ * Strip internal fields from input for logging (we don't want to log internal metadata)
+ */
+function stripInternalFields<T extends StepInput>(
+  input: T
+): Omit<T, "_context" | "actionType" | "integrationId"> {
+  const result = { ...input };
+  for (const field of INTERNAL_FIELDS) {
+    delete (result as Record<string, unknown>)[field];
+  }
+  return result as Omit<T, "_context" | "actionType" | "integrationId">;
 }
 
 /**
@@ -160,30 +170,45 @@ export async function withStepLogging<TInput extends StepInput, TOutput>(
   input: TInput,
   stepLogic: () => Promise<TOutput>
 ): Promise<TOutput> {
-  // Extract context and log input without _context
+  // Extract context and log input without internal fields
   const context = input._context as StepContextWithWorkflow | undefined;
-  const loggedInput = stripContext(input);
+  const loggedInput = stripInternalFields(input);
   const logInfo = await logStepStart(context, loggedInput);
 
   try {
     const result = await stepLogic();
 
-    // Check if result indicates an error
-    const isErrorResult =
+    // Check if result has standardized format { success, data } or { success, error }
+    const isStandardizedResult =
       result &&
       typeof result === "object" &&
       "success" in result &&
+      typeof (result as { success: unknown }).success === "boolean";
+
+    // Check if result indicates an error
+    const isErrorResult =
+      isStandardizedResult &&
       (result as { success: boolean }).success === false;
 
     if (isErrorResult) {
-      const errorResult = result as { success: false; error?: string };
-      await logStepComplete(
-        logInfo,
-        "error",
-        result,
-        errorResult.error || "Step execution failed"
-      );
+      const errorResult = result as {
+        success: false;
+        error?: string | { message: string };
+      };
+      // Support both old format (error: string) and new format (error: { message: string })
+      const errorMessage =
+        typeof errorResult.error === "string"
+          ? errorResult.error
+          : errorResult.error?.message || "Step execution failed";
+      // Log just the error object, not the full result
+      const loggedOutput = errorResult.error ?? { message: errorMessage };
+      await logStepComplete(logInfo, "error", loggedOutput, errorMessage);
+    } else if (isStandardizedResult) {
+      // For standardized success results, log just the data
+      const successResult = result as { success: true; data?: unknown };
+      await logStepComplete(logInfo, "success", successResult.data ?? result);
     } else {
+      // For non-standardized results, log as-is
       await logStepComplete(logInfo, "success", result);
     }
 

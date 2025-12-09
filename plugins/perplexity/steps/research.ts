@@ -33,11 +33,9 @@ type PerplexityResponse = {
   };
 };
 
-type ResearchResult = {
-  report: string;
-  citations: string[];
-  model: string;
-};
+type ResearchResult =
+  | { success: true; data: { report: string; citations: string[]; model: string } }
+  | { success: false; error: { message: string } };
 
 export type PerplexityResearchCoreInput = {
   topic: string;
@@ -59,7 +57,10 @@ async function stepHandler(
   const apiKey = credentials.PERPLEXITY_API_KEY;
 
   if (!apiKey) {
-    throw new Error("Perplexity API Key is not configured.");
+    return {
+      success: false,
+      error: { message: "Perplexity API Key is not configured." },
+    };
   }
 
   const depthInstructions = getDepthInstructions(input.depth);
@@ -89,7 +90,10 @@ async function stepHandler(
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`HTTP ${response.status}: ${errorText}`);
+      return {
+        success: false,
+        error: { message: `HTTP ${response.status}: ${errorText}` },
+      };
     }
 
     const result = (await response.json()) as PerplexityResponse;
@@ -100,12 +104,14 @@ async function stepHandler(
     );
 
     return {
-      report,
-      citations,
-      model: result.model,
+      success: true,
+      data: { report, citations, model: result.model },
     };
   } catch (error) {
-    throw new Error(`Failed to research: ${getErrorMessage(error)}`);
+    return {
+      success: false,
+      error: { message: `Failed to research: ${getErrorMessage(error)}` },
+    };
   }
 }
 

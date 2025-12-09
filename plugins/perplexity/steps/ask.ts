@@ -33,11 +33,9 @@ type PerplexityResponse = {
   };
 };
 
-type AskResult = {
-  answer: string;
-  citations: string[];
-  model: string;
-};
+type AskResult =
+  | { success: true; data: { answer: string; citations: string[]; model: string } }
+  | { success: false; error: { message: string } };
 
 export type PerplexityAskCoreInput = {
   question: string;
@@ -60,7 +58,10 @@ async function stepHandler(
   const apiKey = credentials.PERPLEXITY_API_KEY;
 
   if (!apiKey) {
-    throw new Error("Perplexity API Key is not configured.");
+    return {
+      success: false,
+      error: { message: "Perplexity API Key is not configured." },
+    };
   }
 
   try {
@@ -99,7 +100,10 @@ async function stepHandler(
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`HTTP ${response.status}: ${errorText}`);
+      return {
+        success: false,
+        error: { message: `HTTP ${response.status}: ${errorText}` },
+      };
     }
 
     const result = (await response.json()) as PerplexityResponse;
@@ -110,12 +114,14 @@ async function stepHandler(
     );
 
     return {
-      answer,
-      citations,
-      model: result.model,
+      success: true,
+      data: { answer, citations, model: result.model },
     };
   } catch (error) {
-    throw new Error(`Failed to ask: ${getErrorMessage(error)}`);
+    return {
+      success: false,
+      error: { message: `Failed to ask: ${getErrorMessage(error)}` },
+    };
   }
 }
 

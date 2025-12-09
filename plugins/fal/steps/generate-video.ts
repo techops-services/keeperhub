@@ -28,9 +28,9 @@ type FalVideoResponse = {
   error?: string;
 };
 
-type GenerateVideoResult = {
-  videoUrl: string;
-};
+type GenerateVideoResult =
+  | { success: true; data: { videoUrl: string } }
+  | { success: false; error: { message: string } };
 
 export type FalGenerateVideoCoreInput = {
   model: string;
@@ -96,7 +96,13 @@ async function stepHandler(
   const apiKey = credentials.FAL_API_KEY;
 
   if (!apiKey) {
-    throw new Error("FAL_API_KEY is not configured. Please add it in Project Integrations.");
+    return {
+      success: false,
+      error: {
+        message:
+          "FAL_API_KEY is not configured. Please add it in Project Integrations.",
+      },
+    };
   }
 
   try {
@@ -121,13 +127,19 @@ async function stepHandler(
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`HTTP ${response.status}: ${errorText}`);
+      return {
+        success: false,
+        error: { message: `HTTP ${response.status}: ${errorText}` },
+      };
     }
 
     const queueResponse = (await response.json()) as FalQueueResponse;
 
     let result: FalVideoResponse;
-    if (queueResponse.status === "IN_QUEUE" || queueResponse.status === "IN_PROGRESS") {
+    if (
+      queueResponse.status === "IN_QUEUE" ||
+      queueResponse.status === "IN_PROGRESS"
+    ) {
       result = await pollForResult(
         queueResponse.status_url,
         queueResponse.response_url,
@@ -138,18 +150,22 @@ async function stepHandler(
     }
 
     if (result.error) {
-      throw new Error(result.error);
+      return { success: false, error: { message: result.error } };
     }
 
     if (!result.video?.url) {
-      throw new Error("No video returned from fal.ai");
+      return {
+        success: false,
+        error: { message: "No video returned from fal.ai" },
+      };
     }
 
-    return {
-      videoUrl: result.video.url,
-    };
+    return { success: true, data: { videoUrl: result.video.url } };
   } catch (error) {
-    throw new Error(`Failed to generate video: ${getErrorMessage(error)}`);
+    return {
+      success: false,
+      error: { message: `Failed to generate video: ${getErrorMessage(error)}` },
+    };
   }
 }
 
