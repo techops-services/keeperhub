@@ -64,9 +64,13 @@ db-create:
 	kubectl exec -n local postgresql-0 -- bash -c 'PGPASSWORD=local psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE keeperhub TO local;"'
 
 db-migrate:
-	@echo "Running database migrations..."
-	@echo "Note: For local dev, migrations should run on app startup"
-	@echo "For manual migration, exec into the pod: kubectl exec -it -n local <pod-name> -- pnpm db:push"
+	@echo "Running database migrations on local kubernetes..."
+	@kubectl port-forward -n local svc/postgresql 5433:5432 & \
+	PF_PID=$$!; \
+	sleep 3; \
+	DATABASE_URL="postgresql://local:local@localhost:5433/keeperhub" pnpm db:push; \
+	kill $$PF_PID 2>/dev/null || true
+	@echo "Migrations complete!"
 
 db-studio:
 	@echo "Starting Drizzle Studio..."
@@ -100,5 +104,5 @@ help:
 	@echo ""
 	@echo "  Database:"
 	@echo "    db-create                  - Create keeperhub database in PostgreSQL"
-	@echo "    db-migrate                 - Info about running database migrations"
+	@echo "    db-migrate                 - Run database migrations on local kubernetes"
 	@echo "    db-studio                  - Open Drizzle Studio"

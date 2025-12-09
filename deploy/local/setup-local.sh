@@ -417,6 +417,28 @@ create_keeperhub_db() {
     echo "Database keeperhub created successfully"
 }
 
+# Run database migrations
+run_migrations() {
+    echo ""
+    echo "==================================="
+    echo "Running database migrations..."
+    echo "==================================="
+    echo ""
+
+    # Start port-forward in background
+    kubectl port-forward -n local svc/postgresql 5433:5432 &
+    PF_PID=$!
+    sleep 3
+
+    # Run migrations
+    DATABASE_URL="postgresql://local:local@localhost:5433/keeperhub" pnpm db:push
+
+    # Kill port-forward
+    kill $PF_PID 2>/dev/null || true
+
+    echo "Migrations complete!"
+}
+
 # Main setup process
 main() {
     check_prerequisites
@@ -426,6 +448,7 @@ main() {
     setup_ssl
     setup_database
     create_keeperhub_db
+    run_migrations
 
     echo ""
     echo "==================================="
