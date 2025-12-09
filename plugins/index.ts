@@ -13,7 +13,7 @@
  * 1. Delete the plugin directory
  * 2. Run: pnpm discover-plugins (or it runs automatically on build)
  *
- * Discovered plugins: clerk, discord, resend, sendgrid, slack, v0, web3, webflow
+ * Discovered plugins: clerk, discord, resend, sendgrid, slack, v0, web3, webflow, webhook
  */
 
 import "./clerk";
@@ -24,6 +24,7 @@ import "./slack";
 import "./v0";
 import "./web3";
 import "./webflow";
+import "./webhook";
 
 export type {
   ActionConfigField,
