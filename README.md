@@ -87,6 +87,7 @@ Visit [http://localhost:3000](http://localhost:3000) to get started.
 - **v0**: Create Chat, Send Message
 - **Web3**: Check Balance, Transfer Funds, Read Contract, Write Contract
 - **Webflow**: List Sites, Get Site, Publish Site
+- **Webhook**: Send Webhook
 <!-- PLUGINS:END -->
 
 ## Code Generation
