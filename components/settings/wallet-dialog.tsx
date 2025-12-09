@@ -166,8 +166,8 @@ export function WalletDialog({ open, onOpenChange }: WalletDialogProps) {
                   let balanceContent: React.ReactNode;
                   if (balance.loading) {
                     balanceContent = (
-                      <div className="mt-1 space-y-1">
-                        <div className="h-3 w-24 animate-pulse rounded bg-muted" />
+                      <div className="mt-1 text-muted-foreground text-xs">
+                        Loading...
                       </div>
                     );
                   } else if (balance.error) {
@@ -197,7 +197,6 @@ export function WalletDialog({ open, onOpenChange }: WalletDialogProps) {
                         </div>
                         {balanceContent}
                       </div>
-                      {balance.loading && <Spinner className="h-4 w-4" />}
                     </div>
                   );
                 })}
