@@ -170,6 +170,11 @@ export type IntegrationPlugin = {
   // Icon component (should be exported from plugins/[name]/icon.tsx)
   icon: React.ComponentType<{ className?: string }>;
 
+  // Whether this plugin requires credentials/integration setup
+  // Set to false for plugins that don't need authentication (e.g., webhook)
+  // Defaults to true for backward compatibility
+  requiresCredentials?: boolean;
+
   // Form fields for the integration dialog
   formFields: Array<{
     id: string;

@@ -9,24 +9,21 @@ const discordPlugin: IntegrationPlugin = {
 
   icon: DiscordIcon,
 
-  // No credentials needed - users provide webhook URL directly in each step
+  // Webhook URL is stored in the integration for centralized management
   formFields: [
     {
-      id: "info",
-      label: "Discord Webhooks",
-      type: "text",
-      placeholder: "No configuration needed",
-      configKey: "info",
-      helpText: "Provide webhook URLs directly in each Discord action. Learn how to create webhooks at ",
+      id: "webhookUrl",
+      label: "Webhook URL",
+      type: "url",
+      placeholder: "https://discord.com/api/webhooks/...",
+      configKey: "webhookUrl",
+      helpText: "Discord webhook URL for this channel. This URL will be used by all actions using this integration.",
       helpLink: {
-        text: "support.discord.com",
+        text: "Learn how to create webhooks",
         url: "https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks",
       },
     },
   ],
-
-  // No test function needed since there are no credentials to test
-  // Users provide webhook URL per-step
 
   actions: [
     {
@@ -42,14 +39,6 @@ const discordPlugin: IntegrationPlugin = {
         { field: "error", description: "Error message if failed" },
       ],
       configFields: [
-        {
-          key: "discordWebhookUrl",
-          label: "Webhook URL",
-          type: "template-input",
-          placeholder: "https://discord.com/api/webhooks/... or {{NodeName.webhookUrl}}",
-          example: "https://discord.com/api/webhooks/123456789/abcdef",
-          required: true,
-        },
         {
           key: "discordMessage",
           label: "Message",
