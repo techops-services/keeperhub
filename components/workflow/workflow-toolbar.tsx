@@ -106,6 +106,7 @@ import { IntegrationIcon } from "../ui/integration-icon";
 import { WorkflowIcon } from "../ui/workflow-icon";
 import { UserMenu } from "../workflows/user-menu";
 import { PanelInner } from "./node-config-panel";
+import { KeeperHubLogo } from "../icons/keeperhub-logo";
 
 type WorkflowToolbarProps = {
   workflowId?: string;
@@ -2056,6 +2057,7 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
         position="top-left"
       >
         <div className="flex items-center gap-2">
+          <KeeperHubLogo className="size-7 shrink-0" />
           <WorkflowMenuComponent
             actions={actions}
             state={state}

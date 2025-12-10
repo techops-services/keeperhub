@@ -47,7 +47,7 @@ const RootLayout = ({ children }: RootLayoutProps) => (
     <body className={cn(sans.variable, mono.variable, "antialiased")}>
       <ThemeProvider
         attribute="class"
-        defaultTheme="system"
+        defaultTheme="dark"
         disableTransitionOnChange
         enableSystem
       >
