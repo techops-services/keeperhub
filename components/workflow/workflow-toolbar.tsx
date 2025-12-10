@@ -101,12 +101,12 @@ import {
 import { Panel } from "../ai-elements/panel";
 import { DeployButton } from "../deploy-button";
 import { GitHubStarsButton } from "../github-stars-button";
+import { KeeperHubLogo } from "../icons/keeperhub-logo";
 import { IntegrationFormDialog } from "../settings/integration-form-dialog";
 import { IntegrationIcon } from "../ui/integration-icon";
 import { WorkflowIcon } from "../ui/workflow-icon";
 import { UserMenu } from "../workflows/user-menu";
 import { PanelInner } from "./node-config-panel";
-import { KeeperHubLogo } from "../icons/keeperhub-logo";
 
 type WorkflowToolbarProps = {
   workflowId?: string;
