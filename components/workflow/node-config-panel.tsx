@@ -57,7 +57,6 @@ import { IntegrationSelector } from "../ui/integration-selector";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { ActionConfig } from "./config/action-config";
 import { ActionGrid } from "./config/action-grid";
-import { DiscordWebhookDisplay } from "./config/discord-webhook-display";
 
 import { TriggerConfig } from "./config/trigger-config";
 import { generateNodeCode } from "./utils/code-generators";
@@ -943,15 +942,6 @@ export const PanelInner = () => {
                 }
                 return null;
               })()}
-
-              <DiscordWebhookDisplay
-                actionType={
-                  selectedNode.data.config?.actionType as string | undefined
-                }
-                integrationId={
-                  selectedNode.data.config?.integrationId as string | undefined
-                }
-              />
             </div>
           )}
           {selectedNode.data.type === "trigger" && isOwner && (
