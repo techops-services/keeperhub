@@ -1,6 +1,5 @@
 import "server-only";
 
-import type { ImageModelV2 } from "@ai-sdk/provider";
 import {
   createGateway,
   experimental_generateImage as generateImage,
@@ -15,8 +14,8 @@ type GenerateImageResult =
   | { success: false; error: string };
 
 export type GenerateImageCoreInput = {
-  imageModel: ImageModelV2;
-  imagePrompt: string;
+  imageModel?: string;
+  imagePrompt?: string;
 };
 
 export type GenerateImageInput = StepInput &
@@ -41,16 +40,24 @@ async function stepHandler(
     };
   }
 
+  const modelId = input.imageModel || "google/imagen-4.0-generate";
+  const promptText = input.imagePrompt || "";
+
+  if (!promptText || promptText.trim() === "") {
+    return {
+      success: false,
+      error: "Prompt is required for image generation",
+    };
+  }
+
   try {
     const gateway = createGateway({
       apiKey,
     });
-
-    // biome-ignore lint/suspicious/noExplicitAny: AI gateway model ID is dynamic
-    const modelId = (input.imageModel ?? "google/imagen-4.0-generate") as any;
     const result = await generateImage({
-      model: gateway.imageModel(modelId),
-      prompt: input.imagePrompt,
+      // biome-ignore lint/suspicious/noExplicitAny: AI gateway model ID is dynamic
+      model: gateway.imageModel(modelId as any),
+      prompt: promptText,
       size: "1024x1024",
     });
 
