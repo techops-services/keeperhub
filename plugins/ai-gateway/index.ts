@@ -119,14 +119,28 @@ const aiGatewayPlugin: IntegrationPlugin = {
           key: "imageModel",
           label: "Model",
           type: "select",
-          defaultValue: "google/imagen-4.0-generate",
+          defaultValue: "google/imagen-4.0-generate-001",
           options: [
             {
-              value: "google/imagen-4.0-generate",
-              label: "Imagen 4.0 (Google)",
+              value: "google/imagen-4.0-generate-001",
+              label: "Imagen 4",
             },
-            { value: "openai/dall-e-3", label: "DALL-E 3 (OpenAI)" },
-            { value: "openai/dall-e-2", label: "DALL-E 2 (OpenAI)" },
+            {
+              value: "google/imagen-4.0-fast-generate-001",
+              label: "Imagen 4 Fast",
+            },
+            {
+              value: "google/imagen-4.0-ultra-generate-001",
+              label: "Imagen 4 Ultra",
+            },
+            {
+              value: "bfl/flux-kontext-pro",
+              label: "FLUX.1 Kontext Pro",
+            },
+            {
+              value: "bfl/flux-kontext-max",
+              label: "FLUX.1 Kontext Max",
+            },
           ],
         },
         {
