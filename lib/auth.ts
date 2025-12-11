@@ -140,6 +140,23 @@ export const auth = betterAuth({
     provider: "pg",
     schema,
   }),
+  logger: {
+    level: "debug",
+    disabled: false,
+  },
+  onAPIError: {
+    onError: (error, ctx) => {
+      console.error("[Better Auth API Error]", {
+        error: error instanceof Error ? {
+          message: error.message,
+          stack: error.stack,
+          name: error.name,
+        } : error,
+        path: ctx.request?.url,
+        method: ctx.request?.method,
+      });
+    },
+  },
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
