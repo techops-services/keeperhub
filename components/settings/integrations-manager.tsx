@@ -16,7 +16,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { IntegrationIcon } from "@/components/ui/integration-icon";
 import { Spinner } from "@/components/ui/spinner";
-import { api, type Integration } from "@/lib/api-client";
+import {
+  api,
+  type Integration,
+  type IntegrationWithConfig,
+} from "@/lib/api-client";
 import { getIntegrationLabels } from "@/plugins";
 import { IntegrationFormDialog } from "./integration-form-dialog";
 
@@ -37,7 +41,8 @@ export function IntegrationsManager({
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingIntegration, setEditingIntegration] =
-    useState<Integration | null>(null);
+    useState<IntegrationWithConfig | null>(null);
+  const [loadingIntegration, setLoadingIntegration] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
@@ -159,7 +164,21 @@ export function IntegrationsManager({
                   )}
                 </Button>
                 <Button
-                  onClick={() => setEditingIntegration(integration)}
+                  disabled={loadingIntegration}
+                  onClick={async () => {
+                    try {
+                      setLoadingIntegration(true);
+                      const fullIntegration = await api.integration.get(
+                        integration.id
+                      );
+                      setEditingIntegration(fullIntegration);
+                    } catch (error) {
+                      console.error("Failed to load integration:", error);
+                      toast.error("Failed to load integration details");
+                    } finally {
+                      setLoadingIntegration(false);
+                    }
+                  }}
                   size="sm"
                   variant="outline"
                 >

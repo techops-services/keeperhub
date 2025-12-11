@@ -1,9 +1,7 @@
 import "server-only";
 
-import { fetchCredentials } from "@/lib/credential-fetcher";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
-import type { WebhookCredentials } from "../credentials";
 
 type SendWebhookResult =
   | { success: true; statusCode: number; response: unknown }
@@ -16,10 +14,7 @@ export type SendWebhookCoreInput = {
   webhookPayload?: string;
 };
 
-export type SendWebhookInput = StepInput &
-  SendWebhookCoreInput & {
-    integrationId?: string;
-  };
+export type SendWebhookInput = StepInput & SendWebhookCoreInput;
 
 /**
  * Parse JSON string safely, returning null if invalid
@@ -41,8 +36,7 @@ function parseJsonSafely(jsonString: string | undefined): unknown {
  * Core logic - portable between app and export
  */
 async function stepHandler(
-  input: SendWebhookCoreInput,
-  _credentials: WebhookCredentials
+  input: SendWebhookCoreInput
 ): Promise<SendWebhookResult> {
   console.log("[Webhook] Starting send webhook step");
 
@@ -147,18 +141,14 @@ async function stepHandler(
 }
 
 /**
- * App entry point - fetches credentials and wraps with logging
+ * App entry point - wraps with logging
  */
 export async function sendWebhookStep(
   input: SendWebhookInput
 ): Promise<SendWebhookResult> {
   "use step";
 
-  const credentials = input.integrationId
-    ? await fetchCredentials(input.integrationId)
-    : {};
-
-  return withStepLogging(input, () => stepHandler(input, credentials));
+  return withStepLogging(input, () => stepHandler(input));
 }
 sendWebhookStep.maxRetries = 0;
 
