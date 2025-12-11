@@ -46,8 +46,13 @@ export async function POST(req: Request) {
     try {
       body = await clonedReq.json();
       // Don't log passwords
-      const sanitizedBody = { ...body };
-      if (sanitizedBody.password) {
+      const sanitizedBody =
+        body && typeof body === "object" ? { ...body } : body;
+      if (
+        sanitizedBody &&
+        typeof sanitizedBody === "object" &&
+        "password" in sanitizedBody
+      ) {
         sanitizedBody.password = "[REDACTED]";
       }
       console.log("[Auth POST]", {
