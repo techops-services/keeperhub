@@ -2,12 +2,12 @@ import { toNextJsHandler } from "better-auth/next-js";
 import { auth } from "@/lib/auth";
 
 // Log when this module is loaded
-console.log('[Auth] Route module loaded at', new Date().toISOString());
+console.log("[Auth] Route module loaded at", new Date().toISOString());
 
 const handlers = toNextJsHandler(auth);
 
 // Log when handlers are created
-console.log('[Auth] Handlers created at', new Date().toISOString());
+console.log("[Auth] Handlers created at", new Date().toISOString());
 
 export async function GET(req: Request) {
   process.stdout.write(`[AUTH GET CALLED] ${req.url}\n`);
