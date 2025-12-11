@@ -1,6 +1,8 @@
 "use client";
 
+import { Eye, EyeOff } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api-client";
 import { findActionById } from "@/plugins";
@@ -16,6 +18,7 @@ export function DiscordWebhookDisplay({
 }: DiscordWebhookDisplayProps) {
   const [discordIntegrationConfig, setDiscordIntegrationConfig] =
     useState<Record<string, unknown> | null>(null);
+  const [isVisible, setIsVisible] = useState(false);
 
   // Fetch Discord integration config when integration ID changes
   useEffect(() => {
@@ -51,15 +54,33 @@ export function DiscordWebhookDisplay({
     return null;
   }
 
+  const maskedUrl = "•".repeat(Math.min(webhookUrl.length, 50));
+
   return (
     <div className="space-y-1.5 pt-2">
       <Label className="text-muted-foreground text-xs">
         Webhook URL (from integration)
       </Label>
-      <div className="rounded-md border bg-muted/50 px-3 py-2">
-        <p className="break-all font-mono text-muted-foreground text-xs">
-          {webhookUrl}
+      <div className="flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-2">
+        <p
+          className={`flex-1 overflow-hidden font-mono text-muted-foreground text-xs ${
+            isVisible ? "text-ellipsis whitespace-nowrap" : ""
+          }`}
+        >
+          {isVisible ? webhookUrl : maskedUrl}
         </p>
+        <Button
+          className="h-6 w-6 shrink-0"
+          onClick={() => setIsVisible(!isVisible)}
+          size="icon"
+          variant="ghost"
+        >
+          {isVisible ? (
+            <EyeOff className="size-3.5" />
+          ) : (
+            <Eye className="size-3.5" />
+          )}
+        </Button>
       </div>
     </div>
   );
