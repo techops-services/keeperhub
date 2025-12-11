@@ -1,96 +1,22 @@
 import { toNextJsHandler } from "better-auth/next-js";
 import { auth } from "@/lib/auth";
 
-// Log when this module is loaded
-console.log('[Auth] Route module loaded at', new Date().toISOString());
-
 const handlers = toNextJsHandler(auth);
 
-// Log when handlers are created
-console.log('[Auth] Handlers created at', new Date().toISOString());
-
 export async function GET(req: Request) {
-  process.stdout.write(`[AUTH GET CALLED] ${req.url}\n`);
   try {
-    const url = new URL(req.url);
-    console.log('[Auth GET]', {
-      path: url.pathname,
-      search: url.search,
-      timestamp: new Date().toISOString(),
-    });
-
-    const response = await handlers.GET(req);
-
-    console.log('[Auth GET] Success:', {
-      status: response.status,
-      path: url.pathname,
-    });
-
-    return response;
+    return await handlers.GET(req);
   } catch (error) {
-    console.error('[Auth GET] ERROR:', {
-      path: req.url,
-      error: error instanceof Error ? {
-        message: error.message,
-        stack: error.stack,
-        name: error.name,
-      } : error,
-      timestamp: new Date().toISOString(),
-    });
+    console.error('[Auth GET] ERROR:', error);
     throw error;
   }
 }
 
 export async function POST(req: Request) {
-  process.stdout.write(`[AUTH POST CALLED] ${req.url}\n`);
   try {
-    const url = new URL(req.url);
-    const clonedReq = req.clone();
-    let body;
-
-    try {
-      body = await clonedReq.json();
-      // Don't log passwords
-      const sanitizedBody = { ...body };
-      if (sanitizedBody.password) {
-        sanitizedBody.password = '[REDACTED]';
-      }
-      console.log('[Auth POST]', {
-        path: url.pathname,
-        body: sanitizedBody,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (e) {
-      console.log('[Auth POST]', {
-        path: url.pathname,
-        body: 'Could not parse body',
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    const response = await handlers.POST(req);
-
-    console.log('[Auth POST] Success:', {
-      status: response.status,
-      path: url.pathname,
-    });
-
-    return response;
+    return await handlers.POST(req);
   } catch (error) {
-    console.error('[Auth POST] ERROR:', {
-      path: req.url,
-      error: error instanceof Error ? {
-        message: error.message,
-        stack: error.stack,
-        name: error.name,
-        cause: error.cause,
-      } : error,
-      timestamp: new Date().toISOString(),
-    });
-
-    // Also log the full error object
-    console.error('[Auth POST] Full Error Object:', error);
-
+    console.error('[Auth POST] ERROR:', error);
     throw error;
   }
 }
