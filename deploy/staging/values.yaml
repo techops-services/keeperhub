@@ -66,6 +66,12 @@ resources:
 
 env:
   <<: *shared_env
+  LOG_LEVEL:
+    type: kv
+    value: "info"
+  NODE_OPTIONS:
+    type: kv
+    value: "--enable-source-maps --trace-warnings --trace-uncaught --trace-exit"
   HOSTNAME:
     type: kv
     value: "0.0.0.0"
