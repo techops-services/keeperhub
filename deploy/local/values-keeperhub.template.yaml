@@ -38,6 +38,16 @@ env:
   NODE_ENV:
     type: kv
     value: "development"
+  # Debug logging for observability
+  DEBUG:
+    type: kv
+    value: "*"
+  LOG_LEVEL:
+    type: kv
+    value: "debug"
+  NODE_OPTIONS:
+    type: kv
+    value: "--enable-source-maps"
   DATABASE_URL:
     type: kv
     value: "postgresql://local:local@postgresql.local.svc.cluster.local:5432/keeperhub"
