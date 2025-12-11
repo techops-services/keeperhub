@@ -270,45 +270,47 @@ export function generateWorkflowSDKCode(
     return params;
   }
 
+  function getProviderConfig(modelId: string): {
+    providerImport: string;
+    providerCall: string;
+  } {
+    if (modelId.includes("/")) {
+      // Model has provider prefix (e.g., "openai/gpt-4")
+      const [provider, model] = modelId.split("/", 2);
+      return getProviderByName(provider, model);
+    }
+    // Infer provider from model name
+    if (modelId.startsWith("gpt-") || modelId.startsWith("o1-")) {
+      return getProviderByName("openai", modelId);
+    }
+    if (modelId.startsWith("claude-")) {
+      return getProviderByName("anthropic", modelId);
+    }
+    // Default to openai
+    return getProviderByName("openai", modelId);
+  }
+
+  function getProviderByName(
+    provider: string,
+    model: string
+  ): { providerImport: string; providerCall: string } {
+    if (provider === "anthropic") {
+      return {
+        providerImport: "import { anthropic } from '@ai-sdk/anthropic';",
+        providerCall: `anthropic("${model}", { apiKey: process.env.ANTHROPIC_API_KEY! })`,
+      };
+    }
+    // Default to openai for any other provider
+    return {
+      providerImport: "import { openai } from '@ai-sdk/openai';",
+      providerCall: `openai("${model}", { apiKey: process.env.OPENAI_API_KEY! })`,
+    };
+  }
+
   function buildAITextParams(config: Record<string, unknown>): string[] {
     imports.add("import { generateText } from 'ai';");
     const modelId = (config.aiModel as string) || "gpt-4o";
-
-    // Determine provider and model for direct provider usage
-    let providerImport: string;
-    let providerCall: string;
-    let cleanModelId: string;
-
-    if (modelId.includes("/")) {
-      // Model already has provider prefix (e.g., "openai/gpt-4")
-      const [provider, model] = modelId.split("/", 2);
-      cleanModelId = model;
-      if (provider === "openai") {
-        providerImport = "import { openai } from '@ai-sdk/openai';";
-        providerCall = `openai("${cleanModelId}", { apiKey: process.env.OPENAI_API_KEY! })`;
-      } else if (provider === "anthropic") {
-        providerImport = "import { anthropic } from '@ai-sdk/anthropic';";
-        providerCall = `anthropic("${cleanModelId}", { apiKey: process.env.ANTHROPIC_API_KEY! })`;
-      } else {
-        // Default to openai
-        providerImport = "import { openai } from '@ai-sdk/openai';";
-        providerCall = `openai("${cleanModelId}", { apiKey: process.env.OPENAI_API_KEY! })`;
-      }
-    } else {
-      // Infer provider from model name
-      cleanModelId = modelId;
-      if (modelId.startsWith("gpt-") || modelId.startsWith("o1-")) {
-        providerImport = "import { openai } from '@ai-sdk/openai';";
-        providerCall = `openai("${cleanModelId}", { apiKey: process.env.OPENAI_API_KEY! })`;
-      } else if (modelId.startsWith("claude-")) {
-        providerImport = "import { anthropic } from '@ai-sdk/anthropic';";
-        providerCall = `anthropic("${cleanModelId}", { apiKey: process.env.ANTHROPIC_API_KEY! })`;
-      } else {
-        // Default to openai
-        providerImport = "import { openai } from '@ai-sdk/openai';";
-        providerCall = `openai("${cleanModelId}", { apiKey: process.env.OPENAI_API_KEY! })`;
-      }
-    }
+    const { providerImport, providerCall } = getProviderConfig(modelId);
 
     imports.add(providerImport);
 
