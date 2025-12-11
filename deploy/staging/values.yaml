@@ -66,6 +66,16 @@ resources:
 
 env:
   <<: *shared_env
+  # Debug logging for observability in staging
+  DEBUG:
+    type: kv
+    value: "*"
+  LOG_LEVEL:
+    type: kv
+    value: "debug"
+  NODE_OPTIONS:
+    type: kv
+    value: "--enable-source-maps"
   HOSTNAME:
     type: kv
     value: "0.0.0.0"
