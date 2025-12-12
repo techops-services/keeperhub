@@ -86,6 +86,13 @@ quick_check() {
         echo "✓ PostgreSQL running"
     fi
 
+    # Check LocalStack (for SQS)
+    if ! kubectl get pods -n local -l app=localstack 2>/dev/null | grep -q "Running"; then
+        echo "⚠ LocalStack not running (schedule triggers will not work)"
+    else
+        echo "✓ LocalStack running"
+    fi
+
     # Check cert-manager (optional, warn only)
     if ! kubectl get pods -n local -l app.kubernetes.io/instance=cert-manager 2>/dev/null | grep -q "Running"; then
         echo "⚠ cert-manager not running (HTTPS may not work)"
@@ -396,6 +403,83 @@ setup_database() {
     kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=postgresql -n local --timeout=120s
 }
 
+# Setup LocalStack for SQS (schedule trigger)
+setup_localstack() {
+    echo ""
+    echo "==================================="
+    echo "Setting up LocalStack (SQS)..."
+    echo "==================================="
+    echo ""
+
+    # Check if LocalStack is already running
+    if kubectl get pods -n local -l app=localstack 2>/dev/null | grep -q "Running"; then
+        echo "LocalStack is already running"
+        return 0
+    fi
+
+    # Deploy LocalStack
+    echo "Deploying LocalStack..."
+    kubectl apply -f - <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: localstack
+  namespace: local
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: localstack
+  template:
+    metadata:
+      labels:
+        app: localstack
+    spec:
+      containers:
+        - name: localstack
+          image: localstack/localstack:latest
+          ports:
+            - containerPort: 4566
+          env:
+            - name: SERVICES
+              value: "sqs"
+            - name: DEBUG
+              value: "0"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: localstack
+  namespace: local
+spec:
+  selector:
+    app: localstack
+  ports:
+    - port: 4566
+      targetPort: 4566
+  type: ClusterIP
+EOF
+
+    # Wait for LocalStack to be ready
+    echo "Waiting for LocalStack to be ready..."
+    kubectl wait --for=condition=Ready pods -l app=localstack -n local --timeout=120s
+
+    # Create SQS queue
+    echo "Creating SQS queue..."
+    sleep 5  # Give LocalStack a moment to fully initialize
+    kubectl exec -n local deploy/localstack -- \
+        awslocal sqs create-queue --queue-name keeperhub-workflow-queue || true
+
+    echo "LocalStack setup complete!"
+}
+
 # Create keeperhub database
 create_keeperhub_db() {
     echo ""
@@ -447,6 +531,7 @@ main() {
     apply_resources
     setup_ssl
     setup_database
+    setup_localstack
     create_keeperhub_db
     run_migrations
 
@@ -454,6 +539,11 @@ main() {
     echo "==================================="
     echo "Local environment setup complete!"
     echo "==================================="
+    echo ""
+    echo "Infrastructure running:"
+    echo "  - PostgreSQL (keeperhub database)"
+    echo "  - LocalStack (SQS queue: keeperhub-workflow-queue)"
+    echo "  - cert-manager (SSL certificates)"
     echo ""
     echo "Next steps:"
     echo "  1. Run 'minikube tunnel' in another terminal"

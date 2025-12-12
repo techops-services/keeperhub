@@ -45,6 +45,25 @@ COPY --from=builder /app/package.json ./package.json
 # Run with: docker build --target migrator -t keeperhub-migrator .
 # Then: docker run --env DATABASE_URL=xxx keeperhub-migrator pnpm db:push
 
+# Stage 2.6: Scheduler stage (for schedule dispatcher and executor)
+FROM node:25-alpine AS scheduler
+WORKDIR /app
+RUN npm install -g pnpm tsx
+
+# Copy dependencies and scheduler files
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/lib ./lib
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
+
+ENV NODE_ENV=production
+
+# This stage is used for the schedule dispatcher and executor
+# Build with: docker build --target scheduler -t keeperhub-scheduler .
+# Run dispatcher: docker run keeperhub-scheduler npx tsx scripts/schedule-dispatcher.ts
+# Run executor: docker run keeperhub-scheduler npx tsx scripts/schedule-executor.ts
+
 # Stage 3: Runner
 FROM node:25-alpine AS runner
 WORKDIR /app
