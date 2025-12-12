@@ -177,6 +177,15 @@ export const apiKeys = pgTable("api_keys", {
   lastUsedAt: timestamp("last_used_at"),
 });
 
+// Beta Access Requests - stores emails requesting beta access
+export const betaAccessRequests = pgTable("beta_access_requests", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => generateId()),
+  email: text("email").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Relations
 export const workflowExecutionsRelations = relations(
   workflowExecutions,
@@ -202,3 +211,5 @@ export type ParaWallet = typeof paraWallets.$inferSelect;
 export type NewParaWallet = typeof paraWallets.$inferInsert;
 export type ApiKey = typeof apiKeys.$inferSelect;
 export type NewApiKey = typeof apiKeys.$inferInsert;
+export type BetaAccessRequest = typeof betaAccessRequests.$inferSelect;
+export type NewBetaAccessRequest = typeof betaAccessRequests.$inferInsert;
