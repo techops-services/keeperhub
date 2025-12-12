@@ -15,9 +15,9 @@ import { mono, sans } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
-  title: "AI Workflow Builder - Visual Workflow Automation",
+  title: "KeeperHub - Blockchain Workflow Automation",
   description:
-    "Build powerful AI-driven workflow automations with a visual, node-based editor. Built with Next.js and React Flow.",
+    "Build powerful blockchain workflow automations with a visual, node-based editor. Built with Next.js and React Flow.",
 };
 
 export const viewport: Viewport = {
@@ -47,7 +47,7 @@ const RootLayout = ({ children }: RootLayoutProps) => (
     <body className={cn(sans.variable, mono.variable, "antialiased")}>
       <ThemeProvider
         attribute="class"
-        defaultTheme="system"
+        defaultTheme="dark"
         disableTransitionOnChange
         enableSystem
       >

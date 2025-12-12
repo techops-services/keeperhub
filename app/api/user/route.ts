@@ -1,8 +1,10 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { apiError } from "@/lib/api-error";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { accounts, users } from "@/lib/db/schema";
+import { getUserWallet } from "@/lib/para/wallet-helpers";
 
 export async function GET(request: Request) {
   try {
@@ -37,18 +39,23 @@ export async function GET(request: Request) {
       },
     });
 
+    // Get the user's wallet address (if exists)
+    let walletAddress: string | null = null;
+    try {
+      const wallet = await getUserWallet(session.user.id);
+      walletAddress = wallet.walletAddress;
+    } catch (_error) {
+      // User doesn't have a wallet yet, that's ok
+      walletAddress = null;
+    }
+
     return NextResponse.json({
       ...userData,
       providerId: userAccount?.providerId ?? null,
+      walletAddress,
     });
   } catch (error) {
-    console.error("Failed to get user:", error);
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Failed to get user",
-      },
-      { status: 500 }
-    );
+    return apiError(error, "Failed to get user");
   }
 }
 
@@ -93,12 +100,6 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Failed to update user:", error);
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Failed to update user",
-      },
-      { status: 500 }
-    );
+    return apiError(error, "Failed to update user");
   }
 }

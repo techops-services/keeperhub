@@ -28,7 +28,10 @@ export type ActionConfigFieldBase = {
     | "text" // Regular text input
     | "number" // Number input
     | "select" // Dropdown select
-    | "schema-builder"; // Schema builder for structured output
+    | "schema-builder" // Schema builder for structured output
+    | "abi-function-select" // Dynamic dropdown that parses ABI and shows functions
+    | "abi-function-args" // Dynamic inputs for function arguments based on selected ABI function
+    | "abi-with-auto-fetch"; // ABI textarea with automatic fetch from Etherscan
 
   // Placeholder text
   placeholder?: string;
@@ -56,6 +59,21 @@ export type ActionConfigFieldBase = {
     field: string;
     equals: string;
   };
+
+  // For abi-function-select: which field contains the ABI JSON
+  abiField?: string;
+
+  // For abi-function-select: filter functions by type ("read" or "write")
+  functionFilter?: "read" | "write";
+
+  // For abi-function-args: which field contains the ABI JSON and selected function
+  abiFunctionField?: string;
+
+  // For abi-with-auto-fetch: which field contains the contract address
+  contractAddressField?: string;
+
+  // For abi-with-auto-fetch: which field contains the network
+  networkField?: string;
 };
 
 /**
@@ -152,16 +170,22 @@ export type IntegrationPlugin = {
   // Icon component (should be exported from plugins/[name]/icon.tsx)
   icon: React.ComponentType<{ className?: string }>;
 
+  // Whether this plugin requires an integration to be configured
+  // If false, actions will work out of the box without requiring users to add an integration
+  // Defaults to true if not specified
+  requiresIntegration?: boolean;
+
   // Form fields for the integration dialog
   formFields: Array<{
     id: string;
     label: string;
-    type: "text" | "password" | "url";
+    type: "text" | "password" | "url" | "checkbox";
     placeholder?: string;
     helpText?: string;
     helpLink?: { text: string; url: string };
     configKey: string; // Which key in IntegrationConfig to store the value
     envVar?: string; // Environment variable this field maps to (e.g., "RESEND_API_KEY")
+    defaultValue?: string | boolean; // Default value for the field (for checkboxes, use boolean)
   }>;
 
   // Testing configuration (lazy-loaded to avoid bundling Node.js packages in client)

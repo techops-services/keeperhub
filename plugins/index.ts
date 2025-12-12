@@ -12,20 +12,19 @@
  * To remove an integration:
  * 1. Delete the plugin directory
  * 2. Run: pnpm discover-plugins (or it runs automatically on build)
+ *
+ * Discovered plugins: clerk, discord, resend, sendgrid, slack, v0, web3, webflow, webhook
  */
 
-import "./ai-gateway";
-import "./blob";
-import "./fal";
-import "./firecrawl";
-import "./github";
-import "./linear";
-import "./perplexity";
+import "./clerk";
+import "./discord";
 import "./resend";
+import "./sendgrid";
 import "./slack";
-import "./stripe";
-import "./superagent";
 import "./v0";
+import "./web3";
+import "./webflow";
+import "./webhook";
 
 export type {
   ActionConfigField,

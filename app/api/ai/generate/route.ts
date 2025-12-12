@@ -1,5 +1,9 @@
+import { createAnthropic } from "@ai-sdk/anthropic";
+import { createOpenAI } from "@ai-sdk/openai";
+import type { LanguageModelV2 } from "@ai-sdk/provider";
 import { streamText } from "ai";
 import { NextResponse } from "next/server";
+import { apiError } from "@/lib/api-error";
 import { auth } from "@/lib/auth";
 import { generateAIActionPrompts } from "@/plugins";
 
@@ -246,6 +250,67 @@ Example output (branching workflow with 250px vertical spacing):
 REMEMBER: After adding all nodes, you MUST add edges to connect them! Every node should be reachable from the trigger.`;
 }
 
+function getAIModel(
+  modelString: string,
+  aiGatewayKey: string | undefined,
+  openaiKey: string | undefined,
+  anthropicKey: string | undefined
+):
+  | { success: true; model: LanguageModelV2 | string }
+  | { success: false; error: string } {
+  // AI Gateway mode - model has provider prefix (e.g., "openai/gpt-4")
+  if (modelString.includes("/")) {
+    if (!aiGatewayKey) {
+      return {
+        success: false,
+        error:
+          "AI Gateway API key not configured. Set AI_GATEWAY_API_KEY environment variable.",
+      };
+    }
+    // Use model string directly - AI SDK will route through gateway
+    return { success: true, model: modelString };
+  }
+
+  // Direct provider mode - determine provider from model name
+  if (modelString.startsWith("gpt-") || modelString.startsWith("o1-")) {
+    if (!openaiKey) {
+      return {
+        success: false,
+        error:
+          "OpenAI API key not configured. Set OPENAI_API_KEY environment variable.",
+      };
+    }
+    const provider = createOpenAI({ apiKey: openaiKey });
+    return { success: true, model: provider(modelString) };
+  }
+
+  if (modelString.startsWith("claude-")) {
+    if (!anthropicKey) {
+      return {
+        success: false,
+        error:
+          "Anthropic API key not configured. Set ANTHROPIC_API_KEY environment variable.",
+      };
+    }
+    const provider = createAnthropic({ apiKey: anthropicKey });
+    return {
+      success: true,
+      model: provider(modelString),
+    };
+  }
+
+  // Default to OpenAI for unknown models
+  if (!openaiKey) {
+    return {
+      success: false,
+      error:
+        "OpenAI API key not configured. Set OPENAI_API_KEY environment variable.",
+    };
+  }
+  const provider = createOpenAI({ apiKey: openaiKey });
+  return { success: true, model: provider(modelString) };
+}
+
 export async function POST(request: Request) {
   try {
     const session = await auth.api.getSession({
@@ -266,16 +331,20 @@ export async function POST(request: Request) {
       );
     }
 
-    const apiKey = process.env.AI_GATEWAY_API_KEY || process.env.OPENAI_API_KEY;
+    // Determine which AI provider and model to use
+    const modelString = process.env.AI_MODEL || "gpt-4o";
+    const modelResult = getAIModel(
+      modelString,
+      process.env.AI_GATEWAY_API_KEY,
+      process.env.OPENAI_API_KEY,
+      process.env.ANTHROPIC_API_KEY
+    );
 
-    if (!apiKey) {
-      return NextResponse.json(
-        {
-          error: "AI API key not configured on server. Please contact support.",
-        },
-        { status: 500 }
-      );
+    if (!modelResult.success) {
+      return NextResponse.json({ error: modelResult.error }, { status: 500 });
     }
+
+    const model = modelResult.model;
 
     // Build the user prompt
     let userPrompt = prompt;
@@ -325,7 +394,7 @@ Example: If user says "connect node A to node B", output:
     }
 
     const result = streamText({
-      model: "openai/gpt-5.1-instant",
+      model,
       system: getSystemPrompt(),
       prompt: userPrompt,
     });
@@ -360,15 +429,6 @@ Example: If user says "connect node A to node B", output:
       },
     });
   } catch (error) {
-    console.error("Failed to generate workflow:", error);
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to generate workflow",
-      },
-      { status: 500 }
-    );
+    return apiError(error, "Failed to generate workflow");
   }
 }

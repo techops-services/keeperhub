@@ -1,7 +1,7 @@
 "use client";
 
-import { ChevronRight, Pencil, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Pencil, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -14,15 +14,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { IntegrationIcon } from "@/components/ui/integration-icon";
 import { Spinner } from "@/components/ui/spinner";
 import { api, type Integration } from "@/lib/api-client";
-import { cn } from "@/lib/utils";
 import { getIntegrationLabels } from "@/plugins";
 import { IntegrationFormDialog } from "./integration-form-dialog";
 
@@ -47,7 +41,6 @@ export function IntegrationsManager({
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   // Sync external dialog state
   useEffect(() => {
@@ -71,32 +64,10 @@ export function IntegrationsManager({
     loadIntegrations();
   }, [loadIntegrations]);
 
-  // Group integrations by type
-  const groupedIntegrations = useMemo(() => {
-    const groups = new Map<string, Integration[]>();
-    const labels = getIntegrationLabels() as Record<string, string>;
-
-    for (const integration of integrations) {
-      const type = integration.type;
-      if (!groups.has(type)) {
-        groups.set(type, []);
-      }
-      groups.get(type)?.push(integration);
-    }
-
-    // Sort groups by label
-    return Array.from(groups.entries())
-      .map(([type, items]) => ({
-        type,
-        label: labels[type] || SYSTEM_INTEGRATION_LABELS[type] || type,
-        items,
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, [integrations]);
-
   const handleDelete = async (id: string) => {
     try {
       await api.integration.delete(id);
+      toast.success("Integration deleted");
       await loadIntegrations();
       onIntegrationChange?.();
     } catch (error) {
@@ -137,18 +108,6 @@ export function IntegrationsManager({
     onIntegrationChange?.();
   };
 
-  const toggleGroup = (type: string) => {
-    setExpandedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(type)) {
-        next.delete(type);
-      } else {
-        next.add(type);
-      }
-      return next;
-    });
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -158,80 +117,63 @@ export function IntegrationsManager({
   }
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-4">
       {integrations.length === 0 ? (
-        <div className="py-8 text-center">
+        <div className="rounded-lg border border-dashed py-12 text-center">
           <p className="text-muted-foreground text-sm">
             No integrations configured yet
           </p>
         </div>
       ) : (
-        <div className="space-y-1">
-          {groupedIntegrations.map((group) => (
-            <Collapsible
-              key={group.type}
-              onOpenChange={() => toggleGroup(group.type)}
-              open={expandedGroups.has(group.type)}
+        <div className="space-y-2">
+          {integrations.map((integration) => (
+            <div
+              className="flex items-center justify-between rounded-lg border p-4"
+              key={integration.id}
             >
-              <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted/50">
+              <div className="flex items-center gap-3">
                 <IntegrationIcon
-                  className="size-4"
-                  integration={
-                    group.type === "ai-gateway" ? "vercel" : group.type
-                  }
+                  className="size-8"
+                  integration={integration.type}
                 />
-                <span className="font-medium">{group.label}</span>
-                <ChevronRight
-                  className={cn(
-                    "size-4 text-muted-foreground transition-transform",
-                    expandedGroups.has(group.type) && "rotate-90"
-                  )}
-                />
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="space-y-1 py-1">
-                  {group.items.map((integration) => (
-                    <div
-                      className="flex items-center justify-between rounded-md py-1.5 pr-2 pl-[33px]"
-                      key={integration.id}
-                    >
-                      <span className="text-sm">{integration.name}</span>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          className="h-7 px-2"
-                          disabled={testingId === integration.id}
-                          onClick={() => handleTest(integration.id)}
-                          size="sm"
-                          variant="outline"
-                        >
-                          {testingId === integration.id ? (
-                            <Spinner className="size-3" />
-                          ) : (
-                            <span className="text-xs">Test</span>
-                          )}
-                        </Button>
-                        <Button
-                          className="size-7"
-                          onClick={() => setEditingIntegration(integration)}
-                          size="icon"
-                          variant="outline"
-                        >
-                          <Pencil className="size-3" />
-                        </Button>
-                        <Button
-                          className="size-7"
-                          onClick={() => setDeletingId(integration.id)}
-                          size="icon"
-                          variant="outline"
-                        >
-                          <Trash2 className="size-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                <div>
+                  <p className="font-medium text-sm">{integration.name}</p>
+                  <p className="text-muted-foreground text-xs">
+                    {getIntegrationLabels()[integration.type] ||
+                      SYSTEM_INTEGRATION_LABELS[integration.type] ||
+                      integration.type}
+                  </p>
                 </div>
-              </CollapsibleContent>
-            </Collapsible>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  disabled={testingId === integration.id}
+                  onClick={() => handleTest(integration.id)}
+                  size="sm"
+                  variant="outline"
+                >
+                  {testingId === integration.id ? (
+                    <Spinner className="size-4" />
+                  ) : (
+                    "Test"
+                  )}
+                </Button>
+                <Button
+                  onClick={() => setEditingIntegration(integration)}
+                  size="sm"
+                  variant="outline"
+                >
+                  <Pencil className="size-4" />
+                </Button>
+                <Button
+                  onClick={() => setDeletingId(integration.id)}
+                  size="sm"
+                  variant="outline"
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+            </div>
           ))}
         </div>
       )}

@@ -15,6 +15,7 @@ import {
 import { TemplateBadgeInput } from "@/components/ui/template-badge-input";
 import {
   findActionById,
+  flattenConfigFields,
   getActionsByCategory,
   getAllIntegrations,
 } from "@/plugins";
@@ -281,6 +282,33 @@ export function ActionConfig({
     const newCategory = actionType ? getCategoryForAction(actionType) : null;
     setCategory(newCategory || "");
   }, [actionType]);
+
+  // Initialize default values for fields when action type changes
+  useEffect(() => {
+    if (!actionType || disabled) {
+      return;
+    }
+
+    const action = findActionById(actionType);
+    if (!action) {
+      return;
+    }
+
+    // Flatten fields to handle groups
+    const flatFields = flattenConfigFields(action.configFields);
+
+    // Initialize default values for fields that don't have values yet
+    // We check config values to avoid overwriting existing values
+    for (const field of flatFields) {
+      const currentValue = config[field.key];
+      if (
+        field.defaultValue !== undefined &&
+        (currentValue === undefined || currentValue === "")
+      ) {
+        onUpdateConfig(field.key, field.defaultValue);
+      }
+    }
+  }, [actionType, disabled, config, onUpdateConfig]);
 
   const handleCategoryChange = (newCategory: string) => {
     setCategory(newCategory);
