@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { validateWorkflowIntegrations } from "@/lib/db/integrations";
 import { workflows } from "@/lib/db/schema";
+import { syncWorkflowSchedule } from "@/lib/schedule-service";
 
 // Helper to strip sensitive data from nodes for public viewing
 function sanitizeNodesForPublicView(
@@ -182,6 +183,18 @@ export async function PATCH(
         { error: "Workflow not found" },
         { status: 404 }
       );
+    }
+
+    // Sync schedule if nodes were updated
+    if (body.nodes !== undefined) {
+      const syncResult = await syncWorkflowSchedule(workflowId, body.nodes);
+      if (!syncResult.synced) {
+        console.warn(
+          `[Workflow] Schedule sync failed for ${workflowId}:`,
+          syncResult.error
+        );
+        // Don't fail the request, but log the warning
+      }
     }
 
     return NextResponse.json({

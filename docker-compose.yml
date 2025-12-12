@@ -59,6 +59,21 @@ services:
       HOSTNAME: "0.0.0.0"
     command: sh -c "npm install -g pnpm && pnpm install && pnpm dev --hostname 0.0.0.0"
 
+  localstack:
+    image: localstack/localstack:latest
+    container_name: workflow-builder-localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=sqs
+      - DEBUG=0
+    volumes:
+      - localstack_data:/var/lib/localstack
+    profiles:
+      - dev
+      - localstack
+
 volumes:
   postgres_data:
   node_modules:
+  localstack_data:
