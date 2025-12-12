@@ -96,6 +96,7 @@ import {
 import {
   findActionById,
   flattenConfigFields,
+  getIntegration,
   getIntegrationLabels,
 } from "@/plugins";
 import { Panel } from "../ai-elements/panel";
@@ -335,6 +336,64 @@ function getMissingRequiredFields(
     .filter((result): result is MissingRequiredFieldInfo => result !== null);
 }
 
+// Determine the required integration type for a node
+// Returns null if node doesn't require an integration
+function getNodeRequiredIntegration(
+  node: WorkflowNode,
+  userIntegrationIds: Set<string>
+): IntegrationType | null {
+  // Skip disabled nodes
+  if (node.data.enabled === false) {
+    return null;
+  }
+
+  const actionType = node.data.config?.actionType as string | undefined;
+  if (!actionType) {
+    return null;
+  }
+
+  // Look up the integration type from the plugin registry first
+  const action = findActionById(actionType);
+  // Fall back to built-in action integrations for actions not in the registry
+  const requiredIntegrationType =
+    action?.integration || BUILTIN_ACTION_INTEGRATIONS[actionType];
+
+  if (!requiredIntegrationType) {
+    return null;
+  }
+
+  // Check if this plugin requires an integration
+  if (action) {
+    const plugin = getIntegration(action.integration);
+    if (plugin?.requiresIntegration === false) {
+      return null;
+    }
+  }
+
+  // Check if this node has a valid integrationId configured
+  const configuredIntegrationId = node.data.config?.integrationId as
+    | string
+    | undefined;
+  if (
+    configuredIntegrationId &&
+    userIntegrationIds.has(configuredIntegrationId)
+  ) {
+    return null;
+  }
+
+  return requiredIntegrationType;
+}
+
+// Get the display name for a node
+function getNodeDisplayName(node: WorkflowNode): string {
+  const actionType = node.data.config?.actionType as string | undefined;
+  if (!actionType) {
+    return node.data.label || "Unknown";
+  }
+  const actionInfo = findActionById(actionType);
+  return node.data.label || actionInfo?.label || actionType;
+}
+
 // Get missing integrations for workflow nodes
 // Uses the plugin registry to determine which integrations are required
 // Also handles built-in actions that aren't in the plugin registry
@@ -348,44 +407,18 @@ function getMissingIntegrations(
   const integrationLabels = getIntegrationLabels();
 
   for (const node of nodes) {
-    // Skip disabled nodes
-    if (node.data.enabled === false) {
-      continue;
-    }
-
-    const actionType = node.data.config?.actionType as string | undefined;
-    if (!actionType) {
-      continue;
-    }
-
-    // Look up the integration type from the plugin registry first
-    const action = findActionById(actionType);
-    // Fall back to built-in action integrations for actions not in the registry
-    const requiredIntegrationType =
-      action?.integration || BUILTIN_ACTION_INTEGRATIONS[actionType];
-
+    const requiredIntegrationType = getNodeRequiredIntegration(
+      node,
+      userIntegrationIds
+    );
     if (!requiredIntegrationType) {
-      continue;
-    }
-
-    // Check if this node has a valid integrationId configured
-    // The integration must exist (not just be configured)
-    const configuredIntegrationId = node.data.config?.integrationId as
-      | string
-      | undefined;
-    const hasValidIntegration =
-      configuredIntegrationId &&
-      userIntegrationIds.has(configuredIntegrationId);
-    if (hasValidIntegration) {
       continue;
     }
 
     // Check if user has any integration of this type
     if (!userIntegrationTypes.has(requiredIntegrationType)) {
       const existing = missingByType.get(requiredIntegrationType) || [];
-      // Use human-readable label from registry if no custom label
-      const actionInfo = findActionById(actionType);
-      existing.push(node.data.label || actionInfo?.label || actionType);
+      existing.push(getNodeDisplayName(node));
       missingByType.set(requiredIntegrationType, existing);
     }
   }

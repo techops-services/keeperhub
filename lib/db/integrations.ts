@@ -2,6 +2,10 @@ import "server-only";
 
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
+import {
+  findActionById,
+  getIntegration as getPluginDefinition,
+} from "@/plugins";
 import type { IntegrationConfig, IntegrationType } from "../types/integration";
 import { db } from "./index";
 import { integrations, type NewIntegration } from "./schema";
@@ -268,12 +272,38 @@ type WorkflowNodeForValidation = {
   data?: {
     config?: {
       integrationId?: string;
+      actionType?: string;
     };
   };
 };
 
 /**
+ * Check if a node's integration ID should be included for validation
+ */
+function shouldIncludeIntegrationId(node: WorkflowNodeForValidation): boolean {
+  const actionType = node.data?.config?.actionType;
+
+  // No action type - include for validation
+  if (!actionType || typeof actionType !== "string") {
+    return true;
+  }
+
+  const action = findActionById(actionType);
+
+  // Unknown action - include for validation
+  if (!action) {
+    return true;
+  }
+
+  const plugin = getPluginDefinition(action.integration);
+
+  // Only include if plugin requires integration (defaults to true)
+  return plugin?.requiresIntegration !== false;
+}
+
+/**
  * Extract all integration IDs from workflow nodes
+ * Only includes nodes whose actions actually require an integration
  */
 export function extractIntegrationIds(
   nodes: WorkflowNodeForValidation[]
@@ -282,7 +312,11 @@ export function extractIntegrationIds(
 
   for (const node of nodes) {
     const integrationId = node.data?.config?.integrationId;
-    if (integrationId && typeof integrationId === "string") {
+    if (!integrationId || typeof integrationId !== "string") {
+      continue;
+    }
+
+    if (shouldIncludeIntegrationId(node)) {
       integrationIds.push(integrationId);
     }
   }
