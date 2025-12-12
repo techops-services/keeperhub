@@ -1,15 +1,16 @@
 import { vi } from "vitest";
 
-// Mock environment variables
-process.env.DATABASE_URL =
-  "postgresql://postgres:postgres@localhost:5432/workflow_builder_test";
-process.env.AWS_ENDPOINT_URL = "http://localhost:4566";
-process.env.AWS_REGION = "us-east-1";
-process.env.AWS_ACCESS_KEY_ID = "test";
-process.env.AWS_SECRET_ACCESS_KEY = "test";
-process.env.SQS_QUEUE_URL =
+// Set default environment variables (only if not already set)
+// This allows E2E tests to override with real infrastructure
+process.env.DATABASE_URL ??=
+  "postgresql://postgres:postgres@localhost:5432/workflow_builder";
+process.env.AWS_ENDPOINT_URL ??= "http://localhost:4566";
+process.env.AWS_REGION ??= "us-east-1";
+process.env.AWS_ACCESS_KEY_ID ??= "test";
+process.env.AWS_SECRET_ACCESS_KEY ??= "test";
+process.env.SQS_QUEUE_URL ??=
   "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/keeperhub-workflow-queue";
-process.env.KEEPERHUB_URL = "http://localhost:3000";
+process.env.KEEPERHUB_URL ??= "http://localhost:3000";
 
 // Global test utilities
 vi.mock("@/lib/db", () => ({
