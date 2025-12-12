@@ -1,0 +1,130 @@
+# Schedule Trigger Components for KeeperHub
+# These are deployed separately from the main app to allow independent scaling
+#
+# Components:
+# 1. ConfigMap with scheduler environment
+# 2. CronJob for dispatcher (runs every minute)
+# 3. Deployment for executor (long-running SQS consumer)
+#
+# IMPORTANT: For local development, you need to run:
+#   minikube mount $(pwd):/app
+# This mounts the local codebase into minikube at /app
+#
+# For production, build the scheduler into the keeperhub Docker image
+# and use the same image with different entrypoints.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scheduler-env
+  namespace: local
+data:
+  AWS_ENDPOINT_URL: "http://localstack:4566"
+  AWS_REGION: "us-east-1"
+  AWS_ACCESS_KEY_ID: "test"
+  AWS_SECRET_ACCESS_KEY: "test"
+  SQS_QUEUE_URL: "http://localstack:4566/000000000000/keeperhub-workflow-queue"
+  KEEPERHUB_URL: "http://keeperhub-common:3000"
+  DATABASE_URL: "postgresql://local:local@postgresql:5432/keeperhub"
+---
+# Schedule Dispatcher CronJob
+# Runs every minute to check for scheduled workflows and send to SQS
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: schedule-dispatcher
+  namespace: local
+  labels:
+    app: schedule-dispatcher
+    component: scheduler
+spec:
+  schedule: "* * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: schedule-dispatcher
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: dispatcher
+              # Use the scheduler image which includes scripts and dependencies
+              # Build with: docker build --target scheduler -t keeperhub-scheduler .
+              image: keeperhub-scheduler:latest
+              imagePullPolicy: Never
+              workingDir: /app
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  echo "[Dispatcher] Starting at $(date)"
+                  tsx scripts/schedule-dispatcher.ts
+                  echo "[Dispatcher] Completed at $(date)"
+              envFrom:
+                - configMapRef:
+                    name: scheduler-env
+              resources:
+                requests:
+                  memory: "128Mi"
+                  cpu: "50m"
+                limits:
+                  memory: "256Mi"
+                  cpu: "200m"
+---
+# Schedule Executor Deployment
+# Long-running process that polls SQS and triggers workflow executions
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: schedule-executor
+  namespace: local
+  labels:
+    app: schedule-executor
+    component: scheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: schedule-executor
+  template:
+    metadata:
+      labels:
+        app: schedule-executor
+    spec:
+      containers:
+        - name: executor
+          # Use the scheduler image which includes scripts and dependencies
+          # Build with: docker build --target scheduler -t keeperhub-scheduler .
+          image: keeperhub-scheduler:latest
+          imagePullPolicy: Never
+          workingDir: /app
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "[Executor] Starting SQS listener..."
+              tsx scripts/schedule-executor.ts
+          envFrom:
+            - configMapRef:
+                name: scheduler-env
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          # Simple liveness check - if the node process dies, restart
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "pgrep -f 'schedule-executor' || exit 1"
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 3
