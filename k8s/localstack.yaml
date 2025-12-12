@@ -1,0 +1,82 @@
+---
+# LocalStack for SQS (local K8s testing)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: keeperhub
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: localstack
+  namespace: keeperhub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: localstack
+  template:
+    metadata:
+      labels:
+        app: localstack
+    spec:
+      containers:
+        - name: localstack
+          image: localstack/localstack:latest
+          ports:
+            - containerPort: 4566
+          env:
+            - name: SERVICES
+              value: "sqs"
+            - name: DEBUG
+              value: "0"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: localstack
+  namespace: keeperhub
+spec:
+  selector:
+    app: localstack
+  ports:
+    - port: 4566
+      targetPort: 4566
+  type: ClusterIP
+---
+# Init job to create SQS queue
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-sqs-queue
+  namespace: keeperhub
+spec:
+  template:
+    spec:
+      containers:
+        - name: aws-cli
+          image: amazon/aws-cli:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              sleep 10  # Wait for LocalStack to be ready
+              aws --endpoint-url=http://localstack:4566 sqs create-queue \
+                --queue-name keeperhub-workflow-queue \
+                --region us-east-1
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              value: "test"
+            - name: AWS_SECRET_ACCESS_KEY
+              value: "test"
+            - name: AWS_DEFAULT_REGION
+              value: "us-east-1"
+      restartPolicy: OnFailure
+  backoffLimit: 3

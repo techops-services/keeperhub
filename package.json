@@ -23,7 +23,9 @@
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:schedule": "vitest run tests/e2e/schedule-pipeline.test.ts",
+    "test:e2e:schedule:full": "FULL_E2E=true vitest run tests/e2e/schedule-pipeline.test.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.54",
