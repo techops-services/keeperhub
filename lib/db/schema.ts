@@ -1,5 +1,13 @@
 import { relations } from "drizzle-orm";
-import { boolean, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 import type { IntegrationType } from "../types/integration";
 import { generateId } from "../utils/id";
 
@@ -177,12 +185,54 @@ export const apiKeys = pgTable("api_keys", {
   lastUsedAt: timestamp("last_used_at"),
 });
 
+// Workflow Schedules table for scheduled trigger configuration
+export const workflowSchedules = pgTable(
+  "workflow_schedules",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => generateId()),
+    workflowId: text("workflow_id")
+      .notNull()
+      .unique()
+      .references(() => workflows.id, { onDelete: "cascade" }),
+    cronExpression: text("cron_expression").notNull(),
+    timezone: text("timezone").notNull().default("UTC"),
+    enabled: boolean("enabled").notNull().default(true),
+    lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+    lastStatus: text("last_status").$type<"success" | "error" | null>(),
+    lastError: text("last_error"),
+    nextRunAt: timestamp("next_run_at", { withTimezone: true }),
+    runCount: text("run_count").default("0"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idx_workflow_schedules_enabled").on(table.enabled),
+    uniqueIndex("idx_workflow_schedules_workflow").on(table.workflowId),
+  ]
+);
+
 // Relations
 export const workflowExecutionsRelations = relations(
   workflowExecutions,
   ({ one }) => ({
     workflow: one(workflows, {
       fields: [workflowExecutions.workflowId],
+      references: [workflows.id],
+    }),
+  })
+);
+
+export const workflowSchedulesRelations = relations(
+  workflowSchedules,
+  ({ one }) => ({
+    workflow: one(workflows, {
+      fields: [workflowSchedules.workflowId],
       references: [workflows.id],
     }),
   })
@@ -202,3 +252,5 @@ export type ParaWallet = typeof paraWallets.$inferSelect;
 export type NewParaWallet = typeof paraWallets.$inferInsert;
 export type ApiKey = typeof apiKeys.$inferSelect;
 export type NewApiKey = typeof apiKeys.$inferInsert;
+export type WorkflowSchedule = typeof workflowSchedules.$inferSelect;
+export type NewWorkflowSchedule = typeof workflowSchedules.$inferInsert;

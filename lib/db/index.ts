@@ -9,6 +9,8 @@ import {
   workflowExecutionLogs,
   workflowExecutions,
   workflowExecutionsRelations,
+  workflowSchedules,
+  workflowSchedulesRelations,
   workflows,
 } from "./schema";
 
@@ -22,6 +24,8 @@ const schema = {
   workflowExecutions,
   workflowExecutionLogs,
   workflowExecutionsRelations,
+  workflowSchedules,
+  workflowSchedulesRelations,
   apiKeys,
 };
 

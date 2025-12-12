@@ -68,35 +68,62 @@ export async function POST(
   try {
     const { workflowId } = await context.params;
 
-    // Get session
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
+    // Check for internal execution header (MVP auth for scheduled triggers)
+    const isInternalExecution =
+      request.headers.get("X-Internal-Execution") === "true";
 
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    let userId: string;
+    let workflow: typeof workflows.$inferSelect | undefined;
+
+    if (isInternalExecution) {
+      // Internal execution from scheduler - get userId from workflow
+      console.log("[Workflow Execute] Internal execution request");
+
+      workflow = await db.query.workflows.findFirst({
+        where: eq(workflows.id, workflowId),
+      });
+
+      if (!workflow) {
+        return NextResponse.json(
+          { error: "Workflow not found" },
+          { status: 404 }
+        );
+      }
+
+      userId = workflow.userId;
+    } else {
+      // Normal user execution - validate session
+      const session = await auth.api.getSession({
+        headers: request.headers,
+      });
+
+      if (!session) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      // Get workflow and verify ownership
+      workflow = await db.query.workflows.findFirst({
+        where: eq(workflows.id, workflowId),
+      });
+
+      if (!workflow) {
+        return NextResponse.json(
+          { error: "Workflow not found" },
+          { status: 404 }
+        );
+      }
+
+      if (workflow.userId !== session.user.id) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      userId = session.user.id;
     }
 
-    // Get workflow and verify ownership
-    const workflow = await db.query.workflows.findFirst({
-      where: eq(workflows.id, workflowId),
-    });
-
-    if (!workflow) {
-      return NextResponse.json(
-        { error: "Workflow not found" },
-        { status: 404 }
-      );
-    }
-
-    if (workflow.userId !== session.user.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    // Validate that all integrationIds in workflow nodes belong to the current user
+    // Validate that all integrationIds in workflow nodes belong to the workflow owner
     const validation = await validateWorkflowIntegrations(
       workflow.nodes as WorkflowNode[],
-      session.user.id
+      userId
     );
     if (!validation.valid) {
       console.error(
@@ -113,22 +140,49 @@ export async function POST(
     const body = await request.json().catch(() => ({}));
     const input = body.input || {};
 
-    // Create execution record
-    const [execution] = await db
-      .insert(workflowExecutions)
-      .values({
-        workflowId,
-        userId: session.user.id,
-        status: "running",
-        input,
-      })
-      .returning();
+    // Check if executionId was provided (for scheduled executions)
+    // This allows the executor to pre-create the execution record
+    let executionId = body.executionId;
 
-    console.log("[API] Created execution:", execution.id);
+    if (executionId) {
+      // Verify execution exists and is in running state
+      const existingExecution = await db.query.workflowExecutions.findFirst({
+        where: eq(workflowExecutions.id, executionId),
+      });
+
+      if (existingExecution) {
+        // Use existing execution
+        console.log("[API] Using existing execution:", executionId);
+      } else {
+        // Create new execution with provided ID
+        await db.insert(workflowExecutions).values({
+          id: executionId,
+          workflowId,
+          userId,
+          status: "running",
+          input,
+        });
+        console.log("[API] Created execution with provided ID:", executionId);
+      }
+    } else {
+      // Create new execution record
+      const [execution] = await db
+        .insert(workflowExecutions)
+        .values({
+          workflowId,
+          userId,
+          status: "running",
+          input,
+        })
+        .returning();
+
+      executionId = execution.id;
+      console.log("[API] Created execution:", executionId);
+    }
 
     // Execute the workflow in the background (don't await)
     executeWorkflowBackground(
-      execution.id,
+      executionId,
       workflowId,
       workflow.nodes as WorkflowNode[],
       workflow.edges as WorkflowEdge[],
@@ -137,7 +191,7 @@ export async function POST(
 
     // Return immediately with the execution ID
     return NextResponse.json({
-      executionId: execution.id,
+      executionId,
       status: "running",
     });
   } catch (error) {
