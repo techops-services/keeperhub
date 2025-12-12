@@ -29,10 +29,10 @@ import {
 const SKIP_INFRA_TESTS = process.env.SKIP_INFRA_TESTS === "true";
 const DATABASE_URL =
   process.env.DATABASE_URL ||
-  "postgresql://postgres:postgres@localhost:5432/workflow_builder_test";
+  "postgresql://postgres:postgres@localhost:5432/workflow_builder";
 const AWS_ENDPOINT = process.env.AWS_ENDPOINT_URL || "http://localhost:4566";
 const KEEPERHUB_URL = process.env.KEEPERHUB_URL || "http://localhost:3000";
-const QUEUE_NAME = "keeperhub-workflow-queue-test";
+const QUEUE_NAME = "keeperhub-workflow-queue";
 
 describe.skipIf(SKIP_INFRA_TESTS)("Schedule Pipeline E2E", () => {
   let queryClient: ReturnType<typeof postgres>;
