@@ -140,6 +140,25 @@ export const auth = betterAuth({
     provider: "pg",
     schema,
   }),
+  logger: {
+    level: "debug",
+    disabled: false,
+  },
+  onAPIError: {
+    onError: (error, ctx) => {
+      console.error("[Better Auth API Error]", {
+        error:
+          error instanceof Error
+            ? {
+                message: error.message,
+                stack: error.stack,
+                name: error.name,
+              }
+            : error,
+        context: ctx,
+      });
+    },
+  },
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
@@ -156,5 +175,14 @@ export const auth = betterAuth({
       enabled: !!process.env.GOOGLE_CLIENT_ID,
     },
   },
+  advanced: {
+    // Use secure cookies in production (HTTPS only)
+    useSecureCookies: process.env.NODE_ENV === "production",
+  },
+  trustedOrigins: [
+    "http://localhost:3000",
+    "https://workflows-staging.keeperhub.com",
+    "https://*.keeperhub.com",
+  ],
   plugins,
 });

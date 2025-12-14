@@ -99,8 +99,6 @@ import {
   getIntegrationLabels,
 } from "@/plugins";
 import { Panel } from "../ai-elements/panel";
-import { DeployButton } from "../deploy-button";
-import { GitHubStarsButton } from "../github-stars-button";
 import { KeeperHubLogo } from "../icons/keeperhub-logo";
 import { IntegrationFormDialog } from "../settings/integration-form-dialog";
 import { IntegrationIcon } from "../ui/integration-icon";
@@ -1444,19 +1442,19 @@ function RunButtonGroup({
 }) {
   return (
     <Button
-      className="border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
+      className="bg-keeperhub-green hover:bg-keeperhub-green-dark disabled:opacity-100 disabled:[&>svg]:text-muted-foreground"
       disabled={
         state.isExecuting || state.nodes.length === 0 || state.isGenerating
       }
       onClick={() => actions.handleExecute()}
-      size="icon"
       title="Run Workflow"
-      variant="secondary"
     >
       {state.isExecuting ? (
         <Loader2 className="size-4 animate-spin" />
       ) : (
-        <Play className="size-4" />
+        <div className="flex items-center gap-2">
+          <Play className="size-4" /> Run
+        </div>
       )}
     </Button>
   );
@@ -1526,6 +1524,34 @@ function WorkflowMenuComponent({
                 New Workflow{" "}
                 {!workflowId && <Check className="size-4 shrink-0" />}
               </a>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="flex items-center justify-between"
+              disabled
+            >
+              <span>All Workflows</span>
+              <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground text-xs">
+                Coming Soon
+              </span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="flex items-center justify-between"
+              disabled
+            >
+              <span>Hub</span>
+              <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground text-xs">
+                Coming Soon
+              </span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="flex items-center justify-between"
+              disabled
+            >
+              <span>Analytics</span>
+              <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground text-xs">
+                Coming Soon
+              </span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             {state.allWorkflows.length === 0 ? (
@@ -2079,12 +2105,6 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
             workflowId={workflowId}
           />
           <div className="flex items-center gap-2">
-            {!workflowId && (
-              <>
-                <GitHubStarsButton />
-                <DeployButton />
-              </>
-            )}
             {workflowId && !state.isOwner && (
               <DuplicateButton
                 isDuplicating={state.isDuplicating}

@@ -12,8 +12,17 @@ const webhookPlugin: IntegrationPlugin = {
   // No credentials needed - users configure URL, method, headers, and payload directly in each action
   requiresCredentials: false,
 
-  // Empty form fields since no credentials are needed
-  formFields: [],
+  // Default form fields for webhook configuration
+  formFields: [
+    {
+      id: "info",
+      label: "Webhook Configuration",
+      type: "text",
+      placeholder: "No configuration needed",
+      configKey: "info",
+      helpText: "Configure webhook URL, method, headers, and payload directly in each webhook action.",
+    },
+  ],
 
   // No test function needed since there are no credentials to test
 
