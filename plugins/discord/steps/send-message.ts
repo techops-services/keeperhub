@@ -18,13 +18,12 @@ type SendDiscordMessageResult =
   | { success: false; error: string };
 
 export type SendDiscordMessageCoreInput = {
-  discordWebhookUrl: string;
   discordMessage: string;
 };
 
 export type SendDiscordMessageInput = StepInput &
   SendDiscordMessageCoreInput & {
-    integrationId?: string;
+    integrationId: string;
   };
 
 /**
@@ -32,17 +31,17 @@ export type SendDiscordMessageInput = StepInput &
  */
 async function stepHandler(
   input: SendDiscordMessageCoreInput,
-  _credentials: DiscordCredentials
+  credentials: DiscordCredentials
 ): Promise<SendDiscordMessageResult> {
   console.log("[Discord] Starting send message step");
 
-  const webhookUrl = input.discordWebhookUrl;
+  const webhookUrl = credentials.webhookUrl;
 
   if (!webhookUrl) {
-    console.error("[Discord] No webhook URL provided");
+    console.error("[Discord] No webhook URL provided in integration");
     return {
       success: false,
-      error: "Discord webhook URL is required",
+      error: "Discord webhook URL is required. Please configure it in the integration settings.",
     };
   }
 
@@ -105,9 +104,7 @@ export async function sendDiscordMessageStep(
 ): Promise<SendDiscordMessageResult> {
   "use step";
 
-  const credentials = input.integrationId
-    ? await fetchCredentials(input.integrationId)
-    : {};
+  const credentials = await fetchCredentials(input.integrationId);
 
   return withStepLogging(input, () => stepHandler(input, credentials));
 }

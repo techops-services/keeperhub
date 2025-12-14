@@ -898,7 +898,7 @@ export const PanelInner = () => {
 
                 // Get integration type dynamically
                 let integrationType: string | undefined;
-                let requiresIntegration = true;
+                let requiresCredentials = true; // Default to true for system actions
 
                 if (actionType) {
                   if (SYSTEM_INTEGRATION_MAP[actionType]) {
@@ -906,40 +906,41 @@ export const PanelInner = () => {
                   } else {
                     // Look up from plugin registry
                     const action = findActionById(actionType);
-                    integrationType = action?.integration;
-
-                    // Check if this plugin requires integration
                     if (action) {
+                      integrationType = action.integration;
+                      // Check if plugin requires credentials (default to true)
                       const plugin = getIntegration(action.integration);
-                      requiresIntegration = plugin?.requiresIntegration ?? true;
+                      requiresCredentials =
+                        plugin?.requiresCredentials !== false;
                     }
                   }
                 }
 
-                if (!integrationType) {
-                  return null;
-                }
-
-                // If integration is not required, show a message instead of selector
-                if (!requiresIntegration) {
+                // Show integration selector if credentials required, otherwise show info message
+                if (integrationType && requiresCredentials) {
                   return (
-                    <div className="rounded-md border border-border bg-muted/50 px-3 py-2 text-muted-foreground text-sm">
-                      No integration required
+                    <IntegrationSelector
+                      integrationType={integrationType as IntegrationType}
+                      label="Integration"
+                      onChange={(id) => handleUpdateConfig("integrationId", id)}
+                      onOpenSettings={() => setShowIntegrationsDialog(true)}
+                      value={
+                        (selectedNode.data.config?.integrationId as string) ||
+                        ""
+                      }
+                    />
+                  );
+                }
+                if (integrationType && !requiresCredentials) {
+                  return (
+                    <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2">
+                      <span className="text-muted-foreground text-sm">
+                        No integration required
+                      </span>
                     </div>
                   );
                 }
-
-                return (
-                  <IntegrationSelector
-                    integrationType={integrationType as IntegrationType}
-                    label="Integration"
-                    onChange={(id) => handleUpdateConfig("integrationId", id)}
-                    onOpenSettings={() => setShowIntegrationsDialog(true)}
-                    value={
-                      (selectedNode.data.config?.integrationId as string) || ""
-                    }
-                  />
-                );
+                return null;
               })()}
             </div>
           )}

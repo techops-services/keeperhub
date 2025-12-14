@@ -20,6 +20,7 @@ import {
   getAllIntegrations,
 } from "@/plugins";
 import { ActionConfigRenderer } from "./action-config-renderer";
+import { DiscordWebhookDisplay } from "./discord-webhook-display";
 import { SchemaBuilder, type SchemaField } from "./schema-builder";
 
 type ActionConfigProps = {
@@ -419,12 +420,21 @@ export function ActionConfig({
 
       {/* Plugin actions - declarative config fields */}
       {pluginAction && !SYSTEM_ACTION_IDS.includes(actionType) && (
-        <ActionConfigRenderer
-          config={config}
-          disabled={disabled}
-          fields={pluginAction.configFields}
-          onUpdateConfig={handlePluginUpdateConfig}
-        />
+        <>
+          {/* Discord-specific: Show webhook URL above message field */}
+          {pluginAction.integration === "discord" && (
+            <DiscordWebhookDisplay
+              actionType={actionType}
+              integrationId={config?.integrationId as string | undefined}
+            />
+          )}
+          <ActionConfigRenderer
+            config={config}
+            disabled={disabled}
+            fields={pluginAction.configFields}
+            onUpdateConfig={handlePluginUpdateConfig}
+          />
+        </>
       )}
     </>
   );
