@@ -10,7 +10,7 @@ const sendgridPlugin: IntegrationPlugin = {
   icon: SendGridIcon,
 
   // No integration required - uses KeeperHub SendGrid API key by default
-  requiresIntegration: false,
+  requiresCredentials: false,
 
   formFields: [
     {
