@@ -7,6 +7,11 @@
  * the plugins/index.ts file with imports. Also updates the README.md with
  * the current list of available actions.
  *
+ * Plugin Allowlist (Optional):
+ * - Create config/plugin-allowlist.json to control which plugins are enabled
+ * - If the file doesn't exist, all discovered plugins are enabled
+ * - This prevents disabled plugins from being registered while keeping them in the codebase
+ *
  * Additionally generates codegen templates from step files that have
  * a stepHandler function.
  *
@@ -37,6 +42,11 @@ const OUTPUT_CONFIGS_FILE = join(
 );
 const CODEGEN_REGISTRY_FILE = join(process.cwd(), "lib", "codegen-registry.ts");
 const README_FILE = join(process.cwd(), "README.md");
+const PLUGIN_ALLOWLIST_FILE = join(
+  process.cwd(),
+  "config",
+  "plugin-allowlist.json"
+);
 const PLUGINS_MARKER_REGEX =
   /<!-- PLUGINS:START[^>]*-->[\s\S]*?<!-- PLUGINS:END -->/;
 
@@ -59,6 +69,25 @@ async function formatCode(code: string): Promise<string> {
   }
 }
 
+/**
+ * Load plugin allowlist from config file
+ * Returns null if config doesn't exist (meaning all plugins enabled)
+ */
+function loadPluginAllowlist(): string[] | null {
+  if (!existsSync(PLUGIN_ALLOWLIST_FILE)) {
+    return null; // No allowlist = all plugins enabled
+  }
+
+  try {
+    const content = readFileSync(PLUGIN_ALLOWLIST_FILE, "utf-8");
+    const config = JSON.parse(content);
+    return config.plugins || [];
+  } catch (error) {
+    console.warn(`   Warning: Failed to load plugin allowlist: ${error}`);
+    return null; // Fallback to all plugins on error
+  }
+}
+
 // Track generated codegen templates
 const generatedCodegenTemplates = new Map<
   string,
@@ -66,12 +95,13 @@ const generatedCodegenTemplates = new Map<
 >();
 
 /**
- * Discover all plugin directories
+ * Discover all plugin directories (returns both all and enabled plugins)
  */
-function discoverPlugins(): string[] {
+function discoverPlugins(): { all: string[]; enabled: string[] } {
+  const allowlist = loadPluginAllowlist();
   const entries = readdirSync(PLUGINS_DIR);
 
-  const plugins = entries.filter((entry) => {
+  const allPlugins = entries.filter((entry) => {
     // Skip special directories and files
     if (
       entry.startsWith("_") ||
@@ -91,7 +121,24 @@ function discoverPlugins(): string[] {
     }
   });
 
-  return plugins.sort();
+  let enabledPlugins = allPlugins;
+
+  // Apply allowlist filter if config exists
+  if (allowlist !== null) {
+    enabledPlugins = allPlugins.filter((plugin) => allowlist.includes(plugin));
+    const disabledCount = allPlugins.length - enabledPlugins.length;
+
+    if (disabledCount > 0) {
+      console.log(
+        `   Allowlist enabled: ${disabledCount} plugin(s) filtered out`
+      );
+    }
+  }
+
+  return {
+    all: allPlugins.sort(),
+    enabled: enabledPlugins.sort(),
+  };
 }
 
 /**
@@ -841,22 +888,28 @@ export function getOutputDisplayConfig(actionType: string): OutputDisplayConfig 
 async function main(): Promise<void> {
   console.log("Discovering plugins...");
 
-  const plugins = discoverPlugins();
+  const { all: allPlugins, enabled: enabledPlugins } = discoverPlugins();
 
-  if (plugins.length === 0) {
+  if (allPlugins.length === 0) {
     console.log("No plugins found in plugins/ directory");
   } else {
-    console.log(`Found ${plugins.length} plugin(s):`);
-    for (const plugin of plugins) {
+    console.log(`Found ${enabledPlugins.length} enabled plugin(s):`);
+    for (const plugin of enabledPlugins) {
       console.log(`   - ${plugin}`);
+    }
+    if (allPlugins.length > enabledPlugins.length) {
+      const disabledPlugins = allPlugins.filter(
+        (p) => !enabledPlugins.includes(p)
+      );
+      console.log(`Disabled ${disabledPlugins.length} plugin(s): ${disabledPlugins.join(", ")}`);
     }
   }
 
   console.log("\nGenerating lib/types/integration.ts...");
-  generateTypesFile(plugins);
+  generateTypesFile(allPlugins); // Use all plugins for types
 
   console.log("Generating plugins/index.ts...");
-  generateIndexFile(plugins);
+  generateIndexFile(enabledPlugins); // Only import enabled plugins
 
   console.log("Updating README.md...");
   await updateReadme();
