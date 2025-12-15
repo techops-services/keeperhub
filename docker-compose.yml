@@ -1,79 +1,247 @@
-x-db-credentials: &db-credentials
-  POSTGRES_USER: ${POSTGRES_USER:-postgres}
-  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-  POSTGRES_DB: ${POSTGRES_DB:-workflow_builder}
+# =============================================================================
+# KeeperHub Docker Compose
+#
+# Profiles:
+#   dev      - Full development stack (no K8s Jobs, dispatcher runs as cron)
+#   minikube - Hybrid mode (services in Docker, job-spawner in Minikube)
+#   prod     - Production-ready containers
+#
+# Usage:
+#   docker compose --profile dev up -d        # Development (no K8s)
+#   docker compose --profile minikube up -d   # Hybrid mode
+#   make hybrid-setup                         # Full hybrid setup
+# =============================================================================
 
-x-db-connection: &db-connection
-  DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-workflow_builder}
+# -----------------------------------------------------------------------------
+# Primitives (from .env or defaults)
+# -----------------------------------------------------------------------------
+x-primitives:
+  db_name: &db_name "${POSTGRES_DB:-keeperhub}"
+  db_user: &db_user "${POSTGRES_USER:-postgres}"
+  db_password: &db_password "${POSTGRES_PASSWORD:-postgres}"
+  aws_region: &aws_region "us-east-1"
+  aws_access_key: &aws_access_key "test"
+  aws_secret_key: &aws_secret_key "test"
 
-x-app-common: &app-common
-  ports:
-    - "3000:3000"
-  environment:
-    <<: *db-connection
-  depends_on:
-    db:
-      condition: service_healthy
+# -----------------------------------------------------------------------------
+# Environment Groups
+# -----------------------------------------------------------------------------
+x-env-db: &env_db
+  POSTGRES_USER: *db_user
+  POSTGRES_PASSWORD: *db_password
+  POSTGRES_DB: *db_name
 
+x-env-db-connection: &env_db_connection
+  DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-keeperhub}
+
+x-env-aws: &env_aws
+  AWS_REGION: *aws_region
+  AWS_ACCESS_KEY_ID: *aws_access_key
+  AWS_SECRET_ACCESS_KEY: *aws_secret_key
+  # Use host.minikube.internal so URLs work from both host and Minikube
+  AWS_ENDPOINT_URL: http://host.minikube.internal:4566
+
+x-env-sqs: &env_sqs
+  SQS_QUEUE_URL: http://host.minikube.internal:4566/000000000000/keeperhub-workflow-queue
+
+# -----------------------------------------------------------------------------
+# Services
+# -----------------------------------------------------------------------------
 services:
+  # ===========================================================================
+  # Database
+  # ===========================================================================
   db:
     image: postgres:16-alpine
-    container_name: workflow-builder-db
+    container_name: keeperhub-db
+    hostname: db
     restart: unless-stopped
     environment:
-      <<: *db-credentials
+      <<: *env_db
     ports:
-      - "5432:5432"
+      - "5433:5432"  # External 5433 to avoid host port conflicts, internal 5432
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - keeperhub_db_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 5
-
-  app:
-    <<: *app-common
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: workflow-builder-app
-    restart: unless-stopped
-    profiles:
-      - prod
-
-  dev:
-    <<: *app-common
-    image: node:22-alpine
-    container_name: workflow-builder-dev
-    working_dir: /app
     profiles:
       - dev
-    volumes:
-      - .:/app
-      - node_modules:/app/node_modules
-    env_file:
-      - .env
-    environment:
-      <<: *db-connection
-      HOSTNAME: "0.0.0.0"
-    command: sh -c "npm install -g pnpm && pnpm install && pnpm dev --hostname 0.0.0.0"
+      - minikube
 
+  # ===========================================================================
+  # LocalStack (SQS)
+  # ===========================================================================
   localstack:
     image: localstack/localstack:latest
-    container_name: workflow-builder-localstack
+    container_name: keeperhub-localstack
+    hostname: localstack
     ports:
       - "4566:4566"
     environment:
       - SERVICES=sqs
       - DEBUG=0
+      - SQS_ENDPOINT_STRATEGY=path
+      # Use host.minikube.internal so queue URLs work from both host and Minikube
+      - LOCALSTACK_HOST=host.minikube.internal:4566
     volumes:
-      - localstack_data:/var/lib/localstack
+      - ./deploy/local/hybrid/init-localstack.sh:/etc/localstack/init/ready.d/init-aws.sh:ro
+      - keeperhub_localstack_data:/var/lib/localstack
+    healthcheck:
+      test: ["CMD-SHELL", "awslocal sqs list-queues || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     profiles:
       - dev
-      - localstack
+      - minikube
 
+  # ===========================================================================
+  # KeeperHub App (Next.js)
+  # ===========================================================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    image: keeperhub:latest
+    container_name: keeperhub-app
+    hostname: keeperhub
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      <<: [*env_db_connection, *env_aws, *env_sqs]
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles:
+      - prod
+
+  # Development app with hot reload
+  app-dev:
+    image: node:22-alpine
+    container_name: keeperhub-app-dev
+    hostname: keeperhub
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - keeperhub_node_modules:/app/node_modules
+    env_file:
+      - .env
+    environment:
+      <<: [*env_db_connection, *env_aws, *env_sqs]
+      HOSTNAME: "0.0.0.0"
+    depends_on:
+      db:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    command: sh -c "npm install -g pnpm && pnpm install && pnpm dev --hostname 0.0.0.0"
+    profiles:
+      - dev
+      - minikube
+
+  # ===========================================================================
+  # Schedule Dispatcher (CronJob alternative for Docker)
+  # Runs every minute to check for due schedules and send messages to SQS
+  # NOTE: In minikube profile, this runs as a K8s CronJob instead
+  # ===========================================================================
+  dispatcher:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: scheduler
+    image: keeperhub-scheduler:latest
+    container_name: keeperhub-dispatcher
+    restart: unless-stopped
+    working_dir: /app
+    environment:
+      <<: [*env_db_connection, *env_aws, *env_sqs]
+    depends_on:
+      db:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    # Run dispatcher every minute using a simple loop
+    # (Docker doesn't have native cron, so we simulate it)
+    command: |
+      sh -c 'while true; do
+        echo "[Dispatcher] Running at $$(date)"
+        tsx scripts/schedule-dispatcher.ts
+        echo "[Dispatcher] Sleeping 60s..."
+        sleep 60
+      done'
+    profiles:
+      - dev  # Only in dev profile (not minikube - uses K8s CronJob)
+
+  # ===========================================================================
+  # Schedule Executor (Direct execution for dev profile)
+  # Polls SQS and executes workflows directly (no K8s Jobs)
+  # NOTE: In minikube profile, job-spawner runs in K8s instead
+  # ===========================================================================
+  executor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: scheduler
+    image: keeperhub-scheduler:latest
+    container_name: keeperhub-executor
+    restart: unless-stopped
+    working_dir: /app
+    environment:
+      <<: [*env_db_connection, *env_aws, *env_sqs]
+      KEEPERHUB_URL: http://keeperhub:3000
+    depends_on:
+      db:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+      app-dev:
+        condition: service_started
+    command: tsx scripts/schedule-executor.ts
+    profiles:
+      - dev  # Only in dev profile (minikube uses job-spawner in K8s)
+
+  # ===========================================================================
+  # Database Migrator (one-shot)
+  # ===========================================================================
+  migrator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: migrator
+    image: keeperhub-migrator:latest
+    container_name: keeperhub-migrator
+    environment:
+      <<: *env_db_connection
+    depends_on:
+      db:
+        condition: service_healthy
+    command: pnpm db:push
+    profiles:
+      - migrator
+
+# =============================================================================
+# Volumes
+# =============================================================================
 volumes:
-  postgres_data:
-  node_modules:
-  localstack_data:
+  keeperhub_db_data:
+    name: keeperhub_db_data
+  keeperhub_node_modules:
+    name: keeperhub_node_modules
+  keeperhub_localstack_data:
+    name: keeperhub_localstack_data
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  default:
+    name: keeperhub-network

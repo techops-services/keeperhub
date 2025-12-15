@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install dev build type-check lint fix deploy-to-local-kubernetes setup-local-kubernetes check-local-kubernetes status logs restart teardown db-create db-migrate db-studio deploy-scheduler scheduler-status scheduler-logs test test-unit test-integration test-e2e
+.PHONY: help install dev build type-check lint fix deploy-to-local-kubernetes setup-local-kubernetes check-local-kubernetes status logs restart teardown db-create db-migrate db-studio build-scheduler-images deploy-scheduler scheduler-status scheduler-logs runner-logs teardown-scheduler test test-unit test-integration test-e2e hybrid-setup hybrid-up hybrid-deploy hybrid-deploy-only hybrid-status hybrid-down hybrid-reset hybrid-logs dev-up dev-down dev-logs
 
 # Development
 install:
@@ -77,22 +77,35 @@ db-studio:
 	pnpm db:studio
 
 # Schedule Trigger Deployment
+build-scheduler-images:
+	@echo "Building scheduler and runner images..."
+	docker build --target scheduler -t keeperhub-scheduler:latest .
+	docker build --target workflow-runner -t keeperhub-runner:latest .
+	@echo "Loading images into minikube..."
+	minikube image load keeperhub-scheduler:latest
+	minikube image load keeperhub-runner:latest
+	@echo "Images ready!"
+
 deploy-scheduler: check-local-kubernetes
 	@echo "Deploying schedule trigger components..."
 	kubectl apply -f ./deploy/local/schedule-trigger.yaml
 	@echo ""
 	@echo "Schedule trigger components deployed:"
 	@echo "  - ConfigMap: scheduler-env"
+	@echo "  - RBAC: ServiceAccount, Role, RoleBinding for job-spawner"
 	@echo "  - CronJob: schedule-dispatcher (runs every minute)"
-	@echo "  - Deployment: schedule-executor (SQS consumer)"
+	@echo "  - Deployment: job-spawner (polls SQS, creates K8s Jobs)"
 
 scheduler-status:
 	@echo "=== Schedule Dispatcher Jobs ==="
 	@kubectl get cronjobs -n local -l component=scheduler
 	@kubectl get jobs -n local -l app=schedule-dispatcher --sort-by=.metadata.creationTimestamp | tail -5
 	@echo ""
-	@echo "=== Schedule Executor ==="
-	@kubectl get pods -n local -l app=schedule-executor
+	@echo "=== Job Spawner ==="
+	@kubectl get pods -n local -l app=job-spawner
+	@echo ""
+	@echo "=== Workflow Runner Jobs ==="
+	@kubectl get jobs -n local -l app=workflow-runner --sort-by=.metadata.creationTimestamp | tail -10 || echo "No workflow jobs"
 	@echo ""
 	@echo "=== LocalStack (SQS) ==="
 	@kubectl get pods -n local -l app=localstack
@@ -101,8 +114,12 @@ scheduler-logs:
 	@echo "=== Recent Dispatcher Job Logs ==="
 	@kubectl logs -n local -l app=schedule-dispatcher --tail=50 2>/dev/null || echo "No dispatcher logs available"
 	@echo ""
-	@echo "=== Executor Logs ==="
-	@kubectl logs -n local -l app=schedule-executor --tail=100 -f
+	@echo "=== Job Spawner Logs ==="
+	@kubectl logs -n local -l app=job-spawner --tail=100 -f
+
+runner-logs:
+	@echo "=== Recent Workflow Runner Job Logs ==="
+	@kubectl logs -n local -l app=workflow-runner --tail=100 2>/dev/null || echo "No runner logs available"
 
 teardown-scheduler:
 	kubectl delete -f ./deploy/local/schedule-trigger.yaml --ignore-not-found=true
@@ -130,6 +147,92 @@ test-e2e:
 	kill $$PF_PID_DB 2>/dev/null || true; \
 	kill $$PF_PID_SQS 2>/dev/null || true
 
+# =============================================================================
+# Docker Compose - Dev Profile (No K8s Jobs)
+# =============================================================================
+
+dev-up:
+	@echo "Starting dev profile (no K8s Jobs)..."
+	docker compose --profile dev up -d
+	@echo ""
+	@echo "Services started:"
+	@echo "  - db (PostgreSQL)"
+	@echo "  - localstack (SQS)"
+	@echo "  - app-dev (KeeperHub)"
+	@echo "  - dispatcher (runs every minute)"
+	@echo "  - executor (polls SQS, calls API directly)"
+	@echo ""
+	@echo "App: http://localhost:3000"
+
+dev-down:
+	docker compose --profile dev down
+
+dev-logs:
+	docker compose --profile dev logs -f
+
+dev-migrate:
+	docker compose run --rm migrator
+
+# =============================================================================
+# Hybrid Mode (Docker Compose + Minikube for K8s Jobs)
+# =============================================================================
+
+hybrid-setup:
+	# Full setup: prerequisites, /etc/hosts, Docker Compose, Minikube, scheduler
+	chmod +x ./deploy/local/hybrid/setup.sh
+	./deploy/local/hybrid/setup.sh
+
+hybrid-up:
+	# Start Docker Compose services (everything except scheduler)
+	docker compose --profile minikube up -d
+	@echo "Docker Compose services started. Now deploy scheduler to Minikube:"
+	@echo "  make hybrid-deploy"
+
+hybrid-deploy:
+	# Deploy scheduler to Minikube (builds images if needed)
+	chmod +x ./deploy/local/hybrid/deploy.sh
+	./deploy/local/hybrid/deploy.sh --build
+
+hybrid-deploy-only:
+	# Deploy scheduler to Minikube (skip image build)
+	chmod +x ./deploy/local/hybrid/deploy.sh
+	./deploy/local/hybrid/deploy.sh
+
+hybrid-status:
+	# Show status of hybrid deployment
+	./deploy/local/hybrid/deploy.sh --status
+
+hybrid-down:
+	# Teardown hybrid deployment
+	./deploy/local/hybrid/deploy.sh --teardown
+	docker compose --profile minikube down
+
+hybrid-reset:
+	# Full reset: teardown, remove volumes, rebuild, and restart
+	@echo "Tearing down hybrid deployment..."
+	-./deploy/local/hybrid/deploy.sh --teardown 2>/dev/null || true
+	docker compose --profile minikube down -v
+	@echo "Rebuilding and starting fresh..."
+	docker compose --profile minikube up -d
+	@echo "Waiting for services to be ready..."
+	@sleep 10
+	@echo "Running database migrations..."
+	docker compose run --rm migrator || true
+	@echo "Deploying scheduler to Minikube..."
+	./deploy/local/hybrid/deploy.sh --build
+	@echo ""
+	@echo "Hybrid reset complete!"
+	@echo "  App: http://localhost:3000"
+
+hybrid-logs:
+	# Follow job-spawner logs
+	kubectl logs -n local -l app=job-spawner -f
+
+hybrid-runner-logs:
+	# Show recent workflow runner job logs
+	@echo "=== Recent Workflow Runner Job Logs ==="
+	@kubectl logs -n local -l app=workflow-runner --tail=100 2>/dev/null || echo "No runner logs available"
+
 # Help
 help:
 	@echo "KeeperHub Development Commands"
@@ -140,13 +243,30 @@ help:
 	@echo ""
 	@echo "  Development:"
 	@echo "    install                    - Install dependencies"
-	@echo "    dev                        - Start development server"
+	@echo "    dev                        - Start development server (local)"
 	@echo "    build                      - Build for production"
 	@echo "    type-check                 - Run TypeScript type checking"
 	@echo "    lint                       - Run linter"
 	@echo "    fix                        - Fix linting issues"
 	@echo ""
-	@echo "  Local Kubernetes:"
+	@echo "  Docker Compose - Dev Profile (no K8s Jobs, ~2-3GB RAM):"
+	@echo "    dev-up                     - Start dev profile (db, app, dispatcher, executor)"
+	@echo "    dev-down                   - Stop dev profile"
+	@echo "    dev-logs                   - Follow dev profile logs"
+	@echo "    dev-migrate                - Run database migrations"
+	@echo ""
+	@echo "  Hybrid Mode (Docker Compose + Minikube, ~4-5GB RAM):"
+	@echo "    hybrid-setup               - Full setup (compose, minikube, scheduler)"
+	@echo "    hybrid-up                  - Start Docker Compose services"
+	@echo "    hybrid-deploy              - Build and deploy scheduler to Minikube"
+	@echo "    hybrid-deploy-only         - Deploy scheduler (skip build)"
+	@echo "    hybrid-status              - Show hybrid deployment status"
+	@echo "    hybrid-down                - Teardown hybrid deployment"
+	@echo "    hybrid-reset               - Full reset and restart"
+	@echo "    hybrid-logs                - Follow job-spawner logs"
+	@echo "    hybrid-runner-logs         - Show workflow runner logs"
+	@echo ""
+	@echo "  Full Kubernetes (all in Minikube, ~8GB RAM):"
 	@echo "    setup-local-kubernetes     - Setup minikube with all infrastructure"
 	@echo "    check-local-kubernetes     - Quick check if environment is ready"
 	@echo "    deploy-to-local-kubernetes - Build and deploy to minikube"
@@ -156,15 +276,17 @@ help:
 	@echo "    restart                    - Restart keeperhub deployment"
 	@echo "    teardown                   - Delete keeperhub resources from cluster"
 	@echo ""
-	@echo "  Database:"
+	@echo "  Database (Full K8s mode):"
 	@echo "    db-create                  - Create keeperhub database in PostgreSQL"
 	@echo "    db-migrate                 - Run database migrations on local kubernetes"
 	@echo "    db-studio                  - Open Drizzle Studio"
 	@echo ""
-	@echo "  Schedule Trigger:"
-	@echo "    deploy-scheduler           - Deploy schedule dispatcher and executor"
-	@echo "    scheduler-status           - Show scheduler pods and jobs status"
-	@echo "    scheduler-logs             - Follow scheduler logs"
+	@echo "  Schedule Trigger (Full K8s mode):"
+	@echo "    build-scheduler-images     - Build and load scheduler + runner images"
+	@echo "    deploy-scheduler           - Deploy dispatcher, job-spawner, RBAC"
+	@echo "    scheduler-status           - Show scheduler pods and workflow jobs"
+	@echo "    scheduler-logs             - Follow job-spawner logs"
+	@echo "    runner-logs                - Show workflow runner job logs"
 	@echo "    teardown-scheduler         - Remove scheduler components"
 	@echo ""
 	@echo "  Testing:"
@@ -172,3 +294,8 @@ help:
 	@echo "    test-unit                  - Run unit tests"
 	@echo "    test-integration           - Run integration tests"
 	@echo "    test-e2e                   - Run E2E tests against local kubernetes"
+	@echo ""
+	@echo "Recommended workflow:"
+	@echo "  1. For UI/API dev (no workflow testing): make dev-up"
+	@echo "  2. For workflow testing with K8s Jobs:   make hybrid-setup"
+	@echo "  3. For production-like testing:          make setup-local-kubernetes"

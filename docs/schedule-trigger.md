@@ -4,39 +4,86 @@ This document describes the schedule trigger feature for KeeperHub, which enable
 
 ## Architecture Overview
 
-The schedule trigger system consists of three main components:
+KeeperHub supports multiple deployment modes for workflow execution:
+
+### Mode 1: Dev Mode (No K8s Jobs)
+
+Direct execution via API - suitable for UI/API development:
 
 ```
 ┌─────────────────┐     ┌─────────────┐     ┌──────────────────┐
 │   Dispatcher    │────▶│  SQS Queue  │────▶│    Executor      │
-│   (CronJob)     │     │ (LocalStack)│     │  (Deployment)    │
+│   (Docker)      │     │ (LocalStack)│     │    (Docker)      │
 └─────────────────┘     └─────────────┘     └──────────────────┘
-        │                                            │
         │                                            │
         ▼                                            ▼
 ┌─────────────────┐                         ┌──────────────────┐
 │   PostgreSQL    │                         │   KeeperHub API  │
-│ (workflow_      │                         │ /api/workflow/   │
-│  schedules)     │                         │ {id}/execute     │
-└─────────────────┘                         └──────────────────┘
+│   (Docker)      │                         │ /api/workflow/   │
+└─────────────────┘                         │ {id}/execute     │
+                                            └──────────────────┘
 ```
 
-### Components
+### Mode 2: Hybrid Mode (Docker + Minikube K8s Jobs)
+
+Isolated workflow execution in K8s Jobs - suitable for workflow testing:
+
+```
+┌───────────────────────────────────────────────────┐
+│            Docker Compose (minikube profile)       │
+│  ┌─────────┐  ┌───────────┐  ┌──────────────┐    │
+│  │   db    │  │ localstack│  │   app-dev    │    │
+│  │(Postgres)│  │   (SQS)   │  │  (Next.js)   │    │
+│  └─────────┘  └───────────┘  └──────────────┘    │
+└───────────────────────────────────────────────────┘
+                        │ host.minikube.internal
+                        ▼
+┌───────────────────────────────────────────────────┐
+│                    Minikube                        │
+│  ┌──────────────┐      ┌──────────────────────┐  │
+│  │  Dispatcher  │─SQS─▶│    Job Spawner       │  │
+│  │  (CronJob)   │      │   (Deployment)       │  │
+│  └──────────────┘      └──────────────────────┘  │
+│                                │                  │
+│                                ▼ creates          │
+│                        ┌──────────────────────┐  │
+│                        │   Workflow Runner    │  │
+│                        │     (K8s Jobs)       │  │
+│                        └──────────────────────┘  │
+└───────────────────────────────────────────────────┘
+```
+
+### Mode 3: Full Kubernetes
+
+All services in Minikube - suitable for production-like testing (~8GB RAM).
+
+## Components
 
 1. **Schedule Dispatcher** (`scripts/schedule-dispatcher.ts`)
-   - Runs as a Kubernetes CronJob every minute
+   - Runs as a Kubernetes CronJob (hybrid/k8s) or Docker loop (dev)
    - Queries `workflow_schedules` table for schedules due to run
    - Sends messages to SQS queue for each triggered schedule
    - Updates `next_run_at` and `last_run_at` timestamps
 
-2. **Schedule Executor** (`scripts/schedule-executor.ts`)
-   - Runs as a long-running Kubernetes Deployment
+2. **Schedule Executor** (`scripts/schedule-executor.ts`) - Dev Mode Only
+   - Runs as a Docker container in dev profile
    - Polls SQS queue for workflow trigger messages
-   - Calls KeeperHub API to execute workflows
+   - Calls KeeperHub API to execute workflows directly
    - Handles retries and error logging
 
-3. **SQS Queue** (LocalStack in local dev, AWS in production)
-   - Decouples dispatcher from executor
+3. **Job Spawner** (`scripts/job-spawner.ts`) - Hybrid/K8s Mode
+   - Runs as a Kubernetes Deployment
+   - Polls SQS queue for workflow trigger messages
+   - Creates K8s Jobs for each workflow execution
+   - Provides isolated execution environment
+
+4. **Workflow Runner** (`scripts/workflow-runner.ts`) - Hybrid/K8s Mode
+   - Runs inside K8s Jobs (one per workflow execution)
+   - Executes workflow steps in isolation
+   - Updates execution status in database
+
+5. **SQS Queue** (LocalStack in local dev, AWS in production)
+   - Decouples dispatcher from executor/job-spawner
    - Provides message durability and retry capabilities
    - Queue name: `keeperhub-workflow-queue`
 
@@ -58,67 +105,152 @@ CREATE TABLE workflow_schedules (
 
 ## Local Development
 
-### Prerequisites
+KeeperHub provides three deployment modes with increasing resource requirements:
 
-- Minikube with Docker driver
-- kubectl, helm, mkcert installed
-- Docker daemon running
+| Mode | Command | RAM | K8s Jobs | Best For |
+|------|---------|-----|----------|----------|
+| **Dev** | `make dev-up` | ~2-3GB | No | UI/API development |
+| **Hybrid** | `make hybrid-setup` | ~4-5GB | Yes | Workflow testing |
+| **Full K8s** | `make setup-local-kubernetes` | ~8GB | Yes | Production-like |
 
-### Setup
+### Dev Mode (Recommended for Most Development)
+
+All services run in Docker Compose. Workflows execute directly via API calls.
 
 ```bash
-# 1. Setup infrastructure (PostgreSQL, LocalStack, cert-manager)
+# Start everything
+make dev-up
+
+# Run migrations
+make dev-migrate
+
+# View logs
+make dev-logs
+
+# Stop
+make dev-down
+```
+
+Access: http://localhost:3000
+
+### Hybrid Mode (Recommended for Workflow Testing)
+
+Docker Compose for infrastructure + Minikube for workflow execution.
+
+```bash
+# One-command setup (handles everything)
+make hybrid-setup
+
+# Or step-by-step:
+docker compose --profile minikube up -d  # Start Docker services
+make hybrid-deploy                        # Deploy scheduler to Minikube
+
+# Check status
+make hybrid-status
+
+# View job-spawner logs
+make hybrid-logs
+
+# View workflow runner logs
+make hybrid-runner-logs
+
+# Teardown
+make hybrid-down
+```
+
+**Prerequisites for Hybrid Mode:**
+
+```bash
+# Add to /etc/hosts (required for SQS URL resolution)
+echo "127.0.0.1 host.minikube.internal" | sudo tee -a /etc/hosts
+```
+
+Access: http://localhost:3000
+
+### Full Kubernetes Mode
+
+All services run in Minikube.
+
+```bash
+# Setup infrastructure
 make setup-local-kubernetes
 
-# 2. Build and deploy KeeperHub
+# Deploy KeeperHub
 make deploy-to-local-kubernetes
 
-# 3. Build scheduler image
-docker build --target scheduler -t keeperhub-scheduler:latest .
-minikube image load keeperhub-scheduler:latest
-
-# 4. Deploy scheduler components
+# Deploy scheduler
+make build-scheduler-images
 make deploy-scheduler
+
+# Check status
+make scheduler-status
+
+# View logs
+make scheduler-logs
+
+# Teardown
+make teardown
 ```
 
 ### Makefile Commands
 
 | Command | Description |
 |---------|-------------|
-| `make deploy-scheduler` | Deploy dispatcher CronJob and executor Deployment |
+| **Dev Mode** ||
+| `make dev-up` | Start dev profile (db, app, dispatcher, executor) |
+| `make dev-down` | Stop dev profile |
+| `make dev-logs` | Follow dev profile logs |
+| `make dev-migrate` | Run database migrations |
+| **Hybrid Mode** ||
+| `make hybrid-setup` | Full hybrid setup (one command) |
+| `make hybrid-up` | Start Docker Compose services |
+| `make hybrid-deploy` | Build and deploy scheduler to Minikube |
+| `make hybrid-status` | Show hybrid deployment status |
+| `make hybrid-down` | Teardown hybrid deployment |
+| `make hybrid-logs` | Follow job-spawner logs |
+| `make hybrid-runner-logs` | Show workflow runner logs |
+| **Full K8s Mode** ||
+| `make deploy-scheduler` | Deploy scheduler to Minikube |
 | `make scheduler-status` | Show scheduler pods and job status |
-| `make scheduler-logs` | Follow scheduler logs (dispatcher + executor) |
-| `make teardown-scheduler` | Remove scheduler components from cluster |
-| `make test-e2e` | Run E2E tests against minikube |
+| `make scheduler-logs` | Follow scheduler logs |
+| `make teardown-scheduler` | Remove scheduler components |
 
-### Verify Deployment
+### Verify Hybrid Deployment
 
 ```bash
-# Check scheduler status
-make scheduler-status
+# Check status
+make hybrid-status
 
 # Expected output:
-# === Schedule Dispatcher Jobs ===
-# NAME                  SCHEDULE    SUSPEND   ACTIVE   LAST SCHEDULE
-# schedule-dispatcher   * * * * *   False     0        30s
+# === Docker Compose (minikube profile) ===
+# NAME                  STATUS    PORTS
+# keeperhub-db          running   0.0.0.0:5432->5432/tcp
+# keeperhub-localstack  running   0.0.0.0:4566->4566/tcp
+# keeperhub-app-dev     running   0.0.0.0:3000->3000/tcp
 #
-# === Schedule Executor ===
-# NAME                                 READY   STATUS    RESTARTS
-# schedule-executor-xxx                1/1     Running   0
+# === Schedule Dispatcher (CronJob) ===
+# NAME                  SCHEDULE    ACTIVE
+# schedule-dispatcher   * * * * *   0
 #
-# === LocalStack (SQS) ===
-# NAME                          READY   STATUS    RESTARTS
-# localstack-xxx                1/1     Running   0
+# === Job Spawner ===
+# NAME                  READY   STATUS
+# job-spawner-xxx       1/1     Running
+#
+# === Workflow Runner Jobs ===
+# (Jobs appear here when workflows execute)
 ```
 
 ### View Logs
 
 ```bash
-# Dispatcher logs (shows each minute's run)
-kubectl logs -n local -l app=schedule-dispatcher --tail=50
+# Job spawner logs (shows SQS polling and K8s Job creation)
+make hybrid-logs
 
-# Executor logs (shows SQS polling and workflow triggers)
-kubectl logs -n local -l app=schedule-executor -f
+# Workflow runner logs (shows actual workflow execution)
+make hybrid-runner-logs
+
+# Docker Compose logs
+docker compose --profile minikube logs -f
 ```
 
 ## Kubernetes Resources
@@ -263,15 +395,82 @@ docker build --target scheduler -t keeperhub-scheduler:latest .
 minikube image load keeperhub-scheduler:latest
 ```
 
+## Execution Modes Comparison
+
+### Dev Mode Limitations
+
+In dev mode, workflow execution happens inside the KeeperHub API via direct API calls:
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────────────────┐
+│    Executor     │────▶│   KeeperHub     │────▶│  Workflow runs inside       │
+│  (SQS consumer) │     │   API Pod       │     │  the API request handler    │
+└─────────────────┘     └─────────────────┘     └─────────────────────────────┘
+```
+
+| Issue | Impact |
+|-------|--------|
+| **Long-running workflows** | Block the API request, risk timeout |
+| **Resource contention** | Workflow execution competes with API requests |
+| **No isolation** | A failing workflow could affect API stability |
+| **No independent scaling** | Can't scale workflow execution separately from API |
+
+**Best for**: UI/API development, short-running workflows (< 30s)
+
+### Hybrid Mode Benefits
+
+In hybrid mode, workflows execute in isolated K8s Jobs:
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────────────────┐
+│   Job Spawner   │────▶│   K8s Job API   │────▶│  Workflow runs in isolated  │
+│  (SQS consumer) │     │                 │     │  container (workflow-runner) │
+└─────────────────┘     └─────────────────┘     └─────────────────────────────┘
+```
+
+| Benefit | Description |
+|---------|-------------|
+| **Isolated execution** | Each workflow runs in its own container |
+| **No API contention** | Workflows don't block API requests |
+| **Resource limits** | Each Job has defined CPU/memory limits |
+| **Automatic cleanup** | K8s automatically cleans up completed Jobs |
+| **Independent scaling** | Job-spawner can scale separately from app |
+
+**Best for**: Workflow testing, longer-running workflows, production-like behavior
+
+### Production Considerations
+
+For production, use the full K8s mode or hybrid mode with:
+- Proper resource limits on workflow-runner Jobs
+- Dead letter queue for failed workflows
+- Monitoring on job-spawner and workflow execution
+- TTL configuration for job cleanup
+
+---
+
 ## Files Reference
 
 | File | Purpose |
 |------|---------|
+| **Scripts** ||
 | `scripts/schedule-dispatcher.ts` | Dispatcher script (queries DB, sends to SQS) |
-| `scripts/schedule-executor.ts` | Executor script (polls SQS, triggers workflows) |
+| `scripts/schedule-executor.ts` | Executor script - dev mode (polls SQS, calls API) |
+| `scripts/job-spawner.ts` | Job spawner - hybrid/k8s mode (polls SQS, creates K8s Jobs) |
+| `scripts/workflow-runner.ts` | Workflow runner - runs inside K8s Jobs |
+| **Services** ||
 | `lib/schedule-service.ts` | Schedule management service |
 | `lib/db/schema/workflow-schedules.ts` | Database schema |
-| `deploy/local/schedule-trigger.yaml` | K8s manifests for scheduler |
-| `deploy/local/setup-local.sh` | Local infrastructure setup |
+| `lib/workflow-executor.workflow.ts` | Workflow execution logic |
+| **Docker Compose** ||
+| `docker-compose.yml` | Docker Compose with dev/minikube profiles |
+| **Hybrid Mode** ||
+| `deploy/local/hybrid/setup.sh` | Full hybrid setup script |
+| `deploy/local/hybrid/deploy.sh` | Hybrid deployment helper |
+| `deploy/local/hybrid/init-localstack.sh` | LocalStack SQS initialization |
+| `deploy/local/hybrid/README.md` | Hybrid mode documentation |
+| **Full K8s Mode** ||
+| `deploy/local/schedule-trigger.yaml` | K8s manifests for scheduler (full k8s mode) |
+| `deploy/local/setup-local.sh` | Minikube infrastructure setup |
+| **Tests** ||
 | `tests/unit/schedule-*.test.ts` | Unit tests |
 | `tests/e2e/schedule-pipeline.test.ts` | E2E tests |
