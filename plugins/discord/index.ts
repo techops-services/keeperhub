@@ -17,6 +17,7 @@ const discordPlugin: IntegrationPlugin = {
       type: "url",
       placeholder: "https://discord.com/api/webhooks/...",
       configKey: "webhookUrl",
+      envVar: "webhookUrl",
       helpText: "Discord webhook URL for this channel. This URL will be used by all actions using this integration.",
       helpLink: {
         text: "Learn how to create webhooks",
