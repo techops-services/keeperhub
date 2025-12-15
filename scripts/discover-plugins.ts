@@ -95,13 +95,13 @@ const generatedCodegenTemplates = new Map<
 >();
 
 /**
- * Discover all plugin directories
+ * Discover all plugin directories (returns both all and enabled plugins)
  */
-function discoverPlugins(): string[] {
+function discoverPlugins(): { all: string[]; enabled: string[] } {
   const allowlist = loadPluginAllowlist();
   const entries = readdirSync(PLUGINS_DIR);
 
-  let plugins = entries.filter((entry) => {
+  const allPlugins = entries.filter((entry) => {
     // Skip special directories and files
     if (
       entry.startsWith("_") ||
@@ -121,11 +121,12 @@ function discoverPlugins(): string[] {
     }
   });
 
+  let enabledPlugins = allPlugins;
+
   // Apply allowlist filter if config exists
   if (allowlist !== null) {
-    const beforeCount = plugins.length;
-    plugins = plugins.filter((plugin) => allowlist.includes(plugin));
-    const disabledCount = beforeCount - plugins.length;
+    enabledPlugins = allPlugins.filter((plugin) => allowlist.includes(plugin));
+    const disabledCount = allPlugins.length - enabledPlugins.length;
 
     if (disabledCount > 0) {
       console.log(
@@ -134,7 +135,10 @@ function discoverPlugins(): string[] {
     }
   }
 
-  return plugins.sort();
+  return {
+    all: allPlugins.sort(),
+    enabled: enabledPlugins.sort(),
+  };
 }
 
 /**
@@ -884,22 +888,28 @@ export function getOutputDisplayConfig(actionType: string): OutputDisplayConfig 
 async function main(): Promise<void> {
   console.log("Discovering plugins...");
 
-  const plugins = discoverPlugins();
+  const { all: allPlugins, enabled: enabledPlugins } = discoverPlugins();
 
-  if (plugins.length === 0) {
+  if (allPlugins.length === 0) {
     console.log("No plugins found in plugins/ directory");
   } else {
-    console.log(`Found ${plugins.length} plugin(s):`);
-    for (const plugin of plugins) {
+    console.log(`Found ${enabledPlugins.length} enabled plugin(s):`);
+    for (const plugin of enabledPlugins) {
       console.log(`   - ${plugin}`);
+    }
+    if (allPlugins.length > enabledPlugins.length) {
+      const disabledPlugins = allPlugins.filter(
+        (p) => !enabledPlugins.includes(p)
+      );
+      console.log(`Disabled ${disabledPlugins.length} plugin(s): ${disabledPlugins.join(", ")}`);
     }
   }
 
   console.log("\nGenerating lib/types/integration.ts...");
-  generateTypesFile(plugins);
+  generateTypesFile(allPlugins); // Use all plugins for types
 
   console.log("Generating plugins/index.ts...");
-  generateIndexFile(plugins);
+  generateIndexFile(enabledPlugins); // Only import enabled plugins
 
   console.log("Updating README.md...");
   await updateReadme();
