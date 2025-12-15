@@ -1,15 +1,6 @@
 import { NextResponse } from "next/server";
 
-// Hardcoded beta allowlist - add emails here
-const BETA_ALLOWLIST = [
-  "simon@techops.services",
-  "sasha@techops.services",
-  "jacob@techops.services",
-  "dumitru@techops.services",
-  "arty@techops.services",
-  "luca@techops.services",
-  "tait@techops.services",
-];
+import betaAllowlist from "@/config/beta-allowlist.json";
 
 export async function POST(request: Request) {
   try {
@@ -19,7 +10,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Email required" }, { status: 400 });
     }
 
-    const isAllowlisted = BETA_ALLOWLIST.some(
+    const isAllowlisted = betaAllowlist.emails.some(
       (e) => e.toLowerCase() === email.toLowerCase().trim()
     );
 

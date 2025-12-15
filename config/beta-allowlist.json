@@ -1,0 +1,13 @@
+{
+  "$schema": "./beta-allowlist.schema.json",
+  "description": "Beta allowlist - add email addresses below to grant access",
+  "emails": [
+    "simon@techops.services",
+    "sasha@techops.services",
+    "jacob@techops.services",
+    "dumitru@techops.services",
+    "arty@techops.services",
+    "luca@techops.services",
+    "tait@techops.services"
+  ]
+}
