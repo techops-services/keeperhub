@@ -79,7 +79,7 @@ jobs:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
           curl -H "Content-Type: application/json" \
-          -d "{\"username\": \"KeeperHub Sync\", \"content\": \"**ℹDaily Sync Report**\n\nNo new updates from upstream today.\"}" \
+          -d "{\"username\": \"KeeperHub Sync\", \"content\": \"**Daily Sync Report**\n\nNo new updates from upstream today.\"}" \
           $DISCORD_WEBHOOK
 
       - name: Notify Discord (Failure)
