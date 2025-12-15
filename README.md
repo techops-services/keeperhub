@@ -94,7 +94,7 @@ Visit [http://localhost:3000](http://localhost:3000) to get started.
 - **Clerk**: Get User, Create User, Update User, Delete User
 - **Discord**: Send Discord Message
 - **Resend**: Send Email
-- **SendGrid**: Send Email
+- **Email**: Send Email
 - **Slack**: Send Slack Message
 - **v0**: Create Chat, Send Message
 - **Web3**: Check Balance, Transfer Funds, Read Contract, Write Contract
