@@ -79,6 +79,129 @@ pnpm dev
 
 Visit [http://localhost:3000](http://localhost:3000) to get started.
 
+## Running the Application
+
+KeeperHub supports multiple deployment modes depending on your development needs:
+
+### Option 1: Local Development (Simplest)
+
+For UI/API development without Docker:
+
+```bash
+pnpm install
+pnpm db:push
+pnpm dev
+```
+
+**Requirements:** Node.js 18+, PostgreSQL database
+
+### Option 2: Dev Mode with Docker (~2-3GB RAM)
+
+Full development stack with scheduled workflow execution (no K8s Jobs):
+
+```bash
+# Start all services
+make dev-up
+
+# Run database migrations
+make dev-migrate
+
+# View logs
+make dev-logs
+
+# Stop services
+make dev-down
+```
+
+**Services started:**
+- PostgreSQL (port 5433)
+- LocalStack SQS (port 4566)
+- KeeperHub App (port 3000)
+- Schedule Dispatcher (runs every minute)
+- Schedule Executor (polls SQS, calls API directly)
+
+### Option 3: Hybrid Mode with K8s Jobs (~4-5GB RAM)
+
+For testing workflow execution in isolated K8s Job containers:
+
+```bash
+# Full setup (first time)
+make hybrid-setup
+
+# Or step by step:
+make hybrid-up           # Start Docker services
+make hybrid-deploy       # Build and deploy to Minikube
+
+# View status
+make hybrid-status
+
+# View logs
+make hybrid-logs         # Job spawner logs
+make hybrid-runner-logs  # Workflow runner logs
+
+# Teardown
+make hybrid-down
+```
+
+**Architecture:**
+- Docker Compose: PostgreSQL, LocalStack, KeeperHub App
+- Minikube: Schedule Dispatcher (CronJob), Job Spawner, Workflow Runner Jobs
+
+### Option 4: Full Kubernetes (~8GB RAM)
+
+All services running in Minikube:
+
+```bash
+make setup-local-kubernetes
+make deploy-to-local-kubernetes
+make deploy-scheduler
+```
+
+## Testing
+
+### Run All Tests
+
+```bash
+pnpm test
+```
+
+### Run Specific Test Suites
+
+```bash
+# Unit tests
+pnpm test -- --run tests/unit/
+
+# Integration tests
+pnpm test -- --run tests/integration/
+
+# Workflow runner E2E tests (requires PostgreSQL on port 5433)
+DATABASE_URL="postgresql://postgres:postgres@localhost:5433/keeperhub" \
+  pnpm test -- --run tests/e2e/workflow-runner.test.ts
+```
+
+### E2E Tests Against Local Kubernetes
+
+```bash
+make test-e2e
+```
+
+### Manual Workflow Runner Testing
+
+Test the workflow runner directly:
+
+```bash
+# With bootstrap script (patches server-only)
+WORKFLOW_ID=<id> EXECUTION_ID=<id> DATABASE_URL=<url> \
+  node scripts/workflow-runner-bootstrap.cjs
+
+# In Docker container
+docker run --rm --network host \
+  -e WORKFLOW_ID=<id> \
+  -e EXECUTION_ID=<id> \
+  -e DATABASE_URL=<url> \
+  keeperhub-runner:latest
+```
+
 ## Workflow Types
 
 ### Trigger Nodes
@@ -176,24 +299,55 @@ The generated code includes:
 
 ```bash
 # Development
-pnpm dev
-
-# Build
-pnpm build
-
-# Type checking
-pnpm type-check
-
-# Linting
-pnpm check
-
-# Formatting
-pnpm fix
+pnpm dev              # Start Next.js dev server
+pnpm build            # Build for production
+pnpm type-check       # Run TypeScript type checking
+pnpm check            # Run linter
+pnpm fix              # Fix linting issues
 
 # Database
-pnpm db:generate  # Generate migrations
-pnpm db:push      # Push schema to database
-pnpm db:studio    # Open Drizzle Studio
+pnpm db:generate      # Generate migrations
+pnpm db:push          # Push schema to database
+pnpm db:studio        # Open Drizzle Studio
+
+# Testing
+pnpm test             # Run all tests
+pnpm test -- --watch  # Run tests in watch mode
+```
+
+### Make Commands
+
+```bash
+# Show all available commands
+make help
+
+# Docker Compose (Dev Mode)
+make dev-up           # Start dev profile
+make dev-down         # Stop dev profile
+make dev-logs         # Follow logs
+make dev-migrate      # Run migrations
+
+# Hybrid Mode (Docker + Minikube)
+make hybrid-setup     # Full setup
+make hybrid-up        # Start Docker services
+make hybrid-deploy    # Deploy to Minikube
+make hybrid-status    # Show status
+make hybrid-logs      # Job spawner logs
+make hybrid-down      # Teardown
+
+# Full Kubernetes
+make setup-local-kubernetes
+make deploy-to-local-kubernetes
+make status
+make logs
+make teardown
+
+# Scheduler
+make build-scheduler-images
+make deploy-scheduler
+make scheduler-status
+make scheduler-logs
+make runner-logs
 ```
 
 ## Integrations

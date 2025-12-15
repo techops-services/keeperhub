@@ -206,3 +206,44 @@ awslocal sqs get-queue-attributes --queue-url http://host.minikube.internal:4566
 
 In `dev` profile, workflows execute directly via the `executor` service (calling the API).
 In `minikube` profile, workflows execute in isolated K8s Jobs created by `job-spawner`.
+
+## Testing
+
+### Run Workflow Runner E2E Tests
+
+The workflow runner tests require PostgreSQL to be running (port 5433):
+
+```bash
+# Start dev profile (or minikube profile) to get PostgreSQL running
+make dev-up
+
+# Run the workflow runner tests
+DATABASE_URL="postgresql://postgres:postgres@localhost:5433/keeperhub" \
+  pnpm test -- --run tests/e2e/workflow-runner.test.ts
+```
+
+### Manual Workflow Runner Testing
+
+Test the workflow runner directly without K8s:
+
+```bash
+# Create a test execution in the database first, then:
+WORKFLOW_ID=<workflow-id> \
+EXECUTION_ID=<execution-id> \
+DATABASE_URL="postgresql://postgres:postgres@localhost:5433/keeperhub" \
+  node scripts/workflow-runner-bootstrap.cjs
+```
+
+### Test in Docker Container
+
+```bash
+# Build the runner image
+docker build --target workflow-runner -t keeperhub-runner:latest .
+
+# Run workflow in container
+docker run --rm --network host \
+  -e WORKFLOW_ID=<workflow-id> \
+  -e EXECUTION_ID=<execution-id> \
+  -e DATABASE_URL="postgresql://postgres:postgres@localhost:5433/keeperhub" \
+  keeperhub-runner:latest
+```
