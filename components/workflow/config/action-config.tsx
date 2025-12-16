@@ -35,6 +35,7 @@ import {
   flattenConfigFields,
   getActionsByCategory,
   getAllIntegrations,
+  getIntegration,
 } from "@/plugins";
 import { ActionConfigRenderer } from "./action-config-renderer";
 import { DiscordWebhookDisplay } from "./discord-webhook-display";
@@ -465,51 +466,53 @@ export function ActionConfig({
         </div>
       </div>
 
-      {integrationType && isOwner && (
-        <div className="space-y-2">
-          <div className="ml-1 flex items-center justify-between">
-            <div className="flex items-center gap-1">
-              <Label>Connection</Label>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <HelpCircle className="size-3.5 text-muted-foreground" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>API key or OAuth credentials for this service</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+      {integrationType &&
+        isOwner &&
+        getIntegration(integrationType)?.requiresCredentials !== false && (
+          <div className="space-y-2">
+            <div className="ml-1 flex items-center justify-between">
+              <div className="flex items-center gap-1">
+                <Label>Connection</Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="size-3.5 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>API key or OAuth credentials for this service</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <Button
+                className="size-6"
+                disabled={disabled}
+                onClick={handleAddSecondaryConnection}
+                size="icon"
+                variant="ghost"
+              >
+                <Plus className="size-4" />
+              </Button>
             </div>
-            <Button
-              className="size-6"
+            <IntegrationSelector
               disabled={disabled}
-              onClick={handleAddSecondaryConnection}
-              size="icon"
-              variant="ghost"
-            >
-              <Plus className="size-4" />
-            </Button>
+              integrationType={integrationType}
+              onChange={(id) => onUpdateConfig("integrationId", id)}
+              value={(config?.integrationId as string) || ""}
+            />
+            <IntegrationFormDialog
+              mode="create"
+              onClose={() => setShowAddConnectionDialog(false)}
+              onSuccess={(integrationId) => {
+                setShowAddConnectionDialog(false);
+                setIntegrationsVersion((v) => v + 1);
+                onUpdateConfig("integrationId", integrationId);
+              }}
+              open={showAddConnectionDialog}
+              preselectedType={integrationType}
+            />
           </div>
-          <IntegrationSelector
-            disabled={disabled}
-            integrationType={integrationType}
-            onChange={(id) => onUpdateConfig("integrationId", id)}
-            value={(config?.integrationId as string) || ""}
-          />
-          <IntegrationFormDialog
-            mode="create"
-            onClose={() => setShowAddConnectionDialog(false)}
-            onSuccess={(integrationId) => {
-              setShowAddConnectionDialog(false);
-              setIntegrationsVersion((v) => v + 1);
-              onUpdateConfig("integrationId", integrationId);
-            }}
-            open={showAddConnectionDialog}
-            preselectedType={integrationType}
-          />
-        </div>
-      )}
+        )}
 
       {/* System actions - hardcoded config fields */}
       {config?.actionType === "HTTP Request" && (
