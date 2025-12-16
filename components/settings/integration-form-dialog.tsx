@@ -37,13 +37,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { IntegrationIcon } from "@/components/ui/integration-icon";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import {
   aiGatewayStatusAtom,

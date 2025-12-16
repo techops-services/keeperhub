@@ -901,7 +901,9 @@ async function main(): Promise<void> {
       const disabledPlugins = allPlugins.filter(
         (p) => !enabledPlugins.includes(p)
       );
-      console.log(`Disabled ${disabledPlugins.length} plugin(s): ${disabledPlugins.join(", ")}`);
+      console.log(
+        `Disabled ${disabledPlugins.length} plugin(s): ${disabledPlugins.join(", ")}`
+      );
     }
   }
 
