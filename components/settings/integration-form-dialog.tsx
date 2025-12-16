@@ -59,7 +59,6 @@ import {
   getSortedIntegrationTypes,
 } from "@/plugins";
 import { getIntegrationDescriptions } from "@/plugins/registry";
-import { SendGridIntegrationSection } from "./sendgrid-integration-section";
 import { Web3WalletSection } from "./web3-wallet-section";
 
 type IntegrationFormDialogProps = {
@@ -75,7 +74,7 @@ type IntegrationFormDialogProps = {
 type IntegrationFormData = {
   name: string;
   type: IntegrationType | null;
-  config: Record<string, string | boolean>;
+  config: Record<string, string>;
 };
 
 // System integrations that don't have plugins
@@ -203,7 +202,7 @@ function ConfigFields({
   isEditMode,
 }: {
   formData: IntegrationFormData;
-  updateConfig: (key: string, value: string | boolean) => void;
+  updateConfig: (key: string, value: string) => void;
   isEditMode: boolean;
 }) {
   if (!formData.type) {
@@ -235,17 +234,6 @@ function ConfigFields({
   const plugin = getIntegration(formData.type);
   if (!plugin?.formFields) {
     return null;
-  }
-
-  // Handle SendGrid integration with special checkbox logic
-  if (formData.type === "sendgrid") {
-    return (
-      <SendGridIntegrationSection
-        config={formData.config}
-        formFields={plugin.formFields}
-        updateConfig={updateConfig}
-      />
-    );
   }
 
   return plugin.formFields.map((field) => {
@@ -707,7 +695,7 @@ export function IntegrationFormDialog({
       if (mode === "edit" && integration) {
         // Only include config if there are actual new values entered
         const hasNewConfig = Object.values(formData.config).some(
-          (v) => v && (typeof v === "boolean" || v.length > 0)
+          (v) => v && v.length > 0
         );
         await api.integration.update(integration.id, {
           name: integrationName,
@@ -739,7 +727,7 @@ export function IntegrationFormDialog({
 
     // Check if we have config values to test
     const hasConfig = Object.values(formData.config).some(
-      (v) => v && (typeof v === "boolean" || v.length > 0)
+      (v) => v && v.length > 0
     );
 
     // In edit mode without new config, skip testing
@@ -813,7 +801,7 @@ export function IntegrationFormDialog({
 
     // Check if we have any config values to test
     const hasConfig = Object.values(formData.config).some(
-      (v) => v && (typeof v === "boolean" || v.length > 0)
+      (v) => v && v.length > 0
     );
     if (!hasConfig && mode === "create") {
       toast.error("Please enter credentials first");

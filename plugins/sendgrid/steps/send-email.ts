@@ -135,17 +135,8 @@ export async function sendEmailStep(
     ? await fetchCredentials(input.integrationId)
     : {};
 
-  // Fetch integration config to check useKeeperHubApiKey
-  let useKeeperHubApiKey = true; // Default to true
-  if (input.integrationId) {
-    const { getIntegrationById } = await import("@/lib/db/integrations");
-    const integration = await getIntegrationById(input.integrationId);
-    if (integration?.config) {
-      const useKeeperHubValue = integration.config.useKeeperHubApiKey;
-      useKeeperHubApiKey =
-        useKeeperHubValue === true || useKeeperHubValue === "true";
-    }
-  }
+  // Always use KeeperHub API key
+  const useKeeperHubApiKey = true;
 
   const coreInput: SendEmailCoreInput = {
     ...input,

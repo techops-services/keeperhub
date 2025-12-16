@@ -214,7 +214,10 @@ export function IntegrationsManager({
               </Button>
               <Button
                 className="size-7"
-                onClick={() => setEditingIntegration(integration)}
+                onClick={async () => {
+                  const fullIntegration = await api.integration.get(integration.id);
+                  setEditingIntegration(fullIntegration);
+                }}
                 size="icon"
                 variant="outline"
               >

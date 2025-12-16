@@ -27,8 +27,14 @@ const aiGatewayPlugin: IntegrationPlugin = {
 
   testConfig: {
     getTestFunction: async () => {
-      const { testConnection } = await import("./test");
-      return testConnection;
+      return async (_credentials: Record<string, string>) => {
+        const { testConnection } = await import("./test");
+        const result = await testConnection();
+        return {
+          success: result.status === "success",
+          error: result.status === "error" ? result.message : undefined,
+        };
+      };
     },
   },
 
