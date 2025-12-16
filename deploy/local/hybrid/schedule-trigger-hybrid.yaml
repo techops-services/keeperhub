@@ -13,8 +13,8 @@ data:
   AWS_ACCESS_KEY_ID: "test"
   AWS_SECRET_ACCESS_KEY: "test"
   SQS_QUEUE_URL: "http://host.minikube.internal:4566/000000000000/keeperhub-workflow-queue"
-  # Database - connects to Docker Compose PostgreSQL
-  DATABASE_URL: "postgresql://postgres:postgres@host.minikube.internal:5432/keeperhub"
+  # Database - connects to Docker Compose PostgreSQL (port 5433 is exposed by docker-compose)
+  DATABASE_URL: "postgresql://postgres:postgres@host.minikube.internal:5433/keeperhub"
   # Job spawner settings
   RUNNER_IMAGE: "keeperhub-runner:latest"
   K8S_NAMESPACE: "local"
