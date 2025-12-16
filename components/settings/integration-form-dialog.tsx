@@ -59,6 +59,8 @@ import {
   getSortedIntegrationTypes,
 } from "@/plugins";
 import { getIntegrationDescriptions } from "@/plugins/registry";
+import { SendGridIntegrationSection } from "./sendgrid-integration-section";
+import { Web3WalletSection } from "./web3-wallet-section";
 
 type IntegrationFormDialogProps = {
   open: boolean;
@@ -201,7 +203,7 @@ function ConfigFields({
   isEditMode,
 }: {
   formData: IntegrationFormData;
-  updateConfig: (key: string, value: string) => void;
+  updateConfig: (key: string, value: string | boolean) => void;
   isEditMode: boolean;
 }) {
   if (!formData.type) {
@@ -224,10 +226,26 @@ function ConfigFields({
     );
   }
 
+  // Handle Web3 wallet creation
+  if (formData.type === "web3") {
+    return <Web3WalletSection />;
+  }
+
   // Get plugin form fields from registry
   const plugin = getIntegration(formData.type);
   if (!plugin?.formFields) {
     return null;
+  }
+
+  // Handle SendGrid integration with special checkbox logic
+  if (formData.type === "sendgrid") {
+    return (
+      <SendGridIntegrationSection
+        config={formData.config}
+        formFields={plugin.formFields}
+        updateConfig={updateConfig}
+      />
+    );
   }
 
   return plugin.formFields.map((field) => {
