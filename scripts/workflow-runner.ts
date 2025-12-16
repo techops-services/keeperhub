@@ -34,6 +34,7 @@ import {
 import { executeWorkflow } from "../lib/workflow-executor.workflow";
 import type { WorkflowNode, WorkflowEdge } from "../lib/workflow-store";
 import { validateWorkflowIntegrations } from "../lib/db/integrations";
+import { calculateTotalSteps } from "../lib/workflow-progress";
 
 // Validate required environment variables
 function validateEnv(): {
@@ -138,6 +139,27 @@ function computeNextRunTime(
 }
 
 /**
+ * Initialize progress tracking for an execution
+ */
+async function initializeExecutionProgress(
+  executionId: string,
+  totalSteps: number
+): Promise<void> {
+  await db
+    .update(workflowExecutions)
+    .set({
+      totalSteps: totalSteps.toString(),
+      completedSteps: "0",
+      executionTrace: [],
+      currentNodeId: null,
+      currentNodeName: null,
+      lastSuccessfulNodeId: null,
+      lastSuccessfulNodeName: null,
+    })
+    .where(eq(workflowExecutions.id, executionId));
+}
+
+/**
  * Update schedule status after execution
  */
 async function updateScheduleStatus(
@@ -203,6 +225,7 @@ async function main(): Promise<void> {
 
     // Validate integration ownership
     const nodes = workflow.nodes as WorkflowNode[];
+    const edges = workflow.edges as WorkflowEdge[];
     const validation = await validateWorkflowIntegrations(nodes, workflow.userId);
 
     if (!validation.valid) {
@@ -210,6 +233,11 @@ async function main(): Promise<void> {
         `Workflow contains invalid integration references: ${validation.invalidIds?.join(", ")}`
       );
     }
+
+    // Initialize progress tracking
+    const totalSteps = calculateTotalSteps(nodes, edges);
+    console.log(`[Runner] Total steps: ${totalSteps}`);
+    await initializeExecutionProgress(executionId, totalSteps);
 
     // Execute the workflow
     console.log("[Runner] Executing workflow...");

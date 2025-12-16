@@ -129,6 +129,14 @@ export const workflowExecutions = pgTable("workflow_executions", {
   startedAt: timestamp("started_at").notNull().defaultNow(),
   completedAt: timestamp("completed_at"),
   duration: text("duration"), // Duration in milliseconds
+  // Progress tracking
+  totalSteps: text("total_steps"),
+  completedSteps: text("completed_steps").default("0"),
+  currentNodeId: text("current_node_id"),
+  currentNodeName: text("current_node_name"),
+  lastSuccessfulNodeId: text("last_successful_node_id"),
+  lastSuccessfulNodeName: text("last_successful_node_name"),
+  executionTrace: jsonb("execution_trace").$type<string[]>(),
 });
 
 // Workflow execution logs to track individual node executions

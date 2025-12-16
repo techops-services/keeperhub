@@ -7,9 +7,11 @@ import "server-only";
 
 import { redactSensitiveData } from "../utils/redact";
 import {
+  incrementCompletedSteps,
   logStepCompleteDb,
   logStepStartDb,
   logWorkflowCompleteDb,
+  updateCurrentStep,
 } from "../workflow-logging";
 
 export type StepContext = {
@@ -163,6 +165,20 @@ export async function withStepLogging<TInput extends StepInput, TOutput>(
   // Extract context and log input without _context
   const context = input._context as StepContextWithWorkflow | undefined;
   const loggedInput = stripContext(input);
+
+  // Update progress: mark this step as currently running
+  if (context?.executionId && context.nodeId) {
+    try {
+      await updateCurrentStep({
+        executionId: context.executionId,
+        currentNodeId: context.nodeId,
+        currentNodeName: context.nodeName,
+      });
+    } catch (err) {
+      console.error("[stepHandler] Failed to update current step:", err);
+    }
+  }
+
   const logInfo = await logStepStart(context, loggedInput);
 
   try {
@@ -187,6 +203,20 @@ export async function withStepLogging<TInput extends StepInput, TOutput>(
       await logStepComplete(logInfo, "success", result);
     }
 
+    // Update progress: increment completed steps
+    if (context?.executionId && context.nodeId) {
+      try {
+        await incrementCompletedSteps({
+          executionId: context.executionId,
+          nodeId: context.nodeId,
+          nodeName: context.nodeName,
+          success: !isErrorResult,
+        });
+      } catch (err) {
+        console.error("[stepHandler] Failed to increment completed steps:", err);
+      }
+    }
+
     // If this step should also log workflow completion, do it now
     if (context?._workflowComplete && context.executionId) {
       await logWorkflowComplete({
@@ -200,6 +230,21 @@ export async function withStepLogging<TInput extends StepInput, TOutput>(
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
     await logStepComplete(logInfo, "error", undefined, errorMessage);
+
+    // Update progress on error too
+    if (context?.executionId && context.nodeId) {
+      try {
+        await incrementCompletedSteps({
+          executionId: context.executionId,
+          nodeId: context.nodeId,
+          nodeName: context.nodeName,
+          success: false,
+        });
+      } catch (err) {
+        console.error("[stepHandler] Failed to increment completed steps:", err);
+      }
+    }
+
     throw error;
   }
 }
