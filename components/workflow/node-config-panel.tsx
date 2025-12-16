@@ -53,6 +53,7 @@ import { findActionById, getIntegration } from "@/plugins";
 import { Panel } from "../ai-elements/panel";
 import { IntegrationsDialog } from "../settings/integrations-dialog";
 import { Drawer, DrawerContent, DrawerTrigger } from "../ui/drawer";
+import { IntegrationSelector } from "../ui/integration-selector";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { ActionConfig } from "./config/action-config";
 import { ActionGrid } from "./config/action-grid";
@@ -870,30 +871,88 @@ export const PanelInner = () => {
             </div>
           )}
           {selectedNode.data.type === "action" && isOwner && (
-            <div className="flex shrink-0 items-center gap-2 border-t p-4">
-              <Button
-                onClick={handleToggleEnabled}
-                size="icon"
-                title={
-                  selectedNode.data.enabled === false
-                    ? "Enable Step"
-                    : "Disable Step"
+            <div className="flex shrink-0 items-center justify-between border-t p-4">
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={handleToggleEnabled}
+                  size="icon"
+                  title={
+                    selectedNode.data.enabled === false
+                      ? "Enable Step"
+                      : "Disable Step"
+                  }
+                  variant="ghost"
+                >
+                  {selectedNode.data.enabled === false ? (
+                    <EyeOff className="size-4" />
+                  ) : (
+                    <Eye className="size-4" />
+                  )}
+                </Button>
+                <Button
+                  onClick={() => setShowDeleteNodeAlert(true)}
+                  size="icon"
+                  variant="ghost"
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+
+              {(() => {
+                const actionType = selectedNode.data.config
+                  ?.actionType as string;
+
+                // Database Query is special - has integration but no plugin
+                const SYSTEM_INTEGRATION_MAP: Record<string, string> = {
+                  "Database Query": "database",
+                };
+
+                // Get integration type dynamically
+                let integrationType: string | undefined;
+                let requiresCredentials = true; // Default to true for system actions
+
+                if (actionType) {
+                  if (SYSTEM_INTEGRATION_MAP[actionType]) {
+                    integrationType = SYSTEM_INTEGRATION_MAP[actionType];
+                  } else {
+                    // Look up from plugin registry
+                    const action = findActionById(actionType);
+                    if (action) {
+                      integrationType = action.integration;
+                      // Check if plugin requires credentials (default to true)
+                      const plugin = getIntegration(action.integration);
+                      requiresCredentials =
+                        plugin?.requiresCredentials !== false;
+                    }
+                  }
                 }
-                variant="ghost"
-              >
-                {selectedNode.data.enabled === false ? (
-                  <EyeOff className="size-4" />
-                ) : (
-                  <Eye className="size-4" />
-                )}
-              </Button>
-              <Button
-                onClick={() => setShowDeleteNodeAlert(true)}
-                size="icon"
-                variant="ghost"
-              >
-                <Trash2 className="size-4" />
-              </Button>
+
+                // Show integration selector if credentials required, otherwise show info message
+                if (integrationType && requiresCredentials) {
+                  return (
+                    <IntegrationSelector
+                      integrationType={integrationType as IntegrationType}
+                      label="Integration"
+                      onChange={(id) => handleUpdateConfig("integrationId", id)}
+                      onOpenSettings={() => setShowIntegrationsDialog(true)}
+                      value={
+                        (selectedNode.data.config?.integrationId as string) ||
+                        ""
+                      }
+                    />
+                  );
+                }
+                if (integrationType && !requiresCredentials) {
+                  return (
+                    <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2">
+                      <span className="text-muted-foreground text-sm">
+                        No integration required
+                      </span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
             </div>
           )}
           {selectedNode.data.type === "trigger" && isOwner && (
