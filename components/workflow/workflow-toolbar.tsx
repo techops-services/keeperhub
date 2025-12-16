@@ -96,6 +96,7 @@ import {
 import {
   findActionById,
   flattenConfigFields,
+  getIntegration,
   getIntegrationLabels,
 } from "@/plugins";
 import { Panel } from "../ai-elements/panel";
@@ -365,6 +366,12 @@ function getMissingIntegrations(
       action?.integration || BUILTIN_ACTION_INTEGRATIONS[actionType];
 
     if (!requiredIntegrationType) {
+      continue;
+    }
+
+    // Skip integrations that don't require credentials (e.g., webhook)
+    const plugin = getIntegration(requiredIntegrationType);
+    if (plugin && plugin.requiresCredentials === false) {
       continue;
     }
 
