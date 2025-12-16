@@ -633,6 +633,23 @@ export const workflowApi = {
   })(),
 };
 
+// Beta API
+export const betaApi = {
+  // Check if an email is on the allowlist
+  checkEmail: (email: string) =>
+    apiCall<{ isAllowlisted: boolean }>("/api/beta/check-email", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+
+  // Request beta access (stores email in DB)
+  requestAccess: (email: string) =>
+    apiCall<{ success: boolean }>("/api/beta/request-access", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+};
+
 // AI Gateway API (User Keys feature)
 export const aiGatewayApi = {
   // Get status (whether feature is enabled, user has managed key, etc.)
@@ -658,6 +675,7 @@ export const aiGatewayApi = {
 // Export all APIs as a single object
 export const api = {
   ai: aiApi,
+  beta: betaApi,
   aiGateway: aiGatewayApi,
   integration: integrationApi,
   user: userApi,
