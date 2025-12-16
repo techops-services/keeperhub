@@ -11,13 +11,14 @@ export type GetIntegrationsResponse = {
   id: string;
   name: string;
   type: IntegrationType;
+  isManaged?: boolean;
   createdAt: string;
   updatedAt: string;
   // Config is intentionally excluded for security
 }[];
 
 export type CreateIntegrationRequest = {
-  name: string;
+  name?: string;
   type: IntegrationType;
   config: IntegrationConfig;
 };
@@ -59,6 +60,7 @@ export async function GET(request: Request) {
         id: integration.id,
         name: integration.name,
         type: integration.type,
+        isManaged: integration.isManaged ?? false,
         createdAt: integration.createdAt.toISOString(),
         updatedAt: integration.updatedAt.toISOString(),
       })
@@ -86,16 +88,16 @@ export async function POST(request: Request) {
 
     const body: CreateIntegrationRequest = await request.json();
 
-    if (!(body.name && body.type && body.config)) {
+    if (!(body.type && body.config)) {
       return NextResponse.json(
-        { error: "Name, type, and config are required" },
+        { error: "Type and config are required" },
         { status: 400 }
       );
     }
 
     const integration = await createIntegration(
       session.user.id,
-      body.name,
+      body.name || "",
       body.type,
       body.config
     );

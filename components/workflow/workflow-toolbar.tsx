@@ -339,6 +339,7 @@ function getMissingRequiredFields(
 // Get missing integrations for workflow nodes
 // Uses the plugin registry to determine which integrations are required
 // Also handles built-in actions that aren't in the plugin registry
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Upstream function - preserving original structure for easier merges
 function getMissingIntegrations(
   nodes: WorkflowNode[],
   userIntegrations: Array<{ id: string; type: IntegrationType }>
@@ -1607,10 +1608,20 @@ function WorkflowIssuesDialog({
   const { brokenReferences, missingRequiredFields, missingIntegrations } =
     actions.workflowIssues;
 
-  const handleGoToStep = (nodeId: string) => {
+  const handleGoToStep = (nodeId: string, fieldKey?: string) => {
     actions.setShowWorkflowIssuesDialog(false);
     state.setSelectedNodeId(nodeId);
     state.setActiveTab("properties");
+    // Focus on the specific field after a short delay to allow the panel to render
+    if (fieldKey) {
+      setTimeout(() => {
+        const element = document.getElementById(fieldKey);
+        if (element) {
+          element.focus();
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 100);
+    }
   };
 
   const handleAddIntegration = (integrationType: IntegrationType) => {
@@ -1642,147 +1653,128 @@ function WorkflowIssuesDialog({
             </AlertDialogDescription>
           </AlertDialogHeader>
 
-          <div className="flex-1 space-y-4 overflow-y-auto py-2">
+          <div className="flex-1 space-y-3 overflow-y-auto py-2">
+            {/* Missing Connections Section */}
+            {missingIntegrations.length > 0 && (
+              <div className="space-y-1">
+                <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                  Missing Connections
+                </h4>
+                {missingIntegrations.map((missing) => (
+                  <div
+                    className="flex items-center gap-3 py-1"
+                    key={missing.integrationType}
+                  >
+                    <IntegrationIcon
+                      className="size-4 shrink-0"
+                      integration={missing.integrationType}
+                    />
+                    <p className="min-w-0 flex-1 text-sm">
+                      <span className="font-medium">
+                        {missing.integrationLabel}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {" — "}
+                        {missing.nodeNames.length > 3
+                          ? `${missing.nodeNames.slice(0, 3).join(", ")} +${missing.nodeNames.length - 3} more`
+                          : missing.nodeNames.join(", ")}
+                      </span>
+                    </p>
+                    <Button
+                      className="shrink-0"
+                      onClick={() =>
+                        handleAddIntegration(missing.integrationType)
+                      }
+                      size="sm"
+                      variant="outline"
+                    >
+                      Add
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Broken References Section */}
             {brokenReferences.length > 0 && (
               <div className="space-y-2">
-                <h4 className="flex items-center gap-1.5 font-medium text-red-600 text-sm dark:text-red-400">
-                  <AlertTriangle className="size-4" />
-                  Broken References ({brokenReferences.length})
+                <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                  Broken References
                 </h4>
-                <div className="space-y-2">
-                  {brokenReferences.map((broken) => (
-                    <div
-                      className="flex items-center gap-3 rounded-lg border border-red-500/20 bg-red-500/5 p-3"
-                      key={broken.nodeId}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-foreground text-sm">
-                          {broken.nodeLabel}
-                        </p>
-                        <div className="mt-1 space-y-1">
-                          {broken.brokenReferences.map((ref, idx) => (
-                            <p
-                              className="text-muted-foreground text-xs"
-                              key={`${ref.fieldKey}-${idx}`}
-                            >
-                              <span className="font-mono text-red-600 dark:text-red-400">
-                                {ref.displayText}
-                              </span>{" "}
-                              in {ref.fieldLabel}
-                            </p>
-                          ))}
+                {brokenReferences.map((broken) => (
+                  <div key={broken.nodeId}>
+                    <p className="font-medium text-sm">{broken.nodeLabel}</p>
+                    <div className="mt-1 space-y-0.5">
+                      {broken.brokenReferences.map((ref, idx) => (
+                        <div
+                          className="flex items-center gap-3 py-0.5 pl-3"
+                          key={`${broken.nodeId}-${ref.fieldKey}-${idx}`}
+                        >
+                          <p className="min-w-0 flex-1 text-muted-foreground text-sm">
+                            <span className="font-mono">{ref.displayText}</span>
+                            {" in "}
+                            {ref.fieldLabel}
+                          </p>
+                          <Button
+                            className="shrink-0"
+                            onClick={() =>
+                              handleGoToStep(broken.nodeId, ref.fieldKey)
+                            }
+                            size="sm"
+                            variant="outline"
+                          >
+                            Fix
+                          </Button>
                         </div>
-                      </div>
-                      <Button
-                        className="shrink-0"
-                        onClick={() => handleGoToStep(broken.nodeId)}
-                        size="sm"
-                        variant="outline"
-                      >
-                        Fix
-                      </Button>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
             )}
 
             {/* Missing Required Fields Section */}
             {missingRequiredFields.length > 0 && (
               <div className="space-y-2">
-                <h4 className="flex items-center gap-1.5 font-medium text-orange-600 text-sm dark:text-orange-400">
-                  <AlertTriangle className="size-4" />
-                  Missing Required Fields ({missingRequiredFields.length})
+                <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                  Missing Required Fields
                 </h4>
-                <div className="space-y-2">
-                  {missingRequiredFields.map((node) => (
-                    <div
-                      className="flex items-center gap-3 rounded-lg border border-orange-500/20 bg-orange-500/5 p-3"
-                      key={node.nodeId}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-foreground text-sm">
-                          {node.nodeLabel}
-                        </p>
-                        <div className="mt-1 space-y-1">
-                          {node.missingFields.map((field) => (
-                            <p
-                              className="text-muted-foreground text-xs"
-                              key={field.fieldKey}
-                            >
-                              Missing:{" "}
-                              <span className="font-medium text-orange-600 dark:text-orange-400">
-                                {field.fieldLabel}
-                              </span>
-                            </p>
-                          ))}
+                {missingRequiredFields.map((node) => (
+                  <div key={node.nodeId}>
+                    <p className="font-medium text-sm">{node.nodeLabel}</p>
+                    <div className="mt-1 space-y-0.5">
+                      {node.missingFields.map((field) => (
+                        <div
+                          className="flex items-center gap-3 py-0.5 pl-3"
+                          key={`${node.nodeId}-${field.fieldKey}`}
+                        >
+                          <p className="min-w-0 flex-1 text-muted-foreground text-sm">
+                            {field.fieldLabel}
+                          </p>
+                          <Button
+                            className="shrink-0"
+                            onClick={() =>
+                              handleGoToStep(node.nodeId, field.fieldKey)
+                            }
+                            size="sm"
+                            variant="outline"
+                          >
+                            Fix
+                          </Button>
                         </div>
-                      </div>
-                      <Button
-                        className="shrink-0"
-                        onClick={() => handleGoToStep(node.nodeId)}
-                        size="sm"
-                        variant="outline"
-                      >
-                        Fix
-                      </Button>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Missing Integrations Section */}
-            {missingIntegrations.length > 0 && (
-              <div className="space-y-2">
-                <h4 className="flex items-center gap-1.5 font-medium text-orange-600 text-sm dark:text-orange-400">
-                  <AlertTriangle className="size-4" />
-                  Missing Integrations ({missingIntegrations.length})
-                </h4>
-                <div className="space-y-2">
-                  {missingIntegrations.map((missing) => (
-                    <div
-                      className="flex items-center gap-3 rounded-lg border border-orange-500/20 bg-orange-500/5 p-3"
-                      key={missing.integrationType}
-                    >
-                      <IntegrationIcon
-                        className="size-5 shrink-0"
-                        integration={missing.integrationType}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-foreground text-sm">
-                          {missing.integrationLabel}
-                        </p>
-                        <p className="text-muted-foreground text-xs">
-                          Used by:{" "}
-                          {missing.nodeNames.length > 3
-                            ? `${missing.nodeNames.slice(0, 3).join(", ")} and ${missing.nodeNames.length - 3} more`
-                            : missing.nodeNames.join(", ")}
-                        </p>
-                      </div>
-                      <Button
-                        className="shrink-0"
-                        onClick={() =>
-                          handleAddIntegration(missing.integrationType)
-                        }
-                        size="sm"
-                        variant="outline"
-                      >
-                        Add
-                      </Button>
-                    </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
 
-          <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogFooter className="sm:justify-between">
             <Button onClick={actions.handleExecuteAnyway} variant="outline">
               Run Anyway
             </Button>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -1954,12 +1946,14 @@ function WorkflowDialogsComponent({
               the workflow?
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogFooter className="sm:justify-between">
             <Button onClick={actions.handleRunWithoutSaving} variant="outline">
               Run Without Saving
             </Button>
-            <Button onClick={actions.handleSaveAndRun}>Save and Run</Button>
+            <div className="flex gap-2">
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <Button onClick={actions.handleSaveAndRun}>Save and Run</Button>
+            </div>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

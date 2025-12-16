@@ -775,19 +775,11 @@ export const PanelInner = () => {
           className="flex flex-col overflow-hidden"
           value="properties"
         >
-          <div className="flex-1 space-y-4 overflow-y-auto p-4">
-            {selectedNode.data.type === "trigger" && (
-              <TriggerConfig
-                config={selectedNode.data.config || {}}
-                disabled={isGenerating || !isOwner}
-                onUpdateConfig={handleUpdateConfig}
-                workflowId={currentWorkflowId ?? undefined}
-              />
-            )}
-
-            {selectedNode.data.type === "action" &&
-              !selectedNode.data.config?.actionType &&
-              isOwner && (
+          {/* Action selection - full height flex layout */}
+          {selectedNode.data.type === "action" &&
+            !selectedNode.data.config?.actionType &&
+            isOwner && (
+              <div className="flex min-h-0 flex-1 flex-col px-4 pt-4">
                 <ActionGrid
                   disabled={isGenerating}
                   isNewlyCreated={selectedNode?.id === newlyCreatedNodeId}
@@ -799,66 +791,85 @@ export const PanelInner = () => {
                     }
                   }}
                 />
+              </div>
+            )}
+
+          {/* Other content - scrollable */}
+          {!(
+            selectedNode.data.type === "action" &&
+            !selectedNode.data.config?.actionType &&
+            isOwner
+          ) && (
+            <div className="flex-1 space-y-4 overflow-y-auto p-4">
+              {selectedNode.data.type === "trigger" && (
+                <TriggerConfig
+                  config={selectedNode.data.config || {}}
+                  disabled={isGenerating || !isOwner}
+                  onUpdateConfig={handleUpdateConfig}
+                  workflowId={currentWorkflowId ?? undefined}
+                />
               )}
 
-            {selectedNode.data.type === "action" &&
-              !selectedNode.data.config?.actionType &&
-              !isOwner && (
+              {selectedNode.data.type === "action" &&
+                !selectedNode.data.config?.actionType &&
+                !isOwner && (
+                  <div className="rounded-lg border border-muted bg-muted/30 p-3">
+                    <p className="text-muted-foreground text-sm">
+                      No action configured for this step.
+                    </p>
+                  </div>
+                )}
+
+              {selectedNode.data.type === "action" &&
+              selectedNode.data.config?.actionType ? (
+                <ActionConfig
+                  config={selectedNode.data.config || {}}
+                  disabled={isGenerating || !isOwner}
+                  isOwner={isOwner}
+                  onUpdateConfig={handleUpdateConfig}
+                />
+              ) : null}
+
+              {selectedNode.data.type !== "action" ||
+              selectedNode.data.config?.actionType ? (
+                <>
+                  <div className="space-y-2">
+                    <Label className="ml-1" htmlFor="label">
+                      Label
+                    </Label>
+                    <Input
+                      disabled={isGenerating || !isOwner}
+                      id="label"
+                      onChange={(e) => handleUpdateLabel(e.target.value)}
+                      value={selectedNode.data.label}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="ml-1" htmlFor="description">
+                      Description
+                    </Label>
+                    <Input
+                      disabled={isGenerating || !isOwner}
+                      id="description"
+                      onChange={(e) => handleUpdateDescription(e.target.value)}
+                      placeholder="Optional description"
+                      value={selectedNode.data.description || ""}
+                    />
+                  </div>
+                </>
+              ) : null}
+
+              {!isOwner && (
                 <div className="rounded-lg border border-muted bg-muted/30 p-3">
                   <p className="text-muted-foreground text-sm">
-                    No action configured for this step.
+                    You are viewing a public workflow. Duplicate it to make
+                    changes.
                   </p>
                 </div>
               )}
-
-            {selectedNode.data.type === "action" &&
-            selectedNode.data.config?.actionType ? (
-              <ActionConfig
-                config={selectedNode.data.config || {}}
-                disabled={isGenerating || !isOwner}
-                onUpdateConfig={handleUpdateConfig}
-              />
-            ) : null}
-
-            {selectedNode.data.type !== "action" ||
-            selectedNode.data.config?.actionType ? (
-              <>
-                <div className="space-y-2">
-                  <Label className="ml-1" htmlFor="label">
-                    Label
-                  </Label>
-                  <Input
-                    disabled={isGenerating || !isOwner}
-                    id="label"
-                    onChange={(e) => handleUpdateLabel(e.target.value)}
-                    value={selectedNode.data.label}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="ml-1" htmlFor="description">
-                    Description
-                  </Label>
-                  <Input
-                    disabled={isGenerating || !isOwner}
-                    id="description"
-                    onChange={(e) => handleUpdateDescription(e.target.value)}
-                    placeholder="Optional description"
-                    value={selectedNode.data.description || ""}
-                  />
-                </div>
-              </>
-            ) : null}
-
-            {!isOwner && (
-              <div className="rounded-lg border border-muted bg-muted/30 p-3">
-                <p className="text-muted-foreground text-sm">
-                  You are viewing a public workflow. Duplicate it to make
-                  changes.
-                </p>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
           {selectedNode.data.type === "action" && isOwner && (
             <div className="flex shrink-0 items-center justify-between border-t p-4">
               <div className="flex items-center gap-2">
@@ -921,7 +932,6 @@ export const PanelInner = () => {
                   return (
                     <IntegrationSelector
                       integrationType={integrationType as IntegrationType}
-                      label="Integration"
                       onChange={(id) => handleUpdateConfig("integrationId", id)}
                       onOpenSettings={() => setShowIntegrationsDialog(true)}
                       value={

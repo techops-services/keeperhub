@@ -1,7 +1,7 @@
 "use client";
 
 import { Pencil, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -31,18 +31,21 @@ const SYSTEM_INTEGRATION_LABELS: Record<string, string> = {
 
 type IntegrationsManagerProps = {
   showCreateDialog: boolean;
+  onCreateDialogClose?: () => void;
   onIntegrationChange?: () => void;
+  filter?: string;
 };
 
 export function IntegrationsManager({
   showCreateDialog: externalShowCreateDialog,
+  onCreateDialogClose,
   onIntegrationChange,
+  filter = "",
 }: IntegrationsManagerProps) {
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingIntegration, setEditingIntegration] =
     useState<IntegrationWithConfig | null>(null);
-  const [loadingIntegration, setLoadingIntegration] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
@@ -68,6 +71,38 @@ export function IntegrationsManager({
   useEffect(() => {
     loadIntegrations();
   }, [loadIntegrations]);
+
+  // Get integrations with their labels, sorted by label then name
+  const integrationsWithLabels = useMemo(() => {
+    const labels = getIntegrationLabels() as Record<string, string>;
+    const filterLower = filter.toLowerCase();
+
+    return integrations
+      .map((integration) => ({
+        ...integration,
+        label:
+          labels[integration.type] ||
+          SYSTEM_INTEGRATION_LABELS[integration.type] ||
+          integration.type,
+      }))
+      .filter((integration) => {
+        if (!filter) {
+          return true;
+        }
+        return (
+          integration.label.toLowerCase().includes(filterLower) ||
+          integration.name.toLowerCase().includes(filterLower) ||
+          integration.type.toLowerCase().includes(filterLower)
+        );
+      })
+      .sort((a, b) => {
+        const labelCompare = a.label.localeCompare(b.label);
+        if (labelCompare !== 0) {
+          return labelCompare;
+        }
+        return a.name.localeCompare(b.name);
+      });
+  }, [integrations, filter]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -106,6 +141,7 @@ export function IntegrationsManager({
   const handleDialogClose = () => {
     setShowCreateDialog(false);
     setEditingIntegration(null);
+    onCreateDialogClose?.();
   };
 
   const handleDialogSuccess = async () => {
@@ -121,81 +157,93 @@ export function IntegrationsManager({
     );
   }
 
-  return (
-    <div className="space-y-4">
-      {integrations.length === 0 ? (
-        <div className="rounded-lg border border-dashed py-12 text-center">
+  const renderIntegrationsList = () => {
+    if (integrations.length === 0) {
+      return (
+        <div className="py-8 text-center">
           <p className="text-muted-foreground text-sm">
-            No integrations configured yet
+            No connections configured yet
           </p>
         </div>
-      ) : (
-        <div className="space-y-2">
-          {integrations.map((integration) => (
-            <div
-              className="flex items-center justify-between rounded-lg border p-4"
-              key={integration.id}
-            >
-              <div className="flex items-center gap-3">
-                <IntegrationIcon
-                  className="size-8"
-                  integration={integration.type}
-                />
-                <div>
-                  <p className="font-medium text-sm">{integration.name}</p>
-                  <p className="text-muted-foreground text-xs">
-                    {getIntegrationLabels()[integration.type] ||
-                      SYSTEM_INTEGRATION_LABELS[integration.type] ||
-                      integration.type}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  disabled={testingId === integration.id}
-                  onClick={() => handleTest(integration.id)}
-                  size="sm"
-                  variant="outline"
-                >
-                  {testingId === integration.id ? (
-                    <Spinner className="size-4" />
-                  ) : (
-                    "Test"
-                  )}
-                </Button>
-                <Button
-                  disabled={loadingIntegration}
-                  onClick={async () => {
-                    try {
-                      setLoadingIntegration(true);
-                      const fullIntegration = await api.integration.get(
-                        integration.id
-                      );
-                      setEditingIntegration(fullIntegration);
-                    } catch (error) {
-                      console.error("Failed to load integration:", error);
-                      toast.error("Failed to load integration details");
-                    } finally {
-                      setLoadingIntegration(false);
-                    }
-                  }}
-                  size="sm"
-                  variant="outline"
-                >
-                  <Pencil className="size-4" />
-                </Button>
-                <Button
-                  onClick={() => setDeletingId(integration.id)}
-                  size="sm"
-                  variant="outline"
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
+      );
+    }
+
+    if (integrationsWithLabels.length === 0) {
+      return (
+        <div className="py-8 text-center">
+          <p className="text-muted-foreground text-sm">
+            No connections match your filter
+          </p>
         </div>
-      )}
+      );
+    }
+
+    return (
+      <div className="space-y-1">
+        {integrationsWithLabels.map((integration) => (
+          <div
+            className="flex items-center justify-between rounded-md px-2 py-1.5"
+            key={integration.id}
+          >
+            <div className="flex items-center gap-2">
+              <IntegrationIcon
+                className="size-4"
+                integration={
+                  integration.type === "ai-gateway"
+                    ? "vercel"
+                    : integration.type
+                }
+              />
+              <span className="font-medium text-sm">{integration.label}</span>
+              <span className="text-muted-foreground text-sm">
+                {integration.name}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button
+                className="h-7 px-2"
+                disabled={testingId === integration.id}
+                onClick={() => handleTest(integration.id)}
+                size="sm"
+                variant="outline"
+              >
+                {testingId === integration.id ? (
+                  <Spinner className="size-3" />
+                ) : (
+                  <span className="text-xs">Test</span>
+                )}
+              </Button>
+              <Button
+                className="size-7"
+                onClick={async () => {
+                  const fullIntegration = await api.integration.get(
+                    integration.id
+                  );
+                  setEditingIntegration(fullIntegration);
+                }}
+                size="icon"
+                variant="outline"
+              >
+                <Pencil className="size-3" />
+              </Button>
+              <Button
+                className="size-7"
+                onClick={() => setDeletingId(integration.id)}
+                size="icon"
+                variant="outline"
+              >
+                <Trash2 className="size-3" />
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-1">
+      {renderIntegrationsList()}
 
       {(showCreateDialog || editingIntegration) && (
         <IntegrationFormDialog
@@ -217,10 +265,10 @@ export function IntegrationsManager({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Integration</AlertDialogTitle>
+            <AlertDialogTitle>Delete Connection</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this integration? Workflows using
-              this integration will fail until a new one is selected.
+              Are you sure you want to delete this connection? Workflows using
+              it will fail until a new one is configured.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
