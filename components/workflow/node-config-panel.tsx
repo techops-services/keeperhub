@@ -53,7 +53,6 @@ import { findActionById, getIntegration } from "@/plugins";
 import { Panel } from "../ai-elements/panel";
 import { IntegrationsDialog } from "../settings/integrations-dialog";
 import { Drawer, DrawerContent, DrawerTrigger } from "../ui/drawer";
-import { IntegrationSelector } from "../ui/integration-selector";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { ActionConfig } from "./config/action-config";
 import { ActionGrid } from "./config/action-grid";
@@ -775,19 +774,11 @@ export const PanelInner = () => {
           className="flex flex-col overflow-hidden"
           value="properties"
         >
-          <div className="flex-1 space-y-4 overflow-y-auto p-4">
-            {selectedNode.data.type === "trigger" && (
-              <TriggerConfig
-                config={selectedNode.data.config || {}}
-                disabled={isGenerating || !isOwner}
-                onUpdateConfig={handleUpdateConfig}
-                workflowId={currentWorkflowId ?? undefined}
-              />
-            )}
-
-            {selectedNode.data.type === "action" &&
-              !selectedNode.data.config?.actionType &&
-              isOwner && (
+          {/* Action selection - full height flex layout */}
+          {selectedNode.data.type === "action" &&
+            !selectedNode.data.config?.actionType &&
+            isOwner && (
+              <div className="flex min-h-0 flex-1 flex-col px-4 pt-4">
                 <ActionGrid
                   disabled={isGenerating}
                   isNewlyCreated={selectedNode?.id === newlyCreatedNodeId}
@@ -799,149 +790,110 @@ export const PanelInner = () => {
                     }
                   }}
                 />
+              </div>
+            )}
+
+          {/* Other content - scrollable */}
+          {!(
+            selectedNode.data.type === "action" &&
+            !selectedNode.data.config?.actionType &&
+            isOwner
+          ) && (
+            <div className="flex-1 space-y-4 overflow-y-auto p-4">
+              {selectedNode.data.type === "trigger" && (
+                <TriggerConfig
+                  config={selectedNode.data.config || {}}
+                  disabled={isGenerating || !isOwner}
+                  onUpdateConfig={handleUpdateConfig}
+                  workflowId={currentWorkflowId ?? undefined}
+                />
               )}
 
-            {selectedNode.data.type === "action" &&
-              !selectedNode.data.config?.actionType &&
-              !isOwner && (
+              {selectedNode.data.type === "action" &&
+                !selectedNode.data.config?.actionType &&
+                !isOwner && (
+                  <div className="rounded-lg border border-muted bg-muted/30 p-3">
+                    <p className="text-muted-foreground text-sm">
+                      No action configured for this step.
+                    </p>
+                  </div>
+                )}
+
+              {selectedNode.data.type === "action" &&
+              selectedNode.data.config?.actionType ? (
+                <ActionConfig
+                  config={selectedNode.data.config || {}}
+                  disabled={isGenerating || !isOwner}
+                  isOwner={isOwner}
+                  onUpdateConfig={handleUpdateConfig}
+                />
+              ) : null}
+
+              {selectedNode.data.type !== "action" ||
+              selectedNode.data.config?.actionType ? (
+                <>
+                  <div className="space-y-2">
+                    <Label className="ml-1" htmlFor="label">
+                      Label
+                    </Label>
+                    <Input
+                      disabled={isGenerating || !isOwner}
+                      id="label"
+                      onChange={(e) => handleUpdateLabel(e.target.value)}
+                      value={selectedNode.data.label}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="ml-1" htmlFor="description">
+                      Description
+                    </Label>
+                    <Input
+                      disabled={isGenerating || !isOwner}
+                      id="description"
+                      onChange={(e) => handleUpdateDescription(e.target.value)}
+                      placeholder="Optional description"
+                      value={selectedNode.data.description || ""}
+                    />
+                  </div>
+                </>
+              ) : null}
+
+              {!isOwner && (
                 <div className="rounded-lg border border-muted bg-muted/30 p-3">
                   <p className="text-muted-foreground text-sm">
-                    No action configured for this step.
+                    You are viewing a public workflow. Duplicate it to make
+                    changes.
                   </p>
                 </div>
               )}
-
-            {selectedNode.data.type === "action" &&
-            selectedNode.data.config?.actionType ? (
-              <ActionConfig
-                config={selectedNode.data.config || {}}
-                disabled={isGenerating || !isOwner}
-                onUpdateConfig={handleUpdateConfig}
-              />
-            ) : null}
-
-            {selectedNode.data.type !== "action" ||
-            selectedNode.data.config?.actionType ? (
-              <>
-                <div className="space-y-2">
-                  <Label className="ml-1" htmlFor="label">
-                    Label
-                  </Label>
-                  <Input
-                    disabled={isGenerating || !isOwner}
-                    id="label"
-                    onChange={(e) => handleUpdateLabel(e.target.value)}
-                    value={selectedNode.data.label}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="ml-1" htmlFor="description">
-                    Description
-                  </Label>
-                  <Input
-                    disabled={isGenerating || !isOwner}
-                    id="description"
-                    onChange={(e) => handleUpdateDescription(e.target.value)}
-                    placeholder="Optional description"
-                    value={selectedNode.data.description || ""}
-                  />
-                </div>
-              </>
-            ) : null}
-
-            {!isOwner && (
-              <div className="rounded-lg border border-muted bg-muted/30 p-3">
-                <p className="text-muted-foreground text-sm">
-                  You are viewing a public workflow. Duplicate it to make
-                  changes.
-                </p>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
           {selectedNode.data.type === "action" && isOwner && (
-            <div className="flex shrink-0 items-center justify-between border-t p-4">
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={handleToggleEnabled}
-                  size="icon"
-                  title={
-                    selectedNode.data.enabled === false
-                      ? "Enable Step"
-                      : "Disable Step"
-                  }
-                  variant="ghost"
-                >
-                  {selectedNode.data.enabled === false ? (
-                    <EyeOff className="size-4" />
-                  ) : (
-                    <Eye className="size-4" />
-                  )}
-                </Button>
-                <Button
-                  onClick={() => setShowDeleteNodeAlert(true)}
-                  size="icon"
-                  variant="ghost"
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              </div>
-
-              {(() => {
-                const actionType = selectedNode.data.config
-                  ?.actionType as string;
-
-                // Database Query is special - has integration but no plugin
-                const SYSTEM_INTEGRATION_MAP: Record<string, string> = {
-                  "Database Query": "database",
-                };
-
-                // Get integration type dynamically
-                let integrationType: string | undefined;
-                let requiresCredentials = true; // Default to true for system actions
-
-                if (actionType) {
-                  if (SYSTEM_INTEGRATION_MAP[actionType]) {
-                    integrationType = SYSTEM_INTEGRATION_MAP[actionType];
-                  } else {
-                    // Look up from plugin registry
-                    const action = findActionById(actionType);
-                    if (action) {
-                      integrationType = action.integration;
-                      // Check if plugin requires credentials (default to true)
-                      const plugin = getIntegration(action.integration);
-                      requiresCredentials =
-                        plugin?.requiresCredentials !== false;
-                    }
-                  }
+            <div className="flex shrink-0 items-center gap-2 border-t p-4">
+              <Button
+                onClick={handleToggleEnabled}
+                size="icon"
+                title={
+                  selectedNode.data.enabled === false
+                    ? "Enable Step"
+                    : "Disable Step"
                 }
-
-                // Show integration selector if credentials required, otherwise show info message
-                if (integrationType && requiresCredentials) {
-                  return (
-                    <IntegrationSelector
-                      integrationType={integrationType as IntegrationType}
-                      label="Integration"
-                      onChange={(id) => handleUpdateConfig("integrationId", id)}
-                      onOpenSettings={() => setShowIntegrationsDialog(true)}
-                      value={
-                        (selectedNode.data.config?.integrationId as string) ||
-                        ""
-                      }
-                    />
-                  );
-                }
-                if (integrationType && !requiresCredentials) {
-                  return (
-                    <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2">
-                      <span className="text-muted-foreground text-sm">
-                        No integration required
-                      </span>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
+                variant="ghost"
+              >
+                {selectedNode.data.enabled === false ? (
+                  <EyeOff className="size-4" />
+                ) : (
+                  <Eye className="size-4" />
+                )}
+              </Button>
+              <Button
+                onClick={() => setShowDeleteNodeAlert(true)}
+                size="icon"
+                variant="ghost"
+              >
+                <Trash2 className="size-4" />
+              </Button>
             </div>
           )}
           {selectedNode.data.type === "trigger" && isOwner && (

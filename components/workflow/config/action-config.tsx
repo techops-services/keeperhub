@@ -1,18 +1,35 @@
 "use client";
 
-import { Settings } from "lucide-react";
+import { useAtomValue, useSetAtom } from "jotai";
+import { HelpCircle, Plus, Settings } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { IntegrationFormDialog } from "@/components/settings/integration-form-dialog";
+import { Button } from "@/components/ui/button";
 import { CodeEditor } from "@/components/ui/code-editor";
 import { IntegrationIcon } from "@/components/ui/integration-icon";
+import { IntegrationSelector } from "@/components/ui/integration-selector";
 import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { TemplateBadgeInput } from "@/components/ui/template-badge-input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  aiGatewayStatusAtom,
+  openAiGatewayConsentModalAtom,
+} from "@/lib/ai-gateway/state";
+import { integrationsVersionAtom } from "@/lib/integrations-store";
+import type { IntegrationType } from "@/lib/types/integration";
 import {
   findActionById,
   flattenConfigFields,
@@ -27,6 +44,7 @@ type ActionConfigProps = {
   config: Record<string, unknown>;
   onUpdateConfig: (key: string, value: string) => void;
   disabled: boolean;
+  isOwner?: boolean;
 };
 
 // Database Query fields component
@@ -210,6 +228,11 @@ const SYSTEM_ACTIONS: Array<{ id: string; label: string }> = [
 
 const SYSTEM_ACTION_IDS = SYSTEM_ACTIONS.map((a) => a.id);
 
+// System actions that need integrations (not in plugin registry)
+const SYSTEM_ACTION_INTEGRATIONS: Record<string, IntegrationType> = {
+  "Database Query": "database",
+};
+
 // Build category mapping dynamically from plugins + System
 function useCategoryData() {
   return useMemo(() => {
@@ -270,6 +293,7 @@ export function ActionConfig({
   config,
   onUpdateConfig,
   disabled,
+  isOwner = true,
 }: ActionConfigProps) {
   const actionType = (config?.actionType as string) || "";
   const categories = useCategoryData();
@@ -277,6 +301,12 @@ export function ActionConfig({
 
   const selectedCategory = actionType ? getCategoryForAction(actionType) : null;
   const [category, setCategory] = useState<string>(selectedCategory || "");
+  const [showAddConnectionDialog, setShowAddConnectionDialog] = useState(false);
+  const setIntegrationsVersion = useSetAtom(integrationsVersionAtom);
+
+  // AI Gateway managed keys state
+  const aiGatewayStatus = useAtomValue(aiGatewayStatusAtom);
+  const openConsentModal = useSetAtom(openAiGatewayConsentModalAtom);
 
   // Sync category state when actionType changes (e.g., when switching nodes)
   useEffect(() => {
@@ -332,12 +362,52 @@ export function ActionConfig({
   // Get dynamic config fields for plugin actions
   const pluginAction = actionType ? findActionById(actionType) : null;
 
+  // Determine the integration type for the current action
+  const integrationType: IntegrationType | undefined = useMemo(() => {
+    if (!actionType) {
+      return;
+    }
+
+    // Check system actions first
+    if (SYSTEM_ACTION_INTEGRATIONS[actionType]) {
+      return SYSTEM_ACTION_INTEGRATIONS[actionType];
+    }
+
+    // Check plugin actions
+    const action = findActionById(actionType);
+    return action?.integration as IntegrationType | undefined;
+  }, [actionType]);
+
+  // Check if AI Gateway managed keys should be offered (user can have multiple for different teams)
+  const shouldUseManagedKeys =
+    integrationType === "ai-gateway" &&
+    aiGatewayStatus?.enabled &&
+    aiGatewayStatus?.isVercelUser;
+
+  const handleConsentSuccess = (integrationId: string) => {
+    onUpdateConfig("integrationId", integrationId);
+    setIntegrationsVersion((v) => v + 1);
+  };
+
+  const handleAddSecondaryConnection = () => {
+    if (shouldUseManagedKeys) {
+      openConsentModal({
+        onConsent: handleConsentSuccess,
+        onManualEntry: () => {
+          setShowAddConnectionDialog(true);
+        },
+      });
+    } else {
+      setShowAddConnectionDialog(true);
+    }
+  };
+
   return (
     <>
       <div className="grid grid-cols-2 gap-2">
         <div className="space-y-2">
           <Label className="ml-1" htmlFor="actionCategory">
-            Category
+            Service
           </Label>
           <Select
             disabled={disabled}
@@ -354,6 +424,7 @@ export function ActionConfig({
                   <span>System</span>
                 </div>
               </SelectItem>
+              <SelectSeparator />
               {integrations.map((integration) => (
                 <SelectItem key={integration.type} value={integration.label}>
                   <div className="flex items-center gap-2">
@@ -392,6 +463,52 @@ export function ActionConfig({
           </Select>
         </div>
       </div>
+
+      {integrationType && isOwner && (
+        <div className="space-y-2">
+          <div className="ml-1 flex items-center justify-between">
+            <div className="flex items-center gap-1">
+              <Label>Connection</Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="size-3.5 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>API key or OAuth credentials for this service</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <Button
+              className="size-6"
+              disabled={disabled}
+              onClick={handleAddSecondaryConnection}
+              size="icon"
+              variant="ghost"
+            >
+              <Plus className="size-4" />
+            </Button>
+          </div>
+          <IntegrationSelector
+            disabled={disabled}
+            integrationType={integrationType}
+            onChange={(id) => onUpdateConfig("integrationId", id)}
+            value={(config?.integrationId as string) || ""}
+          />
+          <IntegrationFormDialog
+            mode="create"
+            onClose={() => setShowAddConnectionDialog(false)}
+            onSuccess={(integrationId) => {
+              setShowAddConnectionDialog(false);
+              setIntegrationsVersion((v) => v + 1);
+              onUpdateConfig("integrationId", integrationId);
+            }}
+            open={showAddConnectionDialog}
+            preselectedType={integrationType}
+          />
+        </div>
+      )}
 
       {/* System actions - hardcoded config fields */}
       {config?.actionType === "HTTP Request" && (
