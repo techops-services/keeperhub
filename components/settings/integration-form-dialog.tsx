@@ -74,7 +74,7 @@ type IntegrationFormDialogProps = {
 
 type IntegrationFormData = {
   name: string;
-  type: IntegrationType;
+  type: IntegrationType | null;
   config: Record<string, string | boolean>;
 };
 
@@ -221,7 +221,7 @@ function ConfigFields({
         label="Database URL"
         onChange={updateConfig}
         placeholder="postgresql://user:password@host:port/database"
-        value={formData.config.url || ""}
+        value={(formData.config.url as string) || ""}
       />
     );
   }
@@ -263,7 +263,7 @@ function ConfigFields({
           label={field.label}
           onChange={updateConfig}
           placeholder={field.placeholder}
-          value={formData.config[field.configKey] || ""}
+          value={(formData.config[field.configKey] as string) || ""}
         />
       );
     }
@@ -276,7 +276,7 @@ function ConfigFields({
           onChange={(e) => updateConfig(field.configKey, e.target.value)}
           placeholder={field.placeholder}
           type={field.type}
-          value={formData.config[field.configKey] || ""}
+          value={(formData.config[field.configKey] as string) || ""}
         />
         {(field.helpText || field.helpLink) && (
           <p className="text-muted-foreground text-xs">
@@ -707,7 +707,7 @@ export function IntegrationFormDialog({
       if (mode === "edit" && integration) {
         // Only include config if there are actual new values entered
         const hasNewConfig = Object.values(formData.config).some(
-          (v) => v && v.length > 0
+          (v) => v && (typeof v === "boolean" || v.length > 0)
         );
         await api.integration.update(integration.id, {
           name: integrationName,
@@ -739,7 +739,7 @@ export function IntegrationFormDialog({
 
     // Check if we have config values to test
     const hasConfig = Object.values(formData.config).some(
-      (v) => v && v.length > 0
+      (v) => v && (typeof v === "boolean" || v.length > 0)
     );
 
     // In edit mode without new config, skip testing
@@ -813,7 +813,7 @@ export function IntegrationFormDialog({
 
     // Check if we have any config values to test
     const hasConfig = Object.values(formData.config).some(
-      (v) => v && v.length > 0
+      (v) => v && (typeof v === "boolean" || v.length > 0)
     );
     if (!hasConfig && mode === "create") {
       toast.error("Please enter credentials first");
