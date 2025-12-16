@@ -848,26 +848,6 @@ export function IntegrationFormDialog({
     );
   }, [integrationTypes, searchQuery]);
 
-  const getDialogTitle = () => {
-    if (mode === "edit") {
-      return "Edit Connection";
-    }
-    if (step === "select") {
-      return "Add Connection";
-    }
-    return `Add ${formData.type ? getLabel(formData.type) : ""} Connection`;
-  };
-
-  const getDialogDescription = () => {
-    if (mode === "edit") {
-      return "Update your connection credentials";
-    }
-    if (step === "select") {
-      return "Select a service to connect";
-    }
-    return "Enter your credentials";
-  };
-
   return (
     <Dialog onOpenChange={(isOpen) => !isOpen && onClose()} open={open}>
       <DialogContent className="max-w-md">

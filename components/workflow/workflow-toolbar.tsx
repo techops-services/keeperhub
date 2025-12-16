@@ -339,6 +339,7 @@ function getMissingRequiredFields(
 // Get missing integrations for workflow nodes
 // Uses the plugin registry to determine which integrations are required
 // Also handles built-in actions that aren't in the plugin registry
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Upstream function - preserving original structure for easier merges
 function getMissingIntegrations(
   nodes: WorkflowNode[],
   userIntegrations: Array<{ id: string; type: IntegrationType }>

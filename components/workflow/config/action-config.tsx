@@ -289,6 +289,7 @@ function normalizeActionType(actionType: string): string {
   return actionType;
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Upstream function - preserving original structure for easier merges
 export function ActionConfig({
   config,
   onUpdateConfig,

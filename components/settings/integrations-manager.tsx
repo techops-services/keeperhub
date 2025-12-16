@@ -46,7 +46,6 @@ export function IntegrationsManager({
   const [loading, setLoading] = useState(true);
   const [editingIntegration, setEditingIntegration] =
     useState<IntegrationWithConfig | null>(null);
-  const [loadingIntegration, setLoadingIntegration] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
@@ -87,7 +86,9 @@ export function IntegrationsManager({
           integration.type,
       }))
       .filter((integration) => {
-        if (!filter) return true;
+        if (!filter) {
+          return true;
+        }
         return (
           integration.label.toLowerCase().includes(filterLower) ||
           integration.name.toLowerCase().includes(filterLower) ||
