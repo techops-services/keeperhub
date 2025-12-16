@@ -932,7 +932,6 @@ export const PanelInner = () => {
                   return (
                     <IntegrationSelector
                       integrationType={integrationType as IntegrationType}
-                      label="Integration"
                       onChange={(id) => handleUpdateConfig("integrationId", id)}
                       onOpenSettings={() => setShowIntegrationsDialog(true)}
                       value={

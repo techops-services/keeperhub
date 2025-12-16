@@ -16,7 +16,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { IntegrationIcon } from "@/components/ui/integration-icon";
 import { Spinner } from "@/components/ui/spinner";
-import { api, type Integration } from "@/lib/api-client";
+import {
+  api,
+  type Integration,
+  type IntegrationWithConfig,
+} from "@/lib/api-client";
 import { getIntegrationLabels } from "@/plugins";
 import { IntegrationFormDialog } from "./integration-form-dialog";
 

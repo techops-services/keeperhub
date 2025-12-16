@@ -1,6 +1,6 @@
 import type { IntegrationPlugin } from "../registry";
 import { registerIntegration } from "../registry";
-import { AiGatewayIcon } from "./icon";
+import AiGatewayIcon from "./icon";
 
 const aiGatewayPlugin: IntegrationPlugin = {
   type: "ai-gateway",
@@ -27,8 +27,8 @@ const aiGatewayPlugin: IntegrationPlugin = {
 
   testConfig: {
     getTestFunction: async () => {
-      const { testAiGateway } = await import("./test");
-      return testAiGateway;
+      const { testConnection } = await import("./test");
+      return testConnection;
     },
   },
 
