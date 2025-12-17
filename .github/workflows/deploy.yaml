@@ -2,6 +2,7 @@ on:
   push:
     branches:
       - staging
+      - feat/KEEP-1167-schedule-trigger-mvp
       # - main
   workflow_dispatch:
 
@@ -18,6 +19,7 @@ jobs:
       NAMESPACE: keeperhub
       SERVICE_NAME: keeperhub
       AWS_ECR_NAME: keeperhub-${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
+      SERVICE_ACCOUNT_ROLE_ARN: ${{ vars.SERVICE_ACCOUNT_ROLE_ARN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,8 +48,8 @@ jobs:
         id: build-app-image
         if: ${{ !contains(github.event.head_commit.message , '[skip build]') }}
         env:
-          SHA_TAG: ${{ steps.vars.outputs.sha_short }}
-          LATEST_TAG: latest
+          SHA_TAG: app-${{ steps.vars.outputs.sha_short }}
+          LATEST_TAG: app-latest
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
           # Build Docker containers and push them to ECR ${{ env.AWS_ECR_NAME }}
@@ -65,27 +67,64 @@ jobs:
         id: build-migrator
         if: ${{ !contains(github.event.head_commit.message , '[skip build]') }}
         env:
-          SHA_TAG: ${{ steps.vars.outputs.sha_short }}
-          LATEST_TAG: latest
+          SHA_TAG: migrator-${{ steps.vars.outputs.sha_short }}
+          LATEST_TAG: migrator-latest
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
           # Build image for database migrations
           docker build --target migrator \
-                        -t $ECR_REGISTRY/$AWS_ECR_NAME:migrator \
+                        -t $ECR_REGISTRY/$AWS_ECR_NAME:migrator-${SHA_TAG} \
+                        -t $ECR_REGISTRY/$AWS_ECR_NAME:$LATEST_TAG \
                         -f ./Dockerfile \
                         .
 
-          docker push $ECR_REGISTRY/$AWS_ECR_NAME:migrator
+          docker push $ECR_REGISTRY/$AWS_ECR_NAME:migrator-$SHA_TAG
+
+      - name: Build, tag, and push scheduler image to ECR
+        id: build-scheduler
+        if: ${{ !contains(github.event.head_commit.message , '[skip build]') }}
+        env:
+          SHA_TAG: scheduler-${{ steps.vars.outputs.sha_short }}
+          LATEST_TAG: scheduler-latest
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          # Build image for database migrations
+          docker build --target scheduler \
+                        -t $ECR_REGISTRY/$AWS_ECR_NAME:scheduler-${SHA_TAG} \
+                        -t $ECR_REGISTRY/$AWS_ECR_NAME:$LATEST_TAG \
+                        -f ./Dockerfile \
+                        .
+
+          docker push $ECR_REGISTRY/$AWS_ECR_NAME:scheduler-$SHA_TAG
+
+      - name: Build, tag, and push scheduler image to ECR
+        id: build-workflow-runner
+        if: ${{ !contains(github.event.head_commit.message , '[skip build]') }}
+        env:
+          SHA_TAG: workflow-runner-${{ steps.vars.outputs.sha_short }}
+          LATEST_TAG: workflow-runner-latest
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          # Build image for database migrations
+          docker build --target workflow-runner \
+                        -t $ECR_REGISTRY/$AWS_ECR_NAME:workflow-runner-${SHA_TAG} \
+                        -t $ECR_REGISTRY/$AWS_ECR_NAME:$LATEST_TAG \
+                        -f ./Dockerfile \
+                        .
+
+          docker push $ECR_REGISTRY/$AWS_ECR_NAME:workflow-runner-$SHA_TAG
 
       - name: Replace variables in the Helm values file
         id: replace-vars
         if: ${{ !contains(github.event.head_commit.message , '[skip deploy]') }}
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_REPOSITORY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
+          SERVICE_ACCOUNT_ROLE_ARN: ${{ env.SERVICE_ACCOUNT_ROLE_ARN }}
         run: |
           sed -i 's|${ECR_REGISTRY}|'"$ECR_REGISTRY"'|g' $HELM_FILE
           sed -i 's|${IMAGE_TAG}|'"$IMAGE_TAG"'|g' $HELM_FILE
+          sed -i 's|${SERVICE_ACCOUNT_ROLE_ARN}|'"$SERVICE_ACCOUNT_ROLE_ARN"'|g' $HELM_FILE
 
       - name: Deploying Service to Kubernetes with Helm
         id: deploy
