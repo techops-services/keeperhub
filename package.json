@@ -13,7 +13,7 @@
     "fix": "npx ultracite@latest fix",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push",
+    "db:push": "drizzle-kit push --force",
     "db:studio": "drizzle-kit studio",
     "discover-plugins": "tsx scripts/discover-plugins.ts",
     "create-plugin": "tsx scripts/create-plugin.ts",
