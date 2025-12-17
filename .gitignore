@@ -56,3 +56,9 @@ lib/output-display-configs.ts
 
 # local kubernetes generated values (from templates)
 deploy/local/values-keeperhub.yaml
+
+# pnpm cache
+.pnpm-store/
+
+# tailwindcss logs
+tailwindcss-*.log

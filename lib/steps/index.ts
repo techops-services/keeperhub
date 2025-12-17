@@ -6,6 +6,7 @@
 
 import type { sendEmailStep } from "../../plugins/resend/steps/send-email";
 import type { sendSlackMessageStep } from "../../plugins/slack/steps/send-slack-message";
+import type { checkBalanceStep } from "../../plugins/web3/steps/check-balance";
 import type { transferFundsStep } from "../../plugins/web3/steps/transfer-funds";
 import type { conditionStep } from "./condition";
 import type { databaseQueryStep } from "./database-query";
@@ -39,6 +40,10 @@ export const stepRegistry: Record<string, StepFunction> = {
   "Transfer Funds": async (input) =>
     (await import("../../plugins/web3/steps/transfer-funds")).transferFundsStep(
       input as Parameters<typeof transferFundsStep>[0]
+    ),
+  "Check Balance": async (input) =>
+    (await import("../../plugins/web3/steps/check-balance")).checkBalanceStep(
+      input as Parameters<typeof checkBalanceStep>[0]
     ),
 };
 
