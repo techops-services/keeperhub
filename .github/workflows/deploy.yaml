@@ -93,6 +93,7 @@ jobs:
             ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:scheduler-latest
           cache-from: |
             type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-app
+            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:scheduler-latest
           cache-to: type=inline
 
       - name: Build, tag, and push workflow-runner image to ECR
