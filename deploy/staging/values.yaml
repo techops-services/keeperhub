@@ -198,6 +198,7 @@ cronjob:
         limits:
           memory: "256Mi"
           cpu: "200m"
+      restartPolicy: OnFailure
       concurrencyPolicy: Forbid
       successfulJobsHistoryLimit: 3
       failedJobsHistoryLimit: 3
