@@ -60,8 +60,8 @@ jobs:
             ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:app-${{ steps.vars.outputs.sha_short }}
             ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:app-latest
             ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:${{ env.ENVIRONMENT_TAG }}
-          cache-from: type=gha,scope=app
-          cache-to: type=gha,mode=max,scope=app
+          cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-app
+          cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-app,mode=max
 
       - name: Build, tag, and push migrator image to ECR
         id: build-migrator
@@ -75,8 +75,9 @@ jobs:
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:migrator-${{ steps.vars.outputs.sha_short }}
             ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:migrator-latest
-          cache-from: type=gha,scope=migrator
-          cache-to: type=gha,mode=max,scope=migrator
+          cache-from: |
+            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-app
+          cache-to: type=inline
 
       - name: Build, tag, and push scheduler image to ECR
         id: build-scheduler
@@ -90,8 +91,9 @@ jobs:
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:scheduler-${{ steps.vars.outputs.sha_short }}
             ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:scheduler-latest
-          cache-from: type=gha,scope=scheduler
-          cache-to: type=gha,mode=max,scope=scheduler
+          cache-from: |
+            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-app
+          cache-to: type=inline
 
       - name: Build, tag, and push workflow-runner image to ECR
         id: build-workflow-runner
@@ -105,8 +107,9 @@ jobs:
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:workflow-runner-${{ steps.vars.outputs.sha_short }}
             ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:workflow-runner-latest
-          cache-from: type=gha,scope=workflow-runner
-          cache-to: type=gha,mode=max,scope=workflow-runner
+          cache-from: |
+            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-app
+          cache-to: type=inline
 
       - name: Replace variables in the Helm values file
         id: replace-vars

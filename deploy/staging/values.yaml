@@ -186,9 +186,7 @@ cronjob:
       command: ["/bin/sh"]
       args:
         - "-c"
-        - "echo $(date) - [Dispatcher] Starting"
-        - tsx scripts/schedule-dispatcher.ts
-        - "echo $(date) - [Dispatcher] Completed"
+        - "echo $(date) - [Dispatcher] Starting && tsx scripts/schedule-dispatcher.ts && echo $(date) - [Dispatcher] Completed"
       serviceAccount:
         name: "keeperhub-staging"
       resources:
