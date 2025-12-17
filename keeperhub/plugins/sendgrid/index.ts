@@ -1,5 +1,5 @@
-import type { IntegrationPlugin } from "../registry";
-import { registerIntegration } from "../registry";
+import type { IntegrationPlugin } from "@/plugins/registry";
+import { registerIntegration } from "@/plugins/registry";
 import { SendGridIcon } from "./icon";
 
 const sendgridPlugin: IntegrationPlugin = {
@@ -19,7 +19,8 @@ const sendgridPlugin: IntegrationPlugin = {
       type: "checkbox",
       configKey: "useKeeperHubApiKey",
       defaultValue: true,
-      helpText: "When checked, uses the KeeperHub SendGrid API key. Uncheck to use your own API key.",
+      helpText:
+        "When checked, uses the KeeperHub SendGrid API key. Uncheck to use your own API key.",
     },
     {
       id: "apiKey",
@@ -87,4 +88,3 @@ const sendgridPlugin: IntegrationPlugin = {
 registerIntegration(sendgridPlugin);
 
 export default sendgridPlugin;
-

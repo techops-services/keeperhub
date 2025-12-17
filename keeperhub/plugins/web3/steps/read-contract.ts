@@ -116,7 +116,10 @@ async function stepHandler(
       });
       console.log("[Read Contract] Function arguments parsed:", args);
     } catch (error) {
-      console.error("[Read Contract] Failed to parse function arguments:", error);
+      console.error(
+        "[Read Contract] Failed to parse function arguments:",
+        error
+      );
       return {
         success: false,
         error: `Invalid function arguments JSON: ${getErrorMessage(error)}`,
@@ -153,7 +156,12 @@ async function stepHandler(
 
   // Call the contract function
   try {
-    console.log("[Read Contract] Calling function:", abiFunction, "with args:", args);
+    console.log(
+      "[Read Contract] Calling function:",
+      abiFunction,
+      "with args:",
+      args
+    );
 
     // Check if function exists
     if (typeof contract[abiFunction] !== "function") {
@@ -179,7 +187,9 @@ async function stepHandler(
     let structuredResult = serializedResult;
 
     // Check if function has outputs defined in ABI
-    const outputs = (functionAbi as { outputs?: Array<{ name?: string; type: string }> }).outputs;
+    const outputs = (
+      functionAbi as { outputs?: Array<{ name?: string; type: string }> }
+    ).outputs;
 
     if (outputs && outputs.length > 0) {
       if (outputs.length === 1) {
@@ -187,10 +197,16 @@ async function stepHandler(
         const outputName = outputs[0].name?.trim();
         if (outputName) {
           // Named single output: wrap in object
-          structuredResult = { [outputName]: Array.isArray(serializedResult) ? serializedResult[0] : serializedResult };
+          structuredResult = {
+            [outputName]: Array.isArray(serializedResult)
+              ? serializedResult[0]
+              : serializedResult,
+          };
         } else {
           // Unnamed single output: return raw value
-          structuredResult = Array.isArray(serializedResult) ? serializedResult[0] : serializedResult;
+          structuredResult = Array.isArray(serializedResult)
+            ? serializedResult[0]
+            : serializedResult;
         }
       } else if (Array.isArray(serializedResult)) {
         // Multiple outputs: always map to object with field names (named or generated)

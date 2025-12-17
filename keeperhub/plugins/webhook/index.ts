@@ -1,5 +1,5 @@
-import type { IntegrationPlugin } from "../registry";
-import { registerIntegration } from "../registry";
+import type { IntegrationPlugin } from "@/plugins/registry";
+import { registerIntegration } from "@/plugins/registry";
 import { WebhookIcon } from "./icon";
 
 const webhookPlugin: IntegrationPlugin = {
@@ -20,7 +20,8 @@ const webhookPlugin: IntegrationPlugin = {
       type: "text",
       placeholder: "No configuration needed",
       configKey: "info",
-      helpText: "Configure webhook URL, method, headers, and payload directly in each webhook action.",
+      helpText:
+        "Configure webhook URL, method, headers, and payload directly in each webhook action.",
     },
   ],
 
@@ -35,9 +36,18 @@ const webhookPlugin: IntegrationPlugin = {
       stepFunction: "sendWebhookStep",
       stepImportPath: "send-webhook",
       outputFields: [
-        { field: "success", description: "Whether the webhook was sent successfully" },
-        { field: "statusCode", description: "HTTP status code from the response" },
-        { field: "response", description: "Response body from the webhook endpoint" },
+        {
+          field: "success",
+          description: "Whether the webhook was sent successfully",
+        },
+        {
+          field: "statusCode",
+          description: "HTTP status code from the response",
+        },
+        {
+          field: "response",
+          description: "Response body from the webhook endpoint",
+        },
         { field: "error", description: "Error message if failed" },
       ],
       configFields: [
@@ -67,9 +77,11 @@ const webhookPlugin: IntegrationPlugin = {
           key: "webhookHeaders",
           label: "Headers",
           type: "template-textarea",
-          placeholder: '{"Authorization": "Bearer token", "Content-Type": "application/json"}',
+          placeholder:
+            '{"Authorization": "Bearer token", "Content-Type": "application/json"}',
           rows: 4,
-          example: '{"Authorization": "Bearer token", "Content-Type": "application/json"}',
+          example:
+            '{"Authorization": "Bearer token", "Content-Type": "application/json"}',
           required: false,
         },
         {
@@ -90,4 +102,3 @@ const webhookPlugin: IntegrationPlugin = {
 registerIntegration(webhookPlugin);
 
 export default webhookPlugin;
-

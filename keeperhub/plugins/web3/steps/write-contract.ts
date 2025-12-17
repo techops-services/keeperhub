@@ -1,9 +1,9 @@
 import "server-only";
 
-import { db } from "@/lib/db";
-import { workflowExecutions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
+import { db } from "@/lib/db";
+import { workflowExecutions } from "@/lib/db/schema";
 import { initializeParaSigner } from "@/lib/para/wallet-helpers";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
@@ -77,11 +77,15 @@ async function stepHandler(
     executionId: input._context?.executionId,
   });
 
-  const { contractAddress, network, abi, abiFunction, functionArgs, _context } = input;
+  const { contractAddress, network, abi, abiFunction, functionArgs, _context } =
+    input;
 
   // Validate contract address
   if (!ethers.isAddress(contractAddress)) {
-    console.error("[Write Contract] Invalid contract address:", contractAddress);
+    console.error(
+      "[Write Contract] Invalid contract address:",
+      contractAddress
+    );
     return {
       success: false,
       error: `Invalid contract address: ${contractAddress}`,
@@ -145,7 +149,10 @@ async function stepHandler(
       });
       console.log("[Write Contract] Function arguments parsed:", args);
     } catch (error) {
-      console.error("[Write Contract] Failed to parse function arguments:", error);
+      console.error(
+        "[Write Contract] Failed to parse function arguments:",
+        error
+      );
       return {
         success: false,
         error: `Invalid function arguments JSON: ${getErrorMessage(error)}`,
@@ -164,7 +171,10 @@ async function stepHandler(
 
   let userId: string;
   try {
-    console.log("[Write Contract] Looking up user from execution:", _context.executionId);
+    console.log(
+      "[Write Contract] Looking up user from execution:",
+      _context.executionId
+    );
     userId = await getUserIdFromExecution(_context.executionId);
     console.log("[Write Contract] Found userId:", userId);
   } catch (error) {
@@ -194,7 +204,10 @@ async function stepHandler(
     console.log("[Write Contract] Initializing Para signer for user:", userId);
     signer = await initializeParaSigner(userId, rpcUrl);
     const signerAddress = await signer.getAddress();
-    console.log("[Write Contract] Signer initialized successfully:", signerAddress);
+    console.log(
+      "[Write Contract] Signer initialized successfully:",
+      signerAddress
+    );
   } catch (error) {
     console.error("[Write Contract] Failed to initialize wallet:", error);
     return {
@@ -209,7 +222,10 @@ async function stepHandler(
     contract = new ethers.Contract(contractAddress, parsedAbi, signer);
     console.log("[Write Contract] Contract instance created with Para wallet");
   } catch (error) {
-    console.error("[Write Contract] Failed to create contract instance:", error);
+    console.error(
+      "[Write Contract] Failed to create contract instance:",
+      error
+    );
     return {
       success: false,
       error: `Failed to create contract instance: ${getErrorMessage(error)}`,
@@ -218,7 +234,12 @@ async function stepHandler(
 
   // Call the contract function
   try {
-    console.log("[Write Contract] Calling function:", abiFunction, "with args:", args);
+    console.log(
+      "[Write Contract] Calling function:",
+      abiFunction,
+      "with args:",
+      args
+    );
 
     // Check if function exists
     if (typeof contract[abiFunction] !== "function") {
@@ -236,16 +257,23 @@ async function stepHandler(
     // Wait for transaction to be mined
     const receipt = await tx.wait();
 
-    console.log("[Write Contract] Transaction confirmed in block:", receipt.blockNumber);
+    console.log(
+      "[Write Contract] Transaction confirmed in block:",
+      receipt.blockNumber
+    );
 
     // Extract return value if function has outputs
-    const outputs = (functionAbi as { outputs?: Array<{ name?: string; type: string }> }).outputs;
-    let result: unknown = undefined;
+    const outputs = (
+      functionAbi as { outputs?: Array<{ name?: string; type: string }> }
+    ).outputs;
+    let result: unknown;
 
     if (outputs && outputs.length > 0) {
       // For functions with return values, we need to decode the logs or use staticCall
       // For now, we'll just note that the function has outputs
-      console.log("[Write Contract] Function has outputs but return values are not extracted from transaction");
+      console.log(
+        "[Write Contract] Function has outputs but return values are not extracted from transaction"
+      );
     }
 
     return {

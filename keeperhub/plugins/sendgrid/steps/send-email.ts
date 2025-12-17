@@ -47,7 +47,7 @@ async function stepHandler(
 ): Promise<SendEmailResult> {
   // Determine which API key to use
   let apiKey: string | undefined;
-  
+
   if (useKeeperHubApiKey) {
     // Use KeeperHub API key from environment
     apiKey = process.env.SENDGRID_API_KEY;
@@ -72,8 +72,16 @@ async function stepHandler(
     const personalizations = [
       {
         to: [{ email: input.emailTo }],
-        ...(input.emailCc && { cc: input.emailCc.split(",").map((email) => ({ email: email.trim() })) }),
-        ...(input.emailBcc && { bcc: input.emailBcc.split(",").map((email) => ({ email: email.trim() })) }),
+        ...(input.emailCc && {
+          cc: input.emailCc
+            .split(",")
+            .map((email) => ({ email: email.trim() })),
+        }),
+        ...(input.emailBcc && {
+          bcc: input.emailBcc
+            .split(",")
+            .map((email) => ({ email: email.trim() })),
+        }),
         subject: input.emailSubject,
       },
     ];
@@ -150,4 +158,3 @@ sendEmailStep.maxRetries = 0;
 
 // Export marker for codegen auto-generation
 export const _integrationType = "sendgrid";
-

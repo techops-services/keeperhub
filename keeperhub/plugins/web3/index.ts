@@ -1,5 +1,5 @@
-import type { IntegrationPlugin } from "../registry";
-import { registerIntegration } from "../registry";
+import type { IntegrationPlugin } from "@/plugins/registry";
+import { registerIntegration } from "@/plugins/registry";
 import { Web3Icon } from "./icon";
 
 const web3Plugin: IntegrationPlugin = {
@@ -18,7 +18,8 @@ const web3Plugin: IntegrationPlugin = {
       type: "text",
       placeholder: "Create a wallet to use Web3 actions",
       configKey: "info",
-      helpText: "You'll need to create a Para wallet to use Web3 actions in your workflows.",
+      helpText:
+        "You'll need to create a Para wallet to use Web3 actions in your workflows.",
     },
   ],
 
@@ -117,7 +118,8 @@ const web3Plugin: IntegrationPlugin = {
         },
         {
           field: "result",
-          description: "The contract function return value (structured based on ABI outputs)",
+          description:
+            "The contract function return value (structured based on ABI outputs)",
         },
         {
           field: "error",

@@ -66,7 +66,11 @@ async function stepHandler(
   const headersObj = parseJsonSafely(input.webhookHeaders);
   const headers: Record<string, string> = {};
 
-  if (headersObj && typeof headersObj === "object" && !Array.isArray(headersObj)) {
+  if (
+    headersObj &&
+    typeof headersObj === "object" &&
+    !Array.isArray(headersObj)
+  ) {
     for (const [key, value] of Object.entries(headersObj)) {
       if (typeof value === "string") {
         headers[key] = value;
@@ -76,8 +80,7 @@ async function stepHandler(
 
   // Set default Content-Type if not provided and method requires body
   if (
-    !headers["Content-Type"] &&
-    !headers["content-type"] &&
+    !(headers["Content-Type"] || headers["content-type"]) &&
     method !== "GET" &&
     input.webhookPayload
   ) {
@@ -153,4 +156,3 @@ export async function sendWebhookStep(
 sendWebhookStep.maxRetries = 0;
 
 export const _integrationType = "webhook";
-

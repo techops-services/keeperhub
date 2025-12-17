@@ -40,4 +40,3 @@ export async function testSendGrid(credentials: Record<string, string>) {
     };
   }
 }
-

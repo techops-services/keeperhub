@@ -1,9 +1,9 @@
 import "server-only";
 
-import { db } from "@/lib/db";
-import { workflowExecutions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
+import { db } from "@/lib/db";
+import { workflowExecutions } from "@/lib/db/schema";
 import { initializeParaSigner } from "@/lib/para/wallet-helpers";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
@@ -59,7 +59,10 @@ async function stepHandler(
 
   // Validate recipient address
   if (!ethers.isAddress(recipientAddress)) {
-    console.error("[Transfer Funds] Invalid recipient address:", recipientAddress);
+    console.error(
+      "[Transfer Funds] Invalid recipient address:",
+      recipientAddress
+    );
     return {
       success: false,
       error: `Invalid recipient address: ${recipientAddress}`,
@@ -78,7 +81,10 @@ async function stepHandler(
   let amountInWei: bigint;
   try {
     amountInWei = ethers.parseEther(amount);
-    console.log("[Transfer Funds] Amount parsed:", { amount, amountInWei: amountInWei.toString() });
+    console.log("[Transfer Funds] Amount parsed:", {
+      amount,
+      amountInWei: amountInWei.toString(),
+    });
   } catch (error) {
     console.error("[Transfer Funds] Failed to parse amount:", error);
     return {
@@ -98,7 +104,10 @@ async function stepHandler(
 
   let userId: string;
   try {
-    console.log("[Transfer Funds] Looking up user from execution:", _context.executionId);
+    console.log(
+      "[Transfer Funds] Looking up user from execution:",
+      _context.executionId
+    );
     userId = await getUserIdFromExecution(_context.executionId);
     console.log("[Transfer Funds] Found userId:", userId);
   } catch (error) {
@@ -118,7 +127,10 @@ async function stepHandler(
     console.log("[Transfer Funds] Initializing Para signer for user:", userId);
     signer = await initializeParaSigner(userId, SEPOLIA_RPC_URL);
     const signerAddress = await signer.getAddress();
-    console.log("[Transfer Funds] Signer initialized successfully:", signerAddress);
+    console.log(
+      "[Transfer Funds] Signer initialized successfully:",
+      signerAddress
+    );
   } catch (error) {
     console.error("[Transfer Funds] Failed to initialize wallet:", error);
     return {

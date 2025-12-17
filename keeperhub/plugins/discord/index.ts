@@ -1,5 +1,5 @@
-import type { IntegrationPlugin } from "../registry";
-import { registerIntegration } from "../registry";
+import type { IntegrationPlugin } from "@/plugins/registry";
+import { registerIntegration } from "@/plugins/registry";
 import { DiscordIcon } from "./icon";
 
 const discordPlugin: IntegrationPlugin = {
@@ -18,7 +18,8 @@ const discordPlugin: IntegrationPlugin = {
       placeholder: "https://discord.com/api/webhooks/...",
       configKey: "webhookUrl",
       envVar: "webhookUrl",
-      helpText: "Discord webhook URL for this channel. This URL will be used by all actions using this integration.",
+      helpText:
+        "Discord webhook URL for this channel. This URL will be used by all actions using this integration.",
       helpLink: {
         text: "Learn how to create webhooks",
         url: "https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks",
@@ -44,7 +45,8 @@ const discordPlugin: IntegrationPlugin = {
           key: "discordMessage",
           label: "Message",
           type: "template-textarea",
-          placeholder: "Your message. Use {{NodeName.field}} to insert data from previous nodes.",
+          placeholder:
+            "Your message. Use {{NodeName.field}} to insert data from previous nodes.",
           rows: 4,
           example: "Hello from my workflow!",
           required: true,

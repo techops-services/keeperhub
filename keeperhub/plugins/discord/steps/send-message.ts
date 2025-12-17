@@ -41,7 +41,8 @@ async function stepHandler(
     console.error("[Discord] No webhook URL provided in integration");
     return {
       success: false,
-      error: "Discord webhook URL is required. Please configure it in the integration settings.",
+      error:
+        "Discord webhook URL is required. Please configure it in the integration settings.",
     };
   }
 
@@ -68,18 +69,23 @@ async function stepHandler(
     });
 
     if (!response.ok) {
-      const errorData = (await response.json().catch(() => ({}))) as DiscordWebhookResponse;
+      const errorData = (await response
+        .json()
+        .catch(() => ({}))) as DiscordWebhookResponse;
       console.error("[Discord] API error:", errorData);
       return {
         success: false,
-        error: errorData.message || `HTTP ${response.status}: Failed to send Discord message`,
+        error:
+          errorData.message ||
+          `HTTP ${response.status}: Failed to send Discord message`,
       };
     }
 
     // Discord webhooks return 204 No Content on success or the message object
-    const result = response.status === 204
-      ? null
-      : ((await response.json().catch(() => ({}))) as DiscordWebhookResponse);
+    const result =
+      response.status === 204
+        ? null
+        : ((await response.json().catch(() => ({}))) as DiscordWebhookResponse);
 
     console.log("[Discord] Message sent successfully");
 
