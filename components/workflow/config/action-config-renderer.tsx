@@ -13,12 +13,12 @@ import {
 } from "@/components/ui/select";
 import { TemplateBadgeInput } from "@/components/ui/template-badge-input";
 import { TemplateBadgeTextarea } from "@/components/ui/template-badge-textarea";
+import { AbiWithAutoFetchField } from "@/keeperhub/components/workflow/config/abi-with-auto-fetch-field";
 import {
   type ActionConfigField,
   type ActionConfigFieldBase,
   isFieldGroup,
 } from "@/plugins";
-import { AbiWithAutoFetchField } from "./abi-with-auto-fetch-field";
 import { SchemaBuilder, type SchemaField } from "./schema-builder";
 
 type FieldProps = {

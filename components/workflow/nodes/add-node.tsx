@@ -2,8 +2,8 @@
 
 import type { NodeProps } from "@xyflow/react";
 import { Plus } from "lucide-react";
-import { KeeperHubLogo } from "@/components/icons/keeperhub-logo";
 import { Button } from "@/components/ui/button";
+import { KeeperHubLogo } from "@/keeperhub/components/icons/keeperhub-logo";
 
 type AddNodeData = {
   onClick?: () => void;

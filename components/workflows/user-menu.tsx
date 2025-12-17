@@ -10,7 +10,6 @@ import {
 import { SettingsDialog } from "@/components/settings";
 import { ApiKeysDialog } from "@/components/settings/api-keys-dialog";
 import { IntegrationsDialog } from "@/components/settings/integrations-dialog";
-import { WalletDialog } from "@/components/settings/wallet-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +25,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { WalletDialog } from "@/keeperhub/components/settings/wallet-dialog";
 import { api } from "@/lib/api-client";
 import { signOut, useSession } from "@/lib/auth-client";
 

@@ -38,6 +38,7 @@ import { Input } from "@/components/ui/input";
 import { IntegrationIcon } from "@/components/ui/integration-icon";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
+import { Web3WalletSection } from "@/keeperhub/components/settings/web3-wallet-section";
 import {
   aiGatewayStatusAtom,
   aiGatewayTeamsAtom,
@@ -52,7 +53,6 @@ import {
   getSortedIntegrationTypes,
 } from "@/plugins";
 import { getIntegrationDescriptions } from "@/plugins/registry";
-import { Web3WalletSection } from "./web3-wallet-section";
 
 type IntegrationFormDialogProps = {
   open: boolean;
