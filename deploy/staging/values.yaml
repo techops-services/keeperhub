@@ -192,29 +192,12 @@ cronjob:
       serviceAccount:
         name: "keeperhub-staging"
       resources:
-        limits:
-          cpu: 50m
-          memory: 256Mi
         requests:
-          cpu: 50m
-          memory: 256Mi
-      failedJobsHistoryLimit: 1
-      successfulJobsHistoryLimit: 3
+          memory: "128Mi"
+          cpu: "50m"
+        limits:
+          memory: "256Mi"
+          cpu: "200m"
       concurrencyPolicy: Forbid
-      restartPolicy: OnFailure
-      backoffLimit: 2
-      nodeSelector:
-        type: infra
-      tolerations:
-        - effect: NoSchedule
-          operator: Exists
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: kubernetes.io/e2e-az-name
-                    operator: In
-                    values:
-                      - e2e-az1
-                      - e2e-az2
+      successfulJobsHistoryLimit: 3
+      failedJobsHistoryLimit: 3
