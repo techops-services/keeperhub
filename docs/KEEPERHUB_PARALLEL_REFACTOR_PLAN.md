@@ -370,16 +370,39 @@ Instead of reverting, we've extended the extension registry to minimize base fil
 
 #### Phase 6: Configure Build (Day 4)
 
-- [ ] Update `next.config.ts` for KeeperHub routes
-- [ ] Create `keeperhub/next.config.ts` overrides
-- [ ] Update `package.json` scripts for KeeperHub mode
-- [ ] Configure environment variable `KEEPERHUB_MODE=true`
+- [x] Reviewed `next.config.ts` - no changes needed
+- [x] Reviewed `package.json` scripts - no changes needed
+- [x] Documented KeeperHub environment variables (below)
+
+**Note:** The original plan included `KEEPERHUB_MODE` toggle, Next.js rewrites, and a centralized config file. These are no longer needed because:
+
+- The extension registry pattern loads KeeperHub features automatically
+- API routes use thin wrappers in `app/api/` (Next.js standard routing)
+- Env vars are accessed directly where needed (no abstraction layer)
+- No build-time configuration changes required
+
+**KeeperHub Environment Variables:**
+
+```bash
+# Para Wallet Integration (required for Web3 features)
+PARA_API_KEY=your_para_api_key
+PARA_ENVIRONMENT=beta  # or "production"
+WALLET_ENCRYPTION_KEY=32_byte_encryption_key
+
+# Blockchain (required for ABI auto-fetch)
+ETHERSCAN_API_KEY=your_etherscan_api_key
+
+# Email (optional - falls back to KeeperHub defaults)
+SENDGRID_API_KEY=your_sendgrid_api_key
+FROM_ADDRESS=noreply@keeperhub.com
+```
 
 #### Phase 7: Testing (Day 5)
 
-- [ ] Test base template works standalone
-- [ ] Test KeeperHub features work with extensions
-- [ ] Test upstream merge doesn't break KeeperHub
+- [x] `pnpm type-check` - passes
+- [x] `pnpm check` - passes (175 files)
+- [x] Dev server runs successfully
+- [ ] Test upstream merge doesn't break KeeperHub (manual test when upstream updates)
 - [ ] Test deployment pipeline
 
 ---
