@@ -147,7 +147,8 @@ async function stepHandler(
 /**
  * App entry point - wraps with logging
  */
-export function sendWebhookStep(
+// biome-ignore lint/suspicious/useAwait: "use step" directive requires async
+export async function sendWebhookStep(
   input: SendWebhookInput
 ): Promise<SendWebhookResult> {
   "use step";

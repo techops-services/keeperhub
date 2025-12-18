@@ -239,7 +239,8 @@ async function stepHandler(
  * Read Contract Step
  * Reads data from a smart contract using view/pure functions
  */
-export function readContractStep(
+// biome-ignore lint/suspicious/useAwait: "use step" directive requires async
+export async function readContractStep(
   input: ReadContractInput
 ): Promise<ReadContractResult> {
   "use step";

@@ -188,7 +188,8 @@ async function stepHandler(
  * Transfer Funds Step
  * Transfers ETH from the user's wallet to a recipient address
  */
-export function transferFundsStep(
+// biome-ignore lint/suspicious/useAwait: "use step" directive requires async
+export async function transferFundsStep(
   input: TransferFundsInput
 ): Promise<TransferFundsResult> {
   "use step";

@@ -296,7 +296,8 @@ async function stepHandler(
  * Write Contract Step
  * Writes data to a smart contract using state-changing functions
  */
-export function writeContractStep(
+// biome-ignore lint/suspicious/useAwait: "use step" directive requires async
+export async function writeContractStep(
   input: WriteContractInput
 ): Promise<WriteContractResult> {
   "use step";

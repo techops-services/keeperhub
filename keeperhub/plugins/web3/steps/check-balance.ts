@@ -100,7 +100,8 @@ async function stepHandler(
  * Check Balance Step
  * Checks the ETH balance of an address (contract or wallet)
  */
-export function checkBalanceStep(
+// biome-ignore lint/suspicious/useAwait: "use step" directive requires async
+export async function checkBalanceStep(
   input: CheckBalanceInput
 ): Promise<CheckBalanceResult> {
   "use step";
