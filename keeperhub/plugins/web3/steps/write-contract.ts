@@ -2,9 +2,9 @@ import "server-only";
 
 import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
+import { initializeParaSigner } from "@/keeperhub/lib/para/wallet-helpers";
 import { db } from "@/lib/db";
 import { workflowExecutions } from "@/lib/db/schema";
-import { initializeParaSigner } from "@/lib/para/wallet-helpers";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
 

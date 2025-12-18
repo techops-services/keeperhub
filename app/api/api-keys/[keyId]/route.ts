@@ -1,6 +1,5 @@
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { apiError } from "@/lib/api-error";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { apiKeys } from "@/lib/db/schema";
@@ -32,6 +31,13 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    return apiError(error, "Failed to delete API key");
+    console.error("Failed to delete API key:", error);
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to delete API key",
+      },
+      { status: 500 }
+    );
   }
 }

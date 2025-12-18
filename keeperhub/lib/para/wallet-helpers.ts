@@ -3,9 +3,9 @@ import { ParaEthersSigner } from "@getpara/ethers-v6-integration";
 import { Environment, Para as ParaServer } from "@getpara/server-sdk";
 import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
+import { decryptUserShare } from "@/keeperhub/lib/encryption";
 import { db } from "@/lib/db";
 import { paraWallets } from "@/lib/db/schema";
-import { decryptUserShare } from "@/lib/encryption";
 
 /**
  * Get user's Para wallet from database

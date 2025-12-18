@@ -277,35 +277,35 @@ techops-workflow-builder-template/
 
 #### Phase 1: Setup Parallel Structure (Day 1)
 
-- [ ] Create `keeperhub/` directory structure
-- [ ] Create `keeperhub/plugins/index.ts` that imports base plugins + custom
-- [ ] Move `plugins/web3/` to `keeperhub/plugins/web3/`
-- [ ] Move `plugins/sendgrid/` to `keeperhub/plugins/sendgrid/`
-- [ ] Move `plugins/discord/` to `keeperhub/plugins/discord/`
-- [ ] Move `plugins/webhook/` to `keeperhub/plugins/webhook/`
-- [ ] Update import paths in moved plugins
+- [x] Create `keeperhub/` directory structure
+- [x] Create `keeperhub/plugins/index.ts` that imports base plugins + custom
+- [x] Move `plugins/web3/` to `keeperhub/plugins/web3/`
+- [x] Move `plugins/sendgrid/` to `keeperhub/plugins/sendgrid/`
+- [x] Move `plugins/discord/` to `keeperhub/plugins/discord/`
+- [x] Move `plugins/webhook/` to `keeperhub/plugins/webhook/`
+- [x] Update import paths in moved plugins
+- [x] Update `scripts/discover-plugins.ts` to scan both `plugins/` and `keeperhub/plugins/`
 
 #### Phase 2: Move KeeperHub Components (Day 1-2)
 
-- [ ] Move `components/icons/keeperhub-logo.tsx` to `keeperhub/components/icons/`
-- [ ] Move `components/settings/wallet-dialog.tsx` to `keeperhub/components/settings/`
-- [ ] Move `components/settings/web3-wallet-section.tsx` to `keeperhub/components/settings/`
-- [ ] Move `components/settings/sendgrid-integration-section.tsx` to `keeperhub/components/settings/`
-- [ ] Move `components/workflow/config/abi-with-auto-fetch-field.tsx` to `keeperhub/components/workflow/config/`
+- [x] Move `components/icons/keeperhub-logo.tsx` to `keeperhub/components/icons/`
+- [x] Move `components/settings/wallet-dialog.tsx` to `keeperhub/components/settings/`
+- [x] Move `components/settings/web3-wallet-section.tsx` to `keeperhub/components/settings/`
+- [x] Move `components/workflow/config/abi-with-auto-fetch-field.tsx` to `keeperhub/components/workflow/config/`
+- [x] Update imports in base components to use `@/keeperhub/` paths
 
-#### Phase 3: Move KeeperHub Libraries (Day 2)
+#### Phase 3: Move KeeperHub Libraries and API Routes (Day 2)
 
-- [ ] Move `lib/api-error.ts` to `keeperhub/lib/`
-- [ ] Move `lib/logger.ts` to `keeperhub/lib/`
-- [ ] Move `lib/encryption.ts` to `keeperhub/lib/`
-- [ ] Move `lib/para/wallet-helpers.ts` to `keeperhub/lib/para/`
+- [x] Move `lib/encryption.ts` to `keeperhub/lib/`
+- [x] Move `lib/para/wallet-helpers.ts` to `keeperhub/lib/para/`
+- [x] Move `lib/api-error.ts` to `keeperhub/lib/` (KeeperHub-only utility)
+- [x] Move `app/api/user/wallet/route.ts` to `keeperhub/api/user/wallet/route.ts`
+- [x] Move `app/api/web3/fetch-abi/route.ts` to `keeperhub/api/web3/fetch-abi/route.ts`
+- [x] Create thin wrapper routes in `app/api/` that re-export from `keeperhub/api/`
+- [x] Revert base API routes to upstream-style inline error handling (remove apiError dependency)
 - [ ] Create `keeperhub/db/schema-extensions.ts` with paraWallets table
 
-#### Phase 4: Move KeeperHub API Routes (Day 2-3)
-
-- [ ] Move `app/api/user/wallet/route.ts` to `keeperhub/api/user/wallet/route.ts`
-- [ ] Move `app/api/web3/fetch-abi/route.ts` to `keeperhub/api/web3/fetch-abi/route.ts`
-- [ ] Configure Next.js rewrites for `/api/keeperhub/*` routes
+**Note on `lib/api-error.ts`:** This utility was added by KeeperHub and modified 20 base API routes. To maintain upstream compatibility, we reverted all base routes to use inline error handling (matching upstream pattern) and moved `api-error.ts` to `keeperhub/lib/` for use only in KeeperHub-specific routes.
 
 #### Phase 5: Create Extension Points (Day 3)
 
