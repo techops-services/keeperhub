@@ -1,6 +1,5 @@
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { apiError } from "@/lib/api-error";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { validateWorkflowIntegrations } from "@/lib/db/integrations";
@@ -82,7 +81,14 @@ export async function GET(
 
     return NextResponse.json(responseData);
   } catch (error) {
-    return apiError(error, "Failed to get workflow");
+    console.error("Failed to get workflow:", error);
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to get workflow",
+      },
+      { status: 500 }
+    );
   }
 }
 
@@ -204,7 +210,14 @@ export async function PATCH(
       isOwner: true,
     });
   } catch (error) {
-    return apiError(error, "Failed to update workflow");
+    console.error("Failed to update workflow:", error);
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to update workflow",
+      },
+      { status: 500 }
+    );
   }
 }
 
@@ -241,6 +254,13 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    return apiError(error, "Failed to delete workflow");
+    console.error("Failed to delete workflow:", error);
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to delete workflow",
+      },
+      { status: 500 }
+    );
   }
 }

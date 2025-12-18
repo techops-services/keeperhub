@@ -5,7 +5,6 @@ import {
   Eye,
   EyeOff,
   FileCode,
-  MenuIcon,
   RefreshCw,
   Trash2,
 } from "lucide-react";
@@ -49,11 +48,10 @@ import {
   showDeleteDialogAtom,
   updateNodeDataAtom,
 } from "@/lib/workflow-store";
+
 import { findActionById, getIntegration } from "@/plugins";
-import { Panel } from "../ai-elements/panel";
-import { IntegrationsDialog } from "../settings/integrations-dialog";
-import { Drawer, DrawerContent, DrawerTrigger } from "../ui/drawer";
 import { IntegrationSelector } from "../ui/integration-selector";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { ActionConfig } from "./config/action-config";
 import { ActionGrid } from "./config/action-grid";
@@ -114,15 +112,18 @@ const MultiSelectionPanel = ({
               {selectionText} selected
             </p>
           </div>
-        </div>
-        <div className="shrink-0 border-t p-4">
-          <Button
-            onClick={() => setShowDeleteAlert(true)}
-            size="icon"
-            variant="ghost"
-          >
-            <Trash2 className="size-4" />
-          </Button>
+
+          <div className="flex items-center gap-2 pt-4">
+            <Button
+              className="text-muted-foreground"
+              onClick={() => setShowDeleteAlert(true)}
+              size="sm"
+              variant="ghost"
+            >
+              <Trash2 className="mr-2 size-4" />
+              Delete
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -171,7 +172,6 @@ export const PanelInner = () => {
   const [showDeleteNodeAlert, setShowDeleteNodeAlert] = useState(false);
   const [showDeleteEdgeAlert, setShowDeleteEdgeAlert] = useState(false);
   const [showDeleteRunsAlert, setShowDeleteRunsAlert] = useState(false);
-  const [showIntegrationsDialog, setShowIntegrationsDialog] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useAtom(propertiesPanelActiveTabAtom);
   const refreshRunsRef = useRef<(() => Promise<void>) | null>(null);
@@ -513,15 +513,20 @@ export const PanelInner = () => {
               </Label>
               <Input disabled id="edge-target" value={selectedEdge.target} />
             </div>
-          </div>
-          <div className="shrink-0 border-t p-4">
-            <Button
-              onClick={() => setShowDeleteEdgeAlert(true)}
-              size="icon"
-              variant="ghost"
-            >
-              <Trash2 className="size-4" />
-            </Button>
+
+            {isOwner && (
+              <div className="flex items-center gap-2 pt-4">
+                <Button
+                  className="text-muted-foreground"
+                  onClick={() => setShowDeleteEdgeAlert(true)}
+                  size="sm"
+                  variant="ghost"
+                >
+                  <Trash2 className="mr-2 size-4" />
+                  Delete
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -615,57 +620,70 @@ export const PanelInner = () => {
                   </p>
                 </div>
               )}
+              {isOwner && (
+                <div className="flex items-center gap-2 pt-4">
+                  <Button
+                    className="text-muted-foreground"
+                    onClick={() => setShowClearDialog(true)}
+                    size="sm"
+                    variant="ghost"
+                  >
+                    <Eraser className="mr-2 size-4" />
+                    Clear
+                  </Button>
+                  <Button
+                    className="text-muted-foreground"
+                    onClick={() => setShowDeleteDialog(true)}
+                    size="sm"
+                    variant="ghost"
+                  >
+                    <Trash2 className="mr-2 size-4" />
+                    Delete
+                  </Button>
+                </div>
+              )}
             </div>
-            {isOwner && (
-              <div className="flex shrink-0 items-center gap-2 border-t p-4">
-                <Button
-                  onClick={() => setShowClearDialog(true)}
-                  variant="ghost"
-                >
-                  <Eraser className="size-4" />
-                  Clear
-                </Button>
-                <Button
-                  onClick={() => setShowDeleteDialog(true)}
-                  variant="ghost"
-                >
-                  <Trash2 className="size-4" />
-                  Delete
-                </Button>
-              </div>
-            )}
           </TabsContent>
           {isOwner && (
             <TabsContent className="flex flex-col overflow-hidden" value="runs">
+              {/* Actions in content header */}
+              <div className="flex shrink-0 items-center gap-2 border-b px-4 py-2">
+                <Button
+                  className="text-muted-foreground"
+                  disabled={isRefreshing}
+                  onClick={handleRefreshRuns}
+                  size="sm"
+                  variant="ghost"
+                >
+                  <RefreshCw
+                    className={`mr-2 size-4 ${isRefreshing ? "animate-spin" : ""}`}
+                  />
+                  Refresh
+                </Button>
+                <Button
+                  className="text-muted-foreground"
+                  onClick={() => setShowDeleteRunsAlert(true)}
+                  size="sm"
+                  variant="ghost"
+                >
+                  <Eraser className="mr-2 size-4" />
+                  Clear All
+                </Button>
+              </div>
               <div className="flex-1 space-y-4 overflow-y-auto p-4">
                 <WorkflowRuns
                   isActive={activeTab === "runs"}
                   onRefreshRef={refreshRunsRef}
                 />
               </div>
-              <div className="flex shrink-0 items-center gap-2 border-t p-4">
-                <Button
-                  disabled={isRefreshing}
-                  onClick={handleRefreshRuns}
-                  size="icon"
-                  variant="ghost"
-                >
-                  <RefreshCw
-                    className={`size-4 ${isRefreshing ? "animate-spin" : ""}`}
-                  />
-                </Button>
-                <Button
-                  onClick={() => setShowDeleteRunsAlert(true)}
-                  size="icon"
-                  variant="ghost"
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              </div>
             </TabsContent>
           )}
-          <TabsContent className="flex flex-col overflow-hidden" value="code">
-            <div className="shrink-0 border-b bg-muted/30 px-3 pb-2">
+          <TabsContent
+            className="flex flex-col overflow-hidden data-[state=inactive]:hidden"
+            forceMount
+            value="code"
+          >
+            <div className="flex shrink-0 items-center justify-between border-b bg-muted/30 px-3 pb-2">
               <div className="flex items-center gap-2">
                 <FileCode className="size-3.5 text-muted-foreground" />
                 <code className="text-muted-foreground text-xs">
@@ -677,6 +695,15 @@ export const PanelInner = () => {
                   .ts
                 </code>
               </div>
+              <Button
+                className="text-muted-foreground"
+                onClick={handleCopyWorkflowCode}
+                size="sm"
+                variant="ghost"
+              >
+                <Copy className="mr-2 size-4" />
+                Copy
+              </Button>
             </div>
             <div className="flex-1 overflow-hidden">
               <CodeEditor
@@ -694,15 +721,6 @@ export const PanelInner = () => {
                 }}
                 value={workflowCode}
               />
-            </div>
-            <div className="shrink-0 border-t p-4">
-              <Button
-                onClick={handleCopyWorkflowCode}
-                size="icon"
-                variant="ghost"
-              >
-                <Copy className="size-4" />
-              </Button>
             </div>
           </TabsContent>
         </Tabs>
@@ -727,11 +745,6 @@ export const PanelInner = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-
-        <IntegrationsDialog
-          onOpenChange={setShowIntegrationsDialog}
-          open={showIntegrationsDialog}
-        />
       </>
     );
   }
@@ -868,105 +881,104 @@ export const PanelInner = () => {
                   </p>
                 </div>
               )}
-            </div>
-          )}
-          {selectedNode.data.type === "action" && isOwner && (
-            <div className="flex shrink-0 items-center justify-between border-t p-4">
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={handleToggleEnabled}
-                  size="icon"
-                  title={
-                    selectedNode.data.enabled === false
-                      ? "Enable Step"
-                      : "Disable Step"
-                  }
-                  variant="ghost"
-                >
-                  {selectedNode.data.enabled === false ? (
-                    <EyeOff className="size-4" />
-                  ) : (
-                    <Eye className="size-4" />
-                  )}
-                </Button>
-                <Button
-                  onClick={() => setShowDeleteNodeAlert(true)}
-                  size="icon"
-                  variant="ghost"
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              </div>
 
-              {(() => {
-                const actionType = selectedNode.data.config
-                  ?.actionType as string;
+              {/* Actions and integration selector */}
+              {isOwner && (
+                <div className="flex items-center justify-between gap-2 pt-4">
+                  <div className="flex items-center gap-2">
+                    {selectedNode.data.type === "action" && (
+                      <Button
+                        className="text-muted-foreground"
+                        onClick={handleToggleEnabled}
+                        size="sm"
+                        variant="ghost"
+                      >
+                        {selectedNode.data.enabled === false ? (
+                          <>
+                            <EyeOff className="mr-2 size-4" />
+                            Disabled
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="mr-2 size-4" />
+                            Enabled
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    <Button
+                      className="text-muted-foreground"
+                      onClick={() => setShowDeleteNodeAlert(true)}
+                      size="sm"
+                      variant="ghost"
+                    >
+                      <Trash2 className="mr-2 size-4" />
+                      Delete
+                    </Button>
+                  </div>
 
-                // Database Query is special - has integration but no plugin
-                const SYSTEM_INTEGRATION_MAP: Record<string, string> = {
-                  "Database Query": "database",
-                };
+                  {/* KeeperHub: Integration selector in footer */}
+                  {selectedNode.data.type === "action" &&
+                    (() => {
+                      const actionType = selectedNode.data.config
+                        ?.actionType as string;
 
-                // Get integration type dynamically
-                let integrationType: string | undefined;
-                let requiresCredentials = true; // Default to true for system actions
+                      const SYSTEM_INTEGRATION_MAP: Record<string, string> = {
+                        "Database Query": "database",
+                      };
 
-                if (actionType) {
-                  if (SYSTEM_INTEGRATION_MAP[actionType]) {
-                    integrationType = SYSTEM_INTEGRATION_MAP[actionType];
-                  } else {
-                    // Look up from plugin registry
-                    const action = findActionById(actionType);
-                    if (action) {
-                      integrationType = action.integration;
-                      // Check if plugin requires credentials (default to true)
-                      const plugin = getIntegration(action.integration);
-                      requiresCredentials =
-                        plugin?.requiresCredentials !== false;
-                    }
-                  }
-                }
+                      let integrationType: string | undefined;
+                      let requiresCredentials = true;
 
-                // Show integration selector if credentials required, otherwise show info message
-                if (integrationType && requiresCredentials) {
-                  return (
-                    <IntegrationSelector
-                      integrationType={integrationType as IntegrationType}
-                      onChange={(id) => handleUpdateConfig("integrationId", id)}
-                      onOpenSettings={() => setShowIntegrationsDialog(true)}
-                      value={
-                        (selectedNode.data.config?.integrationId as string) ||
-                        ""
+                      if (actionType) {
+                        if (SYSTEM_INTEGRATION_MAP[actionType]) {
+                          integrationType = SYSTEM_INTEGRATION_MAP[actionType];
+                        } else {
+                          const action = findActionById(actionType);
+                          if (action) {
+                            integrationType = action.integration;
+                            const plugin = getIntegration(action.integration);
+                            requiresCredentials =
+                              plugin?.requiresCredentials !== false;
+                          }
+                        }
                       }
-                    />
-                  );
-                }
-                if (integrationType && !requiresCredentials) {
-                  return (
-                    <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2">
-                      <span className="text-muted-foreground text-sm">
-                        No integration required
-                      </span>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-            </div>
-          )}
-          {selectedNode.data.type === "trigger" && isOwner && (
-            <div className="shrink-0 border-t p-4">
-              <Button
-                onClick={() => setShowDeleteNodeAlert(true)}
-                size="icon"
-                variant="ghost"
-              >
-                <Trash2 className="size-4" />
-              </Button>
+
+                      if (integrationType && requiresCredentials) {
+                        return (
+                          <IntegrationSelector
+                            integrationType={integrationType as IntegrationType}
+                            onChange={(id) =>
+                              handleUpdateConfig("integrationId", id)
+                            }
+                            value={
+                              (selectedNode.data.config
+                                ?.integrationId as string) || ""
+                            }
+                          />
+                        );
+                      }
+                      if (integrationType && !requiresCredentials) {
+                        return (
+                          <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2">
+                            <span className="text-muted-foreground text-sm">
+                              No integration required
+                            </span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                </div>
+              )}
             </div>
           )}
         </TabsContent>
-        <TabsContent className="flex flex-col overflow-hidden" value="code">
+        <TabsContent
+          className="flex flex-col overflow-hidden data-[state=inactive]:hidden"
+          forceMount
+          value="code"
+        >
           {(() => {
             const triggerType = selectedNode.data.config?.triggerType as string;
             let filename = "";
@@ -995,13 +1007,22 @@ export const PanelInner = () => {
             return (
               <>
                 {filename && (
-                  <div className="shrink-0 border-b bg-muted/30 px-3 pb-2">
+                  <div className="flex shrink-0 items-center justify-between border-b bg-muted/30 px-3 pb-2">
                     <div className="flex items-center gap-2">
                       <FileCode className="size-3.5 text-muted-foreground" />
                       <code className="text-muted-foreground text-xs">
                         {filename}
                       </code>
                     </div>
+                    <Button
+                      className="text-muted-foreground"
+                      onClick={handleCopyCode}
+                      size="sm"
+                      variant="ghost"
+                    >
+                      <Copy className="mr-2 size-4" />
+                      Copy
+                    </Button>
                   </div>
                 )}
                 <div className="flex-1 overflow-hidden">
@@ -1021,26 +1042,16 @@ export const PanelInner = () => {
                     value={generateNodeCode(selectedNode)}
                   />
                 </div>
-                <div className="shrink-0 border-t p-4">
-                  <Button onClick={handleCopyCode} size="sm" variant="ghost">
-                    <Copy className="mr-2 size-4" />
-                    Copy Code
-                  </Button>
-                </div>
               </>
             );
           })()}
         </TabsContent>
         {isOwner && (
           <TabsContent className="flex flex-col overflow-hidden" value="runs">
-            <div className="flex-1 space-y-4 overflow-y-auto p-4">
-              <WorkflowRuns
-                isActive={activeTab === "runs"}
-                onRefreshRef={refreshRunsRef}
-              />
-            </div>
-            <div className="flex shrink-0 items-center gap-2 border-t p-4">
+            {/* Actions in content header */}
+            <div className="flex shrink-0 items-center gap-2 border-b px-4 py-2">
               <Button
+                className="text-muted-foreground"
                 disabled={isRefreshing}
                 onClick={handleRefreshRuns}
                 size="sm"
@@ -1049,16 +1060,23 @@ export const PanelInner = () => {
                 <RefreshCw
                   className={`mr-2 size-4 ${isRefreshing ? "animate-spin" : ""}`}
                 />
-                Refresh Runs
+                Refresh
               </Button>
               <Button
+                className="text-muted-foreground"
                 onClick={() => setShowDeleteRunsAlert(true)}
                 size="sm"
                 variant="ghost"
               >
                 <Eraser className="mr-2 size-4" />
-                Clear All Runs
+                Clear All
               </Button>
+            </div>
+            <div className="flex-1 space-y-4 overflow-y-auto p-4">
+              <WorkflowRuns
+                isActive={activeTab === "runs"}
+                onRefreshRef={refreshRunsRef}
+              />
             </div>
           </TabsContent>
         )}
@@ -1091,7 +1109,7 @@ export const PanelInner = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Node</AlertDialogTitle>
+            <AlertDialogTitle>Delete Step</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete this node? This action cannot be
               undone.
@@ -1103,37 +1121,11 @@ export const PanelInner = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <IntegrationsDialog
-        onOpenChange={setShowIntegrationsDialog}
-        open={showIntegrationsDialog}
-      />
     </>
   );
 };
-export const NodeConfigPanel = () => {
-  return (
-    <>
-      {/* Mobile: Drawer */}
-      <div className="md:hidden">
-        <Drawer>
-          <DrawerTrigger asChild>
-            <Panel position="bottom-right">
-              <Button className="h-8 w-8" size="icon" variant="ghost">
-                <MenuIcon className="size-4" />
-              </Button>
-            </Panel>
-          </DrawerTrigger>
-          <DrawerContent>
-            <PanelInner />
-          </DrawerContent>
-        </Drawer>
-      </div>
-
-      {/* Desktop: Docked sidebar - now resizable */}
-      <div className="hidden size-full flex-col bg-background md:flex">
-        <PanelInner />
-      </div>
-    </>
-  );
-};
+export const NodeConfigPanel = () => (
+  <div className="hidden size-full flex-col bg-background md:flex">
+    <PanelInner />
+  </div>
+);

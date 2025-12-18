@@ -9,9 +9,11 @@ import { AuthProvider } from "@/components/auth/provider";
 import { GitHubStarsLoader } from "@/components/github-stars-loader";
 import { GitHubStarsProvider } from "@/components/github-stars-provider";
 import { GlobalModals } from "@/components/global-modals";
+import { OverlayProvider } from "@/components/overlays/overlay-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { PersistentCanvas } from "@/components/workflow/persistent-canvas";
+import { KeeperHubExtensionLoader } from "@/keeperhub/components/extension-loader";
 import { mono, sans } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 
@@ -46,6 +48,7 @@ function LayoutContent({ children }: { children: ReactNode }) {
 const RootLayout = ({ children }: RootLayoutProps) => (
   <html lang="en" suppressHydrationWarning>
     <body className={cn(sans.variable, mono.variable, "antialiased")}>
+      <KeeperHubExtensionLoader />
       <ThemeProvider
         attribute="class"
         defaultTheme="dark"
@@ -54,19 +57,21 @@ const RootLayout = ({ children }: RootLayoutProps) => (
       >
         <Provider>
           <AuthProvider>
-            <Suspense
-              fallback={
-                <GitHubStarsProvider stars={null}>
+            <OverlayProvider>
+              <Suspense
+                fallback={
+                  <GitHubStarsProvider stars={null}>
+                    <LayoutContent>{children}</LayoutContent>
+                  </GitHubStarsProvider>
+                }
+              >
+                <GitHubStarsLoader>
                   <LayoutContent>{children}</LayoutContent>
-                </GitHubStarsProvider>
-              }
-            >
-              <GitHubStarsLoader>
-                <LayoutContent>{children}</LayoutContent>
-              </GitHubStarsLoader>
-            </Suspense>
-            <Toaster />
-            <GlobalModals />
+                </GitHubStarsLoader>
+              </Suspense>
+              <Toaster />
+              <GlobalModals />
+            </OverlayProvider>
           </AuthProvider>
         </Provider>
       </ThemeProvider>

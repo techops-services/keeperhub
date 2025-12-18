@@ -3,7 +3,6 @@ import { createOpenAI } from "@ai-sdk/openai";
 import type { LanguageModelV2 } from "@ai-sdk/provider";
 import { streamText } from "ai";
 import { NextResponse } from "next/server";
-import { apiError } from "@/lib/api-error";
 import { auth } from "@/lib/auth";
 import { generateAIActionPrompts } from "@/plugins";
 
@@ -429,6 +428,15 @@ Example: If user says "connect node A to node B", output:
       },
     });
   } catch (error) {
-    return apiError(error, "Failed to generate workflow");
+    console.error("Failed to generate workflow:", error);
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to generate workflow",
+      },
+      { status: 500 }
+    );
   }
 }

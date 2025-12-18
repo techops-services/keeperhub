@@ -42,9 +42,9 @@ import {
   aiGatewayStatusAtom,
   aiGatewayTeamsAtom,
   aiGatewayTeamsLoadingAtom,
-  openAiGatewayConsentModalAtom,
 } from "@/lib/ai-gateway/state";
 import { api, type Integration } from "@/lib/api-client";
+import { getCustomIntegrationFormHandler } from "@/lib/extension-registry";
 import type { IntegrationType } from "@/lib/types/integration";
 import {
   getIntegration,
@@ -52,7 +52,6 @@ import {
   getSortedIntegrationTypes,
 } from "@/plugins";
 import { getIntegrationDescriptions } from "@/plugins/registry";
-import { Web3WalletSection } from "./web3-wallet-section";
 
 type IntegrationFormDialogProps = {
   open: boolean;
@@ -218,9 +217,15 @@ function ConfigFields({
     );
   }
 
-  // Handle Web3 wallet creation
-  if (formData.type === "web3") {
-    return <Web3WalletSection />;
+  // Check for custom integration form handlers (extension registry)
+  const customHandler = getCustomIntegrationFormHandler(formData.type);
+  if (customHandler) {
+    return customHandler({
+      integrationType: formData.type,
+      isEditMode,
+      config: formData.config,
+      updateConfig,
+    });
   }
 
   // Get plugin form fields from registry
@@ -561,7 +566,6 @@ export function IntegrationFormDialog({
 
   // AI Gateway managed keys state
   const aiGatewayStatus = useAtomValue(aiGatewayStatusAtom);
-  const openConsentModal = useSetAtom(openAiGatewayConsentModalAtom);
 
   // Check if AI Gateway managed keys should be offered
   const shouldUseManagedKeys =
@@ -597,14 +601,12 @@ export function IntegrationFormDialog({
   const setTeamsLoading = useSetAtom(aiGatewayTeamsLoadingAtom);
 
   // Helper to open consent modal with callbacks
+  // Note: This file is deprecated - overlays have replaced dialogs
   const showConsentModalWithCallbacks = useCallback(() => {
     onClose();
-    openConsentModal({
-      onConsent: (integrationId: string) => {
-        onSuccess?.(integrationId);
-      },
-    });
-  }, [onClose, openConsentModal, onSuccess]);
+    // TODO: This should use the overlay system but this file is dead code
+    console.warn("integration-form-dialog.tsx is deprecated");
+  }, [onClose]);
 
   // Handle preselected AI Gateway - fetch status/teams and show consent modal if managed keys available
   useEffect(() => {

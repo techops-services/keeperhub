@@ -1,7 +1,10 @@
 /**
- * Step registry - maps action types to executable step functions
- * This allows the workflow executor to call step functions directly
- * without code generation or eval()
+ * Step registry - Legacy file
+ *
+ * NOTE: This file is DEPRECATED. Use lib/step-registry.ts instead.
+ * The auto-generated step-registry.ts provides dynamic imports for all plugins.
+ *
+ * This file is kept for backwards compatibility with system steps only.
  */
 
 import type { sendEmailStep } from "../../plugins/resend/steps/send-email";
@@ -15,7 +18,7 @@ import type { httpRequestStep } from "./http-request";
 // Step function type
 export type StepFunction = (input: Record<string, unknown>) => Promise<unknown>;
 
-// Registry of all available steps
+// Registry of system steps only (plugins are handled by lib/step-registry.ts)
 export const stepRegistry: Record<string, StepFunction> = {
   "HTTP Request": async (input) =>
     (await import("./http-request")).httpRequestStep(

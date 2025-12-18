@@ -4,37 +4,6 @@ import { atom } from "jotai";
 import type { VercelTeam } from "@/lib/api-client";
 
 /**
- * AI Gateway consent modal state
- */
-export const showAiGatewayConsentModalAtom = atom(false);
-
-/**
- * Callbacks for the consent modal - stored in atoms so any component can set them
- */
-export type AiGatewayConsentCallbacks = {
-  onConsent?: (integrationId: string) => void;
-  onManualEntry?: () => void;
-  onDecline?: () => void;
-};
-
-export const aiGatewayConsentCallbacksAtom = atom<AiGatewayConsentCallbacks>(
-  {}
-);
-
-/**
- * Write-only atom to open the consent modal with specific callbacks.
- * Usage: const openModal = useSetAtom(openAiGatewayConsentModalAtom);
- *        openModal({ onConsent: (id) => ..., onManualEntry: () => ... });
- */
-export const openAiGatewayConsentModalAtom = atom(
-  null,
-  (get, set, callbacks: AiGatewayConsentCallbacks) => {
-    set(aiGatewayConsentCallbacksAtom, callbacks);
-    set(showAiGatewayConsentModalAtom, true);
-  }
-);
-
-/**
  * AI Gateway status (fetched from API)
  */
 export type AiGatewayStatus = {
@@ -51,11 +20,6 @@ export type AiGatewayStatus = {
 } | null;
 
 export const aiGatewayStatusAtom = atom<AiGatewayStatus>(null);
-
-/**
- * Loading state for consent action
- */
-export const aiGatewayConsentLoadingAtom = atom(false);
 
 /**
  * Vercel teams for the current user
