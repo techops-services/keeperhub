@@ -7,10 +7,10 @@ import {
   AuthDialog,
   isSingleProviderSignInInitiated,
 } from "@/components/auth/dialog";
-import { SettingsDialog } from "@/components/settings";
-import { ApiKeysDialog } from "@/components/settings/api-keys-dialog";
-import { IntegrationsDialog } from "@/components/settings/integrations-dialog";
-import { WalletDialog } from "@/components/settings/wallet-dialog";
+import { ApiKeysOverlay } from "@/components/overlays/api-keys-overlay";
+import { IntegrationsOverlay } from "@/components/overlays/integrations-overlay";
+import { useOverlay } from "@/components/overlays/overlay-provider";
+import { SettingsOverlay } from "@/components/overlays/settings-overlay";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,16 +26,14 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { WalletOverlay } from "@/keeperhub/components/overlays/wallet-overlay";
 import { api } from "@/lib/api-client";
 import { signOut, useSession } from "@/lib/auth-client";
 
 export const UserMenu = () => {
   const { data: session, isPending } = useSession();
   const { theme, setTheme } = useTheme();
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [integrationsOpen, setIntegrationsOpen] = useState(false);
-  const [apiKeysOpen, setApiKeysOpen] = useState(false);
-  const [walletOpen, setWalletOpen] = useState(false);
+  const { open: openOverlay } = useOverlay();
   const [providerId, setProviderId] = useState<string | null>(null);
 
   // Fetch provider info when session is available
@@ -140,20 +138,21 @@ export const UserMenu = () => {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {!isOAuthUser && (
-          <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
+          <DropdownMenuItem onClick={() => openOverlay(SettingsOverlay)}>
             <Settings className="size-4" />
             <span>Settings</span>
           </DropdownMenuItem>
         )}
-        <DropdownMenuItem onClick={() => setIntegrationsOpen(true)}>
+        <DropdownMenuItem onClick={() => openOverlay(IntegrationsOverlay)}>
           <Plug className="size-4" />
           <span>Connections</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setApiKeysOpen(true)}>
+        <DropdownMenuItem onClick={() => openOverlay(ApiKeysOverlay)}>
           <Key className="size-4" />
           <span>API Keys</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setWalletOpen(true)}>
+        {/* KeeperHub: Wallet overlay */}
+        <DropdownMenuItem onClick={() => openOverlay(WalletOverlay)}>
           <Wallet className="size-4" />
           <span>Wallet</span>
         </DropdownMenuItem>
@@ -179,13 +178,6 @@ export const UserMenu = () => {
           <span>Logout</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
-      <SettingsDialog onOpenChange={setSettingsOpen} open={settingsOpen} />
-      <IntegrationsDialog
-        onOpenChange={setIntegrationsOpen}
-        open={integrationsOpen}
-      />
-      <ApiKeysDialog onOpenChange={setApiKeysOpen} open={apiKeysOpen} />
-      <WalletDialog onOpenChange={setWalletOpen} open={walletOpen} />
     </DropdownMenu>
   );
 };

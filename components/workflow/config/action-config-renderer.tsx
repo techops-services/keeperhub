@@ -13,12 +13,12 @@ import {
 } from "@/components/ui/select";
 import { TemplateBadgeInput } from "@/components/ui/template-badge-input";
 import { TemplateBadgeTextarea } from "@/components/ui/template-badge-textarea";
+import { getCustomFieldRenderer } from "@/lib/extension-registry";
 import {
   type ActionConfigField,
   type ActionConfigFieldBase,
   isFieldGroup,
 } from "@/plugins";
-import { AbiWithAutoFetchField } from "./abi-with-auto-fetch-field";
 import { SchemaBuilder, type SchemaField } from "./schema-builder";
 
 type FieldProps = {
@@ -381,35 +381,20 @@ function renderAbiFunctionArgs(
 }
 
 /**
- * Helper: Render abi-with-auto-fetch field
+ * Helper: Render custom field types via extension registry
  */
-function renderAbiWithAutoFetch(
+function renderCustomField(
   field: ActionConfigFieldBase,
   config: Record<string, unknown>,
   onUpdateConfig: (key: string, value: unknown) => void,
   disabled?: boolean
 ) {
-  const contractAddressField = field.contractAddressField || "contractAddress";
-  const networkField = field.networkField || "network";
-  const value =
-    (config[field.key] as string | undefined) || field.defaultValue || "";
+  const renderer = getCustomFieldRenderer(field.type);
+  if (!renderer) {
+    return null;
+  }
 
-  return (
-    <div className="space-y-2" key={field.key}>
-      <Label className="ml-1" htmlFor={field.key}>
-        {field.label}
-      </Label>
-      <AbiWithAutoFetchField
-        config={config}
-        contractAddressField={contractAddressField}
-        disabled={disabled}
-        field={field}
-        networkField={networkField}
-        onChange={(val: unknown) => onUpdateConfig(field.key, val)}
-        value={value}
-      />
-    </div>
-  );
+  return renderer({ field, config, onUpdateConfig, disabled });
 }
 
 /**
@@ -442,9 +427,15 @@ function renderField(
     return renderAbiFunctionArgs(field, config, onUpdateConfig, disabled);
   }
 
-  // Special handling for abi-with-auto-fetch
-  if (field.type === "abi-with-auto-fetch") {
-    return renderAbiWithAutoFetch(field, config, onUpdateConfig, disabled);
+  // Check for custom field renderers (extension registry)
+  const customResult = renderCustomField(
+    field,
+    config,
+    onUpdateConfig,
+    disabled
+  );
+  if (customResult !== null) {
+    return customResult;
   }
 
   const FieldRenderer = FIELD_RENDERERS[field.type];

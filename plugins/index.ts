@@ -13,14 +13,13 @@
  * 1. Delete the plugin directory
  * 2. Run: pnpm discover-plugins (or it runs automatically on build)
  *
- * Discovered plugins: discord, sendgrid, slack, web3, webhook
+ * Discovered plugins: slack
  */
 
-import "./discord";
-import "./sendgrid";
 import "./slack";
-import "./web3";
-import "./webhook";
+
+// Import KeeperHub custom plugins
+import "@/keeperhub/plugins";
 
 export type {
   ActionConfigField,

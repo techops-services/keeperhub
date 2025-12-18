@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import postgres from "postgres";
-import { apiError } from "@/lib/api-error";
 import { auth } from "@/lib/auth";
 import { getIntegration as getIntegrationFromDb } from "@/lib/db/integrations";
 import {
@@ -86,7 +85,14 @@ export async function POST(
 
     return NextResponse.json(result);
   } catch (error) {
-    return apiError(error, "Failed to test connection");
+    console.error("Failed to test connection:", error);
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to test connection",
+      },
+      { status: 500 }
+    );
   }
 }
 
