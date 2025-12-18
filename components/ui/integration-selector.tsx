@@ -10,14 +10,16 @@ import {
   Settings,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { IntegrationFormDialog } from "@/components/settings/integration-form-dialog";
+import { ConfigureConnectionOverlay } from "@/components/overlays/add-connection-overlay";
+import { AiGatewayConsentOverlay } from "@/components/overlays/ai-gateway-consent-overlay";
+import { EditConnectionOverlay } from "@/components/overlays/edit-connection-overlay";
+import { useOverlay } from "@/components/overlays/overlay-provider";
 import { Button } from "@/components/ui/button";
 import {
   aiGatewayStatusAtom,
   aiGatewayTeamsAtom,
   aiGatewayTeamsFetchedAtom,
   aiGatewayTeamsLoadingAtom,
-  openAiGatewayConsentModalAtom,
 } from "@/lib/ai-gateway/state";
 import { api, type Integration } from "@/lib/api-client";
 import {
@@ -45,9 +47,7 @@ export function IntegrationSelector({
   disabled,
   onAddConnection,
 }: IntegrationSelectorProps) {
-  const [showNewDialog, setShowNewDialog] = useState(false);
-  const [editingIntegration, setEditingIntegration] =
-    useState<Integration | null>(null);
+  const { push } = useOverlay();
   const [globalIntegrations, setGlobalIntegrations] = useAtom(integrationsAtom);
   const integrationsVersion = useAtomValue(integrationsVersionAtom);
   const setIntegrationsVersion = useSetAtom(integrationsVersionAtom);
@@ -57,7 +57,6 @@ export function IntegrationSelector({
   // AI Gateway user keys state
   const [aiGatewayStatus, setAiGatewayStatus] = useAtom(aiGatewayStatusAtom);
   const [aiGatewayStatusFetched, setAiGatewayStatusFetched] = useState(false);
-  const openConsentModal = useSetAtom(openAiGatewayConsentModalAtom);
 
   // AI Gateway teams state (pre-loaded for consent modal)
   const [teams, setTeams] = useAtom(aiGatewayTeamsAtom);
@@ -186,20 +185,12 @@ export function IntegrationSelector({
   const handleNewIntegrationCreated = async (integrationId: string) => {
     await loadIntegrations();
     onChange(integrationId);
-    setShowNewDialog(false);
     // Increment version to trigger re-fetch in other selectors
     setIntegrationsVersion((v) => v + 1);
   };
 
-  const handleEditSuccess = async () => {
+  const handleIntegrationChange = async () => {
     await loadIntegrations();
-    setEditingIntegration(null);
-    setIntegrationsVersion((v) => v + 1);
-  };
-
-  const handleDelete = async () => {
-    await loadIntegrations();
-    setEditingIntegration(null);
     setIntegrationsVersion((v) => v + 1);
     // Refresh AI Gateway status if this is an AI Gateway integration
     if (integrationType === "ai-gateway") {
@@ -207,6 +198,24 @@ export function IntegrationSelector({
       setAiGatewayStatus(status);
     }
   };
+
+  const openNewConnectionOverlay = useCallback(() => {
+    push(ConfigureConnectionOverlay, {
+      type: integrationType,
+      onSuccess: handleNewIntegrationCreated,
+    });
+  }, [integrationType, push, handleNewIntegrationCreated]);
+
+  const openEditConnectionOverlay = useCallback(
+    (integration: Integration) => {
+      push(EditConnectionOverlay, {
+        integration,
+        onSuccess: handleIntegrationChange,
+        onDelete: handleIntegrationChange,
+      });
+    },
+    [push, handleIntegrationChange]
+  );
 
   // Check if AI Gateway managed keys should be used
   const shouldUseManagedKeys =
@@ -228,17 +237,15 @@ export function IntegrationSelector({
     if (onAddConnection) {
       onAddConnection();
     } else if (shouldUseManagedKeys) {
-      // For AI Gateway with managed keys enabled, show consent modal
-      openConsentModal({
+      // For AI Gateway with managed keys enabled, show consent overlay
+      push(AiGatewayConsentOverlay, {
         onConsent: handleConsentSuccess,
-        onManualEntry: () => {
-          setShowNewDialog(true);
-        },
+        onManualEntry: openNewConnectionOverlay,
       });
     } else {
-      setShowNewDialog(true);
+      openNewConnectionOverlay();
     }
-  }, [onAddConnection, shouldUseManagedKeys, openConsentModal, handleConsentSuccess]);
+  }, [onAddConnection, shouldUseManagedKeys, push, handleConsentSuccess, openNewConnectionOverlay]);
 
   // Only show loading skeleton if we have no cached data and haven't fetched yet
   if (!hasCachedData && !hasFetched) {
@@ -276,14 +283,6 @@ export function IntegrationSelector({
           </span>
           <Plus className="size-4" />
         </Button>
-
-        <IntegrationFormDialog
-          mode="create"
-          onClose={() => setShowNewDialog(false)}
-          onSuccess={handleNewIntegrationCreated}
-          open={showNewDialog}
-          preselectedType={integrationType}
-        />
       </>
     );
   }
@@ -306,32 +305,13 @@ export function IntegrationSelector({
           <Button
             className="size-6 shrink-0"
             disabled={disabled}
-            onClick={() => setEditingIntegration(integration)}
+            onClick={() => openEditConnectionOverlay(integration)}
             size="icon"
             variant="ghost"
           >
             <Pencil className="size-3" />
           </Button>
         </div>
-
-        <IntegrationFormDialog
-          mode="create"
-          onClose={() => setShowNewDialog(false)}
-          onSuccess={handleNewIntegrationCreated}
-          open={showNewDialog}
-          preselectedType={integrationType}
-        />
-
-        {editingIntegration && (
-          <IntegrationFormDialog
-            integration={editingIntegration}
-            mode="edit"
-            onClose={() => setEditingIntegration(null)}
-            onDelete={handleDelete}
-            onSuccess={handleEditSuccess}
-            open
-          />
-        )}
       </>
     );
   }
@@ -371,7 +351,7 @@ export function IntegrationSelector({
                 disabled={disabled}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setEditingIntegration(integration);
+                  openEditConnectionOverlay(integration);
                 }}
                 size="icon"
                 variant="ghost"
@@ -414,7 +394,7 @@ export function IntegrationSelector({
                 disabled={disabled}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setEditingIntegration(integration);
+                  openEditConnectionOverlay(integration);
                 }}
                 size="icon"
                 variant="ghost"
@@ -437,25 +417,6 @@ export function IntegrationSelector({
           </button>
         )}
       </div>
-
-      <IntegrationFormDialog
-        mode="create"
-        onClose={() => setShowNewDialog(false)}
-        onSuccess={handleNewIntegrationCreated}
-        open={showNewDialog}
-        preselectedType={integrationType}
-      />
-
-      {editingIntegration && (
-        <IntegrationFormDialog
-          integration={editingIntegration}
-          mode="edit"
-          onClose={() => setEditingIntegration(null)}
-          onDelete={handleDelete}
-          onSuccess={handleEditSuccess}
-          open
-        />
-      )}
     </>
   );
 }

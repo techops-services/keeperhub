@@ -3,7 +3,9 @@
 import { useAtomValue, useSetAtom } from "jotai";
 import { HelpCircle, Plus, Settings } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { IntegrationFormDialog } from "@/components/settings/integration-form-dialog";
+import { ConfigureConnectionOverlay } from "@/components/overlays/add-connection-overlay";
+import { AiGatewayConsentOverlay } from "@/components/overlays/ai-gateway-consent-overlay";
+import { useOverlay } from "@/components/overlays/overlay-provider";
 import { Button } from "@/components/ui/button";
 import { CodeEditor } from "@/components/ui/code-editor";
 import { IntegrationIcon } from "@/components/ui/integration-icon";
@@ -24,21 +26,18 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { aiGatewayStatusAtom } from "@/lib/ai-gateway/state";
 import {
-  aiGatewayStatusAtom,
-  openAiGatewayConsentModalAtom,
-} from "@/lib/ai-gateway/state";
-import { integrationsVersionAtom } from "@/lib/integrations-store";
+  integrationsAtom,
+  integrationsVersionAtom,
+} from "@/lib/integrations-store";
 import type { IntegrationType } from "@/lib/types/integration";
 import {
   findActionById,
-  flattenConfigFields,
   getActionsByCategory,
   getAllIntegrations,
-  getIntegration,
 } from "@/plugins";
 import { ActionConfigRenderer } from "./action-config-renderer";
-import { DiscordWebhookDisplay } from "./discord-webhook-display";
 import { SchemaBuilder, type SchemaField } from "./schema-builder";
 
 type ActionConfigProps = {
@@ -220,6 +219,48 @@ function ConditionFields({
   );
 }
 
+// System action fields wrapper - extracts conditional rendering to reduce complexity
+function SystemActionFields({
+  actionType,
+  config,
+  onUpdateConfig,
+  disabled,
+}: {
+  actionType: string;
+  config: Record<string, unknown>;
+  onUpdateConfig: (key: string, value: string) => void;
+  disabled: boolean;
+}) {
+  switch (actionType) {
+    case "HTTP Request":
+      return (
+        <HttpRequestFields
+          config={config}
+          disabled={disabled}
+          onUpdateConfig={onUpdateConfig}
+        />
+      );
+    case "Database Query":
+      return (
+        <DatabaseQueryFields
+          config={config}
+          disabled={disabled}
+          onUpdateConfig={onUpdateConfig}
+        />
+      );
+    case "Condition":
+      return (
+        <ConditionFields
+          config={config}
+          disabled={disabled}
+          onUpdateConfig={onUpdateConfig}
+        />
+      );
+    default:
+      return null;
+  }
+}
+
 // System actions that don't have plugins
 const SYSTEM_ACTIONS: Array<{ id: string; label: string }> = [
   { id: "HTTP Request", label: "HTTP Request" },
@@ -290,7 +331,6 @@ function normalizeActionType(actionType: string): string {
   return actionType;
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Upstream function - preserving original structure for easier merges
 export function ActionConfig({
   config,
   onUpdateConfig,
@@ -303,45 +343,18 @@ export function ActionConfig({
 
   const selectedCategory = actionType ? getCategoryForAction(actionType) : null;
   const [category, setCategory] = useState<string>(selectedCategory || "");
-  const [showAddConnectionDialog, setShowAddConnectionDialog] = useState(false);
   const setIntegrationsVersion = useSetAtom(integrationsVersionAtom);
+  const globalIntegrations = useAtomValue(integrationsAtom);
+  const { push } = useOverlay();
 
   // AI Gateway managed keys state
   const aiGatewayStatus = useAtomValue(aiGatewayStatusAtom);
-  const openConsentModal = useSetAtom(openAiGatewayConsentModalAtom);
 
   // Sync category state when actionType changes (e.g., when switching nodes)
   useEffect(() => {
     const newCategory = actionType ? getCategoryForAction(actionType) : null;
     setCategory(newCategory || "");
   }, [actionType]);
-
-  // Initialize default values for fields when action type changes
-  useEffect(() => {
-    if (!actionType || disabled) {
-      return;
-    }
-
-    const action = findActionById(actionType);
-    if (!action) {
-      return;
-    }
-
-    // Flatten fields to handle groups
-    const flatFields = flattenConfigFields(action.configFields);
-
-    // Initialize default values for fields that don't have values yet
-    // We check config values to avoid overwriting existing values
-    for (const field of flatFields) {
-      const currentValue = config[field.key];
-      if (
-        field.defaultValue !== undefined &&
-        (currentValue === undefined || currentValue === "")
-      ) {
-        onUpdateConfig(field.key, field.defaultValue);
-      }
-    }
-  }, [actionType, disabled, config, onUpdateConfig]);
 
   const handleCategoryChange = (newCategory: string) => {
     setCategory(newCategory);
@@ -386,21 +399,37 @@ export function ActionConfig({
     aiGatewayStatus?.enabled &&
     aiGatewayStatus?.isVercelUser;
 
+  // Check if there are existing connections for this integration type
+  const hasExistingConnections = useMemo(() => {
+    if (!integrationType) return false;
+    return globalIntegrations.some((i) => i.type === integrationType);
+  }, [integrationType, globalIntegrations]);
+
   const handleConsentSuccess = (integrationId: string) => {
     onUpdateConfig("integrationId", integrationId);
     setIntegrationsVersion((v) => v + 1);
   };
 
-  const handleAddSecondaryConnection = () => {
-    if (shouldUseManagedKeys) {
-      openConsentModal({
-        onConsent: handleConsentSuccess,
-        onManualEntry: () => {
-          setShowAddConnectionDialog(true);
+  const openConnectionOverlay = () => {
+    if (integrationType) {
+      push(ConfigureConnectionOverlay, {
+        type: integrationType,
+        onSuccess: (integrationId: string) => {
+          setIntegrationsVersion((v) => v + 1);
+          onUpdateConfig("integrationId", integrationId);
         },
       });
+    }
+  };
+
+  const handleAddSecondaryConnection = () => {
+    if (shouldUseManagedKeys) {
+      push(AiGatewayConsentOverlay, {
+        onConsent: handleConsentSuccess,
+        onManualEntry: openConnectionOverlay,
+      });
     } else {
-      setShowAddConnectionDialog(true);
+      openConnectionOverlay();
     }
   };
 
@@ -466,24 +495,23 @@ export function ActionConfig({
         </div>
       </div>
 
-      {integrationType &&
-        isOwner &&
-        getIntegration(integrationType)?.requiresCredentials !== false && (
-          <div className="space-y-2">
-            <div className="ml-1 flex items-center justify-between">
-              <div className="flex items-center gap-1">
-                <Label>Connection</Label>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <HelpCircle className="size-3.5 text-muted-foreground" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>API key or OAuth credentials for this service</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
+      {integrationType && isOwner && (
+        <div className="space-y-2">
+          <div className="ml-1 flex items-center justify-between">
+            <div className="flex items-center gap-1">
+              <Label>Connection</Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="size-3.5 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>API key or OAuth credentials for this service</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            {hasExistingConnections && (
               <Button
                 className="size-6"
                 disabled={disabled}
@@ -493,69 +521,33 @@ export function ActionConfig({
               >
                 <Plus className="size-4" />
               </Button>
-            </div>
-            <IntegrationSelector
-              disabled={disabled}
-              integrationType={integrationType}
-              onChange={(id) => onUpdateConfig("integrationId", id)}
-              value={(config?.integrationId as string) || ""}
-            />
-            <IntegrationFormDialog
-              mode="create"
-              onClose={() => setShowAddConnectionDialog(false)}
-              onSuccess={(integrationId) => {
-                setShowAddConnectionDialog(false);
-                setIntegrationsVersion((v) => v + 1);
-                onUpdateConfig("integrationId", integrationId);
-              }}
-              open={showAddConnectionDialog}
-              preselectedType={integrationType}
-            />
+            )}
           </div>
-        )}
+          <IntegrationSelector
+            disabled={disabled}
+            integrationType={integrationType}
+            onChange={(id) => onUpdateConfig("integrationId", id)}
+            value={(config?.integrationId as string) || ""}
+          />
+        </div>
+      )}
 
       {/* System actions - hardcoded config fields */}
-      {config?.actionType === "HTTP Request" && (
-        <HttpRequestFields
-          config={config}
-          disabled={disabled}
-          onUpdateConfig={onUpdateConfig}
-        />
-      )}
-
-      {config?.actionType === "Database Query" && (
-        <DatabaseQueryFields
-          config={config}
-          disabled={disabled}
-          onUpdateConfig={onUpdateConfig}
-        />
-      )}
-
-      {config?.actionType === "Condition" && (
-        <ConditionFields
-          config={config}
-          disabled={disabled}
-          onUpdateConfig={onUpdateConfig}
-        />
-      )}
+      <SystemActionFields
+        actionType={(config?.actionType as string) || ""}
+        config={config}
+        disabled={disabled}
+        onUpdateConfig={onUpdateConfig}
+      />
 
       {/* Plugin actions - declarative config fields */}
       {pluginAction && !SYSTEM_ACTION_IDS.includes(actionType) && (
-        <>
-          {/* Discord-specific: Show webhook URL above message field */}
-          {pluginAction.integration === "discord" && (
-            <DiscordWebhookDisplay
-              actionType={actionType}
-              integrationId={config?.integrationId as string | undefined}
-            />
-          )}
-          <ActionConfigRenderer
-            config={config}
-            disabled={disabled}
-            fields={pluginAction.configFields}
-            onUpdateConfig={handlePluginUpdateConfig}
-          />
-        </>
+        <ActionConfigRenderer
+          config={config}
+          disabled={disabled}
+          fields={pluginAction.configFields}
+          onUpdateConfig={handlePluginUpdateConfig}
+        />
       )}
     </>
   );
