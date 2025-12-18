@@ -124,6 +124,17 @@ jobs:
           sed -i 's|${IMAGE_TAG}|'"$IMAGE_TAG"'|g' $HELM_FILE
           sed -i 's|${SERVICE_ACCOUNT_ROLE_ARN}|'"$SERVICE_ACCOUNT_ROLE_ARN"'|g' $HELM_FILE
 
+      - name: Replace variables in the Job Spawner values file
+        id: replace-vars-job-spawner
+        if: ${{ !contains(github.event.head_commit.message , '[skip deploy]') }}
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
+          JOB_SPAWNER_HELM_FILE: deploy/job-spawner/${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}/values.yaml
+        run: |
+          sed -i 's|${ECR_REGISTRY}|'"$ECR_REGISTRY"'|g' $JOB_SPAWNER_HELM_FILE
+          sed -i 's|${IMAGE_TAG}|'"$IMAGE_TAG"'|g' $JOB_SPAWNER_HELM_FILE
+
       - name: Deploying Service to Kubernetes with Helm
         id: deploy
         uses: bitovi/github-actions-deploy-eks-helm@v1.2.10
@@ -134,6 +145,21 @@ jobs:
           namespace: ${{ env.NAMESPACE }}
           timeout: 5m0s
           name: ${{ env.SERVICE_NAME }}
+          chart-repository: https://techops-services.github.io/helm-charts
+          version: 0.0.33
+          atomic: true
+
+      - name: Deploying Job Spawner to Kubernetes with Helm
+        id: deploy-job-spawner
+        if: ${{ !contains(github.event.head_commit.message , '[skip deploy]') }}
+        uses: bitovi/github-actions-deploy-eks-helm@v1.2.10
+        with:
+          cluster-name: ${{ env.CLUSTER_NAME }}
+          config-files: deploy/job-spawner/${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}/values.yaml
+          chart-path: techops-services/common
+          namespace: ${{ env.NAMESPACE }}
+          timeout: 5m0s
+          name: keeperhub-job-spawner
           chart-repository: https://techops-services.github.io/helm-charts
           version: 0.0.33
           atomic: true
