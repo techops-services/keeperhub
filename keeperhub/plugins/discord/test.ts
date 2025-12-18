@@ -2,7 +2,7 @@
 // Users provide webhook URLs directly in each step
 // Webhook validity will be tested when the workflow runs
 
-export async function testDiscord(_credentials: Record<string, string>) {
+export function testDiscord(_credentials: Record<string, string>) {
   return {
     success: true,
   };

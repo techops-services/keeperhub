@@ -6,10 +6,6 @@ import type { SendGridCredentials } from "../credentials";
 
 const SENDGRID_API_URL = "https://api.sendgrid.com";
 
-type SendGridEmailResponse = {
-  message_id: string;
-};
-
 type SendGridErrorResponse = {
   errors: Array<{
     message: string;
@@ -40,6 +36,7 @@ export type SendEmailInput = StepInput &
 /**
  * Core logic - portable between app and export
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Email sending requires validation of many fields
 async function stepHandler(
   input: SendEmailCoreInput,
   credentials: SendGridCredentials,

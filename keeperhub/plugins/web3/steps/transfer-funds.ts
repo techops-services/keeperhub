@@ -122,7 +122,7 @@ async function stepHandler(
   // TODO: Make this configurable in the future
   const SEPOLIA_RPC_URL = "https://chain.techops.services/eth-sepolia";
 
-  let signer;
+  let signer: Awaited<ReturnType<typeof initializeParaSigner>> | null = null;
   try {
     console.log("[Transfer Funds] Initializing Para signer for user:", userId);
     signer = await initializeParaSigner(userId, SEPOLIA_RPC_URL);
@@ -188,7 +188,7 @@ async function stepHandler(
  * Transfer Funds Step
  * Transfers ETH from the user's wallet to a recipient address
  */
-export async function transferFundsStep(
+export function transferFundsStep(
   input: TransferFundsInput
 ): Promise<TransferFundsResult> {
   "use step";

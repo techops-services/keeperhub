@@ -35,6 +35,7 @@ function parseJsonSafely(jsonString: string | undefined): unknown {
 /**
  * Core logic - portable between app and export
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Webhook handling requires validation of URL, headers, body
 async function stepHandler(
   input: SendWebhookCoreInput
 ): Promise<SendWebhookResult> {
@@ -54,7 +55,7 @@ async function stepHandler(
   // Validate URL format
   try {
     new URL(url);
-  } catch (error) {
+  } catch {
     console.error("[Webhook] Invalid URL format");
     return {
       success: false,
@@ -108,7 +109,7 @@ async function stepHandler(
     let responseData: unknown;
     const contentType = response.headers.get("content-type");
 
-    if (contentType && contentType.includes("application/json")) {
+    if (contentType?.includes("application/json")) {
       try {
         responseData = await response.json();
       } catch {
@@ -146,7 +147,7 @@ async function stepHandler(
 /**
  * App entry point - wraps with logging
  */
-export async function sendWebhookStep(
+export function sendWebhookStep(
   input: SendWebhookInput
 ): Promise<SendWebhookResult> {
   "use step";

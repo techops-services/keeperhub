@@ -100,7 +100,7 @@ async function stepHandler(
  * Check Balance Step
  * Checks the ETH balance of an address (contract or wallet)
  */
-export async function checkBalanceStep(
+export function checkBalanceStep(
   input: CheckBalanceInput
 ): Promise<CheckBalanceResult> {
   "use step";

@@ -38,6 +38,7 @@ function getRpcUrl(network: string): string {
 /**
  * Core read contract logic
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Contract interaction requires extensive validation
 async function stepHandler(
   input: ReadContractInput
 ): Promise<ReadContractResult> {
@@ -110,7 +111,9 @@ async function stepHandler(
       // Filter out empty strings at the end of the array (from UI padding)
       args = parsedArgs.filter((arg, index) => {
         // Keep all non-empty values
-        if (arg !== "") return true;
+        if (arg !== "") {
+          return true;
+        }
         // Keep empty strings if they're not at the end
         return parsedArgs.slice(index + 1).some((a) => a !== "");
       });
@@ -236,7 +239,7 @@ async function stepHandler(
  * Read Contract Step
  * Reads data from a smart contract using view/pure functions
  */
-export async function readContractStep(
+export function readContractStep(
   input: ReadContractInput
 ): Promise<ReadContractResult> {
   "use step";

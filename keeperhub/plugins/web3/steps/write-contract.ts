@@ -65,6 +65,7 @@ function getRpcUrl(network: string): string {
 /**
  * Core write contract logic
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Contract interaction requires extensive validation
 async function stepHandler(
   input: WriteContractInput
 ): Promise<WriteContractResult> {
@@ -143,7 +144,9 @@ async function stepHandler(
       // Filter out empty strings at the end of the array (from UI padding)
       args = parsedArgs.filter((arg, index) => {
         // Keep all non-empty values
-        if (arg !== "") return true;
+        if (arg !== "") {
+          return true;
+        }
         // Keep empty strings if they're not at the end
         return parsedArgs.slice(index + 1).some((a) => a !== "");
       });
@@ -199,7 +202,7 @@ async function stepHandler(
   }
 
   // Initialize Para signer
-  let signer;
+  let signer: Awaited<ReturnType<typeof initializeParaSigner>> | null = null;
   try {
     console.log("[Write Contract] Initializing Para signer for user:", userId);
     signer = await initializeParaSigner(userId, rpcUrl);
@@ -266,7 +269,6 @@ async function stepHandler(
     const outputs = (
       functionAbi as { outputs?: Array<{ name?: string; type: string }> }
     ).outputs;
-    let result: unknown;
 
     if (outputs && outputs.length > 0) {
       // For functions with return values, we need to decode the logs or use staticCall
@@ -279,7 +281,7 @@ async function stepHandler(
     return {
       success: true,
       transactionHash: receipt.hash,
-      result,
+      result: undefined,
     };
   } catch (error) {
     console.error("[Write Contract] Function call failed:", error);
@@ -294,7 +296,7 @@ async function stepHandler(
  * Write Contract Step
  * Writes data to a smart contract using state-changing functions
  */
-export async function writeContractStep(
+export function writeContractStep(
   input: WriteContractInput
 ): Promise<WriteContractResult> {
   "use step";

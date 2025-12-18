@@ -149,6 +149,7 @@ export const workflowExecutionLogs = pgTable("workflow_execution_logs", {
 });
 
 // KeeperHub: Para Wallets table (imported from KeeperHub schema extensions)
+// biome-ignore lint/performance/noBarrelFile: Intentional re-export for schema extensions
 export {
   type NewParaWallet,
   type ParaWallet,
