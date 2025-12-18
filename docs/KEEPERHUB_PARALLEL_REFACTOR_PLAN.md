@@ -303,11 +303,11 @@ techops-workflow-builder-template/
 - [x] Move `app/api/web3/fetch-abi/route.ts` to `keeperhub/api/web3/fetch-abi/route.ts`
 - [x] Create thin wrapper routes in `app/api/` that re-export from `keeperhub/api/`
 - [x] Revert base API routes to upstream-style inline error handling (remove apiError dependency)
-- [ ] Create `keeperhub/db/schema-extensions.ts` with paraWallets table
+- [x] Create `keeperhub/db/schema-extensions.ts` with paraWallets table
 
 **Note on `lib/api-error.ts`:** This utility was added by KeeperHub and modified 20 base API routes. To maintain upstream compatibility, we reverted all base routes to use inline error handling (matching upstream pattern) and moved `api-error.ts` to `keeperhub/lib/` for use only in KeeperHub-specific routes.
 
-#### Phase 5: Create Extension Points (Day 3)
+#### Phase 4: Create Extension Points (Day 3)
 
 Create wrapper components that extend base with KeeperHub features:
 
@@ -325,7 +325,7 @@ export function KeeperHubIntegrationsManager() {
 }
 ```
 
-#### Phase 6: Revert Base Files to Upstream (Day 3-4)
+#### Phase 5: Revert Base Files to Upstream (Day 3-4)
 
 - [ ] Revert `app/layout.tsx` to upstream version
 - [ ] Revert `app/globals.css` to upstream version
@@ -335,14 +335,14 @@ export function KeeperHubIntegrationsManager() {
 - [ ] Revert `lib/db/schema.ts` to upstream (paraWallets in extension)
 - [ ] Revert `plugins/index.ts` to upstream
 
-#### Phase 7: Configure Build (Day 4)
+#### Phase 6: Configure Build (Day 4)
 
 - [ ] Update `next.config.ts` for KeeperHub routes
 - [ ] Create `keeperhub/next.config.ts` overrides
 - [ ] Update `package.json` scripts for KeeperHub mode
 - [ ] Configure environment variable `KEEPERHUB_MODE=true`
 
-#### Phase 8: Testing (Day 5)
+#### Phase 7: Testing (Day 5)
 
 - [ ] Test base template works standalone
 - [ ] Test KeeperHub features work with extensions
