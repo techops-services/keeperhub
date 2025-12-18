@@ -254,7 +254,7 @@ export function ConfigureConnectionOverlay({
   const { push, closeAll } = useOverlay();
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{
+  const [_testResult, setTestResult] = useState<{
     status: "success" | "error";
     message: string;
   } | null>(null);
@@ -375,7 +375,9 @@ export function ConfigureConnectionOverlay({
       );
     }
 
-    if (!formFields) return null;
+    if (!formFields) {
+      return null;
+    }
 
     return formFields.map((field) => {
       if (field.type === "password") {

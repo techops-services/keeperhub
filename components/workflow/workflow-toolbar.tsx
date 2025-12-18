@@ -809,6 +809,7 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
       confirmVariant: "destructive" as const,
       destructive: true,
       onConfirm: async () => {
+        // biome-ignore lint/style/useBlockStatements: upstream code
         if (!currentWorkflowId) return;
         try {
           await api.workflow.delete(currentWorkflowId);

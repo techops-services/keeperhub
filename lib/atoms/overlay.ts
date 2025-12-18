@@ -45,6 +45,7 @@ function generateOverlayId(): string {
  */
 export const openOverlayAtom = atom(
   null,
+  // biome-ignore lint/correctness/noUnusedFunctionParameters: upstream code - jotai requires get param
   (get, set, params: OpenOverlayParams) => {
     const id = generateOverlayId();
     const item: OverlayStackItem = {
@@ -104,6 +105,7 @@ export const popOverlayAtom = atom(null, (get, set) => {
     return;
   }
   // Pop the top item and call its onClose
+  // biome-ignore lint/style/useAtIndex: upstream code
   const poppedItem = stack[stack.length - 1];
   poppedItem?.options.onClose?.();
   set(overlayStackAtom, stack.slice(0, -1));
@@ -137,6 +139,7 @@ export const replaceOverlayAtom = atom(
       set(overlayStackAtom, [item]);
     } else {
       // Call onClose for the replaced item
+      // biome-ignore lint/style/useAtIndex: upstream code
       const poppedItem = stack[stack.length - 1];
       poppedItem?.options.onClose?.();
       set(overlayStackAtom, [...stack.slice(0, -1), item]);
@@ -175,6 +178,7 @@ export const closeAllOverlaysAtom = atom(null, (get, set) => {
 export const closeOverlayAtom = atom(null, (get, set, id: string) => {
   const stack = get(overlayStackAtom);
   const index = stack.findIndex((item) => item.id === id);
+  // biome-ignore lint/style/useBlockStatements: upstream code
   if (index === -1) return;
 
   // Call onClose for all items from this index onwards

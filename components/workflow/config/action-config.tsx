@@ -401,6 +401,7 @@ export function ActionConfig({
 
   // Check if there are existing connections for this integration type
   const hasExistingConnections = useMemo(() => {
+    // biome-ignore lint/style/useBlockStatements: upstream code
     if (!integrationType) return false;
     return globalIntegrations.some((i) => i.type === integrationType);
   }, [integrationType, globalIntegrations]);
