@@ -74,23 +74,25 @@ create_namespace() {
 }
 
 build_and_load_images() {
-    log_info "Building images..."
+    log_info "Building images directly in Minikube's Docker daemon..."
 
     cd "$PROJECT_ROOT"
 
+    # Use minikube's Docker daemon to build directly (faster than build + load)
+    eval $(minikube docker-env)
+
     # Build scheduler image (for dispatcher and job-spawner)
-    log_info "Building keeperhub-scheduler:latest..."
+    log_info "Building keeperhub-scheduler:latest in minikube..."
     docker build --target scheduler -t keeperhub-scheduler:latest .
 
     # Build workflow runner image (for K8s Jobs)
-    log_info "Building keeperhub-runner:latest..."
+    log_info "Building keeperhub-runner:latest in minikube..."
     docker build --target workflow-runner -t keeperhub-runner:latest .
 
-    log_info "Loading images into Minikube..."
-    minikube image load keeperhub-scheduler:latest
-    minikube image load keeperhub-runner:latest
+    # Reset to host Docker daemon
+    eval $(minikube docker-env -u)
 
-    log_info "Images loaded successfully"
+    log_info "Images built directly in minikube (no load needed)"
 }
 
 generate_manifest() {
@@ -133,8 +135,8 @@ data:
   AWS_ACCESS_KEY_ID: "test"
   AWS_SECRET_ACCESS_KEY: "test"
   SQS_QUEUE_URL: "http://host.minikube.internal:4566/000000000000/keeperhub-workflow-queue"
-  # Database - connects to Docker Compose PostgreSQL
-  DATABASE_URL: "postgresql://postgres:postgres@host.minikube.internal:5432/keeperhub"
+  # Database - connects to Docker Compose PostgreSQL (port 5433 exposed on host)
+  DATABASE_URL: "postgresql://postgres:postgres@host.minikube.internal:5433/keeperhub"
   # Job spawner settings
   RUNNER_IMAGE: "keeperhub-runner:latest"
   K8S_NAMESPACE: "local"

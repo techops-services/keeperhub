@@ -1,6 +1,16 @@
 # Schedule Trigger Components for KeeperHub (Hybrid Mode)
 # Connects to Docker Compose services via host.minikube.internal
 ---
+# Secret for workflow runner (integration credential decryption)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: keeperhub-secrets
+  namespace: local
+type: Opaque
+data:
+  integration-encryption-key: MmEzNmM5MzY5M2QzMmExMjhkMGM4ZDIxN2EzMDE1ZTljMDdhMjYyMGUxYTFhYmJiOTBkZWVmMTZkYWFhNTBhNA==
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -13,7 +23,7 @@ data:
   AWS_ACCESS_KEY_ID: "test"
   AWS_SECRET_ACCESS_KEY: "test"
   SQS_QUEUE_URL: "http://host.minikube.internal:4566/000000000000/keeperhub-workflow-queue"
-  # Database - connects to Docker Compose PostgreSQL (port 5433 is exposed by docker-compose)
+  # Database - connects to Docker Compose PostgreSQL (port 5433 exposed on host)
   DATABASE_URL: "postgresql://postgres:postgres@host.minikube.internal:5433/keeperhub"
   # Job spawner settings
   RUNNER_IMAGE: "keeperhub-runner:latest"
