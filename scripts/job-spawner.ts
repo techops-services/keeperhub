@@ -41,7 +41,7 @@ const CONFIG = {
 
   // SQS
   awsRegion: process.env.AWS_REGION || "us-east-1",
-  awsEndpoint: process.env.AWS_ENDPOINT_URL || "http://localhost:4566",
+  awsEndpoint: process.env.AWS_ENDPOINT_URL, // Only set for local dev (LocalStack)
   awsAccessKeyId: process.env.AWS_ACCESS_KEY_ID || "test",
   awsSecretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "test",
   sqsQueueUrl:
@@ -66,15 +66,21 @@ const db = drizzle(queryClient, {
   schema: { workflows, workflowExecutions, workflowSchedules },
 });
 
-// SQS client
-const sqs = new SQSClient({
+// SQS client - only use custom endpoint/credentials for local development
+const sqsConfig: ConstructorParameters<typeof SQSClient>[0] = {
   region: CONFIG.awsRegion,
-  endpoint: CONFIG.awsEndpoint,
-  credentials: {
+};
+
+// Only set endpoint for local development (LocalStack)
+if (CONFIG.awsEndpoint) {
+  sqsConfig.endpoint = CONFIG.awsEndpoint;
+  sqsConfig.credentials = {
     accessKeyId: CONFIG.awsAccessKeyId,
     secretAccessKey: CONFIG.awsSecretAccessKey,
-  },
-});
+  };
+}
+
+const sqs = new SQSClient(sqsConfig);
 
 // K8s client
 const kc = new KubeConfig();

@@ -26,15 +26,21 @@ const connectionString =
 const queryClient = postgres(connectionString);
 const db = drizzle(queryClient, { schema: { workflowSchedules } });
 
-// SQS client
-const sqs = new SQSClient({
+// SQS client - only use custom endpoint/credentials for local development
+const sqsConfig: ConstructorParameters<typeof SQSClient>[0] = {
   region: process.env.AWS_REGION || "us-east-1",
-  endpoint: process.env.AWS_ENDPOINT_URL || "http://localhost:4566",
-  credentials: {
+};
+
+// Only set endpoint for local development (LocalStack)
+if (process.env.AWS_ENDPOINT_URL) {
+  sqsConfig.endpoint = process.env.AWS_ENDPOINT_URL;
+  sqsConfig.credentials = {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID || "test",
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "test",
-  },
-});
+  };
+}
+
+const sqs = new SQSClient(sqsConfig);
 
 const QUEUE_URL =
   process.env.SQS_QUEUE_URL ||
