@@ -22,19 +22,19 @@
  *   SCHEDULE_ID - ID of the schedule (for scheduled executions)
  */
 
+import { CronExpressionParser } from "cron-parser";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { CronExpressionParser } from "cron-parser";
+import { validateWorkflowIntegrations } from "../lib/db/integrations";
 import {
-  workflows,
   workflowExecutions,
   workflowSchedules,
+  workflows,
 } from "../lib/db/schema";
 import { executeWorkflow } from "../lib/workflow-executor.workflow";
-import type { WorkflowNode, WorkflowEdge } from "../lib/workflow-store";
-import { validateWorkflowIntegrations } from "../lib/db/integrations";
 import { calculateTotalSteps } from "../lib/workflow-progress";
+import type { WorkflowEdge, WorkflowNode } from "../lib/workflow-store";
 
 // Validate required environment variables
 function validateEnv(): {
@@ -80,7 +80,10 @@ function validateEnv(): {
 }
 
 // Database connection
-const connectionString = process.env.DATABASE_URL!;
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  throw new Error("DATABASE_URL environment variable is required");
+}
 const queryClient = postgres(connectionString);
 const db = drizzle(queryClient, {
   schema: { workflows, workflowExecutions, workflowSchedules },
@@ -171,7 +174,9 @@ async function updateScheduleStatus(
     where: eq(workflowSchedules.id, scheduleId),
   });
 
-  if (!schedule) return;
+  if (!schedule) {
+    return;
+  }
 
   const nextRunAt = computeNextRunTime(
     schedule.cronExpression,
@@ -199,6 +204,7 @@ async function updateScheduleStatus(
 /**
  * Main execution function
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Main runner orchestrates multiple phases of workflow execution
 async function main(): Promise<void> {
   const startTime = Date.now();
   const { workflowId, executionId, input, scheduleId } = validateEnv();
@@ -226,7 +232,10 @@ async function main(): Promise<void> {
     // Validate integration ownership
     const nodes = workflow.nodes as WorkflowNode[];
     const edges = workflow.edges as WorkflowEdge[];
-    const validation = await validateWorkflowIntegrations(nodes, workflow.userId);
+    const validation = await validateWorkflowIntegrations(
+      nodes,
+      workflow.userId
+    );
 
     if (!validation.valid) {
       throw new Error(
@@ -242,7 +251,7 @@ async function main(): Promise<void> {
     // Execute the workflow
     console.log("[Runner] Executing workflow...");
     const result = await executeWorkflow({
-      nodes: nodes,
+      nodes,
       edges: workflow.edges as WorkflowEdge[],
       triggerInput: input,
       executionId,

@@ -1,14 +1,14 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   computeNextRunTime,
+  extractScheduleConfig,
   validateCronExpression,
   validateTimezone,
-  extractScheduleConfig,
 } from "@/lib/schedule-service";
 import {
+  createManualTriggerNode,
   createScheduleTriggerNode,
   createWebhookTriggerNode,
-  createManualTriggerNode,
   cronExpressions,
   timezones,
 } from "../fixtures/workflows";
@@ -29,10 +29,10 @@ describe("schedule-service", () => {
       const result = computeNextRunTime(cronExpressions.everyDayAt9am, "UTC");
 
       expect(result).not.toBeNull();
-      expect(result!.getUTCHours()).toBe(9);
-      expect(result!.getUTCMinutes()).toBe(0);
+      expect(result?.getUTCHours()).toBe(9);
+      expect(result?.getUTCMinutes()).toBe(0);
       // Should be today at 9am since we're at 8am
-      expect(result!.getUTCDate()).toBe(15);
+      expect(result?.getUTCDate()).toBe(15);
     });
 
     it("computes next run time for every minute cron", () => {
@@ -40,22 +40,25 @@ describe("schedule-service", () => {
 
       expect(result).not.toBeNull();
       // Should be the next minute
-      expect(result!.getTime()).toBeGreaterThan(Date.now());
+      expect(result?.getTime()).toBeGreaterThan(Date.now());
     });
 
     it("computes next run time for every hour cron", () => {
       const result = computeNextRunTime(cronExpressions.everyHour, "UTC");
 
       expect(result).not.toBeNull();
-      expect(result!.getUTCMinutes()).toBe(0);
+      expect(result?.getUTCMinutes()).toBe(0);
     });
 
     it("computes next run time for Monday-only cron", () => {
-      const result = computeNextRunTime(cronExpressions.everyMondayAt9am, "UTC");
+      const result = computeNextRunTime(
+        cronExpressions.everyMondayAt9am,
+        "UTC"
+      );
 
       expect(result).not.toBeNull();
       // 2024-01-15 is a Monday, so should be today at 9am or next Monday
-      const dayOfWeek = result!.getUTCDay();
+      const dayOfWeek = result?.getUTCDay();
       expect(dayOfWeek).toBe(1); // Monday
     });
 
@@ -73,11 +76,14 @@ describe("schedule-service", () => {
       expect(resultNY).not.toBeNull();
       // New York is UTC-5 in January, so 9am NY = 2pm UTC
       // The times should be different
-      expect(resultUTC!.getTime()).not.toBe(resultNY!.getTime());
+      expect(resultUTC?.getTime()).not.toBe(resultNY?.getTime());
     });
 
     it("returns null for invalid cron expression", () => {
-      const result = computeNextRunTime(cronExpressions.invalid.notACron, "UTC");
+      const result = computeNextRunTime(
+        cronExpressions.invalid.notACron,
+        "UTC"
+      );
       expect(result).toBeNull();
     });
 
@@ -104,9 +110,11 @@ describe("schedule-service", () => {
       expect(validateCronExpression(cronExpressions.everyMondayAt9am)).toEqual({
         valid: true,
       });
-      expect(validateCronExpression(cronExpressions.everyWeekdayAt9am)).toEqual({
-        valid: true,
-      });
+      expect(validateCronExpression(cronExpressions.everyWeekdayAt9am)).toEqual(
+        {
+          valid: true,
+        }
+      );
     });
 
     it("validates cron with step values", () => {
@@ -125,7 +133,9 @@ describe("schedule-service", () => {
     });
 
     it("rejects cron with too few fields", () => {
-      const result = validateCronExpression(cronExpressions.invalid.tooFewFields);
+      const result = validateCronExpression(
+        cronExpressions.invalid.tooFewFields
+      );
       expect(result.valid).toBe(false);
       expect(result.error).toContain("5 or 6 fields");
     });
@@ -137,12 +147,16 @@ describe("schedule-service", () => {
     });
 
     it("rejects invalid minute value", () => {
-      const result = validateCronExpression(cronExpressions.invalid.invalidMinute);
+      const result = validateCronExpression(
+        cronExpressions.invalid.invalidMinute
+      );
       expect(result.valid).toBe(false);
     });
 
     it("rejects invalid hour value", () => {
-      const result = validateCronExpression(cronExpressions.invalid.invalidHour);
+      const result = validateCronExpression(
+        cronExpressions.invalid.invalidHour
+      );
       expect(result.valid).toBe(false);
     });
 
@@ -191,23 +205,27 @@ describe("schedule-service", () => {
 
   describe("extractScheduleConfig", () => {
     it("extracts config from schedule trigger node", () => {
-      const triggerNode = createScheduleTriggerNode("0 9 * * *", "America/New_York");
+      const triggerNode = createScheduleTriggerNode(
+        "0 9 * * *",
+        "America/New_York"
+      );
       const result = extractScheduleConfig([triggerNode]);
 
       expect(result).not.toBeNull();
-      expect(result!.cronExpression).toBe("0 9 * * *");
-      expect(result!.timezone).toBe("America/New_York");
+      expect(result?.cronExpression).toBe("0 9 * * *");
+      expect(result?.timezone).toBe("America/New_York");
     });
 
     it("uses UTC as default timezone", () => {
       const triggerNode = createScheduleTriggerNode("0 9 * * *");
       // Remove timezone to test default
-      delete (triggerNode.data.config as Record<string, unknown>).scheduleTimezone;
+      (triggerNode.data.config as Record<string, unknown>).scheduleTimezone =
+        undefined;
 
       const result = extractScheduleConfig([triggerNode]);
 
       expect(result).not.toBeNull();
-      expect(result!.timezone).toBe("UTC");
+      expect(result?.timezone).toBe("UTC");
     });
 
     it("returns null for webhook trigger", () => {
@@ -232,7 +250,8 @@ describe("schedule-service", () => {
     it("returns null when trigger has no cron expression", () => {
       const triggerNode = createScheduleTriggerNode();
       // Remove cron expression
-      delete (triggerNode.data.config as Record<string, unknown>).scheduleCron;
+      (triggerNode.data.config as Record<string, unknown>).scheduleCron =
+        undefined;
 
       const result = extractScheduleConfig([triggerNode]);
       expect(result).toBeNull();
@@ -244,22 +263,22 @@ describe("schedule-service", () => {
           id: "action-1",
           type: "action",
           position: { x: 0, y: 0 },
-          data: { type: "action", label: "Action", config: {} },
+          data: { type: "action" as const, label: "Action", config: {} },
         },
         createScheduleTriggerNode("*/5 * * * *", "Europe/London"),
         {
           id: "action-2",
           type: "action",
           position: { x: 0, y: 0 },
-          data: { type: "action", label: "Action 2", config: {} },
+          data: { type: "action" as const, label: "Action 2", config: {} },
         },
       ];
 
       const result = extractScheduleConfig(nodes);
 
       expect(result).not.toBeNull();
-      expect(result!.cronExpression).toBe("*/5 * * * *");
-      expect(result!.timezone).toBe("Europe/London");
+      expect(result?.cronExpression).toBe("*/5 * * * *");
+      expect(result?.timezone).toBe("Europe/London");
     });
   });
 });

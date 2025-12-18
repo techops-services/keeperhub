@@ -14,20 +14,20 @@
  *   KEEPERHUB_URL - KeeperHub API URL (default: http://localhost:3000)
  */
 
+import {
+  DeleteMessageCommand,
+  type Message,
+  ReceiveMessageCommand,
+  SQSClient,
+} from "@aws-sdk/client-sqs";
+import { CronExpressionParser } from "cron-parser";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import {
-  SQSClient,
-  ReceiveMessageCommand,
-  DeleteMessageCommand,
-  type Message,
-} from "@aws-sdk/client-sqs";
-import { CronExpressionParser } from "cron-parser";
-import {
-  workflows,
   workflowExecutions,
   workflowSchedules,
+  workflows,
 } from "../lib/db/schema";
 import { generateId } from "../lib/utils/id";
 
@@ -59,12 +59,12 @@ const VISIBILITY_TIMEOUT = 300; // 5 minutes
 const WAIT_TIME_SECONDS = 20; // Long polling
 const MAX_MESSAGES = 10;
 
-interface ScheduleMessage {
+type ScheduleMessage = {
   workflowId: string;
   scheduleId: string;
   triggerTime: string;
   triggerType: "schedule";
-}
+};
 
 /**
  * Compute next run time for a cron expression
@@ -96,7 +96,9 @@ async function updateScheduleStatus(
     where: eq(workflowSchedules.id, scheduleId),
   });
 
-  if (!schedule) return;
+  if (!schedule) {
+    return;
+  }
 
   const nextRunAt = computeNextRunTime(
     schedule.cronExpression,
@@ -124,7 +126,9 @@ async function updateScheduleStatus(
 /**
  * Process a single scheduled workflow message
  */
-async function processScheduledWorkflow(message: ScheduleMessage): Promise<void> {
+async function processScheduledWorkflow(
+  message: ScheduleMessage
+): Promise<void> {
   const { workflowId, scheduleId, triggerTime } = message;
 
   console.log(`[Executor] Processing workflow ${workflowId}`);
@@ -230,7 +234,7 @@ async function processScheduledWorkflow(message: ScheduleMessage): Promise<void>
  * Process a single SQS message
  */
 async function processMessage(message: Message): Promise<void> {
-  if (!message.Body || !message.ReceiptHandle) {
+  if (!(message.Body && message.ReceiptHandle)) {
     console.error("[Executor] Invalid message:", message);
     return;
   }

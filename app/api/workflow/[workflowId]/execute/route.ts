@@ -61,6 +61,7 @@ async function executeWorkflowBackground(
   }
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Workflow execution requires complex error handling and validation
 export async function POST(
   request: Request,
   context: { params: Promise<{ workflowId: string }> }

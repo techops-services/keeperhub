@@ -1,12 +1,12 @@
-import { vi } from "vitest";
 import type { Message } from "@aws-sdk/client-sqs";
+import { vi } from "vitest";
 
-export interface MockSQSMessage {
+export type MockSQSMessage = {
   workflowId: string;
   scheduleId: string;
   triggerTime: string;
   triggerType: "schedule";
-}
+};
 
 export function createMockSQSClient() {
   return {

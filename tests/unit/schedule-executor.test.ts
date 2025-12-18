@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock dependencies
 vi.mock("@aws-sdk/client-sqs", () => ({
@@ -134,7 +134,8 @@ describe("schedule-executor", () => {
 
     it("does not increment run count on error", () => {
       const currentRunCount = "5";
-      const status = "error";
+      // Use string type to test the conditional logic
+      const status = "error" as string;
 
       const newRunCount =
         status === "success"
@@ -178,16 +179,14 @@ describe("schedule-executor", () => {
   describe("error handling", () => {
     it("extracts error message from Error instance", () => {
       const error = new Error("Connection refused");
-      const message =
-        error instanceof Error ? error.message : "Unknown error";
+      const message = error instanceof Error ? error.message : "Unknown error";
 
       expect(message).toBe("Connection refused");
     });
 
     it("handles non-Error thrown values", () => {
-      const error = "String error";
-      const message =
-        error instanceof Error ? error.message : "Unknown error";
+      const error: unknown = "String error";
+      const message = error instanceof Error ? error.message : "Unknown error";
 
       expect(message).toBe("Unknown error");
     });
@@ -205,7 +204,7 @@ describe("schedule-executor", () => {
       expect(errorMessage).toBe("API call failed: 500 - Internal Server Error");
     });
 
-    it("handles 404 workflow not found", async () => {
+    it("handles 404 workflow not found", () => {
       const mockResponse = {
         ok: false,
         status: 404,
@@ -215,7 +214,7 @@ describe("schedule-executor", () => {
       expect(mockResponse.status).toBe(404);
     });
 
-    it("handles 403 forbidden", async () => {
+    it("handles 403 forbidden", () => {
       const mockResponse = {
         ok: false,
         status: 403,
@@ -262,7 +261,7 @@ describe("schedule-executor", () => {
 
   describe("workflow validation", () => {
     it("validates workflow exists before execution", () => {
-      const workflow = null;
+      const workflow: null = null;
       const shouldSkip = !workflow;
 
       expect(shouldSkip).toBe(true);
@@ -276,7 +275,7 @@ describe("schedule-executor", () => {
     });
 
     it("validates schedule exists before execution", () => {
-      const schedule = null;
+      const schedule: null = null;
       const shouldSkip = !schedule;
 
       expect(shouldSkip).toBe(true);
@@ -291,9 +290,10 @@ describe("schedule-executor", () => {
         { workflowId: "wf_3", scheduleId: "sched_3" },
       ];
 
-      const processMessage = async (msg: { workflowId: string }) => {
-        return { processed: true, workflowId: msg.workflowId };
-      };
+      const processMessage = async (msg: { workflowId: string }) => ({
+        processed: true,
+        workflowId: msg.workflowId,
+      });
 
       const results = await Promise.allSettled(
         messages.map((msg) => processMessage(msg))
@@ -304,6 +304,7 @@ describe("schedule-executor", () => {
     });
 
     it("handles partial failures in batch", async () => {
+      // biome-ignore lint/suspicious/useAwait: async required for Promise.allSettled rejection behavior
       const processMessage = async (shouldFail: boolean) => {
         if (shouldFail) {
           throw new Error("Processing failed");

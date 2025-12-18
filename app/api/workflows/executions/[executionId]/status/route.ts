@@ -56,9 +56,11 @@ export async function GET(
     }));
 
     // Calculate running count for parallel execution visibility
-    const runningCount = nodeStatuses.filter((n) => n.status === "running").length;
-    const totalSteps = parseInt(execution.totalSteps || "0", 10);
-    const completedSteps = parseInt(execution.completedSteps || "0", 10);
+    const runningCount = nodeStatuses.filter(
+      (n) => n.status === "running"
+    ).length;
+    const totalSteps = Number.parseInt(execution.totalSteps || "0", 10);
+    const completedSteps = Number.parseInt(execution.completedSteps || "0", 10);
 
     // Build progress data
     const progress = {

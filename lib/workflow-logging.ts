@@ -176,9 +176,12 @@ export async function incrementCompletedSteps(
     where: eq(workflowExecutions.id, params.executionId),
   });
 
-  if (!execution) return;
+  if (!execution) {
+    return;
+  }
 
-  const completedSteps = parseInt(execution.completedSteps || "0", 10) + 1;
+  const completedSteps =
+    Number.parseInt(execution.completedSteps || "0", 10) + 1;
   const trace = (execution.executionTrace as string[] | null) || [];
 
   await db

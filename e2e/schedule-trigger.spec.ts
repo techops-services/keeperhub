@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test";
 
+// Top-level regex for class matching
+const SELECTED_CLASS_REGEX = /selected/;
+
 test.describe("Schedule Trigger", () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to the homepage with the workflow canvas
@@ -23,10 +26,10 @@ test.describe("Schedule Trigger", () => {
       await page.waitForTimeout(300);
 
       // Verify trigger node is selected
-      await expect(triggerNode).toHaveClass(/selected/);
+      await expect(triggerNode).toHaveClass(SELECTED_CLASS_REGEX);
 
       // Check that properties panel shows trigger configuration
-      const propertiesPanel = page.locator('[data-testid="properties-panel"]');
+      const _propertiesPanel = page.locator('[data-testid="properties-panel"]');
       // The panel may or may not exist depending on implementation
       // Just verify the trigger node can be selected
     }
@@ -182,12 +185,16 @@ test.describe("Schedule Trigger", () => {
 });
 
 test.describe("Schedule Trigger API", () => {
+  // biome-ignore lint/suspicious/useAwait: Playwright test framework requires async
+  // biome-ignore lint/correctness/noUnusedFunctionParameters: request is provided by Playwright but unused in stub test
   test("execute API returns running status", async ({ request }) => {
     // This test requires a valid workflow ID and authentication
     // Skip if no test workflow is available
     test.skip();
   });
 
+  // biome-ignore lint/suspicious/useAwait: Playwright test framework requires async
+  // biome-ignore lint/correctness/noUnusedFunctionParameters: request is provided by Playwright but unused in stub test
   test("execute API accepts internal execution header", async ({ request }) => {
     // This test verifies the API accepts the internal execution header
     // Skip if no test workflow is available
@@ -196,9 +203,10 @@ test.describe("Schedule Trigger API", () => {
 });
 
 test.describe("Schedule Trigger Database", () => {
+  // biome-ignore lint/suspicious/useAwait: Playwright test framework requires async
   test("schedule is created when workflow is saved with schedule trigger", async ({
-    page,
-    request,
+    page: _page,
+    request: _request,
   }) => {
     // This would require creating a workflow through the UI
     // and verifying the database has a schedule entry
@@ -206,9 +214,10 @@ test.describe("Schedule Trigger Database", () => {
     test.skip();
   });
 
+  // biome-ignore lint/suspicious/useAwait: Playwright test framework requires async
   test("schedule is deleted when trigger type changes", async ({
-    page,
-    request,
+    page: _page,
+    request: _request,
   }) => {
     // This would require modifying a workflow and verifying database
     // Skip for now as it requires database access

@@ -17,28 +17,27 @@
  *   JOB_ACTIVE_DEADLINE - Max execution time in seconds (default: 300)
  */
 
+import {
+  DeleteMessageCommand,
+  type Message,
+  ReceiveMessageCommand,
+  SQSClient,
+} from "@aws-sdk/client-sqs";
+import { BatchV1Api, KubeConfig, type V1Job } from "@kubernetes/client-node";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import {
-  SQSClient,
-  ReceiveMessageCommand,
-  DeleteMessageCommand,
-  type Message,
-} from "@aws-sdk/client-sqs";
-import * as k8s from "@kubernetes/client-node";
-import {
-  workflows,
   workflowExecutions,
   workflowSchedules,
+  workflows,
 } from "../lib/db/schema";
 import { generateId } from "../lib/utils/id";
 
 // Configuration
 const CONFIG = {
   // Database
-  databaseUrl:
-    process.env.DATABASE_URL || "postgres://localhost:5432/workflow",
+  databaseUrl: process.env.DATABASE_URL || "postgres://localhost:5432/workflow",
 
   // SQS
   awsRegion: process.env.AWS_REGION || "us-east-1",
@@ -78,16 +77,16 @@ const sqs = new SQSClient({
 });
 
 // K8s client
-const kc = new k8s.KubeConfig();
+const kc = new KubeConfig();
 kc.loadFromDefault(); // Uses in-cluster config when running in K8s, or ~/.kube/config locally
-const batchApi = kc.makeApiClient(k8s.BatchV1Api);
+const batchApi = kc.makeApiClient(BatchV1Api);
 
-interface ScheduleMessage {
+type ScheduleMessage = {
   workflowId: string;
   scheduleId: string;
   triggerTime: string;
   triggerType: "schedule";
-}
+};
 
 /**
  * Create a K8s Job to execute a workflow
@@ -97,10 +96,10 @@ async function createWorkflowJob(
   executionId: string,
   scheduleId: string,
   input: Record<string, unknown>
-): Promise<k8s.V1Job> {
+): Promise<V1Job> {
   const jobName = `workflow-${executionId.substring(0, 8)}-${Date.now()}`;
 
-  const job: k8s.V1Job = {
+  const job: V1Job = {
     apiVersion: "batch/v1",
     kind: "Job",
     metadata: {
@@ -246,7 +245,7 @@ async function processScheduledWorkflow(
       `[JobSpawner] Created K8s Job: ${job.metadata?.name} for execution ${executionId}`
     );
   } catch (error) {
-    console.error(`[JobSpawner] Failed to create K8s Job:`, error);
+    console.error("[JobSpawner] Failed to create K8s Job:", error);
 
     // Update execution record with error
     await db
@@ -269,7 +268,7 @@ async function processScheduledWorkflow(
  * Process a single SQS message
  */
 async function processMessage(message: Message): Promise<void> {
-  if (!message.Body || !message.ReceiptHandle) {
+  if (!(message.Body && message.ReceiptHandle)) {
     console.error("[JobSpawner] Invalid message:", message);
     return;
   }
@@ -287,9 +286,7 @@ async function processMessage(message: Message): Promise<void> {
       })
     );
 
-    console.log(
-      `[JobSpawner] Message deleted for workflow ${body.workflowId}`
-    );
+    console.log(`[JobSpawner] Message deleted for workflow ${body.workflowId}`);
   } catch (error) {
     console.error(
       `[JobSpawner] Failed to process workflow ${body.workflowId}:`,

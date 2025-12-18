@@ -40,11 +40,15 @@ export function calculateTotalSteps(
   const queue = [...triggerNodes.map((n) => n.id)];
 
   while (queue.length > 0) {
-    const nodeId = queue.shift()!;
-    if (visited.has(nodeId)) continue;
+    const nodeId = queue.shift();
+    if (nodeId === undefined || visited.has(nodeId)) {
+      continue;
+    }
 
     const node = nodes.find((n) => n.id === nodeId);
-    if (!node) continue;
+    if (!node) {
+      continue;
+    }
 
     // Skip disabled nodes and "add" type nodes
     if (node.data?.enabled === false || node.data?.type === "add") {
@@ -85,11 +89,15 @@ export function getExecutableNodeIds(
   const queue = [...triggerNodes.map((n) => n.id)];
 
   while (queue.length > 0) {
-    const nodeId = queue.shift()!;
-    if (visited.has(nodeId)) continue;
+    const nodeId = queue.shift();
+    if (nodeId === undefined || visited.has(nodeId)) {
+      continue;
+    }
 
     const node = nodes.find((n) => n.id === nodeId);
-    if (!node) continue;
+    if (!node) {
+      continue;
+    }
 
     if (node.data?.enabled === false || node.data?.type === "add") {
       continue;

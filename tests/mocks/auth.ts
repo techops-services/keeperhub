@@ -1,6 +1,6 @@
 import { vi } from "vitest";
 
-export interface MockSession {
+export type MockSession = {
   user: {
     id: string;
     email: string;
@@ -11,7 +11,7 @@ export interface MockSession {
     userId: string;
     expiresAt: Date;
   };
-}
+};
 
 export function createMockSession(
   overrides: Partial<MockSession> = {}

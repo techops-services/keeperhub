@@ -1,6 +1,6 @@
 import { vi } from "vitest";
 
-export interface MockWorkflow {
+export type MockWorkflow = {
   id: string;
   userId: string;
   name: string;
@@ -8,9 +8,9 @@ export interface MockWorkflow {
   edges: unknown[];
   createdAt: Date;
   updatedAt: Date;
-}
+};
 
-export interface MockWorkflowSchedule {
+export type MockWorkflowSchedule = {
   id: string;
   workflowId: string;
   cronExpression: string;
@@ -23,9 +23,9 @@ export interface MockWorkflowSchedule {
   runCount: string;
   createdAt: Date;
   updatedAt: Date;
-}
+};
 
-export interface MockWorkflowExecution {
+export type MockWorkflowExecution = {
   id: string;
   workflowId: string;
   userId: string;
@@ -35,7 +35,7 @@ export interface MockWorkflowExecution {
   error: string | null;
   startedAt: Date;
   completedAt: Date | null;
-}
+};
 
 export function createMockDb() {
   const mockDb = {

@@ -1,4 +1,4 @@
-import type { WorkflowNode, WorkflowEdge } from "@/lib/workflow-store";
+import type { WorkflowEdge, WorkflowNode } from "@/lib/workflow-store";
 
 /**
  * Creates a trigger node with schedule configuration

@@ -1,6 +1,6 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
-import path from "path";
-import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -17,7 +17,7 @@ export default defineConfig({
       exclude: ["**/*.test.ts", "**/*.d.ts"],
     },
     setupFiles: ["./tests/setup.ts"],
-    testTimeout: 10000,
+    testTimeout: 10_000,
   },
   resolve: {
     alias: {

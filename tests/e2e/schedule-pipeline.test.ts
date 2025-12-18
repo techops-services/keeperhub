@@ -13,17 +13,16 @@
  * For CI, use docker-compose to spin up the stack before running.
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
-import { eq } from "drizzle-orm";
 import {
-  SQSClient,
   CreateQueueCommand,
   DeleteQueueCommand,
   GetQueueAttributesCommand,
   PurgeQueueCommand,
+  SQSClient,
 } from "@aws-sdk/client-sqs";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 // Skip these tests if infrastructure isn't available
 const SKIP_INFRA_TESTS = process.env.SKIP_INFRA_TESTS === "true";
@@ -36,14 +35,14 @@ const QUEUE_NAME = "keeperhub-workflow-queue";
 
 describe.skipIf(SKIP_INFRA_TESTS)("Schedule Pipeline E2E", () => {
   let queryClient: ReturnType<typeof postgres>;
-  let db: ReturnType<typeof drizzle>;
+  let _db: ReturnType<typeof drizzle>;
   let sqsClient: SQSClient;
   let queueUrl: string;
 
   beforeAll(async () => {
     // Connect to database
     queryClient = postgres(DATABASE_URL);
-    db = drizzle(queryClient);
+    _db = drizzle(queryClient);
 
     // Create SQS client
     sqsClient = new SQSClient({
@@ -62,8 +61,9 @@ describe.skipIf(SKIP_INFRA_TESTS)("Schedule Pipeline E2E", () => {
           QueueName: QUEUE_NAME,
         })
       );
+      // biome-ignore lint/style/noNonNullAssertion: AWS SDK returns QueueUrl on successful creation
       queueUrl = createResult.QueueUrl!;
-    } catch (error) {
+    } catch (_error) {
       // Queue may already exist
       queueUrl = `${AWS_ENDPOINT}/000000000000/${QUEUE_NAME}`;
     }
@@ -109,7 +109,7 @@ describe.skipIf(SKIP_INFRA_TESTS)("Schedule Pipeline E2E", () => {
         const response = await fetch(`${KEEPERHUB_URL}/api/health`);
         // Even a 404 means the server is running
         expect(response.status).toBeLessThan(500);
-      } catch (error) {
+      } catch (_error) {
         // If fetch fails, app isn't running
         console.warn("KeeperHub app not reachable, skipping app tests");
       }
@@ -196,16 +196,19 @@ describe.skipIf(SKIP_INFRA_TESTS)("Schedule Pipeline E2E", () => {
       );
 
       expect(receiveResult.Messages).toBeDefined();
-      expect(receiveResult.Messages!.length).toBeGreaterThan(0);
+      expect(receiveResult.Messages?.length).toBeGreaterThan(0);
 
-      const receivedBody = JSON.parse(receiveResult.Messages![0].Body!);
+      // biome-ignore lint/style/noNonNullAssertion: We just verified Messages is defined and has length > 0
+      // biome-ignore lint/suspicious/noNonNullAssertedOptionalChain: Safe due to prior assertions
+      const receivedBody = JSON.parse(receiveResult.Messages?.[0].Body!);
       expect(receivedBody.workflowId).toBe("test_wf_recv");
     });
   });
 });
 
-describe.skipIf(SKIP_INFRA_TESTS)("Schedule API E2E", () => {
-  const KEEPERHUB_URL = process.env.KEEPERHUB_URL || "http://localhost:3000";
+const describeApiTests = describe.skipIf(SKIP_INFRA_TESTS);
+describeApiTests("Schedule API E2E", () => {
+  // Use the top-level KEEPERHUB_URL constant
 
   describe("Execute API with Internal Header", () => {
     it("rejects unauthenticated external requests", async () => {

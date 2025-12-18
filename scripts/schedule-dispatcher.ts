@@ -13,11 +13,11 @@
  *   SQS_QUEUE_URL - SQS queue URL (default: LocalStack queue)
  */
 
+import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
+import { CronExpressionParser } from "cron-parser";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
-import { CronExpressionParser } from "cron-parser";
 import { workflowSchedules } from "../lib/db/schema";
 
 // Database connection
@@ -40,12 +40,12 @@ const QUEUE_URL =
   process.env.SQS_QUEUE_URL ||
   "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/keeperhub-workflow-queue";
 
-interface ScheduleMessage {
+type ScheduleMessage = {
   workflowId: string;
   scheduleId: string;
   triggerTime: string;
   triggerType: "schedule";
-}
+};
 
 /**
  * Check if a cron expression should trigger at the given time
@@ -68,7 +68,7 @@ function shouldTriggerNow(
     const diffMs = now.getTime() - prev.getTime();
 
     // Within current minute (0-59 seconds)
-    return diffMs >= 0 && diffMs < 60000;
+    return diffMs >= 0 && diffMs < 60_000;
   } catch (error) {
     console.error(`Invalid cron expression: ${cronExpression}`, error);
     return false;
@@ -106,7 +106,9 @@ async function dispatch(): Promise<{
   errors: number;
 }> {
   const runId = crypto.randomUUID().slice(0, 8);
-  console.log(`[${runId}] Starting dispatch run at ${new Date().toISOString()}`);
+  console.log(
+    `[${runId}] Starting dispatch run at ${new Date().toISOString()}`
+  );
 
   // Query all enabled schedules
   const schedules = await db
@@ -146,14 +148,14 @@ async function dispatch(): Promise<{
           triggerType: "schedule",
         });
 
-        triggered++;
+        triggered += 1;
       }
     } catch (error) {
       console.error(
         `[${runId}] Error processing schedule ${schedule.id}:`,
         error
       );
-      errors++;
+      errors += 1;
     }
   }
 

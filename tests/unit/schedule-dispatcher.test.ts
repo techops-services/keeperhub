@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock dependencies before importing the module
 vi.mock("@aws-sdk/client-sqs", () => ({
@@ -54,7 +54,7 @@ describe("schedule-dispatcher", () => {
         // If we're exactly at 9:00:00, prev() returns the previous 9:00 (yesterday)
         // So we need to check if we're within 60 seconds of a match
         // But the actual check is: is the previous match within the current minute?
-        return diffMs >= 0 && diffMs < 60000;
+        return diffMs >= 0 && diffMs < 60_000;
       } catch {
         return false;
       }

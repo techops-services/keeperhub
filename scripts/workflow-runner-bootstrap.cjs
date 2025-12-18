@@ -1,3 +1,4 @@
+"use strict";
 /**
  * Bootstrap script for workflow-runner
  *
@@ -8,33 +9,41 @@
  * Usage: node scripts/workflow-runner-bootstrap.cjs
  */
 
-const path = require('path');
-const Module = require('module');
-const { execSync, spawn } = require('child_process');
+const path = require("node:path");
+const { spawn } = require("node:child_process");
 
 // Create a shim for server-only in node_modules to avoid the error
-const fs = require('fs');
+const fs = require("node:fs");
 const serverOnlyPaths = [
-  path.join(__dirname, '..', 'node_modules', 'server-only', 'index.js'),
-  path.join(__dirname, '..', 'node_modules', '.pnpm', 'server-only@0.0.1', 'node_modules', 'server-only', 'index.js'),
+  path.join(__dirname, "..", "node_modules", "server-only", "index.js"),
+  path.join(
+    __dirname,
+    "..",
+    "node_modules",
+    ".pnpm",
+    "server-only@0.0.1",
+    "node_modules",
+    "server-only",
+    "index.js"
+  ),
 ];
 
 // Backup and replace server-only
 const backups = [];
 for (const serverOnlyPath of serverOnlyPaths) {
   if (fs.existsSync(serverOnlyPath)) {
-    const backup = serverOnlyPath + '.backup';
+    const backup = `${serverOnlyPath}.backup`;
     if (!fs.existsSync(backup)) {
       fs.copyFileSync(serverOnlyPath, backup);
     }
-    fs.writeFileSync(serverOnlyPath, 'module.exports = {};');
+    fs.writeFileSync(serverOnlyPath, "module.exports = {};");
     backups.push({ path: serverOnlyPath, backup });
   }
 }
 
 // Run the actual script using tsx
-const tsx = path.join(__dirname, '..', 'node_modules', '.bin', 'tsx');
-const runner = path.join(__dirname, 'workflow-runner.ts');
+const tsx = path.join(__dirname, "..", "node_modules", ".bin", "tsx");
+const runner = path.join(__dirname, "workflow-runner.ts");
 
 function restoreServerOnly() {
   for (const { path: p, backup } of backups) {
@@ -42,7 +51,7 @@ function restoreServerOnly() {
       try {
         fs.copyFileSync(backup, p);
         fs.unlinkSync(backup);
-      } catch (e) {
+      } catch (_e) {
         // Ignore cleanup errors
       }
     }
@@ -50,32 +59,32 @@ function restoreServerOnly() {
 }
 
 const child = spawn(tsx, [runner], {
-  stdio: ['ignore', 'pipe', 'pipe'],
+  stdio: ["ignore", "pipe", "pipe"],
   env: process.env,
-  cwd: path.join(__dirname, '..'),
+  cwd: path.join(__dirname, ".."),
 });
 
 // Forward child output to parent without keeping event loop alive
-child.stdout.on('data', (data) => process.stdout.write(data));
-child.stderr.on('data', (data) => process.stderr.write(data));
+child.stdout.on("data", (data) => process.stdout.write(data));
+child.stderr.on("data", (data) => process.stderr.write(data));
 
 // Forward signals to child
-process.on('SIGTERM', () => {
-  child.kill('SIGTERM');
+process.on("SIGTERM", () => {
+  child.kill("SIGTERM");
 });
 
-process.on('SIGINT', () => {
-  child.kill('SIGINT');
+process.on("SIGINT", () => {
+  child.kill("SIGINT");
 });
 
-child.on('close', (code, signal) => {
+child.on("close", (code, signal) => {
   restoreServerOnly();
   // Use 'close' instead of 'exit' to ensure stdio is flushed
   process.exit(signal ? 1 : (code ?? 0));
 });
 
-child.on('error', (err) => {
-  console.error('Failed to start workflow runner:', err);
+child.on("error", (err) => {
+  console.error("Failed to start workflow runner:", err);
   restoreServerOnly();
   process.exit(1);
 });

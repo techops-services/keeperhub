@@ -1,9 +1,12 @@
-import { eq } from "drizzle-orm";
 import { CronExpressionParser } from "cron-parser";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { workflowSchedules } from "@/lib/db/schema";
 import { generateId } from "@/lib/utils/id";
 import type { WorkflowNode } from "@/lib/workflow-store";
+
+// Top-level regex for splitting cron expression fields
+const CRON_FIELD_SPLITTER = /\s+/;
 
 /**
  * Compute the next run time for a cron expression in a given timezone
@@ -39,7 +42,7 @@ export function validateCronExpression(cronExpression: string): {
   }
 
   // Basic format check (5 or 6 fields)
-  const parts = cronExpression.trim().split(/\s+/);
+  const parts = cronExpression.trim().split(CRON_FIELD_SPLITTER);
   if (parts.length < 5 || parts.length > 6) {
     return {
       valid: false,
@@ -130,7 +133,9 @@ export async function syncWorkflowSchedule(
 
   // Validate timezone
   if (!validateTimezone(timezone)) {
-    console.warn(`[Schedule] Invalid timezone for workflow ${workflowId}: ${timezone}`);
+    console.warn(
+      `[Schedule] Invalid timezone for workflow ${workflowId}: ${timezone}`
+    );
     return { synced: false, error: `Invalid timezone: ${timezone}` };
   }
 
@@ -247,7 +252,5 @@ export async function updateScheduleAfterRun(
     })
     .where(eq(workflowSchedules.id, scheduleId));
 
-  console.log(
-    `[Schedule] Updated schedule ${scheduleId} after run: ${status}`
-  );
+  console.log(`[Schedule] Updated schedule ${scheduleId} after run: ${status}`);
 }

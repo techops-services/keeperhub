@@ -1,10 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  createScheduledWorkflow,
   createScheduleTriggerNode,
   createWebhookTriggerNode,
-  createScheduledWorkflow,
   cronExpressions,
 } from "../fixtures/workflows";
+
+// Top-level regex for cron validation
+const CRON_VALIDATION_REGEX = /^[\d*/\-,\s]+$/;
 
 // Mock database
 const mockSchedule = {
@@ -53,7 +56,7 @@ describe("Schedule Sync Integration Tests", () => {
   });
 
   describe("Schedule Creation on Workflow Save", () => {
-    it("creates schedule when workflow has schedule trigger", async () => {
+    it("creates schedule when workflow has schedule trigger", () => {
       const { nodes } = createScheduledWorkflow("0 9 * * *", "UTC");
 
       // Simulate no existing schedule
@@ -88,9 +91,11 @@ describe("Schedule Sync Integration Tests", () => {
   });
 
   describe("Schedule Update on Workflow Save", () => {
-    it("updates existing schedule when cron changes", async () => {
+    it("updates existing schedule when cron changes", () => {
       // Simulate existing schedule
-      mockDbQuery.workflowSchedules.findFirst.mockResolvedValueOnce(mockSchedule);
+      mockDbQuery.workflowSchedules.findFirst.mockResolvedValueOnce(
+        mockSchedule
+      );
 
       const oldCron = mockSchedule.cronExpression;
       const newCron = "0 10 * * *";
@@ -108,8 +113,10 @@ describe("Schedule Sync Integration Tests", () => {
       expect(updateData.cronExpression).toBe("0 10 * * *");
     });
 
-    it("updates existing schedule when timezone changes", async () => {
-      mockDbQuery.workflowSchedules.findFirst.mockResolvedValueOnce(mockSchedule);
+    it("updates existing schedule when timezone changes", () => {
+      mockDbQuery.workflowSchedules.findFirst.mockResolvedValueOnce(
+        mockSchedule
+      );
 
       const oldTimezone = mockSchedule.timezone;
       const newTimezone = "America/New_York";
@@ -134,15 +141,14 @@ describe("Schedule Sync Integration Tests", () => {
   });
 
   describe("Schedule Deletion on Workflow Save", () => {
-    it("deletes schedule when trigger type changes from Schedule", async () => {
+    it("deletes schedule when trigger type changes from Schedule", () => {
       // Workflow now has webhook trigger instead of schedule
       const webhookTrigger = createWebhookTriggerNode();
       const nodes = [webhookTrigger];
 
       const scheduleConfig = nodes.find(
         (n) =>
-          n.data.type === "trigger" &&
-          n.data.config?.triggerType === "Schedule"
+          n.data.type === "trigger" && n.data.config?.triggerType === "Schedule"
       );
 
       expect(scheduleConfig).toBeUndefined();
@@ -153,7 +159,7 @@ describe("Schedule Sync Integration Tests", () => {
     });
 
     it("deletes schedule when workflow has no trigger", () => {
-      const nodes: typeof mockSchedule[] = [];
+      const nodes: (typeof mockSchedule)[] = [];
 
       const triggerNode = nodes.find((n: unknown) => {
         const node = n as { data?: { type?: string } };
@@ -169,7 +175,7 @@ describe("Schedule Sync Integration Tests", () => {
       const invalidCron = "not a cron";
 
       // Validate cron
-      const isValid = /^[\d\*\/\-\,\s]+$/.test(invalidCron);
+      const isValid = CRON_VALIDATION_REGEX.test(invalidCron);
       expect(isValid).toBe(false);
     });
 
@@ -262,7 +268,8 @@ describe("Schedule Sync Integration Tests", () => {
 
     it("uses UTC as default when timezone not specified", () => {
       const triggerNode = createScheduleTriggerNode("0 9 * * *");
-      delete (triggerNode.data.config as Record<string, unknown>).scheduleTimezone;
+      (triggerNode.data.config as Record<string, unknown>).scheduleTimezone =
+        undefined;
 
       const timezone = triggerNode.data.config?.scheduleTimezone || "UTC";
       expect(timezone).toBe("UTC");
@@ -272,7 +279,8 @@ describe("Schedule Sync Integration Tests", () => {
   describe("Concurrent Modifications", () => {
     it("handles schedule not found during update", async () => {
       // Create a local mock for this specific test
-      const localMock = vi.fn()
+      const localMock = vi
+        .fn()
         .mockResolvedValueOnce(mockSchedule)
         .mockResolvedValueOnce(undefined);
 

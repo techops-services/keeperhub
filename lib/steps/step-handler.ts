@@ -158,6 +158,7 @@ export type StepInputWithWorkflow = {
  *   });
  * }
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Step logging requires comprehensive error handling and progress tracking
 export async function withStepLogging<TInput extends StepInput, TOutput>(
   input: TInput,
   stepLogic: () => Promise<TOutput>
@@ -213,7 +214,10 @@ export async function withStepLogging<TInput extends StepInput, TOutput>(
           success: !isErrorResult,
         });
       } catch (err) {
-        console.error("[stepHandler] Failed to increment completed steps:", err);
+        console.error(
+          "[stepHandler] Failed to increment completed steps:",
+          err
+        );
       }
     }
 
@@ -241,7 +245,10 @@ export async function withStepLogging<TInput extends StepInput, TOutput>(
           success: false,
         });
       } catch (err) {
-        console.error("[stepHandler] Failed to increment completed steps:", err);
+        console.error(
+          "[stepHandler] Failed to increment completed steps:",
+          err
+        );
       }
     }
 

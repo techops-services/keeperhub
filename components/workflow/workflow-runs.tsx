@@ -387,14 +387,21 @@ function OutputDisplay({
 }
 
 // Progress bar component for running executions
-function ExecutionProgress({
-  execution,
-}: {
-  execution: WorkflowExecution;
-}) {
-  const totalSteps = parseInt(execution.totalSteps || "0", 10);
-  const completedSteps = parseInt(execution.completedSteps || "0", 10);
-  const percentage = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+function getProgressBarColor(status: WorkflowExecution["status"]): string {
+  if (status === "running") {
+    return "bg-blue-500";
+  }
+  if (status === "success") {
+    return "bg-green-500";
+  }
+  return "bg-red-500";
+}
+
+function ExecutionProgress({ execution }: { execution: WorkflowExecution }) {
+  const totalSteps = Number.parseInt(execution.totalSteps || "0", 10);
+  const completedSteps = Number.parseInt(execution.completedSteps || "0", 10);
+  const percentage =
+    totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
   const isRunning = execution.status === "running";
   const isError = execution.status === "error";
 
@@ -409,7 +416,7 @@ function ExecutionProgress({
         <div
           className={cn(
             "h-full transition-all duration-300",
-            isRunning ? "bg-blue-500" : execution.status === "success" ? "bg-green-500" : "bg-red-500"
+            getProgressBarColor(execution.status)
           )}
           style={{ width: `${percentage}%` }}
         />
@@ -602,7 +609,7 @@ export function WorkflowRuns({
   useEffect(() => {
     setExpandedRuns(new Set());
     setExpandedLogs(new Set());
-  }, [currentWorkflowId]);
+  }, []);
 
   // Helper function to map node IDs to labels
   const mapNodeLabels = useCallback(
@@ -922,11 +929,12 @@ export function WorkflowRuns({
             </div>
 
             {/* Progress bar for executions with progress data */}
-            {execution.totalSteps && parseInt(execution.totalSteps, 10) > 0 && (
-              <div className="px-4 pb-3">
-                <ExecutionProgress execution={execution} />
-              </div>
-            )}
+            {execution.totalSteps &&
+              Number.parseInt(execution.totalSteps, 10) > 0 && (
+                <div className="px-4 pb-3">
+                  <ExecutionProgress execution={execution} />
+                </div>
+              )}
 
             {isExpanded && (
               <div className="border-t bg-muted/20">

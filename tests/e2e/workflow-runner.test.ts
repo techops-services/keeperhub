@@ -17,19 +17,18 @@
  * - DATABASE_URL environment variable set
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
-import { eq } from "drizzle-orm";
 import { spawn } from "node:child_process";
 import { join } from "node:path";
+import { eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   users,
-  workflows,
   workflowExecutions,
   workflowSchedules,
+  workflows,
 } from "../../lib/db/schema";
-import { generateId } from "../../lib/utils/id";
 
 // Skip these tests if infrastructure isn't available
 const SKIP_INFRA_TESTS = process.env.SKIP_INFRA_TESTS === "true";
@@ -76,10 +75,10 @@ describe.skipIf(SKIP_INFRA_TESTS)("Workflow Runner E2E", () => {
   beforeEach(async () => {
     try {
       // Delete in FK order
-      await queryClient`DELETE FROM workflow_execution_logs WHERE execution_id LIKE ${TEST_EXECUTION_PREFIX + "%"}`;
-      await queryClient`DELETE FROM workflow_executions WHERE id LIKE ${TEST_EXECUTION_PREFIX + "%"}`;
-      await queryClient`DELETE FROM workflow_schedules WHERE workflow_id LIKE ${TEST_WORKFLOW_PREFIX + "%"}`;
-      await queryClient`DELETE FROM workflows WHERE id LIKE ${TEST_WORKFLOW_PREFIX + "%"}`;
+      await queryClient`DELETE FROM workflow_execution_logs WHERE execution_id LIKE ${`${TEST_EXECUTION_PREFIX}%`}`;
+      await queryClient`DELETE FROM workflow_executions WHERE id LIKE ${`${TEST_EXECUTION_PREFIX}%`}`;
+      await queryClient`DELETE FROM workflow_schedules WHERE workflow_id LIKE ${`${TEST_WORKFLOW_PREFIX}%`}`;
+      await queryClient`DELETE FROM workflows WHERE id LIKE ${`${TEST_WORKFLOW_PREFIX}%`}`;
     } catch {
       // Ignore cleanup errors
     }
@@ -88,10 +87,10 @@ describe.skipIf(SKIP_INFRA_TESTS)("Workflow Runner E2E", () => {
   afterAll(async () => {
     // Final cleanup
     try {
-      await queryClient`DELETE FROM workflow_execution_logs WHERE execution_id LIKE ${TEST_EXECUTION_PREFIX + "%"}`;
-      await queryClient`DELETE FROM workflow_executions WHERE id LIKE ${TEST_EXECUTION_PREFIX + "%"}`;
-      await queryClient`DELETE FROM workflow_schedules WHERE workflow_id LIKE ${TEST_WORKFLOW_PREFIX + "%"}`;
-      await queryClient`DELETE FROM workflows WHERE id LIKE ${TEST_WORKFLOW_PREFIX + "%"}`;
+      await queryClient`DELETE FROM workflow_execution_logs WHERE execution_id LIKE ${`${TEST_EXECUTION_PREFIX}%`}`;
+      await queryClient`DELETE FROM workflow_executions WHERE id LIKE ${`${TEST_EXECUTION_PREFIX}%`}`;
+      await queryClient`DELETE FROM workflow_schedules WHERE workflow_id LIKE ${`${TEST_WORKFLOW_PREFIX}%`}`;
+      await queryClient`DELETE FROM workflows WHERE id LIKE ${`${TEST_WORKFLOW_PREFIX}%`}`;
     } catch (error) {
       console.warn("Cleanup warning:", error);
     }
@@ -103,6 +102,7 @@ describe.skipIf(SKIP_INFRA_TESTS)("Workflow Runner E2E", () => {
    * Helper to run the workflow-runner script
    * Uses the bootstrap script which patches 'server-only' for non-Next.js environments
    */
+  // biome-ignore lint/suspicious/useAwait: async is needed for return type Promise, but implementation uses new Promise
   async function runWorkflowRunner(
     workflowId: string,
     executionId: string,
@@ -117,13 +117,16 @@ describe.skipIf(SKIP_INFRA_TESTS)("Workflow Runner E2E", () => {
         ...process.env,
         WORKFLOW_ID: workflowId,
         EXECUTION_ID: executionId,
-        DATABASE_URL: DATABASE_URL,
+        DATABASE_URL,
         WORKFLOW_INPUT: JSON.stringify(options.input || {}),
         ...(options.scheduleId && { SCHEDULE_ID: options.scheduleId }),
       };
 
       // Use the bootstrap script which handles 'server-only' patching
-      const scriptPath = join(__dirname, "../../scripts/workflow-runner-bootstrap.cjs");
+      const scriptPath = join(
+        __dirname,
+        "../../scripts/workflow-runner-bootstrap.cjs"
+      );
       const child = spawn("node", [scriptPath], {
         env,
         cwd: join(__dirname, "../.."),
@@ -140,10 +143,10 @@ describe.skipIf(SKIP_INFRA_TESTS)("Workflow Runner E2E", () => {
         stderr += data.toString();
       });
 
-      const timeout = options.timeout || 30000;
+      const timeout = options.timeout || 30_000;
       const timer = setTimeout(() => {
         child.kill("SIGTERM");
-        resolve({ exitCode: null, stdout, stderr: stderr + "\nTimeout" });
+        resolve({ exitCode: null, stdout, stderr: `${stderr}\nTimeout` });
       }, timeout);
 
       child.on("close", (code) => {
@@ -200,7 +203,10 @@ describe.skipIf(SKIP_INFRA_TESTS)("Workflow Runner E2E", () => {
     executionId: string
   ): Promise<{ status: string; error?: string | null } | null> {
     const result = await db
-      .select({ status: workflowExecutions.status, error: workflowExecutions.error })
+      .select({
+        status: workflowExecutions.status,
+        error: workflowExecutions.error,
+      })
       .from(workflowExecutions)
       .where(eq(workflowExecutions.id, executionId))
       .limit(1);
@@ -209,7 +215,9 @@ describe.skipIf(SKIP_INFRA_TESTS)("Workflow Runner E2E", () => {
 
   describe("Environment Validation", () => {
     it("fails without WORKFLOW_ID", async () => {
-      const result = await runWorkflowRunner("", "test_exec", { timeout: 10000 });
+      const result = await runWorkflowRunner("", "test_exec", {
+        timeout: 10_000,
+      });
       expect(result.exitCode).toBe(1);
       expect(result.stderr).toContain("WORKFLOW_ID");
     });
@@ -218,12 +226,18 @@ describe.skipIf(SKIP_INFRA_TESTS)("Workflow Runner E2E", () => {
       const env = {
         ...process.env,
         WORKFLOW_ID: "test_wf",
-        DATABASE_URL: DATABASE_URL,
+        DATABASE_URL,
       };
 
       // Use the bootstrap script which handles 'server-only' patching
-      const scriptPath = join(__dirname, "../../scripts/workflow-runner-bootstrap.cjs");
-      const result = await new Promise<{ exitCode: number | null; stderr: string }>((resolve) => {
+      const scriptPath = join(
+        __dirname,
+        "../../scripts/workflow-runner-bootstrap.cjs"
+      );
+      const result = await new Promise<{
+        exitCode: number | null;
+        stderr: string;
+      }>((resolve) => {
         const child = spawn("node", [scriptPath], {
           env,
           cwd: join(__dirname, "../.."),
@@ -237,7 +251,7 @@ describe.skipIf(SKIP_INFRA_TESTS)("Workflow Runner E2E", () => {
         const timer = setTimeout(() => {
           child.kill();
           resolve({ exitCode: null, stderr });
-        }, 10000);
+        }, 10_000);
 
         child.on("close", (code) => {
           clearTimeout(timer);
@@ -252,94 +266,102 @@ describe.skipIf(SKIP_INFRA_TESTS)("Workflow Runner E2E", () => {
 
   describe("Workflow Execution", () => {
     // These tests spawn child processes to run workflows, need longer timeout
-    const WORKFLOW_TEST_TIMEOUT = 60000;
+    const WORKFLOW_TEST_TIMEOUT = 60_000;
 
-    it("executes a simple trigger-only workflow", async () => {
-      const workflowId = `${TEST_WORKFLOW_PREFIX}simple_trigger`;
-      const executionId = `${TEST_EXECUTION_PREFIX}simple_trigger`;
+    it(
+      "executes a simple trigger-only workflow",
+      async () => {
+        const workflowId = `${TEST_WORKFLOW_PREFIX}simple_trigger`;
+        const executionId = `${TEST_EXECUTION_PREFIX}simple_trigger`;
 
-      // Create a workflow with just a trigger node
-      const triggerNode = {
-        id: "trigger_1",
-        type: "custom",
-        position: { x: 0, y: 0 },
-        data: {
-          type: "trigger",
-          label: "Manual Trigger",
-          config: {
-            triggerType: "Manual",
+        // Create a workflow with just a trigger node
+        const triggerNode = {
+          id: "trigger_1",
+          type: "custom",
+          position: { x: 0, y: 0 },
+          data: {
+            type: "trigger",
+            label: "Manual Trigger",
+            config: {
+              triggerType: "Manual",
+            },
           },
-        },
-      };
+        };
 
-      await createTestWorkflow(workflowId, [triggerNode]);
-      await createTestExecution(executionId, workflowId);
+        await createTestWorkflow(workflowId, [triggerNode]);
+        await createTestExecution(executionId, workflowId);
 
-      // Run the workflow runner
-      const result = await runWorkflowRunner(workflowId, executionId, {
-        input: { test: true },
-      });
+        // Run the workflow runner
+        const result = await runWorkflowRunner(workflowId, executionId, {
+          input: { test: true },
+        });
 
-      // Check execution completed
-      expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain("[Runner] Starting workflow execution");
-      expect(result.stdout).toContain("[Runner] Execution completed successfully");
+        // Check execution completed
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout).toContain("[Runner] Starting workflow execution");
+        expect(result.stdout).toContain(
+          "[Runner] Execution completed successfully"
+        );
 
-      // Verify database status was updated
-      const status = await getExecutionStatus(executionId);
-      expect(status?.status).toBe("success");
-    }, WORKFLOW_TEST_TIMEOUT);
+        // Verify database status was updated
+        const status = await getExecutionStatus(executionId);
+        expect(status?.status).toBe("success");
+      },
+      WORKFLOW_TEST_TIMEOUT
+    );
 
-    it("executes a workflow with HTTP Request action", async () => {
-      const workflowId = `${TEST_WORKFLOW_PREFIX}http_request`;
-      const executionId = `${TEST_EXECUTION_PREFIX}http_request`;
+    it(
+      "executes a workflow with HTTP Request action",
+      async () => {
+        const workflowId = `${TEST_WORKFLOW_PREFIX}http_request`;
+        const executionId = `${TEST_EXECUTION_PREFIX}http_request`;
 
-      // Create a workflow with trigger -> HTTP Request
-      const triggerNode = {
-        id: "trigger_1",
-        type: "custom",
-        position: { x: 0, y: 0 },
-        data: {
-          type: "trigger",
-          label: "Manual Trigger",
-          config: { triggerType: "Manual" },
-        },
-      };
-
-      const httpNode = {
-        id: "http_1",
-        type: "custom",
-        position: { x: 0, y: 100 },
-        data: {
-          type: "action",
-          label: "HTTP Request",
-          config: {
-            actionType: "HTTP Request",
-            endpoint: "https://httpbin.org/get",
-            httpMethod: "GET",
+        // Create a workflow with trigger -> HTTP Request
+        const triggerNode = {
+          id: "trigger_1",
+          type: "custom",
+          position: { x: 0, y: 0 },
+          data: {
+            type: "trigger",
+            label: "Manual Trigger",
+            config: { triggerType: "Manual" },
           },
-        },
-      };
+        };
 
-      const edges = [
-        { id: "e1", source: "trigger_1", target: "http_1" },
-      ];
+        const httpNode = {
+          id: "http_1",
+          type: "custom",
+          position: { x: 0, y: 100 },
+          data: {
+            type: "action",
+            label: "HTTP Request",
+            config: {
+              actionType: "HTTP Request",
+              endpoint: "https://httpbin.org/get",
+              httpMethod: "GET",
+            },
+          },
+        };
 
-      await createTestWorkflow(workflowId, [triggerNode, httpNode], edges);
-      await createTestExecution(executionId, workflowId);
+        const edges = [{ id: "e1", source: "trigger_1", target: "http_1" }];
 
-      // Run the workflow runner
-      const result = await runWorkflowRunner(workflowId, executionId, {
-        timeout: 60000, // HTTP requests can be slow
-      });
+        await createTestWorkflow(workflowId, [triggerNode, httpNode], edges);
+        await createTestExecution(executionId, workflowId);
 
-      // Check execution completed
-      expect(result.exitCode).toBe(0);
+        // Run the workflow runner
+        const result = await runWorkflowRunner(workflowId, executionId, {
+          timeout: 60_000, // HTTP requests can be slow
+        });
 
-      // Verify database status was updated
-      const status = await getExecutionStatus(executionId);
-      expect(status?.status).toBe("success");
-    }, WORKFLOW_TEST_TIMEOUT);
+        // Check execution completed
+        expect(result.exitCode).toBe(0);
+
+        // Verify database status was updated
+        const status = await getExecutionStatus(executionId);
+        expect(status?.status).toBe("success");
+      },
+      WORKFLOW_TEST_TIMEOUT
+    );
 
     it("handles workflow not found error", async () => {
       const workflowId = `${TEST_WORKFLOW_PREFIX}nonexistent`;
@@ -358,313 +380,350 @@ describe.skipIf(SKIP_INFRA_TESTS)("Workflow Runner E2E", () => {
       expect(result.stderr + result.stdout).toContain("not found");
     });
 
-    it("executes a workflow with condition node", async () => {
-      const workflowId = `${TEST_WORKFLOW_PREFIX}condition`;
-      const executionId = `${TEST_EXECUTION_PREFIX}condition`;
+    it(
+      "executes a workflow with condition node",
+      async () => {
+        const workflowId = `${TEST_WORKFLOW_PREFIX}condition`;
+        const executionId = `${TEST_EXECUTION_PREFIX}condition`;
 
-      const triggerNode = {
-        id: "trigger_1",
-        type: "custom",
-        position: { x: 0, y: 0 },
-        data: {
-          type: "trigger",
-          label: "Manual Trigger",
-          config: { triggerType: "Manual" },
-        },
-      };
-
-      const conditionNode = {
-        id: "condition_1",
-        type: "custom",
-        position: { x: 0, y: 100 },
-        data: {
-          type: "action",
-          label: "Condition",
-          config: {
-            actionType: "Condition",
-            condition: true, // Simple true condition
+        const triggerNode = {
+          id: "trigger_1",
+          type: "custom",
+          position: { x: 0, y: 0 },
+          data: {
+            type: "trigger",
+            label: "Manual Trigger",
+            config: { triggerType: "Manual" },
           },
-        },
-      };
+        };
 
-      const edges = [
-        { id: "e1", source: "trigger_1", target: "condition_1" },
-      ];
-
-      await createTestWorkflow(workflowId, [triggerNode, conditionNode], edges);
-      await createTestExecution(executionId, workflowId);
-
-      const result = await runWorkflowRunner(workflowId, executionId);
-
-      expect(result.exitCode).toBe(0);
-
-      const status = await getExecutionStatus(executionId);
-      expect(status?.status).toBe("success");
-    }, WORKFLOW_TEST_TIMEOUT);
-
-    it("handles disabled nodes correctly", async () => {
-      const workflowId = `${TEST_WORKFLOW_PREFIX}disabled_node`;
-      const executionId = `${TEST_EXECUTION_PREFIX}disabled_node`;
-
-      const triggerNode = {
-        id: "trigger_1",
-        type: "custom",
-        position: { x: 0, y: 0 },
-        data: {
-          type: "trigger",
-          label: "Manual Trigger",
-          config: { triggerType: "Manual" },
-        },
-      };
-
-      // This node is disabled and should be skipped
-      const disabledNode = {
-        id: "disabled_1",
-        type: "custom",
-        position: { x: 0, y: 100 },
-        data: {
-          type: "action",
-          label: "Disabled Action",
-          enabled: false, // Disabled
-          config: {
-            actionType: "HTTP Request",
-            endpoint: "https://should-not-be-called.example.com",
-            httpMethod: "GET",
+        const conditionNode = {
+          id: "condition_1",
+          type: "custom",
+          position: { x: 0, y: 100 },
+          data: {
+            type: "action",
+            label: "Condition",
+            config: {
+              actionType: "Condition",
+              condition: true, // Simple true condition
+            },
           },
-        },
-      };
+        };
 
-      const edges = [
-        { id: "e1", source: "trigger_1", target: "disabled_1" },
-      ];
+        const edges = [
+          { id: "e1", source: "trigger_1", target: "condition_1" },
+        ];
 
-      await createTestWorkflow(workflowId, [triggerNode, disabledNode], edges);
-      await createTestExecution(executionId, workflowId);
+        await createTestWorkflow(
+          workflowId,
+          [triggerNode, conditionNode],
+          edges
+        );
+        await createTestExecution(executionId, workflowId);
 
-      const result = await runWorkflowRunner(workflowId, executionId);
+        const result = await runWorkflowRunner(workflowId, executionId);
 
-      expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain("Skipping disabled node");
+        expect(result.exitCode).toBe(0);
 
-      const status = await getExecutionStatus(executionId);
-      expect(status?.status).toBe("success");
-    }, WORKFLOW_TEST_TIMEOUT);
+        const status = await getExecutionStatus(executionId);
+        expect(status?.status).toBe("success");
+      },
+      WORKFLOW_TEST_TIMEOUT
+    );
+
+    it(
+      "handles disabled nodes correctly",
+      async () => {
+        const workflowId = `${TEST_WORKFLOW_PREFIX}disabled_node`;
+        const executionId = `${TEST_EXECUTION_PREFIX}disabled_node`;
+
+        const triggerNode = {
+          id: "trigger_1",
+          type: "custom",
+          position: { x: 0, y: 0 },
+          data: {
+            type: "trigger",
+            label: "Manual Trigger",
+            config: { triggerType: "Manual" },
+          },
+        };
+
+        // This node is disabled and should be skipped
+        const disabledNode = {
+          id: "disabled_1",
+          type: "custom",
+          position: { x: 0, y: 100 },
+          data: {
+            type: "action",
+            label: "Disabled Action",
+            enabled: false, // Disabled
+            config: {
+              actionType: "HTTP Request",
+              endpoint: "https://should-not-be-called.example.com",
+              httpMethod: "GET",
+            },
+          },
+        };
+
+        const edges = [{ id: "e1", source: "trigger_1", target: "disabled_1" }];
+
+        await createTestWorkflow(
+          workflowId,
+          [triggerNode, disabledNode],
+          edges
+        );
+        await createTestExecution(executionId, workflowId);
+
+        const result = await runWorkflowRunner(workflowId, executionId);
+
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout).toContain("Skipping disabled node");
+
+        const status = await getExecutionStatus(executionId);
+        expect(status?.status).toBe("success");
+      },
+      WORKFLOW_TEST_TIMEOUT
+    );
   });
 
   describe("Schedule Integration", () => {
-    const WORKFLOW_TEST_TIMEOUT = 60000;
-    it("updates schedule status after successful execution", async () => {
-      const workflowId = `${TEST_WORKFLOW_PREFIX}schedule_success`;
-      const executionId = `${TEST_EXECUTION_PREFIX}schedule_success`;
-      const scheduleId = `${TEST_WORKFLOW_PREFIX}sched_success`;
+    const WORKFLOW_TEST_TIMEOUT = 60_000;
+    it(
+      "updates schedule status after successful execution",
+      async () => {
+        const workflowId = `${TEST_WORKFLOW_PREFIX}schedule_success`;
+        const executionId = `${TEST_EXECUTION_PREFIX}schedule_success`;
+        const scheduleId = `${TEST_WORKFLOW_PREFIX}sched_success`;
 
-      // Create workflow
-      const triggerNode = {
-        id: "trigger_1",
-        type: "custom",
-        position: { x: 0, y: 0 },
-        data: {
-          type: "trigger",
-          label: "Schedule Trigger",
-          config: { triggerType: "Schedule" },
-        },
-      };
-
-      await createTestWorkflow(workflowId, [triggerNode]);
-
-      // Create schedule
-      await db.insert(workflowSchedules).values({
-        id: scheduleId,
-        workflowId,
-        cronExpression: "0 * * * *",
-        timezone: "UTC",
-        enabled: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-
-      // Create execution
-      await createTestExecution(executionId, workflowId);
-
-      // Run with schedule ID
-      const result = await runWorkflowRunner(workflowId, executionId, {
-        scheduleId,
-        input: { triggerType: "schedule" },
-      });
-
-      expect(result.exitCode).toBe(0);
-
-      // Verify schedule was updated
-      const schedule = await db
-        .select()
-        .from(workflowSchedules)
-        .where(eq(workflowSchedules.id, scheduleId))
-        .limit(1);
-
-      expect(schedule[0]?.lastStatus).toBe("success");
-      expect(schedule[0]?.lastRunAt).toBeDefined();
-    }, WORKFLOW_TEST_TIMEOUT);
-
-    it("updates schedule status after failed execution", async () => {
-      const workflowId = `${TEST_WORKFLOW_PREFIX}schedule_error`;
-      const executionId = `${TEST_EXECUTION_PREFIX}schedule_error`;
-      const scheduleId = `${TEST_WORKFLOW_PREFIX}sched_error`;
-
-      // Create workflow with a node that will fail
-      const triggerNode = {
-        id: "trigger_1",
-        type: "custom",
-        position: { x: 0, y: 0 },
-        data: {
-          type: "trigger",
-          label: "Schedule Trigger",
-          config: { triggerType: "Schedule" },
-        },
-      };
-
-      // Action with invalid/missing action type
-      const badNode = {
-        id: "bad_1",
-        type: "custom",
-        position: { x: 0, y: 100 },
-        data: {
-          type: "action",
-          label: "Bad Action",
-          config: {
-            actionType: "NonExistentAction",
+        // Create workflow
+        const triggerNode = {
+          id: "trigger_1",
+          type: "custom",
+          position: { x: 0, y: 0 },
+          data: {
+            type: "trigger",
+            label: "Schedule Trigger",
+            config: { triggerType: "Schedule" },
           },
-        },
-      };
+        };
 
-      const edges = [{ id: "e1", source: "trigger_1", target: "bad_1" }];
+        await createTestWorkflow(workflowId, [triggerNode]);
 
-      await createTestWorkflow(workflowId, [triggerNode, badNode], edges);
+        // Create schedule
+        await db.insert(workflowSchedules).values({
+          id: scheduleId,
+          workflowId,
+          cronExpression: "0 * * * *",
+          timezone: "UTC",
+          enabled: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
 
-      // Create schedule
-      await db.insert(workflowSchedules).values({
-        id: scheduleId,
-        workflowId,
-        cronExpression: "0 * * * *",
-        timezone: "UTC",
-        enabled: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
+        // Create execution
+        await createTestExecution(executionId, workflowId);
 
-      // Create execution
-      await createTestExecution(executionId, workflowId);
+        // Run with schedule ID
+        const result = await runWorkflowRunner(workflowId, executionId, {
+          scheduleId,
+          input: { triggerType: "schedule" },
+        });
 
-      // Run with schedule ID
-      const result = await runWorkflowRunner(workflowId, executionId, {
-        scheduleId,
-      });
+        expect(result.exitCode).toBe(0);
 
-      // Execution should have errors
-      expect(result.exitCode).toBe(1);
+        // Verify schedule was updated
+        const schedule = await db
+          .select()
+          .from(workflowSchedules)
+          .where(eq(workflowSchedules.id, scheduleId))
+          .limit(1);
 
-      // Verify schedule was updated with error
-      const schedule = await db
-        .select()
-        .from(workflowSchedules)
-        .where(eq(workflowSchedules.id, scheduleId))
-        .limit(1);
+        expect(schedule[0]?.lastStatus).toBe("success");
+        expect(schedule[0]?.lastRunAt).toBeDefined();
+      },
+      WORKFLOW_TEST_TIMEOUT
+    );
 
-      expect(schedule[0]?.lastStatus).toBe("error");
-      expect(schedule[0]?.lastError).toBeDefined();
-    }, WORKFLOW_TEST_TIMEOUT);
+    it(
+      "updates schedule status after failed execution",
+      async () => {
+        const workflowId = `${TEST_WORKFLOW_PREFIX}schedule_error`;
+        const executionId = `${TEST_EXECUTION_PREFIX}schedule_error`;
+        const scheduleId = `${TEST_WORKFLOW_PREFIX}sched_error`;
+
+        // Create workflow with a node that will fail
+        const triggerNode = {
+          id: "trigger_1",
+          type: "custom",
+          position: { x: 0, y: 0 },
+          data: {
+            type: "trigger",
+            label: "Schedule Trigger",
+            config: { triggerType: "Schedule" },
+          },
+        };
+
+        // Action with invalid/missing action type
+        const badNode = {
+          id: "bad_1",
+          type: "custom",
+          position: { x: 0, y: 100 },
+          data: {
+            type: "action",
+            label: "Bad Action",
+            config: {
+              actionType: "NonExistentAction",
+            },
+          },
+        };
+
+        const edges = [{ id: "e1", source: "trigger_1", target: "bad_1" }];
+
+        await createTestWorkflow(workflowId, [triggerNode, badNode], edges);
+
+        // Create schedule
+        await db.insert(workflowSchedules).values({
+          id: scheduleId,
+          workflowId,
+          cronExpression: "0 * * * *",
+          timezone: "UTC",
+          enabled: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        // Create execution
+        await createTestExecution(executionId, workflowId);
+
+        // Run with schedule ID
+        const result = await runWorkflowRunner(workflowId, executionId, {
+          scheduleId,
+        });
+
+        // Execution should have errors
+        expect(result.exitCode).toBe(1);
+
+        // Verify schedule was updated with error
+        const schedule = await db
+          .select()
+          .from(workflowSchedules)
+          .where(eq(workflowSchedules.id, scheduleId))
+          .limit(1);
+
+        expect(schedule[0]?.lastStatus).toBe("error");
+        expect(schedule[0]?.lastError).toBeDefined();
+      },
+      WORKFLOW_TEST_TIMEOUT
+    );
   });
 
   describe("Error Handling", () => {
-    const WORKFLOW_TEST_TIMEOUT = 60000;
-    it("handles action step errors gracefully", async () => {
-      const workflowId = `${TEST_WORKFLOW_PREFIX}step_error`;
-      const executionId = `${TEST_EXECUTION_PREFIX}step_error`;
+    const WORKFLOW_TEST_TIMEOUT = 60_000;
+    it(
+      "handles action step errors gracefully",
+      async () => {
+        const workflowId = `${TEST_WORKFLOW_PREFIX}step_error`;
+        const executionId = `${TEST_EXECUTION_PREFIX}step_error`;
 
-      const triggerNode = {
-        id: "trigger_1",
-        type: "custom",
-        position: { x: 0, y: 0 },
-        data: {
-          type: "trigger",
-          label: "Manual Trigger",
-          config: { triggerType: "Manual" },
-        },
-      };
-
-      // HTTP request to a URL that will fail
-      const failingNode = {
-        id: "fail_1",
-        type: "custom",
-        position: { x: 0, y: 100 },
-        data: {
-          type: "action",
-          label: "Failing HTTP",
-          config: {
-            actionType: "HTTP Request",
-            endpoint: "https://this-domain-definitely-does-not-exist-12345.com",
-            httpMethod: "GET",
+        const triggerNode = {
+          id: "trigger_1",
+          type: "custom",
+          position: { x: 0, y: 0 },
+          data: {
+            type: "trigger",
+            label: "Manual Trigger",
+            config: { triggerType: "Manual" },
           },
-        },
-      };
+        };
 
-      const edges = [{ id: "e1", source: "trigger_1", target: "fail_1" }];
+        // HTTP request to a URL that will fail
+        const failingNode = {
+          id: "fail_1",
+          type: "custom",
+          position: { x: 0, y: 100 },
+          data: {
+            type: "action",
+            label: "Failing HTTP",
+            config: {
+              actionType: "HTTP Request",
+              endpoint:
+                "https://this-domain-definitely-does-not-exist-12345.com",
+              httpMethod: "GET",
+            },
+          },
+        };
 
-      await createTestWorkflow(workflowId, [triggerNode, failingNode], edges);
-      await createTestExecution(executionId, workflowId);
+        const edges = [{ id: "e1", source: "trigger_1", target: "fail_1" }];
 
-      const result = await runWorkflowRunner(workflowId, executionId, {
-        timeout: 30000,
-      });
+        await createTestWorkflow(workflowId, [triggerNode, failingNode], edges);
+        await createTestExecution(executionId, workflowId);
 
-      // Should fail but exit gracefully
-      expect(result.exitCode).toBe(1);
+        const result = await runWorkflowRunner(workflowId, executionId, {
+          timeout: 30_000,
+        });
 
-      // Verify execution status shows error
-      const status = await getExecutionStatus(executionId);
-      expect(status?.status).toBe("error");
-      expect(status?.error).toBeDefined();
-    }, WORKFLOW_TEST_TIMEOUT);
+        // Should fail but exit gracefully
+        expect(result.exitCode).toBe(1);
 
-    it("records error details in execution record", async () => {
-      const workflowId = `${TEST_WORKFLOW_PREFIX}error_details`;
-      const executionId = `${TEST_EXECUTION_PREFIX}error_details`;
+        // Verify execution status shows error
+        const status = await getExecutionStatus(executionId);
+        expect(status?.status).toBe("error");
+        expect(status?.error).toBeDefined();
+      },
+      WORKFLOW_TEST_TIMEOUT
+    );
 
-      const triggerNode = {
-        id: "trigger_1",
-        type: "custom",
-        position: { x: 0, y: 0 },
-        data: {
-          type: "trigger",
-          label: "Manual Trigger",
-          config: { triggerType: "Manual" },
-        },
-      };
+    it(
+      "records error details in execution record",
+      async () => {
+        const workflowId = `${TEST_WORKFLOW_PREFIX}error_details`;
+        const executionId = `${TEST_EXECUTION_PREFIX}error_details`;
 
-      // Node with missing action type
-      const incompleteNode = {
-        id: "incomplete_1",
-        type: "custom",
-        position: { x: 0, y: 100 },
-        data: {
-          type: "action",
-          label: "Incomplete Action",
-          config: {}, // No actionType
-        },
-      };
+        const triggerNode = {
+          id: "trigger_1",
+          type: "custom",
+          position: { x: 0, y: 0 },
+          data: {
+            type: "trigger",
+            label: "Manual Trigger",
+            config: { triggerType: "Manual" },
+          },
+        };
 
-      const edges = [{ id: "e1", source: "trigger_1", target: "incomplete_1" }];
+        // Node with missing action type
+        const incompleteNode = {
+          id: "incomplete_1",
+          type: "custom",
+          position: { x: 0, y: 100 },
+          data: {
+            type: "action",
+            label: "Incomplete Action",
+            config: {}, // No actionType
+          },
+        };
 
-      await createTestWorkflow(workflowId, [triggerNode, incompleteNode], edges);
-      await createTestExecution(executionId, workflowId);
+        const edges = [
+          { id: "e1", source: "trigger_1", target: "incomplete_1" },
+        ];
 
-      const result = await runWorkflowRunner(workflowId, executionId);
+        await createTestWorkflow(
+          workflowId,
+          [triggerNode, incompleteNode],
+          edges
+        );
+        await createTestExecution(executionId, workflowId);
 
-      expect(result.exitCode).toBe(1);
+        const result = await runWorkflowRunner(workflowId, executionId);
 
-      const status = await getExecutionStatus(executionId);
-      expect(status?.status).toBe("error");
-      expect(status?.error).toContain("no action type");
-    }, WORKFLOW_TEST_TIMEOUT);
+        expect(result.exitCode).toBe(1);
+
+        const status = await getExecutionStatus(executionId);
+        expect(status?.status).toBe("error");
+        expect(status?.error).toContain("no action type");
+      },
+      WORKFLOW_TEST_TIMEOUT
+    );
   });
 });
 
