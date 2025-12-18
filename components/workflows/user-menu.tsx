@@ -25,9 +25,9 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { WalletDialog } from "@/keeperhub/components/settings/wallet-dialog";
 import { api } from "@/lib/api-client";
 import { signOut, useSession } from "@/lib/auth-client";
+import { getComponentSlot, hasComponentSlot } from "@/lib/extension-registry";
 
 export const UserMenu = () => {
   const { data: session, isPending } = useSession();
@@ -153,10 +153,12 @@ export const UserMenu = () => {
           <Key className="size-4" />
           <span>API Keys</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setWalletOpen(true)}>
-          <Wallet className="size-4" />
-          <span>Wallet</span>
-        </DropdownMenuItem>
+        {hasComponentSlot("user-menu-wallet-dialog") && (
+          <DropdownMenuItem onClick={() => setWalletOpen(true)}>
+            <Wallet className="size-4" />
+            <span>Wallet</span>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
             <Sun className="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
@@ -185,7 +187,15 @@ export const UserMenu = () => {
         open={integrationsOpen}
       />
       <ApiKeysDialog onOpenChange={setApiKeysOpen} open={apiKeysOpen} />
-      <WalletDialog onOpenChange={setWalletOpen} open={walletOpen} />
+      {(() => {
+        const WalletDialogSlot = getComponentSlot<{
+          open: boolean;
+          onOpenChange: (open: boolean) => void;
+        }>("user-menu-wallet-dialog");
+        return WalletDialogSlot
+          ? WalletDialogSlot({ open: walletOpen, onOpenChange: setWalletOpen })
+          : null;
+      })()}
     </DropdownMenu>
   );
 };

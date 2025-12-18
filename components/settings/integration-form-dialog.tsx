@@ -38,7 +38,6 @@ import { Input } from "@/components/ui/input";
 import { IntegrationIcon } from "@/components/ui/integration-icon";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
-import { Web3WalletSection } from "@/keeperhub/components/settings/web3-wallet-section";
 import {
   aiGatewayStatusAtom,
   aiGatewayTeamsAtom,
@@ -46,6 +45,7 @@ import {
   openAiGatewayConsentModalAtom,
 } from "@/lib/ai-gateway/state";
 import { api, type Integration } from "@/lib/api-client";
+import { getCustomIntegrationFormHandler } from "@/lib/extension-registry";
 import type { IntegrationType } from "@/lib/types/integration";
 import {
   getIntegration,
@@ -218,9 +218,15 @@ function ConfigFields({
     );
   }
 
-  // Handle Web3 wallet creation
-  if (formData.type === "web3") {
-    return <Web3WalletSection />;
+  // Check for custom integration form handlers (extension registry)
+  const customHandler = getCustomIntegrationFormHandler(formData.type);
+  if (customHandler) {
+    return customHandler({
+      integrationType: formData.type,
+      isEditMode,
+      config: formData.config,
+      updateConfig,
+    });
   }
 
   // Get plugin form fields from registry

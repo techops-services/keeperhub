@@ -309,31 +309,64 @@ techops-workflow-builder-template/
 
 #### Phase 4: Create Extension Points (Day 3)
 
-Create wrapper components that extend base with KeeperHub features:
+- [x] Create `lib/extension-registry.ts` with field renderer and integration form handler registries
+- [x] Create `keeperhub/lib/extensions.tsx` to register KeeperHub-specific renderers/handlers
+- [x] Create `keeperhub/components/extension-loader.tsx` to load extensions on app init
+- [x] Update `components/workflow/config/action-config-renderer.tsx` to use extension registry
+- [x] Update `components/settings/integration-form-dialog.tsx` to use extension registry
+- [x] Update `app/layout.tsx` to include KeeperHubExtensionLoader
+- [x] Remove direct KeeperHub imports from base components
+
+**Extension Registry Pattern:**
+
+Instead of base components directly importing KeeperHub components, we now use a registry pattern:
 
 ```typescript
-// keeperhub/components/settings/k-integrations-manager.tsx
-import { IntegrationsManager } from "@/components/settings/integrations-manager";
-import { Web3WalletSection } from "./web3-wallet-section";
+// lib/extension-registry.ts - Base provides extension points
+export function registerFieldRenderer(fieldType: string, renderer: CustomFieldRenderer): void;
+export function registerIntegrationFormHandler(integrationType: string, handler: CustomIntegrationFormHandler): void;
 
-export function KeeperHubIntegrationsManager() {
-  return (
-    <IntegrationsManager>
-      <Web3WalletSection />
-    </IntegrationsManager>
-  );
-}
+// keeperhub/lib/extensions.tsx - KeeperHub registers its extensions
+registerFieldRenderer("abi-with-auto-fetch", ({ field, config, onUpdateConfig, disabled }) => {
+  return <AbiWithAutoFetchField ... />;
+});
+
+registerIntegrationFormHandler("web3", () => {
+  return <Web3WalletSection />;
+});
+
+// keeperhub/components/extension-loader.tsx - Loaded in app/layout.tsx
+import "@/keeperhub/lib/extensions"; // Triggers registration on app load
 ```
 
-#### Phase 5: Revert Base Files to Upstream (Day 3-4)
+This pattern allows base components to remain KeeperHub-agnostic while still supporting extension.
 
-- [ ] Revert `app/layout.tsx` to upstream version
-- [ ] Revert `app/globals.css` to upstream version
-- [ ] Revert `components/settings/integration-form-dialog.tsx` to upstream
-- [ ] Revert `components/settings/integrations-manager.tsx` to upstream
-- [ ] Revert `components/workflow/config/action-config-renderer.tsx` to upstream
-- [ ] Revert `lib/db/schema.ts` to upstream (paraWallets in extension)
-- [ ] Revert `plugins/index.ts` to upstream
+#### Phase 5: Minimize Base File Modifications (Day 3-4)
+
+Instead of reverting, we've extended the extension registry to minimize base file changes:
+
+- [x] Add branding registry (logo, appName) to `lib/extension-registry.ts`
+- [x] Add component slots with props support to `lib/extension-registry.ts`
+- [x] Update `components/workflow/workflow-toolbar.tsx` to use `getCustomLogo()`
+- [x] Update `components/workflow/nodes/add-node.tsx` to use `getCustomLogo()` and `getAppName()`
+- [x] Update `components/workflows/user-menu.tsx` to use component slot for wallet dialog
+- [x] Remove direct `@/keeperhub` imports from all base components
+
+**Remaining Minimal Base File Modifications (Documented):**
+
+| File                                                    | Modification                              | Purpose                                    |
+| ------------------------------------------------------- | ----------------------------------------- | ------------------------------------------ |
+| `app/layout.tsx`                                        | `KeeperHubExtensionLoader` import + usage | Loads extensions at startup                |
+| `app/layout.tsx`                                        | Metadata title "KeeperHub"                | Branding (could be env-configurable)       |
+| `app/globals.css`                                       | `--keeperhub-green` CSS variables         | Custom branding colors                     |
+| `app/api/user/route.ts`                                 | `getUserWallet` import                    | Returns wallet address in user profile     |
+| `lib/db/schema.ts`                                      | Re-exports `paraWallets` from keeperhub   | Schema extension                           |
+| `lib/extension-registry.ts`                             | New file                                  | Core extension system                      |
+| `plugins/index.ts`                                      | Imports `@/keeperhub/plugins`             | Auto-generated, includes KeeperHub plugins |
+| `components/settings/integration-form-dialog.tsx`       | Uses `getCustomIntegrationFormHandler()`  | Extension point for custom forms           |
+| `components/workflow/config/action-config-renderer.tsx` | Uses `getCustomFieldRenderer()`           | Extension point for custom fields          |
+
+**Note:** All modifications are now minimal import additions or extension point usages. No component-level business logic changes to base files.
 
 #### Phase 6: Configure Build (Day 4)
 

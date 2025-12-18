@@ -12,6 +12,7 @@ import { GlobalModals } from "@/components/global-modals";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { PersistentCanvas } from "@/components/workflow/persistent-canvas";
+import { KeeperHubExtensionLoader } from "@/keeperhub/components/extension-loader";
 import { mono, sans } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 
@@ -46,6 +47,7 @@ function LayoutContent({ children }: { children: ReactNode }) {
 const RootLayout = ({ children }: RootLayoutProps) => (
   <html lang="en" suppressHydrationWarning>
     <body className={cn(sans.variable, mono.variable, "antialiased")}>
+      <KeeperHubExtensionLoader />
       <ThemeProvider
         attribute="class"
         defaultTheme="dark"

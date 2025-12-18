@@ -3,21 +3,24 @@
 import type { NodeProps } from "@xyflow/react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { KeeperHubLogo } from "@/keeperhub/components/icons/keeperhub-logo";
+import { getAppName, getCustomLogo } from "@/lib/extension-registry";
 
 type AddNodeData = {
   onClick?: () => void;
 };
 
 export function AddNode({ data }: NodeProps & { data?: AddNodeData }) {
+  const CustomLogo = getCustomLogo();
+  const appName = getAppName();
+
   return (
     <div className="flex flex-col items-center justify-center gap-8 rounded-lg border border-border border-dashed bg-background/50 p-8 backdrop-blur-sm">
       <div className="text-center">
         <h1 className="mb-2 flex items-center justify-center gap-2 font-bold text-3xl">
-          <KeeperHubLogo className="size-10" /> KeeperHub
+          {CustomLogo && <CustomLogo className="size-10" />} {appName}
         </h1>
         <p className="text-muted-foreground">
-          Blockchain workflow automation platform
+          Visual workflow automation platform
           {/* ,{" "}
           <a
             className="underline underline-offset-2 transition duration-200 ease-out hover:text-foreground"

@@ -55,9 +55,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { KeeperHubLogo } from "@/keeperhub/components/icons/keeperhub-logo";
 import { api } from "@/lib/api-client";
 import { authClient, useSession } from "@/lib/auth-client";
+import { getCustomLogo } from "@/lib/extension-registry";
 import {
   integrationsAtom,
   integrationsVersionAtom,
@@ -2084,7 +2084,12 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
         position="top-left"
       >
         <div className="flex items-center gap-2">
-          <KeeperHubLogo className="size-7 shrink-0" />
+          {(() => {
+            const CustomLogo = getCustomLogo();
+            return CustomLogo ? (
+              <CustomLogo className="size-7 shrink-0" />
+            ) : null;
+          })()}
           <WorkflowMenuComponent
             actions={actions}
             state={state}
