@@ -26,7 +26,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-// start keeperhub
 import { integrationRequiresCredentials } from "@/keeperhub/lib/integration-helpers";
 // end keeperhub
 import { aiGatewayStatusAtom } from "@/lib/ai-gateway/state";
@@ -39,6 +38,7 @@ import {
   findActionById,
   getActionsByCategory,
   getAllIntegrations,
+  getIntegration,
 } from "@/plugins";
 import { ActionConfigRenderer } from "./action-config-renderer";
 import { SchemaBuilder, type SchemaField } from "./schema-builder";
@@ -524,17 +524,20 @@ export function ActionConfig({
                 </Tooltip>
               </TooltipProvider>
             </div>
-            {hasExistingConnections && (
-              <Button
-                className="size-6"
-                disabled={disabled}
-                onClick={handleAddSecondaryConnection}
-                size="icon"
-                variant="ghost"
-              >
-                <Plus className="size-4" />
-              </Button>
-            )}
+            {/* start keeperhub - hide + button for singleConnection integrations */}
+            {hasExistingConnections &&
+              !getIntegration(integrationType)?.singleConnection && (
+                <Button
+                  className="size-6"
+                  disabled={disabled}
+                  onClick={handleAddSecondaryConnection}
+                  size="icon"
+                  variant="ghost"
+                >
+                  <Plus className="size-4" />
+                </Button>
+              )}
+            {/* end keeperhub */}
           </div>
           <IntegrationSelector
             disabled={disabled}

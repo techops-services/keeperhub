@@ -175,6 +175,11 @@ export type IntegrationPlugin = {
   // Defaults to true for backward compatibility
   requiresCredentials?: boolean;
 
+  // Whether only one connection is allowed per user
+  // Set to true for integrations with unique constraints (e.g., web3 wallet)
+  // When true, the "+" button to add more connections will be hidden
+  singleConnection?: boolean;
+
   // Form fields for the integration dialog
   formFields: Array<{
     id: string;
