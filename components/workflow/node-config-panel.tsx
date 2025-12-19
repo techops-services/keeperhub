@@ -49,8 +49,7 @@ import {
   updateNodeDataAtom,
 } from "@/lib/workflow-store";
 
-import { findActionById, getIntegration } from "@/plugins";
-import { IntegrationSelector } from "../ui/integration-selector";
+import { findActionById } from "@/plugins";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { ActionConfig } from "./config/action-config";
@@ -916,59 +915,6 @@ export const PanelInner = () => {
                       Delete
                     </Button>
                   </div>
-
-                  {/* KeeperHub: Integration selector in footer */}
-                  {selectedNode.data.type === "action" &&
-                    (() => {
-                      const actionType = selectedNode.data.config
-                        ?.actionType as string;
-
-                      const SYSTEM_INTEGRATION_MAP: Record<string, string> = {
-                        "Database Query": "database",
-                      };
-
-                      let integrationType: string | undefined;
-                      let requiresCredentials = true;
-
-                      if (actionType) {
-                        if (SYSTEM_INTEGRATION_MAP[actionType]) {
-                          integrationType = SYSTEM_INTEGRATION_MAP[actionType];
-                        } else {
-                          const action = findActionById(actionType);
-                          if (action) {
-                            integrationType = action.integration;
-                            const plugin = getIntegration(action.integration);
-                            requiresCredentials =
-                              plugin?.requiresCredentials !== false;
-                          }
-                        }
-                      }
-
-                      if (integrationType && requiresCredentials) {
-                        return (
-                          <IntegrationSelector
-                            integrationType={integrationType as IntegrationType}
-                            onChange={(id) =>
-                              handleUpdateConfig("integrationId", id)
-                            }
-                            value={
-                              (selectedNode.data.config
-                                ?.integrationId as string) || ""
-                            }
-                          />
-                        );
-                      }
-                      if (integrationType && !requiresCredentials) {
-                        return (
-                          <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2">
-                            <span className="text-muted-foreground text-sm">
-                              No integration required
-                            </span>
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
                 </div>
               )}
             </div>
