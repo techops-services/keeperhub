@@ -143,26 +143,9 @@ async function createWorkflowJob(
                 { name: "EXECUTION_ID", value: executionId },
                 { name: "SCHEDULE_ID", value: scheduleId },
                 { name: "WORKFLOW_INPUT", value: JSON.stringify(input) },
-                // Database and secrets from ConfigMap/Secret
-                {
-                  name: "DATABASE_URL",
-                  valueFrom: {
-                    configMapKeyRef: {
-                      name: "scheduler-env",
-                      key: "DATABASE_URL",
-                    },
-                  },
-                },
-                {
-                  name: "INTEGRATION_ENCRYPTION_KEY",
-                  valueFrom: {
-                    secretKeyRef: {
-                      name: "keeperhub-secrets",
-                      key: "integration-encryption-key",
-                      optional: true,
-                    },
-                  },
-                },
+                // Pass database URL and encryption key from job-spawner's environment
+                { name: "DATABASE_URL", value: CONFIG.databaseUrl },
+                { name: "INTEGRATION_ENCRYPTION_KEY", value: process.env.INTEGRATION_ENCRYPTION_KEY || "" },
               ],
               resources: {
                 requests: {
