@@ -54,6 +54,7 @@ RUN npm install -g pnpm tsx
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/lib ./lib
+COPY --from=builder /app/keeperhub ./keeperhub
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
@@ -77,6 +78,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/scripts/workflow-runner.ts ./scripts/workflow-runner.ts
 COPY --from=builder /app/lib ./lib
 COPY --from=builder /app/plugins ./plugins
+COPY --from=builder /app/keeperhub ./keeperhub
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
