@@ -50,6 +50,7 @@ const CONFIG = {
 
   // K8s Job settings
   runnerImage: process.env.RUNNER_IMAGE || "keeperhub-runner:latest",
+  imagePullPolicy: process.env.IMAGE_PULL_POLICY || "Never", // Never for local, Always for staging/prod
   namespace: process.env.K8S_NAMESPACE || "local",
   jobTtlSeconds: Number(process.env.JOB_TTL_SECONDS) || 3600,
   jobActiveDeadline: Number(process.env.JOB_ACTIVE_DEADLINE) || 300,
@@ -136,7 +137,7 @@ async function createWorkflowJob(
             {
               name: "runner",
               image: CONFIG.runnerImage,
-              imagePullPolicy: "Never", // Local dev - image loaded via minikube
+              imagePullPolicy: CONFIG.imagePullPolicy,
               env: [
                 { name: "WORKFLOW_ID", value: workflowId },
                 { name: "EXECUTION_ID", value: executionId },

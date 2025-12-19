@@ -57,6 +57,9 @@ env:
   RUNNER_IMAGE:
     type: kv
     value: "${ECR_REGISTRY}/keeperhub-prod:workflow-runner-${IMAGE_TAG}"
+  IMAGE_PULL_POLICY:
+    type: kv
+    value: "Always"
   K8S_NAMESPACE:
     type: kv
     value: "keeperhub"
