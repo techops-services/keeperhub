@@ -26,6 +26,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+// start keeperhub
+import { integrationRequiresCredentials } from "@/keeperhub/lib/integration-helpers";
+// end keeperhub
 import { aiGatewayStatusAtom } from "@/lib/ai-gateway/state";
 import {
   integrationsAtom,
@@ -393,6 +396,14 @@ export function ActionConfig({
     return action?.integration as IntegrationType | undefined;
   }, [actionType]);
 
+  // start keeperhub
+  // Check if integration requires credentials (some like web3 don't)
+  const requiresCredentials = useMemo(
+    () => integrationRequiresCredentials(integrationType),
+    [integrationType]
+  );
+  // end keeperhub
+
   // Check if AI Gateway managed keys should be offered (user can have multiple for different teams)
   const shouldUseManagedKeys =
     integrationType === "ai-gateway" &&
@@ -496,7 +507,8 @@ export function ActionConfig({
         </div>
       </div>
 
-      {integrationType && isOwner && (
+      {/* start keeperhub - added requiresCredentials check (upstream: integrationType && isOwner) */}
+      {integrationType && isOwner && requiresCredentials && (
         <div className="space-y-2">
           <div className="ml-1 flex items-center justify-between">
             <div className="flex items-center gap-1">
@@ -532,6 +544,7 @@ export function ActionConfig({
           />
         </div>
       )}
+      {/* end keeperhub */}
 
       {/* System actions - hardcoded config fields */}
       <SystemActionFields
