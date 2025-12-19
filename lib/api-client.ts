@@ -521,6 +521,14 @@ export const workflowApi = {
         startedAt: Date;
         completedAt: Date | null;
         duration: string | null;
+        // Progress tracking fields
+        totalSteps: string | null;
+        completedSteps: string | null;
+        currentNodeId: string | null;
+        currentNodeName: string | null;
+        lastSuccessfulNodeId: string | null;
+        lastSuccessfulNodeName: string | null;
+        executionTrace: string[] | null;
       }>
     >(`/api/workflows/${id}/executions`),
 
