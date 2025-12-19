@@ -87,6 +87,17 @@ const web3Plugin: IntegrationPlugin = {
       stepImportPath: "transfer-funds",
       configFields: [
         {
+          key: "network",
+          label: "Network",
+          type: "select",
+          placeholder: "Select network",
+          required: true,
+          options: [
+            { label: "Ethereum Mainnet", value: "mainnet" },
+            { label: "Sepolia Testnet", value: "sepolia" },
+          ],
+        },
+        {
           key: "amount",
           label: "Amount (ETH)",
           type: "template-input",

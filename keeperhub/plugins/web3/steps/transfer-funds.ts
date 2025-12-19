@@ -13,6 +13,7 @@ type TransferFundsResult =
   | { success: false; error: string };
 
 export type TransferFundsCoreInput = {
+  network: "mainnet" | "sepolia";
   amount: string;
   recipientAddress: string;
 };
@@ -45,17 +46,23 @@ async function getUserIdFromExecution(
 /**
  * Core transfer logic
  */
+const RPC_URLS: Record<string, string> = {
+  mainnet: "https://chain.techops.services/eth-mainnet",
+  sepolia: "https://chain.techops.services/eth-sepolia",
+};
+
 async function stepHandler(
   input: TransferFundsInput
 ): Promise<TransferFundsResult> {
   console.log("[Transfer Funds] Starting step with input:", {
+    network: input.network,
     amount: input.amount,
     recipientAddress: input.recipientAddress,
     hasContext: !!input._context,
     executionId: input._context?.executionId,
   });
 
-  const { amount, recipientAddress, _context } = input;
+  const { network, amount, recipientAddress, _context } = input;
 
   // Validate recipient address
   if (!ethers.isAddress(recipientAddress)) {
@@ -118,14 +125,24 @@ async function stepHandler(
     };
   }
 
-  // Sepolia testnet RPC URL
-  // TODO: Make this configurable in the future
-  const SEPOLIA_RPC_URL = "https://chain.techops.services/eth-sepolia";
+  const rpcUrl = RPC_URLS[network];
+  if (!rpcUrl) {
+    console.error("[Transfer Funds] Invalid network:", network);
+    return {
+      success: false,
+      error: `Invalid network: ${network}`,
+    };
+  }
 
   let signer: Awaited<ReturnType<typeof initializeParaSigner>> | null = null;
   try {
-    console.log("[Transfer Funds] Initializing Para signer for user:", userId);
-    signer = await initializeParaSigner(userId, SEPOLIA_RPC_URL);
+    console.log(
+      "[Transfer Funds] Initializing Para signer for user:",
+      userId,
+      "on network:",
+      network
+    );
+    signer = await initializeParaSigner(userId, rpcUrl);
     const signerAddress = await signer.getAddress();
     console.log(
       "[Transfer Funds] Signer initialized successfully:",
