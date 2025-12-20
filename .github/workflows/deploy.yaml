@@ -2,23 +2,22 @@ on:
   push:
     branches:
       - staging
-      - feat/KEEP-1167-schedule-trigger-mvp
-      # - main
+      - prod
   workflow_dispatch:
 
 name: deploy-keeperhub
 jobs:
   build-and-deploy-keeperhub:
-    environment: ${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
+    environment: ${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}
     runs-on: ubuntu-latest
     env:
-      HELM_FILE: deploy/${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}/values.yaml
-      REGION: ${{ github.ref == 'refs/heads/main' && 'us-east-1' || 'us-east-2' }}
-      CLUSTER_NAME: ${{ github.ref == 'refs/heads/main' && 'maker-prod' || 'maker-staging' }}
-      ENVIRONMENT_TAG: ${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
+      HELM_FILE: deploy/${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}/values.yaml
+      REGION: ${{ github.ref == 'refs/heads/prod' && 'us-east-1' || 'us-east-2' }}
+      CLUSTER_NAME: ${{ github.ref == 'refs/heads/prod' && 'maker-prod' || 'maker-staging' }}
+      ENVIRONMENT_TAG: ${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}
       NAMESPACE: keeperhub
       SERVICE_NAME: keeperhub
-      AWS_ECR_NAME: keeperhub-${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
+      AWS_ECR_NAME: keeperhub-${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}
       SERVICE_ACCOUNT_ROLE_ARN: ${{ vars.SERVICE_ACCOUNT_ROLE_ARN }}
     steps:
       - name: Checkout
@@ -46,7 +45,7 @@ jobs:
         if: ${{ !contains(github.event.head_commit.message , '[skip build]') }}
         shell: bash
         run: |
-          echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+          echo "sha_short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Build, tag, and push app image to ECR
         id: build-app-image
@@ -130,7 +129,7 @@ jobs:
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
-          JOB_SPAWNER_HELM_FILE: deploy/job-spawner/${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}/values.yaml
+          JOB_SPAWNER_HELM_FILE: deploy/job-spawner/${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}/values.yaml
         run: |
           sed -i 's|${ECR_REGISTRY}|'"$ECR_REGISTRY"'|g' $JOB_SPAWNER_HELM_FILE
           sed -i 's|${IMAGE_TAG}|'"$IMAGE_TAG"'|g' $JOB_SPAWNER_HELM_FILE
@@ -143,7 +142,7 @@ jobs:
       - name: Apply RBAC for Job Spawner
         if: ${{ !contains(github.event.head_commit.message , '[skip deploy]') }}
         run: |
-          kubectl apply -f deploy/${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}/rbac.yaml
+          kubectl apply -f deploy/${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}/rbac.yaml
 
       - name: Deploying Service to Kubernetes with Helm
         id: deploy
@@ -165,7 +164,7 @@ jobs:
         uses: bitovi/github-actions-deploy-eks-helm@v1.2.10
         with:
           cluster-name: ${{ env.CLUSTER_NAME }}
-          config-files: deploy/job-spawner/${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}/values.yaml
+          config-files: deploy/job-spawner/${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}/values.yaml
           chart-path: techops-services/common
           namespace: ${{ env.NAMESPACE }}
           timeout: 5m0s
