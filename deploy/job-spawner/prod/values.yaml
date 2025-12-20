@@ -21,8 +21,20 @@ deployment:
   enabled: true
 
 serviceAccount:
-  create: false
-  name: keeperhub-prod
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: ${SERVICE_ACCOUNT_ROLE_ARN}
+  name: keeperhub-job-spawner-prod
+  rules:
+    - apiGroups: ["batch"]
+      resources: ["jobs"]
+      verbs: ["create", "get", "list", "watch", "delete"]
+    - apiGroups: [""]
+      resources: ["pods"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: [""]
+      resources: ["pods/log"]
+      verbs: ["get"]
 
 podAnnotations:
   reloader.stakater.com/auto: "true"
