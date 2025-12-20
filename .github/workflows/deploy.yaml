@@ -31,7 +31,7 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.REGION }}
-          role-to-assume: arn:aws:iam::068992353948:role/TerraformCloud
+          role-to-assume: "arn:aws:iam::068992353948:role/TerraformCloud"
           role-session-name: keeperhub-prod-deploy
 
       - name: Login to AWS ECR
