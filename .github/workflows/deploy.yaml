@@ -33,6 +33,7 @@ jobs:
           aws-region: ${{ env.REGION }}
           role-to-assume: "arn:aws:iam::068992353948:role/TerraformCloud"
           role-session-name: keeperhub-prod-deploy
+          role-skip-session-tagging: true
 
       - name: Login to AWS ECR
         id: login-ecr
