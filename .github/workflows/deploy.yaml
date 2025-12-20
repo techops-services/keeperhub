@@ -135,6 +135,11 @@ jobs:
           sed -i 's|${IMAGE_TAG}|'"$IMAGE_TAG"'|g' $JOB_SPAWNER_HELM_FILE
           sed -i 's|${SERVICE_ACCOUNT_ROLE_ARN}|'"$SERVICE_ACCOUNT_ROLE_ARN"'|g' $JOB_SPAWNER_HELM_FILE
 
+      - name: Configure kubectl
+        if: ${{ !contains(github.event.head_commit.message , '[skip deploy]') }}
+        run: |
+          aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.REGION }}
+
       - name: Deploying Service to Kubernetes with Helm
         id: deploy
         uses: bitovi/github-actions-deploy-eks-helm@v1.2.10
