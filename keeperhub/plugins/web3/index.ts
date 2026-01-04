@@ -9,19 +9,11 @@ const web3Plugin: IntegrationPlugin = {
 
   icon: Web3Icon,
 
-  // Minimal form field - Web3 uses PARA wallet (user must create manually)
-  // This field is informational only and not used
-  formFields: [
-    {
-      id: "info",
-      label: "Para Wallet",
-      type: "text",
-      placeholder: "Create a wallet to use Web3 actions",
-      configKey: "info",
-      helpText:
-        "You'll need to create a Para wallet to use Web3 actions in your workflows.",
-    },
-  ],
+  // Web3 uses Para wallet - one wallet per user
+  singleConnection: true,
+
+  // No form fields - wallet creation is handled by the custom form handler
+  formFields: [],
 
   // No test function needed - no credentials to test
   // testConfig is optional, so we omit it
