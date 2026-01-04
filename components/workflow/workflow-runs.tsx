@@ -52,6 +52,14 @@ type WorkflowExecution = {
   completedAt: Date | null;
   duration: string | null;
   error: string | null;
+  // Progress tracking fields
+  totalSteps: string | null;
+  completedSteps: string | null;
+  currentNodeId: string | null;
+  currentNodeName: string | null;
+  lastSuccessfulNodeId: string | null;
+  lastSuccessfulNodeName: string | null;
+  executionTrace: string[] | null;
 };
 
 type WorkflowRunsProps = {
@@ -378,6 +386,64 @@ function OutputDisplay({
   );
 }
 
+// Progress bar component for running executions
+function getProgressBarColor(status: WorkflowExecution["status"]): string {
+  if (status === "running") {
+    return "bg-blue-500";
+  }
+  if (status === "success") {
+    return "bg-green-500";
+  }
+  return "bg-red-500";
+}
+
+function ExecutionProgress({ execution }: { execution: WorkflowExecution }) {
+  const totalSteps = Number.parseInt(execution.totalSteps || "0", 10);
+  const completedSteps = Number.parseInt(execution.completedSteps || "0", 10);
+  const percentage =
+    totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+  const isRunning = execution.status === "running";
+  const isError = execution.status === "error";
+
+  if (totalSteps === 0) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {/* Progress bar */}
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+        <div
+          className={cn(
+            "h-full transition-all duration-300",
+            getProgressBarColor(execution.status)
+          )}
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+      {/* Progress text */}
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-muted-foreground">
+          {completedSteps} of {totalSteps} steps
+          {isRunning && execution.currentNodeName && (
+            <span className="ml-2 text-blue-500">
+              Running: {execution.currentNodeName}
+            </span>
+          )}
+          {isError && execution.lastSuccessfulNodeName && (
+            <span className="ml-2 text-muted-foreground">
+              Last success: {execution.lastSuccessfulNodeName}
+            </span>
+          )}
+        </span>
+        <span className="font-mono text-muted-foreground tabular-nums">
+          {percentage}%
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // Component for rendering individual execution log entries
 function ExecutionLogEntry({
   log,
@@ -539,6 +605,12 @@ export function WorkflowRuns({
     loadExecutions();
   }, [loadExecutions]);
 
+  // Clear expanded runs when workflow changes to prevent stale state
+  useEffect(() => {
+    setExpandedRuns(new Set());
+    setExpandedLogs(new Set());
+  }, []);
+
   // Helper function to map node IDs to labels
   const mapNodeLabels = useCallback(
     (
@@ -670,9 +742,12 @@ export function WorkflowRuns({
         const data = await api.workflow.getExecutions(currentWorkflowId);
         setExecutions(data as WorkflowExecution[]);
 
-        // Also refresh logs for expanded runs
+        // Also refresh logs for expanded runs (only if they exist in current executions)
+        const validExecutionIds = new Set(data.map((e) => e.id));
         for (const executionId of expandedRuns) {
-          await refreshExecutionLogs(executionId);
+          if (validExecutionIds.has(executionId)) {
+            await refreshExecutionLogs(executionId);
+          }
         }
       } catch (error) {
         console.error("Failed to poll executions:", error);
@@ -852,6 +927,14 @@ export function WorkflowRuns({
                 )}
               </button>
             </div>
+
+            {/* Progress bar for executions with progress data */}
+            {execution.totalSteps &&
+              Number.parseInt(execution.totalSteps, 10) > 0 && (
+                <div className="px-4 pb-3">
+                  <ExecutionProgress execution={execution} />
+                </div>
+              )}
 
             {isExpanded && (
               <div className="border-t bg-muted/20">
