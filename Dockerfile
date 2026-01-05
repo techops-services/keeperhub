@@ -39,6 +39,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/drizzle ./drizzle
 COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
 COPY --from=builder /app/lib ./lib
+COPY --from=builder /app/keeperhub ./keeperhub
 COPY --from=builder /app/package.json ./package.json
 
 # This stage can be used to run migrations
