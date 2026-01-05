@@ -13,6 +13,7 @@ import { OverlayProvider } from "@/components/overlays/overlay-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { PersistentCanvas } from "@/components/workflow/persistent-canvas";
+import { WorkflowToolbar } from "@/components/workflow/workflow-toolbar";
 import { KeeperHubExtensionLoader } from "@/keeperhub/components/extension-loader";
 import { mono, sans } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
@@ -39,6 +40,7 @@ type RootLayoutProps = {
 function LayoutContent({ children }: { children: ReactNode }) {
   return (
     <ReactFlowProvider>
+      <WorkflowToolbar persistent />
       <PersistentCanvas />
       <div className="pointer-events-none relative z-10">{children}</div>
     </ReactFlowProvider>
