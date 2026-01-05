@@ -1,6 +1,7 @@
 import "server-only";
 
 import { ethers } from "ethers";
+import { getChainIdFromNetwork, getRpcProvider } from "@/lib/rpc";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
 
@@ -17,23 +18,6 @@ export type ReadContractCoreInput = {
 };
 
 export type ReadContractInput = StepInput & ReadContractCoreInput;
-
-/**
- * Get RPC URL based on network selection
- */
-function getRpcUrl(network: string): string {
-  const RPC_URLS: Record<string, string> = {
-    mainnet: "https://chain.techops.services/eth-mainnet",
-    sepolia: "https://chain.techops.services/eth-sepolia",
-  };
-
-  const rpcUrl = RPC_URLS[network];
-  if (!rpcUrl) {
-    throw new Error(`Unsupported network: ${network}`);
-  }
-
-  return rpcUrl;
-}
 
 /**
  * Core read contract logic
@@ -130,52 +114,43 @@ async function stepHandler(
     }
   }
 
-  // Get RPC URL
-  let rpcUrl: string;
+  // Get chain ID from network name
+  let chainId: number;
   try {
-    rpcUrl = getRpcUrl(network);
-    console.log("[Read Contract] Using RPC URL for network:", network);
+    chainId = getChainIdFromNetwork(network);
+    console.log("[Read Contract] Resolved chain ID:", chainId);
   } catch (error) {
-    console.error("[Read Contract] Failed to get RPC URL:", error);
+    console.error("[Read Contract] Failed to resolve network:", error);
     return {
       success: false,
       error: getErrorMessage(error),
     };
   }
 
-  // Create provider and contract instance
-  let contract: ethers.Contract;
+  // Call the contract function with failover
   try {
-    const provider = new ethers.JsonRpcProvider(rpcUrl);
-    contract = new ethers.Contract(contractAddress, parsedAbi, provider);
-    console.log("[Read Contract] Contract instance created");
-  } catch (error) {
-    console.error("[Read Contract] Failed to create contract instance:", error);
-    return {
-      success: false,
-      error: `Failed to create contract instance: ${getErrorMessage(error)}`,
-    };
-  }
+    const rpcProvider = await getRpcProvider({ chainId });
+    console.log("[Read Contract] Using RPC provider for chain:", chainId);
 
-  // Call the contract function
-  try {
-    console.log(
-      "[Read Contract] Calling function:",
-      abiFunction,
-      "with args:",
-      args
-    );
+    const result = await rpcProvider.executeWithFailover(async (provider) => {
+      // Create contract instance
+      const contract = new ethers.Contract(contractAddress, parsedAbi, provider);
+      console.log("[Read Contract] Contract instance created");
 
-    // Check if function exists
-    if (typeof contract[abiFunction] !== "function") {
-      console.error("[Read Contract] Function not found:", abiFunction);
-      return {
-        success: false,
-        error: `Function '${abiFunction}' not found in contract ABI`,
-      };
-    }
+      // Check if function exists
+      if (typeof contract[abiFunction] !== "function") {
+        throw new Error(`Function '${abiFunction}' not found in contract ABI`);
+      }
 
-    const result = await contract[abiFunction](...args);
+      console.log(
+        "[Read Contract] Calling function:",
+        abiFunction,
+        "with args:",
+        args
+      );
+
+      return contract[abiFunction](...args);
+    });
 
     console.log("[Read Contract] Function call successful, result:", result);
 

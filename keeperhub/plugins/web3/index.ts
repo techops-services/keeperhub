@@ -66,6 +66,7 @@ const web3Plugin: IntegrationPlugin = {
           options: [
             { label: "Ethereum Mainnet", value: "mainnet" },
             { label: "Sepolia Testnet", value: "sepolia" },
+            { label: "Base", value: "base" },
           ],
         },
         {
@@ -85,7 +86,33 @@ const web3Plugin: IntegrationPlugin = {
       category: "Web3",
       stepFunction: "transferFundsStep",
       stepImportPath: "transfer-funds",
+      outputFields: [
+        {
+          field: "success",
+          description: "Whether the transfer succeeded",
+        },
+        {
+          field: "transactionHash",
+          description: "The transaction hash of the successful transfer",
+        },
+        {
+          field: "error",
+          description: "Error message if the transfer failed",
+        },
+      ],
       configFields: [
+        {
+          key: "network",
+          label: "Network",
+          type: "select",
+          placeholder: "Select network",
+          required: true,
+          options: [
+            { label: "Ethereum Mainnet", value: "mainnet" },
+            { label: "Sepolia Testnet", value: "sepolia" },
+            { label: "Base", value: "base" },
+          ],
+        },
         {
           key: "amount",
           label: "Amount (ETH)",
@@ -136,6 +163,7 @@ const web3Plugin: IntegrationPlugin = {
           options: [
             { label: "Ethereum Mainnet", value: "mainnet" },
             { label: "Sepolia Testnet", value: "sepolia" },
+            { label: "Base", value: "base" },
           ],
         },
         {
@@ -207,6 +235,7 @@ const web3Plugin: IntegrationPlugin = {
           options: [
             { label: "Ethereum Mainnet", value: "mainnet" },
             { label: "Sepolia Testnet", value: "sepolia" },
+            { label: "Base", value: "base" },
           ],
         },
         {

@@ -5,6 +5,7 @@ import { ethers } from "ethers";
 import { initializeParaSigner } from "@/keeperhub/lib/para/wallet-helpers";
 import { db } from "@/lib/db";
 import { workflowExecutions } from "@/lib/db/schema";
+import { getChainIdFromNetwork, resolveRpcConfig } from "@/lib/rpc";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
 
@@ -13,6 +14,7 @@ type TransferFundsResult =
   | { success: false; error: string };
 
 export type TransferFundsCoreInput = {
+  network: string;
   amount: string;
   recipientAddress: string;
 };
@@ -49,13 +51,14 @@ async function stepHandler(
   input: TransferFundsInput
 ): Promise<TransferFundsResult> {
   console.log("[Transfer Funds] Starting step with input:", {
+    network: input.network,
     amount: input.amount,
     recipientAddress: input.recipientAddress,
     hasContext: !!input._context,
     executionId: input._context?.executionId,
   });
 
-  const { amount, recipientAddress, _context } = input;
+  const { network, amount, recipientAddress, _context } = input;
 
   // Validate recipient address
   if (!ethers.isAddress(recipientAddress)) {
@@ -118,14 +121,32 @@ async function stepHandler(
     };
   }
 
-  // Sepolia testnet RPC URL
-  // TODO: Make this configurable in the future
-  const SEPOLIA_RPC_URL = "https://chain.techops.services/eth-sepolia";
+  // Get chain ID and resolve RPC config (with user preferences)
+  let chainId: number;
+  let rpcUrl: string;
+  try {
+    chainId = getChainIdFromNetwork(network);
+    console.log("[Transfer Funds] Resolved chain ID:", chainId);
+
+    const rpcConfig = await resolveRpcConfig(chainId, userId);
+    if (!rpcConfig) {
+      throw new Error(`Chain ${chainId} not found or not enabled`);
+    }
+
+    rpcUrl = rpcConfig.primaryRpcUrl;
+    console.log("[Transfer Funds] Using RPC URL:", rpcUrl, "source:", rpcConfig.source);
+  } catch (error) {
+    console.error("[Transfer Funds] Failed to resolve RPC config:", error);
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
+  }
 
   let signer: Awaited<ReturnType<typeof initializeParaSigner>> | null = null;
   try {
     console.log("[Transfer Funds] Initializing Para signer for user:", userId);
-    signer = await initializeParaSigner(userId, SEPOLIA_RPC_URL);
+    signer = await initializeParaSigner(userId, rpcUrl);
     const signerAddress = await signer.getAddress();
     console.log(
       "[Transfer Funds] Signer initialized successfully:",

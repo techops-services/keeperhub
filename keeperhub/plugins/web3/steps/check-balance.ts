@@ -1,6 +1,7 @@
 import "server-only";
 
 import { ethers } from "ethers";
+import { getChainIdFromNetwork, getRpcProvider } from "@/lib/rpc";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
 
@@ -14,23 +15,6 @@ export type CheckBalanceCoreInput = {
 };
 
 export type CheckBalanceInput = StepInput & CheckBalanceCoreInput;
-
-/**
- * Get RPC URL based on network selection
- */
-function getRpcUrl(network: string): string {
-  const RPC_URLS: Record<string, string> = {
-    mainnet: "https://chain.techops.services/eth-mainnet",
-    sepolia: "https://chain.techops.services/eth-sepolia",
-  };
-
-  const rpcUrl = RPC_URLS[network];
-  if (!rpcUrl) {
-    throw new Error(`Unsupported network: ${network}`);
-  }
-
-  return rpcUrl;
-}
 
 /**
  * Core check balance logic
@@ -54,37 +38,41 @@ async function stepHandler(
     };
   }
 
-  // Get RPC URL
-  let rpcUrl: string;
+  // Get chain ID from network name
+  let chainId: number;
   try {
-    rpcUrl = getRpcUrl(network);
-    console.log("[Check Balance] Using RPC URL for network:", network);
+    chainId = getChainIdFromNetwork(network);
+    console.log("[Check Balance] Resolved chain ID:", chainId);
   } catch (error) {
-    console.error("[Check Balance] Failed to get RPC URL:", error);
+    console.error("[Check Balance] Failed to resolve network:", error);
     return {
       success: false,
       error: getErrorMessage(error),
     };
   }
 
-  // Check balance
+  // Check balance using RPC provider with failover
   try {
-    const provider = new ethers.JsonRpcProvider(rpcUrl);
-    console.log("[Check Balance] Checking balance for address:", address);
+    const rpcProvider = await getRpcProvider({ chainId });
+    console.log("[Check Balance] Using RPC provider for chain:", chainId);
 
-    const balanceWei = await provider.getBalance(address);
-    const balanceEth = ethers.formatEther(balanceWei);
+    const balance = await rpcProvider.executeWithFailover(async (provider) => {
+      console.log("[Check Balance] Checking balance for address:", address);
+      return provider.getBalance(address);
+    });
+
+    const balanceEth = ethers.formatEther(balance);
 
     console.log("[Check Balance] Balance retrieved successfully:", {
       address,
-      balanceWei: balanceWei.toString(),
+      balanceWei: balance.toString(),
       balanceEth,
     });
 
     return {
       success: true,
       balance: balanceEth,
-      balanceWei: balanceWei.toString(),
+      balanceWei: balance.toString(),
       address,
     };
   } catch (error) {
