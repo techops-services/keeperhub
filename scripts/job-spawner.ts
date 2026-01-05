@@ -145,7 +145,10 @@ async function createWorkflowJob(
                 { name: "WORKFLOW_INPUT", value: JSON.stringify(input) },
                 // Pass database URL and encryption key from job-spawner's environment
                 { name: "DATABASE_URL", value: CONFIG.databaseUrl },
-                { name: "INTEGRATION_ENCRYPTION_KEY", value: process.env.INTEGRATION_ENCRYPTION_KEY || "" },
+                {
+                  name: "INTEGRATION_ENCRYPTION_KEY",
+                  value: process.env.INTEGRATION_ENCRYPTION_KEY || "",
+                },
               ],
               resources: {
                 requests: {

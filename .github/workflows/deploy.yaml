@@ -149,7 +149,7 @@ jobs:
           timeout: 5m0s
           name: ${{ env.SERVICE_NAME }}
           chart-repository: https://techops-services.github.io/helm-charts
-          version: 0.0.33
+          version: 0.2.1
           atomic: true
 
       - name: Deploying Job Spawner to Kubernetes with Helm
@@ -164,5 +164,5 @@ jobs:
           timeout: 5m0s
           name: keeperhub-job-spawner
           chart-repository: https://techops-services.github.io/helm-charts
-          version: 0.0.33
+          version: 0.2.1
           atomic: true
