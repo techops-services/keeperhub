@@ -17,7 +17,6 @@ import { Canvas } from "@/components/ai-elements/canvas";
 import { Connection } from "@/components/ai-elements/connection";
 import { Controls } from "@/components/ai-elements/controls";
 import { AIPrompt } from "@/components/ai-elements/prompt";
-import { WorkflowToolbar } from "@/components/workflow/workflow-toolbar";
 import "@xyflow/react/dist/style.css";
 
 import { PlayCircle, Zap } from "lucide-react";
@@ -77,7 +76,6 @@ const edgeTypes = {
   temporary: Edge.Temporary,
 };
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: React Flow canvas requires complex setup
 export function WorkflowCanvas() {
   const [nodes, setNodes] = useAtom(nodesAtom);
   const [edges, setEdges] = useAtom(edgesAtom);
@@ -458,11 +456,6 @@ export function WorkflowCanvas() {
           : "opacity 300ms",
       }}
     >
-      {/* Toolbar */}
-      <div className="pointer-events-auto">
-        <WorkflowToolbar workflowId={currentWorkflowId ?? undefined} />
-      </div>
-
       {/* React Flow Canvas */}
       <Canvas
         className="bg-background"

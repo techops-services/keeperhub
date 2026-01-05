@@ -7,10 +7,10 @@
  * This file is kept for backwards compatibility with system steps only.
  */
 
-import type { sendEmailStep } from "../../plugins/resend/steps/send-email";
-import type { sendSlackMessageStep } from "../../plugins/slack/steps/send-slack-message";
 import type { checkBalanceStep } from "@/keeperhub/plugins/web3/steps/check-balance";
 import type { transferFundsStep } from "@/keeperhub/plugins/web3/steps/transfer-funds";
+import type { sendEmailStep } from "../../plugins/resend/steps/send-email";
+import type { sendSlackMessageStep } from "../../plugins/slack/steps/send-slack-message";
 import type { conditionStep } from "./condition";
 import type { databaseQueryStep } from "./database-query";
 import type { httpRequestStep } from "./http-request";
@@ -41,13 +41,13 @@ export const stepRegistry: Record<string, StepFunction> = {
       await import("../../plugins/slack/steps/send-slack-message")
     ).sendSlackMessageStep(input as Parameters<typeof sendSlackMessageStep>[0]),
   "Transfer Funds": async (input) =>
-    (await import("@/keeperhub/plugins/web3/steps/transfer-funds")).transferFundsStep(
-      input as Parameters<typeof transferFundsStep>[0]
-    ),
+    (
+      await import("@/keeperhub/plugins/web3/steps/transfer-funds")
+    ).transferFundsStep(input as Parameters<typeof transferFundsStep>[0]),
   "Check Balance": async (input) =>
-    (await import("@/keeperhub/plugins/web3/steps/check-balance")).checkBalanceStep(
-      input as Parameters<typeof checkBalanceStep>[0]
-    ),
+    (
+      await import("@/keeperhub/plugins/web3/steps/check-balance")
+    ).checkBalanceStep(input as Parameters<typeof checkBalanceStep>[0]),
 };
 
 // Helper to check if a step exists
