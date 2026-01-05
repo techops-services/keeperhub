@@ -43,9 +43,12 @@ jobs:
           # Fetch main
           git fetch origin main
 
-          # Check if there are any differences between staging and main
-          if git diff --quiet staging origin/main; then
-            echo "No changes between staging and main. Nothing to merge."
+          # Check if staging is already up-to-date with main using merge-base
+          MERGE_BASE=$(git merge-base HEAD origin/main)
+          MAIN_HEAD=$(git rev-parse origin/main)
+
+          if [ "$MERGE_BASE" = "$MAIN_HEAD" ]; then
+            echo "Staging is already up-to-date with main. Nothing to merge."
             echo "merge_status=no_changes" >> $GITHUB_OUTPUT
             exit 0
           fi
