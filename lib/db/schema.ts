@@ -2,6 +2,7 @@ import { relations } from "drizzle-orm";
 import {
   boolean,
   index,
+  integer,
   jsonb,
   pgTable,
   text,
@@ -228,6 +229,50 @@ export const workflowSchedules = pgTable(
   ]
 );
 
+// Supported blockchain networks with default RPC endpoints
+export const chains = pgTable(
+  "chains",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => generateId()),
+    chainId: integer("chain_id").notNull().unique(), // e.g., 1, 11155111, 8453
+    name: text("name").notNull(), // e.g., "Ethereum Mainnet"
+    symbol: text("symbol").notNull(), // e.g., "ETH"
+    defaultPrimaryRpc: text("default_primary_rpc").notNull(),
+    defaultFallbackRpc: text("default_fallback_rpc"),
+    explorerUrl: text("explorer_url"), // e.g., "https://etherscan.io"
+    explorerApiUrl: text("explorer_api_url"), // For ABI fetching
+    isTestnet: boolean("is_testnet").default(false),
+    isEnabled: boolean("is_enabled").default(true), // Can disable chains
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [index("idx_chains_chain_id").on(table.chainId)]
+);
+
+// User-specific RPC endpoint overrides
+export const userRpcPreferences = pgTable(
+  "user_rpc_preferences",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => generateId()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    chainId: integer("chain_id").notNull(), // References chains.chainId
+    primaryRpcUrl: text("primary_rpc_url").notNull(),
+    fallbackRpcUrl: text("fallback_rpc_url"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("idx_user_rpc_user_chain").on(table.userId, table.chainId),
+    index("idx_user_rpc_user_id").on(table.userId),
+  ]
+);
+
 // Relations
 export const workflowExecutionsRelations = relations(
   workflowExecutions,
@@ -249,6 +294,20 @@ export const workflowSchedulesRelations = relations(
   })
 );
 
+export const chainsRelations = relations(chains, ({ many }) => ({
+  userRpcPreferences: many(userRpcPreferences),
+}));
+
+export const userRpcPreferencesRelations = relations(
+  userRpcPreferences,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [userRpcPreferences.userId],
+      references: [users.id],
+    }),
+  })
+);
+
 export type User = typeof users.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type Workflow = typeof workflows.$inferSelect;
@@ -266,3 +325,7 @@ export type BetaAccessRequest = typeof betaAccessRequests.$inferSelect;
 export type NewBetaAccessRequest = typeof betaAccessRequests.$inferInsert;
 export type WorkflowSchedule = typeof workflowSchedules.$inferSelect;
 export type NewWorkflowSchedule = typeof workflowSchedules.$inferInsert;
+export type Chain = typeof chains.$inferSelect;
+export type NewChain = typeof chains.$inferInsert;
+export type UserRpcPreference = typeof userRpcPreferences.$inferSelect;
+export type NewUserRpcPreference = typeof userRpcPreferences.$inferInsert;
