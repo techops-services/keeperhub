@@ -1,31 +1,41 @@
-import { desc, eq } from "drizzle-orm";
+"use client";
+
+import { useEffect, useState } from "react";
 import { WorkflowTemplateGrid } from "@/keeperhub/components/hub/workflow-template-grid";
-import { db } from "@/lib/db";
-import { workflows } from "@/lib/db/schema";
+import { api, type SavedWorkflow } from "@/lib/api-client";
 
-export default async function HubPage() {
-  const publicWorkflows = await db
-    .select()
-    .from(workflows)
-    .where(eq(workflows.visibility, "public"))
-    .orderBy(desc(workflows.updatedAt));
+export default function HubPage() {
+  // start custom KeeperHub code
+  const [workflows, setWorkflows] = useState<SavedWorkflow[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const mappedWorkflows = publicWorkflows.map((workflow) => ({
-    id: workflow.id,
-    name: workflow.name,
-    description: workflow.description ?? undefined,
-    nodes: workflow.nodes,
-    edges: workflow.edges,
-    visibility: workflow.visibility,
-    createdAt: workflow.createdAt.toISOString(),
-    updatedAt: workflow.updatedAt.toISOString(),
-  }));
+  useEffect(() => {
+    const fetchPublicWorkflows = async () => {
+      try {
+        const publicWorkflows = await api.workflow.getPublic();
+        setWorkflows(publicWorkflows);
+      } catch (error) {
+        console.error("Failed to fetch public workflows:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPublicWorkflows();
+  }, []);
+  // end custom KeeperHub code
 
   return (
     <div className="pointer-events-auto">
       <div className="container mx-auto px-4 py-4 pt-28">
         <h1 className="mb-8 font-bold text-3xl">Public Workflows</h1>
-        <WorkflowTemplateGrid workflows={mappedWorkflows} />
+        {/* start custom KeeperHub code */}
+        {isLoading ? (
+          <p className="text-muted-foreground">Loading workflows...</p>
+        ) : (
+          <WorkflowTemplateGrid workflows={workflows} />
+        )}
+        {/* end custom KeeperHub code */}
       </div>
     </div>
   );

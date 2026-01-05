@@ -438,6 +438,10 @@ export const userApi = {
 export const workflowApi = {
   // Get all workflows
   getAll: () => apiCall<SavedWorkflow[]>("/api/workflows"),
+  // start custom KeeperHub code
+  // Get public workflows
+  getPublic: () => apiCall<SavedWorkflow[]>("/api/workflows/public"),
+  // end custom KeeperHub code
 
   // Get a specific workflow
   getById: (id: string) => apiCall<SavedWorkflow>(`/api/workflows/${id}`),
