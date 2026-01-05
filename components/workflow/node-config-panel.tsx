@@ -185,7 +185,7 @@ export const PanelInner = () => {
             await api.workflow.delete(currentWorkflowId);
             toast.success("Workflow deleted successfully");
             window.location.href = "/";
-          } catch (error) {
+          } catch (_error) {
             toast.error("Failed to delete workflow. Please try again.");
           }
         },

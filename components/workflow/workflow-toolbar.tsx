@@ -1409,16 +1409,20 @@ function WorkflowMenuComponent({
             {/* end custom KeeperHub code */}
             <p className="truncate font-medium text-sm">
               {/* start custom KeeperHub code */}
-              {isHubPage ? (
-                "Hub"
-              ) : workflowId ? (
-                state.workflowName
-              ) : (
-                <>
-                  <span className="sm:hidden">New</span>
-                  <span className="hidden sm:inline">New Workflow</span>
-                </>
-              )}
+              {(() => {
+                if (isHubPage) {
+                  return "Hub";
+                }
+                if (workflowId) {
+                  return state.workflowName;
+                }
+                return (
+                  <>
+                    <span className="sm:hidden">New</span>
+                    <span className="hidden sm:inline">New Workflow</span>
+                  </>
+                );
+              })()}
               {/* end custom KeeperHub code */}
             </p>
             <ChevronDown className="size-3 shrink-0 opacity-50" />

@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { api, type SavedWorkflow } from "@/lib/api-client";
+import { authClient, useSession } from "@/lib/auth-client";
 
 type WorkflowTemplateGridProps = {
   workflows: SavedWorkflow[];
@@ -20,6 +21,7 @@ type WorkflowTemplateGridProps = {
 
 export function WorkflowTemplateGrid({ workflows }: WorkflowTemplateGridProps) {
   const router = useRouter();
+  const { data: session } = useSession();
   const [duplicatingIds, setDuplicatingIds] = useState<Set<string>>(new Set());
 
   const handleDuplicate = async (workflowId: string) => {
@@ -30,6 +32,13 @@ export function WorkflowTemplateGrid({ workflows }: WorkflowTemplateGridProps) {
     setDuplicatingIds((prev) => new Set(prev).add(workflowId));
 
     try {
+      // Auto-sign in as anonymous if user has no session
+      if (!session?.user) {
+        await authClient.signIn.anonymous();
+        // Wait for session to be established
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
       const duplicated = await api.workflow.duplicate(workflowId);
       toast.success("Workflow duplicated successfully");
       router.push(`/workflows/${duplicated.id}`);

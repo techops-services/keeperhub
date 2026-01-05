@@ -22,9 +22,11 @@ export default async function HubPage() {
   }));
 
   return (
-    <div className="container mx-auto px-4 py-4 pt-28">
-      <h1 className="mb-8 font-bold text-3xl">Public Workflows</h1>
-      <WorkflowTemplateGrid workflows={mappedWorkflows} />
+    <div className="pointer-events-auto">
+      <div className="container mx-auto px-4 py-4 pt-28">
+        <h1 className="mb-8 font-bold text-3xl">Public Workflows</h1>
+        <WorkflowTemplateGrid workflows={mappedWorkflows} />
+      </div>
     </div>
   );
 }
