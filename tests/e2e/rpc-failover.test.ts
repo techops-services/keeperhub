@@ -16,6 +16,10 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { type Chain, chains, userRpcPreferences, users } from "@/lib/db/schema";
+import {
+  clearRpcProviderManagerCache,
+  RpcProviderManager,
+} from "@/lib/rpc-provider";
 
 // Skip if DATABASE_URL not set or SKIP_INFRA_TESTS is true (CI environment without DB)
 const shouldSkip =
@@ -351,5 +355,127 @@ describe.skipIf(shouldSkip)("RPC Failover E2E", () => {
         await db.delete(chains).where(eq(chains.chainId, disabledChainId));
       }
     });
+  });
+
+  describe("RPC Provider Failover (Real Endpoints)", () => {
+    // TechOps RPC endpoint (primary, more reliable)
+    const TECHOPS_SEPOLIA_RPC = "https://chain.techops.services/eth-sepolia";
+    const INVALID_RPC = "https://invalid-rpc-endpoint.example.com";
+
+    beforeEach(() => {
+      clearRpcProviderManagerCache();
+    });
+
+    it("should failover from invalid primary to real fallback RPC", async () => {
+      const manager = new RpcProviderManager({
+        config: {
+          primaryRpcUrl: INVALID_RPC,
+          fallbackRpcUrl: TECHOPS_SEPOLIA_RPC,
+          maxRetries: 1,
+          timeoutMs: 10_000,
+          chainName: "Sepolia",
+        },
+      });
+
+      // Execute a real RPC call - getBlockNumber
+      const blockNumber = await manager.executeWithFailover(
+        async (provider) => await provider.getBlockNumber()
+      );
+
+      // Should have failed over to fallback
+      expect(manager.isCurrentlyUsingFallback()).toBe(true);
+      expect(manager.getCurrentProviderType()).toBe("fallback");
+
+      // Should have gotten a valid block number
+      expect(typeof blockNumber).toBe("number");
+      expect(blockNumber).toBeGreaterThan(0);
+
+      // Metrics should reflect the failover
+      const metrics = manager.getMetrics();
+      expect(metrics.primaryFailures).toBeGreaterThan(0);
+      expect(metrics.fallbackAttempts).toBeGreaterThan(0);
+      expect(metrics.lastFailoverTime).not.toBeNull();
+    }, 30_000);
+
+    it("should throw error when both primary and fallback RPCs are invalid", async () => {
+      const manager = new RpcProviderManager({
+        config: {
+          primaryRpcUrl: INVALID_RPC,
+          fallbackRpcUrl: "https://another-invalid-rpc.example.com",
+          maxRetries: 1,
+          timeoutMs: 3000,
+          chainName: "Sepolia",
+        },
+      });
+
+      // Execute a real RPC call - should fail on both endpoints
+      await expect(
+        manager.executeWithFailover(
+          async (provider) => await provider.getBlockNumber()
+        )
+      ).rejects.toThrow("RPC failed on both endpoints");
+
+      // Metrics should reflect both failures
+      const metrics = manager.getMetrics();
+      expect(metrics.primaryFailures).toBeGreaterThan(0);
+      expect(metrics.fallbackFailures).toBeGreaterThan(0);
+    });
+
+    it("should succeed on primary when using real RPC endpoint", async () => {
+      const manager = new RpcProviderManager({
+        config: {
+          primaryRpcUrl: TECHOPS_SEPOLIA_RPC,
+          fallbackRpcUrl: INVALID_RPC,
+          maxRetries: 2,
+          timeoutMs: 15_000,
+          chainName: "Sepolia",
+        },
+      });
+
+      // Execute a real RPC call
+      const blockNumber = await manager.executeWithFailover(
+        async (provider) => await provider.getBlockNumber()
+      );
+
+      // Should NOT have failed over
+      expect(manager.isCurrentlyUsingFallback()).toBe(false);
+      expect(manager.getCurrentProviderType()).toBe("primary");
+
+      // Should have gotten a valid block number
+      expect(typeof blockNumber).toBe("number");
+      expect(blockNumber).toBeGreaterThan(0);
+
+      // Metrics should reflect successful primary
+      const metrics = manager.getMetrics();
+      expect(metrics.primaryAttempts).toBeGreaterThan(0);
+      expect(metrics.primaryFailures).toBe(0);
+      expect(metrics.fallbackAttempts).toBe(0);
+    }, 30_000);
+
+    it("should execute getBalance with failover", async () => {
+      const manager = new RpcProviderManager({
+        config: {
+          primaryRpcUrl: INVALID_RPC,
+          fallbackRpcUrl: TECHOPS_SEPOLIA_RPC,
+          maxRetries: 1,
+          timeoutMs: 10_000,
+          chainName: "Sepolia",
+        },
+      });
+
+      // Use a known address (Sepolia faucet or zero address)
+      const zeroAddress = "0x0000000000000000000000000000000000000000";
+
+      const balance = await manager.executeWithFailover(
+        async (provider) => await provider.getBalance(zeroAddress)
+      );
+
+      // Should have failed over
+      expect(manager.isCurrentlyUsingFallback()).toBe(true);
+
+      // Balance should be a bigint (could be 0 for zero address)
+      expect(typeof balance).toBe("bigint");
+      expect(balance).toBeGreaterThanOrEqual(BigInt(0));
+    }, 30_000);
   });
 });
