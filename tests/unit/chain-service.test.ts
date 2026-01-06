@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock the database before importing the service
 vi.mock("@/lib/db", () => ({
@@ -11,13 +11,13 @@ vi.mock("@/lib/db", () => ({
 
 import { db } from "@/lib/db";
 import {
-  getEnabledChains,
+  createChain,
   getAllChains,
   getChainByChainId,
   getChainById,
-  createChain,
-  updateChain,
+  getEnabledChains,
   setChainEnabled,
+  updateChain,
 } from "@/lib/rpc/chain-service";
 
 describe("chain-service", () => {
@@ -145,7 +145,9 @@ describe("chain-service", () => {
 
       const mockInsert = vi.fn().mockReturnValue({
         values: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([{ ...newChain, id: "chain_456" }]),
+          returning: vi
+            .fn()
+            .mockResolvedValue([{ ...newChain, id: "chain_456" }]),
         }),
       });
       vi.mocked(db.insert).mockImplementation(mockInsert);

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getEnabledChains, getAllChains } from "@/lib/rpc/chain-service";
+import { getAllChains, getEnabledChains } from "@/lib/rpc/chain-service";
 
 export type ChainResponse = {
   id: string;

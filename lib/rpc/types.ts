@@ -2,7 +2,7 @@
  * RPC Configuration Types
  */
 
-export interface ChainConfig {
+export type ChainConfig = {
   chainId: number;
   name: string;
   symbol: string;
@@ -11,19 +11,19 @@ export interface ChainConfig {
   explorerUrl?: string;
   explorerApiUrl?: string;
   isTestnet: boolean;
-}
+};
 
-export interface ResolvedRpcConfig {
+export type ResolvedRpcConfig = {
   chainId: number;
   chainName: string;
   primaryRpcUrl: string;
   fallbackRpcUrl?: string;
   source: "user" | "default";
-}
+};
 
 export const SUPPORTED_CHAIN_IDS = {
   MAINNET: 1,
-  SEPOLIA: 11155111,
+  SEPOLIA: 11_155_111,
   BASE: 8453,
 } as const;
 

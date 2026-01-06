@@ -134,7 +134,11 @@ async function stepHandler(
 
     const result = await rpcProvider.executeWithFailover(async (provider) => {
       // Create contract instance
-      const contract = new ethers.Contract(contractAddress, parsedAbi, provider);
+      const contract = new ethers.Contract(
+        contractAddress,
+        parsedAbi,
+        provider
+      );
       console.log("[Read Contract] Contract instance created");
 
       // Check if function exists
@@ -149,7 +153,7 @@ async function stepHandler(
         args
       );
 
-      return contract[abiFunction](...args);
+      return await contract[abiFunction](...args);
     });
 
     console.log("[Read Contract] Function call successful, result:", result);

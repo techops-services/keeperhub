@@ -8,9 +8,9 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   chains,
-  userRpcPreferences,
   type NewUserRpcPreference,
   type UserRpcPreference,
+  userRpcPreferences,
 } from "@/lib/db/schema";
 import type { ResolvedRpcConfig } from "./types";
 
@@ -123,7 +123,7 @@ export async function resolveAllRpcConfigs(
 export async function getUserRpcPreferences(
   userId: string
 ): Promise<UserRpcPreference[]> {
-  return db
+  return await db
     .select()
     .from(userRpcPreferences)
     .where(eq(userRpcPreferences.userId, userId));

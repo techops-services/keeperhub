@@ -185,7 +185,12 @@ async function stepHandler(
     }
 
     rpcUrl = rpcConfig.primaryRpcUrl;
-    console.log("[Write Contract] Using RPC URL:", rpcUrl, "source:", rpcConfig.source);
+    console.log(
+      "[Write Contract] Using RPC URL:",
+      rpcUrl,
+      "source:",
+      rpcConfig.source
+    );
   } catch (error) {
     console.error("[Write Contract] Failed to resolve RPC config:", error);
     return {

@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import {
-  setUserRpcPreference,
-  deleteUserRpcPreference,
-} from "@/lib/rpc/config-service";
 import { getChainByChainId } from "@/lib/rpc/chain-service";
+import {
+  deleteUserRpcPreference,
+  setUserRpcPreference,
+} from "@/lib/rpc/config-service";
 
 export type SetRpcPreferenceRequest = {
   primaryRpcUrl: string;
@@ -38,13 +38,10 @@ export async function PUT(
     }
 
     const { chainId: chainIdStr } = await params;
-    const chainId = parseInt(chainIdStr, 10);
+    const chainId = Number.parseInt(chainIdStr, 10);
 
-    if (isNaN(chainId)) {
-      return NextResponse.json(
-        { error: "Invalid chain ID" },
-        { status: 400 }
-      );
+    if (Number.isNaN(chainId)) {
+      return NextResponse.json({ error: "Invalid chain ID" }, { status: 400 });
     }
 
     // Verify chain exists
@@ -125,13 +122,10 @@ export async function DELETE(
     }
 
     const { chainId: chainIdStr } = await params;
-    const chainId = parseInt(chainIdStr, 10);
+    const chainId = Number.parseInt(chainIdStr, 10);
 
-    if (isNaN(chainId)) {
-      return NextResponse.json(
-        { error: "Invalid chain ID" },
-        { status: 400 }
-      );
+    if (Number.isNaN(chainId)) {
+      return NextResponse.json({ error: "Invalid chain ID" }, { status: 400 });
     }
 
     const deleted = await deleteUserRpcPreference(session.user.id, chainId);

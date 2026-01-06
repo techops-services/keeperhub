@@ -134,7 +134,12 @@ async function stepHandler(
     }
 
     rpcUrl = rpcConfig.primaryRpcUrl;
-    console.log("[Transfer Funds] Using RPC URL:", rpcUrl, "source:", rpcConfig.source);
+    console.log(
+      "[Transfer Funds] Using RPC URL:",
+      rpcUrl,
+      "source:",
+      rpcConfig.source
+    );
   } catch (error) {
     console.error("[Transfer Funds] Failed to resolve RPC config:", error);
     return {

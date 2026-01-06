@@ -29,21 +29,25 @@ RUN touch README.md || true
 # Build the application
 RUN pnpm build
 
-# Stage 2.5: Migration stage (optional - for running migrations)
+# Stage 2.5: Migration stage (for running migrations and seeding)
 FROM node:25-alpine AS migrator
 WORKDIR /app
-RUN npm install -g pnpm
+RUN npm install -g pnpm tsx
 
-# Copy dependencies and migration files
+# Copy dependencies, migration files, and seed scripts
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/drizzle ./drizzle
 COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
 COPY --from=builder /app/lib ./lib
+COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
-# This stage can be used to run migrations
-# Run with: docker build --target migrator -t keeperhub-migrator .
-# Then: docker run --env DATABASE_URL=xxx keeperhub-migrator pnpm db:push
+# This stage runs migrations and seeds default data
+# Build with: docker build --target migrator -t keeperhub-migrator .
+# Run setup (migrations + seed): docker run --env DATABASE_URL=xxx keeperhub-migrator pnpm db:setup
+# Run migrations only: docker run --env DATABASE_URL=xxx keeperhub-migrator pnpm db:migrate
+# Run seed only: docker run --env DATABASE_URL=xxx keeperhub-migrator pnpm db:seed
 
 # Stage 2.6: Scheduler stage (for schedule dispatcher and job spawner)
 FROM node:25-alpine AS scheduler

@@ -4,20 +4,20 @@
 
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { chains, type Chain, type NewChain } from "@/lib/db/schema";
+import { type Chain, chains, type NewChain } from "@/lib/db/schema";
 
 /**
  * Get all enabled chains
  */
 export async function getEnabledChains(): Promise<Chain[]> {
-  return db.select().from(chains).where(eq(chains.isEnabled, true));
+  return await db.select().from(chains).where(eq(chains.isEnabled, true));
 }
 
 /**
  * Get all chains (including disabled)
  */
 export async function getAllChains(): Promise<Chain[]> {
-  return db.select().from(chains);
+  return await db.select().from(chains);
 }
 
 /**
@@ -79,5 +79,5 @@ export async function setChainEnabled(
   chainId: number,
   enabled: boolean
 ): Promise<Chain | null> {
-  return updateChain(chainId, { isEnabled: enabled });
+  return await updateChain(chainId, { isEnabled: enabled });
 }

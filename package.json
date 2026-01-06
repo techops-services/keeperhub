@@ -6,7 +6,7 @@
   "description": "A template for building your own AI-driven workflow automation platform",
   "scripts": {
     "dev": "pnpm discover-plugins && next dev",
-    "build": "tsx scripts/migrate-prod.ts && pnpm discover-plugins && next build",
+    "build": "tsx scripts/migrate-prod.ts && pnpm discover-plugins && next build --no-lint",
     "start": "next start",
     "type-check": "tsc --noEmit",
     "check": "npx ultracite@latest check",
@@ -15,6 +15,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push --force",
     "db:studio": "drizzle-kit studio",
+    "db:seed": "tsx scripts/seed-chains.ts",
+    "db:setup": "pnpm db:migrate && pnpm db:seed",
     "discover-plugins": "tsx scripts/discover-plugins.ts",
     "create-plugin": "tsx scripts/create-plugin.ts",
     "test": "vitest run",

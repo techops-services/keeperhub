@@ -6,18 +6,18 @@
  */
 
 import {
-  createRpcProviderManager,
   consoleMetricsCollector,
-  type RpcProviderManager,
+  createRpcProviderManager,
   type FailoverStateChangeCallback,
+  type RpcProviderManager,
 } from "@/lib/rpc-provider";
 import { resolveRpcConfig } from "./config-service";
 
-export interface GetProviderOptions {
+export type GetProviderOptions = {
   chainId: number;
   userId?: string;
   onFailoverStateChange?: FailoverStateChangeCallback;
-}
+};
 
 /**
  * Get an RPC provider manager for a specific chain

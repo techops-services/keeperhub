@@ -58,7 +58,7 @@ async function stepHandler(
 
     const balance = await rpcProvider.executeWithFailover(async (provider) => {
       console.log("[Check Balance] Checking balance for address:", address);
-      return provider.getBalance(address);
+      return await provider.getBalance(address);
     });
 
     const balanceEth = ethers.formatEther(balance);

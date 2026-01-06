@@ -23,7 +23,7 @@ const DEFAULT_CHAINS: NewChain[] = [
     isEnabled: true,
   },
   {
-    chainId: 11155111,
+    chainId: 11_155_111,
     name: "Sepolia Testnet",
     symbol: "ETH",
     defaultPrimaryRpc: "https://chain.techops.services/eth-sepolia",
@@ -65,7 +65,9 @@ async function seedChains() {
       .limit(1);
 
     if (existing.length > 0) {
-      console.log(`  - ${chain.name} (${chain.chainId}) already exists, skipping`);
+      console.log(
+        `  - ${chain.name} (${chain.chainId}) already exists, skipping`
+      );
       continue;
     }
 

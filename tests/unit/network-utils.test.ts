@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   getChainIdFromNetwork,
   getNetworkName,
@@ -14,8 +14,8 @@ describe("getChainIdFromNetwork", () => {
     });
 
     it("should return chain ID for sepolia", () => {
-      expect(getChainIdFromNetwork("sepolia")).toBe(11155111);
-      expect(getChainIdFromNetwork("sepolia-testnet")).toBe(11155111);
+      expect(getChainIdFromNetwork("sepolia")).toBe(11_155_111);
+      expect(getChainIdFromNetwork("sepolia-testnet")).toBe(11_155_111);
     });
 
     it("should return chain ID for base", () => {
@@ -25,7 +25,7 @@ describe("getChainIdFromNetwork", () => {
 
     it("should be case insensitive", () => {
       expect(getChainIdFromNetwork("MAINNET")).toBe(1);
-      expect(getChainIdFromNetwork("Sepolia")).toBe(11155111);
+      expect(getChainIdFromNetwork("Sepolia")).toBe(11_155_111);
       expect(getChainIdFromNetwork("BASE")).toBe(8453);
     });
 
@@ -46,13 +46,13 @@ describe("getChainIdFromNetwork", () => {
   describe("with numeric chain IDs", () => {
     it("should return the same chain ID for numbers", () => {
       expect(getChainIdFromNetwork(1)).toBe(1);
-      expect(getChainIdFromNetwork(11155111)).toBe(11155111);
+      expect(getChainIdFromNetwork(11_155_111)).toBe(11_155_111);
       expect(getChainIdFromNetwork(8453)).toBe(8453);
     });
 
     it("should return any numeric chain ID as-is", () => {
       expect(getChainIdFromNetwork(137)).toBe(137); // Polygon
-      expect(getChainIdFromNetwork(42161)).toBe(42161); // Arbitrum
+      expect(getChainIdFromNetwork(42_161)).toBe(42_161); // Arbitrum
     });
   });
 });
@@ -60,21 +60,21 @@ describe("getChainIdFromNetwork", () => {
 describe("getNetworkName", () => {
   it("should return name for known chain IDs", () => {
     expect(getNetworkName(1)).toBe("Ethereum Mainnet");
-    expect(getNetworkName(11155111)).toBe("Sepolia Testnet");
+    expect(getNetworkName(11_155_111)).toBe("Sepolia Testnet");
     expect(getNetworkName(8453)).toBe("Base");
   });
 
   it("should return generic name for unknown chain IDs", () => {
     expect(getNetworkName(137)).toBe("Chain 137");
-    expect(getNetworkName(42161)).toBe("Chain 42161");
-    expect(getNetworkName(999999)).toBe("Chain 999999");
+    expect(getNetworkName(42_161)).toBe("Chain 42161");
+    expect(getNetworkName(999_999)).toBe("Chain 999999");
   });
 });
 
 describe("SUPPORTED_CHAIN_IDS", () => {
   it("should have correct values", () => {
     expect(SUPPORTED_CHAIN_IDS.MAINNET).toBe(1);
-    expect(SUPPORTED_CHAIN_IDS.SEPOLIA).toBe(11155111);
+    expect(SUPPORTED_CHAIN_IDS.SEPOLIA).toBe(11_155_111);
     expect(SUPPORTED_CHAIN_IDS.BASE).toBe(8453);
   });
 

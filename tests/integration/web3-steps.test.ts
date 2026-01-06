@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock server-only module
 vi.mock("server-only", () => ({}));
@@ -6,22 +6,26 @@ vi.mock("server-only", () => ({}));
 // Mock ethers
 vi.mock("ethers", () => ({
   ethers: {
-    isAddress: vi.fn((addr: string) => addr.startsWith("0x") && addr.length === 42),
+    isAddress: vi.fn(
+      (addr: string) => addr.startsWith("0x") && addr.length === 42
+    ),
     formatEther: vi.fn((wei: bigint) => (Number(wei) / 1e18).toString()),
-    parseEther: vi.fn((eth: string) => BigInt(Math.floor(parseFloat(eth) * 1e18))),
+    parseEther: vi.fn((eth: string) =>
+      BigInt(Math.floor(Number.parseFloat(eth) * 1e18))
+    ),
     Contract: vi.fn().mockImplementation(() => ({
-      balanceOf: vi.fn().mockResolvedValue(BigInt(1000000000000000000)),
+      balanceOf: vi.fn().mockResolvedValue(BigInt(1_000_000_000_000_000_000)),
       transfer: vi.fn().mockResolvedValue({
         hash: "0xtxhash123",
         wait: vi.fn().mockResolvedValue({
           hash: "0xtxhash123",
-          blockNumber: 12345,
+          blockNumber: 12_345,
           status: 1,
         }),
       }),
     })),
     JsonRpcProvider: vi.fn().mockImplementation(() => ({
-      getBalance: vi.fn().mockResolvedValue(BigInt(5000000000000000000)),
+      getBalance: vi.fn().mockResolvedValue(BigInt(5_000_000_000_000_000_000)),
     })),
   },
 }));
@@ -31,19 +35,25 @@ vi.mock("@/lib/rpc", () => ({
   getChainIdFromNetwork: vi.fn((network: string) => {
     const map: Record<string, number> = {
       mainnet: 1,
-      sepolia: 11155111,
+      sepolia: 11_155_111,
       base: 8453,
     };
-    if (!map[network]) throw new Error(`Unsupported network: ${network}`);
+    if (!map[network]) {
+      throw new Error(`Unsupported network: ${network}`);
+    }
     return map[network];
   }),
   getRpcProvider: vi.fn().mockResolvedValue({
-    executeWithFailover: vi.fn(async (operation: (provider: unknown) => Promise<unknown>) => {
-      const mockProvider = {
-        getBalance: vi.fn().mockResolvedValue(BigInt(5000000000000000000)),
-      };
-      return operation(mockProvider);
-    }),
+    executeWithFailover: vi.fn(
+      async (operation: (provider: unknown) => Promise<unknown>) => {
+        const mockProvider = {
+          getBalance: vi
+            .fn()
+            .mockResolvedValue(BigInt(5_000_000_000_000_000_000)),
+        };
+        return await operation(mockProvider);
+      }
+    ),
   }),
   resolveRpcConfig: vi.fn().mockResolvedValue({
     chainId: 1,
@@ -70,12 +80,14 @@ vi.mock("@/lib/db", () => ({
 // Mock Para wallet helpers
 vi.mock("@/keeperhub/lib/para/wallet-helpers", () => ({
   initializeParaSigner: vi.fn().mockResolvedValue({
-    getAddress: vi.fn().mockResolvedValue("0x1234567890123456789012345678901234567890"),
+    getAddress: vi
+      .fn()
+      .mockResolvedValue("0x1234567890123456789012345678901234567890"),
     sendTransaction: vi.fn().mockResolvedValue({
       hash: "0xtxhash456",
       wait: vi.fn().mockResolvedValue({
         hash: "0xtxhash456",
-        blockNumber: 12346,
+        blockNumber: 12_346,
         status: 1,
       }),
     }),
@@ -84,7 +96,7 @@ vi.mock("@/keeperhub/lib/para/wallet-helpers", () => ({
 
 // Mock step handler
 vi.mock("@/lib/steps/step-handler", () => ({
-  withStepLogging: vi.fn((input, handler) => handler()),
+  withStepLogging: vi.fn((_input, handler) => handler()),
 }));
 
 // Mock utils
@@ -94,7 +106,11 @@ vi.mock("@/lib/utils", () => ({
 
 // Now import the step functions after all mocks are set up
 import { checkBalanceStep } from "@/keeperhub/plugins/web3/steps/check-balance";
-import { getChainIdFromNetwork, getRpcProvider, resolveRpcConfig } from "@/lib/rpc";
+import {
+  getChainIdFromNetwork,
+  getRpcProvider,
+  resolveRpcConfig,
+} from "@/lib/rpc";
 
 // Helper to create test context
 const createTestContext = () => ({
@@ -123,7 +139,9 @@ describe("Web3 Plugin Steps Integration", () => {
       if (result.success) {
         expect(result.balance).toBe("5");
         expect(result.balanceWei).toBe("5000000000000000000");
-        expect(result.address).toBe("0x1234567890123456789012345678901234567890");
+        expect(result.address).toBe(
+          "0x1234567890123456789012345678901234567890"
+        );
       }
     });
 
@@ -176,7 +194,9 @@ describe("Web3 Plugin Steps Integration", () => {
 
     it("should handle RPC provider errors", async () => {
       vi.mocked(getRpcProvider).mockResolvedValueOnce({
-        executeWithFailover: vi.fn().mockRejectedValue(new Error("RPC connection failed")),
+        executeWithFailover: vi
+          .fn()
+          .mockRejectedValue(new Error("RPC connection failed")),
       } as unknown as Awaited<ReturnType<typeof getRpcProvider>>);
 
       const input = {
@@ -194,16 +214,18 @@ describe("Web3 Plugin Steps Integration", () => {
     });
 
     it("should use failover when primary RPC fails", async () => {
-      let callCount = 0;
       vi.mocked(getRpcProvider).mockResolvedValueOnce({
-        executeWithFailover: vi.fn(async (operation: (provider: unknown) => Promise<unknown>) => {
-          callCount++;
-          // Simulate failover by returning success after mock "failover"
-          const mockProvider = {
-            getBalance: vi.fn().mockResolvedValue(BigInt(3000000000000000000)),
-          };
-          return operation(mockProvider);
-        }),
+        executeWithFailover: vi.fn(
+          async (operation: (provider: unknown) => Promise<unknown>) => {
+            // Simulate failover by returning success after mock "failover"
+            const mockProvider = {
+              getBalance: vi
+                .fn()
+                .mockResolvedValue(BigInt(3_000_000_000_000_000_000)),
+            };
+            return await operation(mockProvider);
+          }
+        ),
       } as unknown as Awaited<ReturnType<typeof getRpcProvider>>);
 
       const input = {

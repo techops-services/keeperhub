@@ -1,17 +1,17 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  RpcProviderManager,
-  createRpcProviderManager,
   clearRpcProviderManagerCache,
+  consoleMetricsCollector,
+  createRpcProviderManager,
   getAllFailoverStates,
   noopMetricsCollector,
-  consoleMetricsCollector,
   type RpcMetricsCollector,
+  RpcProviderManager,
 } from "@/lib/rpc-provider";
 
 // Mock ethers
 vi.mock("ethers", () => {
-  const mockProvider = {
+  const _mockProvider = {
     getBalance: vi.fn(),
     getBlock: vi.fn(),
     call: vi.fn(),
@@ -20,7 +20,7 @@ vi.mock("ethers", () => {
   // Create a proper mock class for FetchRequest
   class MockFetchRequest {
     url: string;
-    timeout: number = 5000;
+    timeout = 5000;
     constructor(url: string) {
       this.url = url;
     }
@@ -31,9 +31,6 @@ vi.mock("ethers", () => {
     getBalance = vi.fn();
     getBlock = vi.fn();
     call = vi.fn();
-    constructor(_fetchRequest: MockFetchRequest) {
-      // Constructor accepts a FetchRequest
-    }
   }
 
   return {
@@ -83,7 +80,7 @@ describe("RpcProviderManager", () => {
           primaryRpcUrl: "https://primary.example.com",
           fallbackRpcUrl: "https://fallback.example.com",
           maxRetries: 5,
-          timeoutMs: 60000,
+          timeoutMs: 60_000,
           chainName: "Ethereum",
         },
         metricsCollector,
@@ -435,17 +432,29 @@ describe("getAllFailoverStates", () => {
 
 describe("noopMetricsCollector", () => {
   it("should not throw when called", () => {
-    expect(() => noopMetricsCollector.recordPrimaryAttempt("test")).not.toThrow();
-    expect(() => noopMetricsCollector.recordPrimaryFailure("test")).not.toThrow();
-    expect(() => noopMetricsCollector.recordFallbackAttempt("test")).not.toThrow();
-    expect(() => noopMetricsCollector.recordFallbackFailure("test")).not.toThrow();
-    expect(() => noopMetricsCollector.recordFailoverEvent("test")).not.toThrow();
+    expect(() =>
+      noopMetricsCollector.recordPrimaryAttempt("test")
+    ).not.toThrow();
+    expect(() =>
+      noopMetricsCollector.recordPrimaryFailure("test")
+    ).not.toThrow();
+    expect(() =>
+      noopMetricsCollector.recordFallbackAttempt("test")
+    ).not.toThrow();
+    expect(() =>
+      noopMetricsCollector.recordFallbackFailure("test")
+    ).not.toThrow();
+    expect(() =>
+      noopMetricsCollector.recordFailoverEvent("test")
+    ).not.toThrow();
   });
 });
 
 describe("consoleMetricsCollector", () => {
   it("should log to console.debug", () => {
-    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {
+      // Intentionally empty - suppress console output during tests
+    });
 
     consoleMetricsCollector.recordPrimaryAttempt("Ethereum");
     expect(debugSpy).toHaveBeenCalledWith(

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock the database before importing the service
 vi.mock("@/lib/db", () => ({
@@ -12,11 +12,11 @@ vi.mock("@/lib/db", () => ({
 
 import { db } from "@/lib/db";
 import {
-  resolveRpcConfig,
-  resolveAllRpcConfigs,
-  getUserRpcPreferences,
-  setUserRpcPreference,
   deleteUserRpcPreference,
+  getUserRpcPreferences,
+  resolveAllRpcConfigs,
+  resolveRpcConfig,
+  setUserRpcPreference,
 } from "@/lib/rpc/config-service";
 
 describe("config-service", () => {
@@ -72,7 +72,7 @@ describe("config-service", () => {
       // Mock user pref query (second call)
       let callCount = 0;
       const mockSelect = vi.fn().mockImplementation(() => {
-        callCount++;
+        callCount += 1;
         if (callCount === 1) {
           // Chain query
           return {
@@ -108,7 +108,7 @@ describe("config-service", () => {
     it("should return chain defaults when user has no custom config", async () => {
       let callCount = 0;
       const mockSelect = vi.fn().mockImplementation(() => {
-        callCount++;
+        callCount += 1;
         if (callCount === 1) {
           return {
             from: vi.fn().mockReturnValue({
@@ -149,7 +149,7 @@ describe("config-service", () => {
     });
 
     it("should return null when chain is disabled", async () => {
-      const disabledChain = { ...mockChain, isEnabled: false };
+      const _disabledChain = { ...mockChain, isEnabled: false };
       const mockSelect = vi.fn().mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -170,7 +170,7 @@ describe("config-service", () => {
       const sepoliaChain = {
         ...mockChain,
         id: "chain_2",
-        chainId: 11155111,
+        chainId: 11_155_111,
         name: "Sepolia",
         defaultPrimaryRpc: "https://sepolia.example.com",
         defaultFallbackRpc: null,
@@ -178,7 +178,7 @@ describe("config-service", () => {
 
       let callCount = 0;
       const mockSelect = vi.fn().mockImplementation(() => {
-        callCount++;
+        callCount += 1;
         if (callCount === 1) {
           // Get all enabled chains
           return {
@@ -201,13 +201,13 @@ describe("config-service", () => {
       expect(result).toHaveLength(2);
       expect(result[0].chainId).toBe(1);
       expect(result[0].source).toBe("default");
-      expect(result[1].chainId).toBe(11155111);
+      expect(result[1].chainId).toBe(11_155_111);
     });
 
     it("should include user preferences when userId provided", async () => {
       let callCount = 0;
       const mockSelect = vi.fn().mockImplementation(() => {
-        callCount++;
+        callCount += 1;
         if (callCount === 1) {
           return {
             from: vi.fn().mockReturnValue({

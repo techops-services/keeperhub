@@ -4,13 +4,13 @@ import { ethers } from "ethers";
  * Interface for metrics collection - allows dependency injection
  * so both server-side (console/structured) and frontend (no-op) can use this
  */
-export interface RpcMetricsCollector {
+export type RpcMetricsCollector = {
   recordPrimaryAttempt(chainName: string): void;
   recordPrimaryFailure(chainName: string): void;
   recordFallbackAttempt(chainName: string): void;
   recordFallbackFailure(chainName: string): void;
   recordFailoverEvent(chainName: string): void;
-}
+};
 
 /**
  * Callback for failover state changes - allows UI to react to failover events
@@ -25,11 +25,21 @@ export type FailoverStateChangeCallback = (
  * No-op metrics collector for environments without metrics (e.g., frontend)
  */
 export const noopMetricsCollector: RpcMetricsCollector = {
-  recordPrimaryAttempt: () => {},
-  recordPrimaryFailure: () => {},
-  recordFallbackAttempt: () => {},
-  recordFallbackFailure: () => {},
-  recordFailoverEvent: () => {},
+  recordPrimaryAttempt: () => {
+    /* noop */
+  },
+  recordPrimaryFailure: () => {
+    /* noop */
+  },
+  recordFallbackAttempt: () => {
+    /* noop */
+  },
+  recordFallbackFailure: () => {
+    /* noop */
+  },
+  recordFailoverEvent: () => {
+    /* noop */
+  },
 };
 
 /**
@@ -48,42 +58,44 @@ export const consoleMetricsCollector: RpcMetricsCollector = {
     console.debug(`[RPC Metrics] Failover event: ${chain}`),
 };
 
-export interface RpcProviderConfig {
+export type RpcProviderConfig = {
   primaryRpcUrl: string;
   fallbackRpcUrl?: string;
   maxRetries?: number;
   timeoutMs?: number;
   chainName?: string;
-}
+};
 
-export interface RpcProviderMetrics {
+export type RpcProviderMetrics = {
   primaryAttempts: number;
   primaryFailures: number;
   fallbackAttempts: number;
   fallbackFailures: number;
   totalRequests: number;
   lastFailoverTime: Date | null;
-}
+};
 
-export interface RpcProviderManagerOptions {
+export type RpcProviderManagerOptions = {
   config: RpcProviderConfig;
   metricsCollector?: RpcMetricsCollector;
   onFailoverStateChange?: FailoverStateChangeCallback;
-}
+};
 
 export class RpcProviderManager {
   private primaryProvider: ethers.JsonRpcProvider | null = null;
   private fallbackProvider: ethers.JsonRpcProvider | null = null;
-  private config: Required<Omit<RpcProviderConfig, "fallbackRpcUrl">> & {
+  private readonly config: Required<
+    Omit<RpcProviderConfig, "fallbackRpcUrl">
+  > & {
     fallbackRpcUrl?: string;
   };
-  private metrics: RpcProviderMetrics;
-  private metricsCollector: RpcMetricsCollector;
+  private readonly metrics: RpcProviderMetrics;
+  private readonly metricsCollector: RpcMetricsCollector;
   private isUsingFallback = false;
   private onFailoverStateChange?: FailoverStateChangeCallback;
 
   private static readonly DEFAULT_MAX_RETRIES = 3;
-  private static readonly DEFAULT_TIMEOUT_MS = 30000;
+  private static readonly DEFAULT_TIMEOUT_MS = 30_000;
 
   constructor(options: RpcProviderManagerOptions) {
     const {
@@ -138,17 +150,17 @@ export class RpcProviderManager {
     return this.fallbackProvider;
   }
 
-  public getProvider(): ethers.JsonRpcProvider {
+  getProvider(): ethers.JsonRpcProvider {
     if (this.isUsingFallback && this.fallbackProvider) {
       return this.fallbackProvider;
     }
     return this.getPrimaryProvider();
   }
 
-  public async executeWithFailover<T>(
+  async executeWithFailover<T>(
     operation: (provider: ethers.JsonRpcProvider) => Promise<T>
   ): Promise<T> {
-    this.metrics.totalRequests++;
+    this.metrics.totalRequests += 1;
 
     // If we've already switched to fallback, use it directly
     if (this.isUsingFallback) {
@@ -258,7 +270,7 @@ export class RpcProviderManager {
 
   private async tryProvider<T>(
     provider: ethers.JsonRpcProvider,
-    operation: (provider: ethers.JsonRpcProvider) => Promise<T>,
+    operation: (p: ethers.JsonRpcProvider) => Promise<T>,
     providerType: "primary" | "fallback",
     maxRetries: number
   ): Promise<{ success: boolean; result?: T; error?: string }> {
@@ -267,10 +279,10 @@ export class RpcProviderManager {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         if (providerType === "primary") {
-          this.metrics.primaryAttempts++;
+          this.metrics.primaryAttempts += 1;
           this.metricsCollector.recordPrimaryAttempt(this.config.chainName);
         } else {
-          this.metrics.fallbackAttempts++;
+          this.metrics.fallbackAttempts += 1;
           this.metricsCollector.recordFallbackAttempt(this.config.chainName);
         }
 
@@ -284,10 +296,10 @@ export class RpcProviderManager {
         lastError = error instanceof Error ? error : new Error(String(error));
 
         if (providerType === "primary") {
-          this.metrics.primaryFailures++;
+          this.metrics.primaryFailures += 1;
           this.metricsCollector.recordPrimaryFailure(this.config.chainName);
         } else {
-          this.metrics.fallbackFailures++;
+          this.metrics.fallbackFailures += 1;
           this.metricsCollector.recordFallbackFailure(this.config.chainName);
         }
 
@@ -295,7 +307,7 @@ export class RpcProviderManager {
           break;
         }
 
-        await this.delay(Math.min(1000 * Math.pow(2, attempt), 5000));
+        await this.delay(Math.min(1000 * 2 ** attempt, 5000));
       }
     }
 
@@ -321,15 +333,15 @@ export class RpcProviderManager {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  public getMetrics(): Readonly<RpcProviderMetrics> {
+  getMetrics(): Readonly<RpcProviderMetrics> {
     return { ...this.metrics };
   }
 
-  public isCurrentlyUsingFallback(): boolean {
+  isCurrentlyUsingFallback(): boolean {
     return this.isUsingFallback;
   }
 
-  public getCurrentProviderType(): "primary" | "fallback" {
+  getCurrentProviderType(): "primary" | "fallback" {
     return this.isUsingFallback ? "fallback" : "primary";
   }
 
@@ -337,16 +349,14 @@ export class RpcProviderManager {
    * Register a callback for failover state changes.
    * Useful for updating UI when failover occurs.
    */
-  public setFailoverStateChangeCallback(
-    callback: FailoverStateChangeCallback
-  ): void {
+  setFailoverStateChangeCallback(callback: FailoverStateChangeCallback): void {
     this.onFailoverStateChange = callback;
   }
 
   /**
    * Get the chain name this manager is configured for
    */
-  public getChainName(): string {
+  getChainName(): string {
     return this.config.chainName;
   }
 }
@@ -354,7 +364,7 @@ export class RpcProviderManager {
 // Cache managers by RPC URL combination to persist failover state across requests
 const managerCache = new Map<string, RpcProviderManager>();
 
-export interface CreateRpcProviderManagerOptions {
+export type CreateRpcProviderManagerOptions = {
   primaryRpcUrl: string;
   fallbackRpcUrl?: string;
   maxRetries?: number;
@@ -362,7 +372,7 @@ export interface CreateRpcProviderManagerOptions {
   chainName?: string;
   metricsCollector?: RpcMetricsCollector;
   onFailoverStateChange?: FailoverStateChangeCallback;
-}
+};
 
 export function createRpcProviderManager(
   options: CreateRpcProviderManagerOptions
