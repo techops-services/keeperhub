@@ -1,5 +1,9 @@
 # Organization Implementation
 
+> **Implementation Approach:** This feature is built using [better-auth's organization plugin](https://www.better-auth.com/docs/plugins/organization), which provides built-in multi-tenancy, RBAC, invitation system, and session-based organization switching.
+>
+> **Detailed Strategy:** See [organization-implementation-strategy.md](./organization-implementation-strategy.md) for complete technical implementation details.
+
 ## Core Requirements
 
 1. **Authenticated users must belong to an organization** - no standalone/personal mode
@@ -10,10 +14,10 @@
 
 ## User Types
 
-| User Type | Org Required | Can Create Workflows | Can Join Org | Can Create ParaWallet |
-|-----------|--------------|---------------------|--------------|----------------------|
-| Anonymous | No | Yes (trial mode) | No | No |
-| Authenticated | Yes | Yes (org-scoped) | Yes | Yes (if owner/admin) |
+| User Type     | Org Required | Can Create Workflows | Can Join Org | Can Create ParaWallet |
+| ------------- | ------------ | -------------------- | ------------ | --------------------- |
+| Anonymous     | No           | Yes (trial mode)     | No           | No                    |
+| Authenticated | Yes          | Yes (org-scoped)     | Yes          | Yes (if owner/admin)  |
 
 ## Registration Flow
 
@@ -30,6 +34,7 @@ Create org (becomes owner)    Join org (role set by inviter)
 ## Org Removal Handling
 
 If a user is removed from their only organization:
+
 - Redirect to "Create or Join Organization" screen
 - They cannot access the main app until they belong to an org again
 
@@ -38,6 +43,13 @@ If a user is removed from their only organization:
 - Owners and admins can invite users
 - Role is set per invite (owner, admin, or member)
 - Invite via email or shareable link with code
+- Invitations expire after 7 days
+- Email delivery via SendGrid plugin integration
+
+**Technical Implementation:**
+- Uses better-auth's built-in invitation system
+- Invitation records stored in database with status tracking (pending/accepted/rejected/cancelled)
+- Email template customizable via `sendInvitationEmail` hook
 
 ## ParaWallet Ownership
 
@@ -45,6 +57,11 @@ If a user is removed from their only organization:
 - Created by owner or admin
 - Email is manually specified (not auto-filled from user's email)
 - All org members can use the wallet for signing
+
+**Technical Implementation:**
+- ParaWallet credentials are scoped by `organizationId`
+- Access control enforced via better-auth permissions: `wallet: ["create", "read", "update", "delete"]`
+- Members have read-only permission (can use wallet), admins/owners can manage
 
 ## Anonymous User Flow
 
