@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { getChainByChainId } from "@/lib/rpc/chain-service";
 import {
   deleteUserRpcPreference,
+  resolveRpcConfig,
   setUserRpcPreference,
 } from "@/lib/rpc/config-service";
 
@@ -19,6 +20,68 @@ export type SetRpcPreferenceResponse = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type GetRpcConfigResponse = {
+  chainId: number;
+  chainName: string;
+  primaryRpcUrl: string;
+  fallbackRpcUrl: string | null;
+  source: "user" | "default";
+};
+
+/**
+ * GET /api/user/rpc-preferences/:chainId
+ * Get the resolved RPC config for a specific chain (user preference or default)
+ */
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ chainId: string }> }
+) {
+  try {
+    const session = await auth.api.getSession({
+      headers: request.headers,
+    });
+
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { chainId: chainIdStr } = await params;
+    const chainId = Number.parseInt(chainIdStr, 10);
+
+    if (Number.isNaN(chainId)) {
+      return NextResponse.json({ error: "Invalid chain ID" }, { status: 400 });
+    }
+
+    const config = await resolveRpcConfig(chainId, session.user.id);
+
+    if (!config) {
+      return NextResponse.json(
+        { error: `Chain ${chainId} not found or disabled` },
+        { status: 404 }
+      );
+    }
+
+    const response: GetRpcConfigResponse = {
+      chainId: config.chainId,
+      chainName: config.chainName,
+      primaryRpcUrl: config.primaryRpcUrl,
+      fallbackRpcUrl: config.fallbackRpcUrl ?? null,
+      source: config.source,
+    };
+
+    return NextResponse.json(response);
+  } catch (error) {
+    console.error("Failed to get RPC config:", error);
+    return NextResponse.json(
+      {
+        error: "Failed to get RPC config",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 }
+    );
+  }
+}
 
 /**
  * PUT /api/user/rpc-preferences/:chainId
