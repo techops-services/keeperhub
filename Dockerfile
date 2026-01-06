@@ -14,8 +14,8 @@ COPY .npmrc* ./
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 
-# Stage 2: Builder
-FROM node:25-alpine AS builder
+# Stage 2: Source (dependencies + source files, no build)
+FROM node:25-alpine AS source
 WORKDIR /app
 RUN npm install -g pnpm
 
@@ -23,25 +23,28 @@ RUN npm install -g pnpm
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Stage 2.5: Builder (runs Next.js build, only needed for runner stage)
+FROM source AS builder
+
 # Create README.md if it doesn't exist to avoid build errors
 RUN touch README.md || true
 
 # Build the application
 RUN pnpm build
 
-# Stage 2.5: Migration stage (for running migrations and seeding)
+# Stage 2.6: Migration stage (for running migrations and seeding)
 FROM node:25-alpine AS migrator
 WORKDIR /app
 RUN npm install -g pnpm tsx
 
 # Copy dependencies, migration files, and seed scripts
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=builder /app/drizzle ./drizzle
-COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
-COPY --from=builder /app/lib ./lib
-COPY --from=builder /app/scripts ./scripts
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/tsconfig.json ./tsconfig.json
+COPY --from=source /app/drizzle ./drizzle
+COPY --from=source /app/drizzle.config.ts ./drizzle.config.ts
+COPY --from=source /app/lib ./lib
+COPY --from=source /app/scripts ./scripts
+COPY --from=source /app/package.json ./package.json
+COPY --from=source /app/tsconfig.json ./tsconfig.json
 
 # This stage runs migrations and seeds default data
 # Build with: docker build --target migrator -t keeperhub-migrator .
@@ -49,18 +52,18 @@ COPY --from=builder /app/tsconfig.json ./tsconfig.json
 # Run migrations only: docker run --env DATABASE_URL=xxx keeperhub-migrator pnpm db:migrate
 # Run seed only: docker run --env DATABASE_URL=xxx keeperhub-migrator pnpm db:seed
 
-# Stage 2.6: Scheduler stage (for schedule dispatcher and job spawner)
+# Stage 2.7: Scheduler stage (for schedule dispatcher and job spawner)
 FROM node:25-alpine AS scheduler
 WORKDIR /app
 RUN npm install -g pnpm tsx
 
 # Copy dependencies and scheduler files
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=builder /app/scripts ./scripts
-COPY --from=builder /app/lib ./lib
-COPY --from=builder /app/keeperhub ./keeperhub
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/tsconfig.json ./tsconfig.json
+COPY --from=source /app/scripts ./scripts
+COPY --from=source /app/lib ./lib
+COPY --from=source /app/keeperhub ./keeperhub
+COPY --from=source /app/package.json ./package.json
+COPY --from=source /app/tsconfig.json ./tsconfig.json
 
 ENV NODE_ENV=production
 
@@ -72,19 +75,19 @@ ENV NODE_ENV=production
 # Run dispatcher: docker run keeperhub-scheduler tsx scripts/schedule-dispatcher.ts
 # Run job spawner: docker run keeperhub-scheduler tsx scripts/job-spawner.ts
 
-# Stage 2.7: Workflow Runner stage (for executing workflows in K8s Jobs)
+# Stage 2.8: Workflow Runner stage (for executing workflows in K8s Jobs)
 FROM node:25-alpine AS workflow-runner
 WORKDIR /app
 RUN npm install -g pnpm tsx
 
 # Copy dependencies and workflow execution files
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=builder /app/scripts/workflow-runner.ts ./scripts/workflow-runner.ts
-COPY --from=builder /app/lib ./lib
-COPY --from=builder /app/plugins ./plugins
-COPY --from=builder /app/keeperhub ./keeperhub
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/tsconfig.json ./tsconfig.json
+COPY --from=source /app/scripts/workflow-runner.ts ./scripts/workflow-runner.ts
+COPY --from=source /app/lib ./lib
+COPY --from=source /app/plugins ./plugins
+COPY --from=source /app/keeperhub ./keeperhub
+COPY --from=source /app/package.json ./package.json
+COPY --from=source /app/tsconfig.json ./tsconfig.json
 
 # Create a shim for 'server-only' package - the runner runs outside Next.js
 # so we replace the package with an empty module that doesn't throw
@@ -100,7 +103,7 @@ ENV NODE_ENV=production
 # Build with: docker build --target workflow-runner -t keeperhub-runner .
 CMD ["tsx", "scripts/workflow-runner.ts"]
 
-# Stage 3: Runner
+# Stage 3: Runner (main Next.js app)
 FROM node:25-alpine AS runner
 WORKDIR /app
 
