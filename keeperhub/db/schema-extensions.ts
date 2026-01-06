@@ -9,8 +9,9 @@
  */
 
 import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
-import { users } from "@/lib/db/schema";
-import { generateId } from "@/lib/utils/id";
+// Note: Using relative paths instead of @/ aliases for drizzle-kit compatibility
+import { users } from "../../lib/db/schema";
+import { generateId } from "../../lib/utils/id";
 
 /**
  * Para Wallets table

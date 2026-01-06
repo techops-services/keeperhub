@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { ConfirmOverlay } from "@/components/overlays/confirm-overlay";
+import { useOverlay } from "@/components/overlays/overlay-provider";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,6 +32,7 @@ import type { IntegrationType } from "@/lib/types/integration";
 import { generateWorkflowCode } from "@/lib/workflow-codegen";
 import {
   clearNodeStatusesAtom,
+  clearWorkflowAtom,
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
   deleteEdgeAtom,
@@ -48,9 +51,7 @@ import {
   showDeleteDialogAtom,
   updateNodeDataAtom,
 } from "@/lib/workflow-store";
-
 import { findActionById } from "@/plugins";
-
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { ActionConfig } from "./config/action-config";
 import { ActionGrid } from "./config/action-grid";
@@ -161,9 +162,61 @@ export const PanelInner = () => {
   const deleteNode = useSetAtom(deleteNodeAtom);
   const deleteEdge = useSetAtom(deleteEdgeAtom);
   const deleteSelectedItems = useSetAtom(deleteSelectedItemsAtom);
-  const setShowClearDialog = useSetAtom(showClearDialogAtom);
-  const setShowDeleteDialog = useSetAtom(showDeleteDialogAtom);
+  const [showClearDialog, setShowClearDialog] = useAtom(showClearDialogAtom);
+  const [showDeleteDialog, setShowDeleteDialog] = useAtom(showDeleteDialogAtom);
   const clearNodeStatuses = useSetAtom(clearNodeStatusesAtom);
+  const clearWorkflow = useSetAtom(clearWorkflowAtom);
+  const { open: openOverlay } = useOverlay();
+
+  // Watch showDeleteDialog atom and open overlay when it becomes true
+  useEffect(() => {
+    if (showDeleteDialog) {
+      openOverlay(ConfirmOverlay, {
+        title: "Delete Workflow",
+        message: `Are you sure you want to delete "${currentWorkflowName}"? This will permanently delete the workflow. This cannot be undone.`,
+        confirmLabel: "Delete Workflow",
+        confirmVariant: "destructive" as const,
+        destructive: true,
+        onConfirm: async () => {
+          if (!currentWorkflowId) {
+            return;
+          }
+          try {
+            await api.workflow.delete(currentWorkflowId);
+            toast.success("Workflow deleted successfully");
+            window.location.href = "/";
+          } catch (_error) {
+            toast.error("Failed to delete workflow. Please try again.");
+          }
+        },
+      });
+      setShowDeleteDialog(false);
+    }
+  }, [
+    showDeleteDialog,
+    currentWorkflowId,
+    currentWorkflowName,
+    openOverlay,
+    setShowDeleteDialog,
+  ]);
+
+  // Watch showClearDialog atom and open overlay when it becomes true
+  useEffect(() => {
+    if (showClearDialog) {
+      openOverlay(ConfirmOverlay, {
+        title: "Clear Workflow",
+        message:
+          "Are you sure you want to clear all nodes and connections? This action cannot be undone.",
+        confirmLabel: "Clear Workflow",
+        confirmVariant: "destructive" as const,
+        destructive: true,
+        onConfirm: () => {
+          clearWorkflow();
+        },
+      });
+      setShowClearDialog(false);
+    }
+  }, [showClearDialog, openOverlay, clearWorkflow, setShowClearDialog]);
   const setPendingIntegrationNodes = useSetAtom(pendingIntegrationNodesAtom);
   const [newlyCreatedNodeId, setNewlyCreatedNodeId] = useAtom(
     newlyCreatedNodeIdAtom
@@ -632,7 +685,9 @@ export const PanelInner = () => {
                   </Button>
                   <Button
                     className="text-muted-foreground"
-                    onClick={() => setShowDeleteDialog(true)}
+                    onClick={() => {
+                      setShowDeleteDialog(true);
+                    }}
                     size="sm"
                     variant="ghost"
                   >

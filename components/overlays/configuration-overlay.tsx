@@ -94,6 +94,7 @@ export function ConfigurationOverlay({ overlayId }: ConfigurationOverlayProps) {
     currentWorkflowNameAtom
   );
   const isOwner = useAtomValue(isWorkflowOwnerAtom);
+
   const updateNodeData = useSetAtom(updateNodeDataAtom);
   const deleteNode = useSetAtom(deleteNodeAtom);
   const deleteEdge = useSetAtom(deleteEdgeAtom);
@@ -111,6 +112,7 @@ export function ConfigurationOverlay({ overlayId }: ConfigurationOverlayProps) {
 
   // Auto-fix invalid integration references
   const globalIntegrations = useAtomValue(integrationsAtom);
+
   useEffect(() => {
     if (!(selectedNode && isOwner)) {
       return;
@@ -465,16 +467,25 @@ export function ConfigurationOverlay({ overlayId }: ConfigurationOverlayProps) {
                   </p>
                 </div>
               )}
-              {isOwner && (
+              {isOwner ? (
                 <div className="flex items-center gap-2 pt-2">
                   <Button onClick={handleClearWorkflow} variant="ghost">
                     <Eraser className="mr-2 size-4" />
                     Clear
                   </Button>
-                  <Button onClick={handleDeleteWorkflow} variant="ghost">
+                  <Button
+                    data-testid="delete-workflow-button"
+                    onClick={() => handleDeleteWorkflow()}
+                    type="button"
+                    variant="ghost"
+                  >
                     <Trash2 className="mr-2 size-4" />
                     Delete
                   </Button>
+                </div>
+              ) : (
+                <div className="text-red-500 text-xs">
+                  DEBUG: isOwner is false - Delete button not rendered
                 </div>
               )}
             </div>

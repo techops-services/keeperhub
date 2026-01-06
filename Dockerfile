@@ -42,6 +42,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=source /app/drizzle ./drizzle
 COPY --from=source /app/drizzle.config.ts ./drizzle.config.ts
 COPY --from=source /app/lib ./lib
+COPY --from=source /app/keeperhub ./keeperhub
 COPY --from=source /app/scripts ./scripts
 COPY --from=source /app/package.json ./package.json
 COPY --from=source /app/tsconfig.json ./tsconfig.json
