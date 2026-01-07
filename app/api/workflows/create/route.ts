@@ -1,11 +1,15 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { NextResponse } from "next/server";
+// start custom keeperhub code //
+import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { validateWorkflowIntegrations } from "@/lib/db/integrations";
 import { workflows } from "@/lib/db/schema";
 import { generateId } from "@/lib/utils/id";
+
+// end keeperhub code //
 
 // Helper function to create a default trigger node
 function createDefaultTriggerNode() {
@@ -42,10 +46,19 @@ export async function POST(request: Request) {
       );
     }
 
+    // start custom keeperhub code //
+    // Get organization context early for validation
+    const context = await getOrgContext();
+    const organizationId = context.organization?.id || null;
+    // end keeperhub code //
+
     // Validate that all integrationIds in nodes belong to the current user
     const validation = await validateWorkflowIntegrations(
       body.nodes,
-      session.user.id
+      session.user.id,
+      // start custom keeperhub code //
+      organizationId
+      // end keeperhub code //
     );
     if (!validation.valid) {
       return NextResponse.json(
@@ -60,15 +73,30 @@ export async function POST(request: Request) {
       nodes = [createDefaultTriggerNode()];
     }
 
+    // start custom keeperhub code //
+    const isAnonymous = context.isAnonymous || !context.organization;
+
     // Generate "Untitled N" name if the provided name is "Untitled Workflow"
     let workflowName = body.name;
     if (body.name === "Untitled Workflow") {
-      const userWorkflows = await db.query.workflows.findMany({
-        where: eq(workflows.userId, session.user.id),
-      });
+      // Count workflows scoped to current context (anonymous or org)
+      const userWorkflows = isAnonymous
+        ? await db.query.workflows.findMany({
+            where: and(
+              eq(workflows.userId, session.user.id),
+              eq(workflows.isAnonymous, true)
+            ),
+          })
+        : await db.query.workflows.findMany({
+            where: and(
+              eq(workflows.organizationId, organizationId ?? ""),
+              eq(workflows.isAnonymous, false)
+            ),
+          });
       const count = userWorkflows.length + 1;
       workflowName = `Untitled ${count}`;
     }
+    // end keeperhub code //
 
     // Generate workflow ID first
     const workflowId = generateId();
@@ -82,6 +110,10 @@ export async function POST(request: Request) {
         nodes,
         edges: body.edges,
         userId: session.user.id,
+        // start custom keeperhub code //
+        organizationId,
+        isAnonymous,
+        // end keeperhub code //
       })
       .returning();
 

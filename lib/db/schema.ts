@@ -118,6 +118,12 @@ export const workflows = pgTable("workflows", {
   userId: text("user_id")
     .notNull()
     .references(() => users.id),
+  // start custom keeperhub code //
+  organizationId: text("organization_id").references(() => organization.id, {
+    onDelete: "cascade",
+  }),
+  isAnonymous: boolean("is_anonymous").default(false).notNull(),
+  // end keeperhub code //
   // biome-ignore lint/suspicious/noExplicitAny: JSONB type - structure validated at application level
   nodes: jsonb("nodes").notNull().$type<any[]>(),
   // biome-ignore lint/suspicious/noExplicitAny: JSONB type - structure validated at application level
@@ -138,6 +144,11 @@ export const integrations = pgTable("integrations", {
   userId: text("user_id")
     .notNull()
     .references(() => users.id),
+  // start custom keeperhub code //
+  organizationId: text("organization_id").references(() => organization.id, {
+    onDelete: "cascade",
+  }),
+  // end keeperhub code //
   name: text("name").notNull(),
   type: text("type").notNull().$type<IntegrationType>(),
   // biome-ignore lint/suspicious/noExplicitAny: JSONB type - encrypted credentials stored as JSON
@@ -206,8 +217,8 @@ export const workflowExecutionLogs = pgTable("workflow_execution_logs", {
 });
 
 // KeeperHub: Para Wallets table (imported from KeeperHub schema extensions)
-// biome-ignore lint/performance/noBarrelFile: Intentional re-export for schema extensions
 // Note: Using relative path instead of @/ alias for drizzle-kit compatibility
+// biome-ignore lint/performance/noBarrelFile: Intentional re-export for schema extensions
 export {
   type NewParaWallet,
   type ParaWallet,

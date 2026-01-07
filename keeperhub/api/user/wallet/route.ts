@@ -156,7 +156,12 @@ async function storeWalletAndIntegration(options: {
   // Create Web3 integration record with truncated address as name
   const truncatedAddress = `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
 
-  await createIntegration(userId, truncatedAddress, "web3", {});
+  await createIntegration({
+    userId,
+    name: truncatedAddress,
+    type: "web3",
+    config: {},
+  });
 
   console.log(`[Para] ✓ Web3 integration created: ${truncatedAddress}`);
 

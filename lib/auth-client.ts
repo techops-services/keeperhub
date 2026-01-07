@@ -1,4 +1,7 @@
-import { anonymousClient, organizationClient } from "better-auth/client/plugins";
+import {
+  anonymousClient,
+  organizationClient,
+} from "better-auth/client/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 import { createAuthClient } from "better-auth/react";
 
@@ -8,8 +11,8 @@ const statement = {
   workflow: ["create", "read", "update", "delete"],
   credential: ["create", "read", "update", "delete"],
   wallet: ["create", "read", "update", "delete"],
-  organization: ["update", "delete"],
-  member: ["create", "update", "delete"],
+  organization: ["read", "update", "delete"],
+  member: ["create", "read", "update", "delete"],
   invitation: ["create", "cancel"],
 } as const;
 

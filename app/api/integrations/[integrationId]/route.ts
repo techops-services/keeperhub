@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+// start custom keeperhub code //
+import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 import { auth } from "@/lib/auth";
 import {
   deleteIntegration,
@@ -6,6 +8,7 @@ import {
   updateIntegration,
 } from "@/lib/db/integrations";
 import type { IntegrationConfig } from "@/lib/types/integration";
+// end keeperhub code //
 
 export type GetIntegrationResponse = {
   id: string;
@@ -39,7 +42,18 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const integration = await getIntegration(integrationId, session.user.id);
+    // start custom keeperhub code //
+    const orgContext = await getOrgContext();
+    const organizationId = orgContext.organization?.id || null;
+    // end keeperhub code //
+
+    const integration = await getIntegration(
+      integrationId,
+      session.user.id,
+      // start custom keeperhub code //
+      organizationId
+      // end keeperhub code //
+    );
 
     if (!integration) {
       return NextResponse.json(
@@ -88,12 +102,20 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // start custom keeperhub code //
+    const orgContext = await getOrgContext();
+    const organizationId = orgContext.organization?.id || null;
+    // end keeperhub code //
+
     const body: UpdateIntegrationRequest = await request.json();
 
     const integration = await updateIntegration(
       integrationId,
       session.user.id,
-      body
+      body,
+      // start custom keeperhub code //
+      organizationId
+      // end keeperhub code //
     );
 
     if (!integration) {
@@ -145,7 +167,18 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const success = await deleteIntegration(integrationId, session.user.id);
+    // start custom keeperhub code //
+    const orgContext = await getOrgContext();
+    const organizationId = orgContext.organization?.id || null;
+    // end keeperhub code //
+
+    const success = await deleteIntegration(
+      integrationId,
+      session.user.id,
+      // start custom keeperhub code //
+      organizationId
+      // end keeperhub code //
+    );
 
     if (!success) {
       return NextResponse.json(

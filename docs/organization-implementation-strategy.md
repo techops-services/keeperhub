@@ -303,9 +303,9 @@ This applies all changes to the database.
 
 ---
 
-## Phase 2: Workflow & Credential Scoping
+## Phase 2: Workflow & Credential Scoping **(implemented)**
 
-### Update Database Schema
+### Update Database Schema **(implemented)**
 
 **`lib/db/schema.ts`** (Modify with markers)
 
@@ -342,7 +342,7 @@ export const integrations = pgTable("integrations", {
    ```
 3. Make `organizationId` required after backfill
 
-### Organization Context Middleware
+### Organization Context Middleware **(implemented)**
 
 **`keeperhub/lib/middleware/org-context.ts`**
 
@@ -424,7 +424,7 @@ export async function hasPermission(
 }
 ```
 
-### Protected Route Wrapper
+### Protected Route Wrapper **(implemented)**
 
 **`keeperhub/lib/middleware/require-org.ts`**
 

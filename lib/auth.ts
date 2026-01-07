@@ -8,6 +8,13 @@ import { db } from "./db";
 import {
   accounts,
   integrations,
+  invitationRelations,
+  invitation as invitationTable,
+  memberRelations,
+  member as memberTable,
+  organizationRelations,
+  // start custom keeperhub code //
+  organization as organizationTable,
   sessions,
   users,
   verifications,
@@ -15,13 +22,6 @@ import {
   workflowExecutions,
   workflowExecutionsRelations,
   workflows,
-  // start custom keeperhub code //
-  organization as organizationTable,
-  member as memberTable,
-  invitation as invitationTable,
-  organizationRelations,
-  memberRelations,
-  invitationRelations,
   // end keeperhub code //
 } from "./db/schema";
 
@@ -31,8 +31,8 @@ const statement = {
   workflow: ["create", "read", "update", "delete"],
   credential: ["create", "read", "update", "delete"],
   wallet: ["create", "read", "update", "delete"], // ParaWallet
-  organization: ["update", "delete"],
-  member: ["create", "update", "delete"],
+  organization: ["read", "update", "delete"],
+  member: ["create", "read", "update", "delete"],
   invitation: ["create", "cancel"],
 } as const;
 
@@ -209,6 +209,7 @@ const plugins = [
         link: inviteLink,
       });
 
+      // When implementing email, uncomment:
       // await sendEmail({
       //   to: data.email,
       //   template: "organization-invitation",
@@ -219,6 +220,7 @@ const plugins = [
       //     inviteLink,
       //   },
       // });
+      await Promise.resolve();
     },
 
     // Invitation settings
@@ -227,17 +229,22 @@ const plugins = [
 
     // Hooks for custom business logic
     organizationHooks: {
-      async afterCreateOrganization({ organization, member, user }) {
-        console.log(`[Organization] Created: ${organization.name} by ${user.name}`);
+      async afterCreateOrganization({ organization: org, user }) {
+        console.log(`[Organization] Created: ${org.name} by ${user.name}`);
         // TODO: Initialize default resources (e.g., welcome workflow template)
+        await Promise.resolve();
       },
 
-      async afterAddMember({ member, user, organization }) {
-        console.log(`[Organization] User ${user.email} joined ${organization.name}`);
+      async afterAddMember({ user, organization: org }) {
+        console.log(`[Organization] User ${user.email} joined ${org.name}`);
+        await Promise.resolve();
       },
 
-      async afterAcceptInvitation({ invitation, member, user, organization }) {
-        console.log(`[Invitation] ${user.email} accepted invite to ${organization.name}`);
+      async afterAcceptInvitation({ user, organization: org }) {
+        console.log(
+          `[Invitation] ${user.email} accepted invite to ${org.name}`
+        );
+        await Promise.resolve();
       },
     },
   }),
