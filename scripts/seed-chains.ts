@@ -1,6 +1,11 @@
 /**
  * Seed script for default blockchain chains
  *
+ * RPC URL resolution priority:
+ *   1. CHAIN_RPC_CONFIG JSON (for Helm/AWS Parameter Store)
+ *   2. Individual env vars (CHAIN_ETH_MAINNET_PRIMARY_RPC, etc.)
+ *   3. Public RPC defaults (no API keys required)
+ *
  * Run with: pnpm tsx scripts/seed-chains.ts
  */
 
@@ -9,14 +14,41 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { chains, type NewChain } from "../lib/db/schema";
+import {
+  createRpcUrlResolver,
+  PUBLIC_RPCS,
+  parseRpcConfig,
+} from "../lib/rpc/rpc-config";
+
+// Parse JSON config from environment (if available)
+const rpcConfig = (() => {
+  const config = parseRpcConfig(process.env.CHAIN_RPC_CONFIG);
+  if (process.env.CHAIN_RPC_CONFIG && Object.keys(config).length === 0) {
+    console.warn("Failed to parse CHAIN_RPC_CONFIG, using individual env vars");
+  }
+  return config;
+})();
+
+// Create resolver function for this script
+const getRpcUrl = createRpcUrlResolver(rpcConfig);
 
 const DEFAULT_CHAINS: NewChain[] = [
   {
     chainId: 1,
     name: "Ethereum Mainnet",
     symbol: "ETH",
-    defaultPrimaryRpc: "https://chain.techops.services/eth-mainnet",
-    defaultFallbackRpc: "https://eth.llamarpc.com",
+    defaultPrimaryRpc: getRpcUrl(
+      "eth-mainnet",
+      "CHAIN_ETH_MAINNET_PRIMARY_RPC",
+      PUBLIC_RPCS.ETH_MAINNET,
+      "primary"
+    ),
+    defaultFallbackRpc: getRpcUrl(
+      "eth-mainnet",
+      "CHAIN_ETH_MAINNET_FALLBACK_RPC",
+      PUBLIC_RPCS.ETH_MAINNET,
+      "fallback"
+    ),
     explorerUrl: "https://etherscan.io",
     explorerApiUrl: "https://api.etherscan.io/v2/api",
     isTestnet: false,
@@ -26,8 +58,18 @@ const DEFAULT_CHAINS: NewChain[] = [
     chainId: 11_155_111,
     name: "Sepolia Testnet",
     symbol: "ETH",
-    defaultPrimaryRpc: "https://chain.techops.services/eth-sepolia",
-    defaultFallbackRpc: "https://rpc.sepolia.org",
+    defaultPrimaryRpc: getRpcUrl(
+      "sepolia",
+      "CHAIN_SEPOLIA_PRIMARY_RPC",
+      PUBLIC_RPCS.SEPOLIA,
+      "primary"
+    ),
+    defaultFallbackRpc: getRpcUrl(
+      "sepolia",
+      "CHAIN_SEPOLIA_FALLBACK_RPC",
+      PUBLIC_RPCS.SEPOLIA,
+      "fallback"
+    ),
     explorerUrl: "https://sepolia.etherscan.io",
     explorerApiUrl: "https://api-sepolia.etherscan.io/v2/api",
     isTestnet: true,
@@ -37,11 +79,127 @@ const DEFAULT_CHAINS: NewChain[] = [
     chainId: 8453,
     name: "Base",
     symbol: "ETH",
-    defaultPrimaryRpc: "https://chain.techops.services/base-mainnet",
-    defaultFallbackRpc: "https://mainnet.base.org",
+    defaultPrimaryRpc: getRpcUrl(
+      "base-mainnet",
+      "CHAIN_BASE_MAINNET_PRIMARY_RPC",
+      PUBLIC_RPCS.BASE_MAINNET,
+      "primary"
+    ),
+    defaultFallbackRpc: getRpcUrl(
+      "base-mainnet",
+      "CHAIN_BASE_MAINNET_FALLBACK_RPC",
+      PUBLIC_RPCS.BASE_MAINNET,
+      "fallback"
+    ),
     explorerUrl: "https://basescan.org",
     explorerApiUrl: "https://api.basescan.org/api",
     isTestnet: false,
+    isEnabled: true,
+  },
+  {
+    chainId: 84_532,
+    name: "Base Sepolia",
+    symbol: "ETH",
+    defaultPrimaryRpc: getRpcUrl(
+      "base-sepolia",
+      "CHAIN_BASE_SEPOLIA_PRIMARY_RPC",
+      PUBLIC_RPCS.BASE_SEPOLIA,
+      "primary"
+    ),
+    defaultFallbackRpc: getRpcUrl(
+      "base-sepolia",
+      "CHAIN_BASE_SEPOLIA_FALLBACK_RPC",
+      PUBLIC_RPCS.BASE_SEPOLIA,
+      "fallback"
+    ),
+    explorerUrl: "https://sepolia.basescan.org",
+    explorerApiUrl: "https://api-sepolia.basescan.org/api",
+    isTestnet: true,
+    isEnabled: true,
+  },
+  {
+    chainId: 42_429,
+    name: "Tempo Testnet",
+    symbol: "USD",
+    defaultPrimaryRpc: getRpcUrl(
+      "tempo-testnet",
+      "CHAIN_TEMPO_TESTNET_PRIMARY_RPC",
+      PUBLIC_RPCS.TEMPO_TESTNET,
+      "primary"
+    ),
+    defaultFallbackRpc: getRpcUrl(
+      "tempo-testnet",
+      "CHAIN_TEMPO_TESTNET_FALLBACK_RPC",
+      PUBLIC_RPCS.TEMPO_TESTNET,
+      "fallback"
+    ),
+    explorerUrl: "https://explorer.testnet.tempo.xyz",
+    explorerApiUrl: "https://explorer.testnet.tempo.xyz/api",
+    isTestnet: true,
+    isEnabled: true,
+  },
+  {
+    chainId: 42_420,
+    name: "Tempo",
+    symbol: "USD",
+    defaultPrimaryRpc: getRpcUrl(
+      "tempo-mainnet",
+      "CHAIN_TEMPO_MAINNET_PRIMARY_RPC",
+      PUBLIC_RPCS.TEMPO_MAINNET,
+      "primary"
+    ),
+    defaultFallbackRpc: getRpcUrl(
+      "tempo-mainnet",
+      "CHAIN_TEMPO_MAINNET_FALLBACK_RPC",
+      PUBLIC_RPCS.TEMPO_MAINNET,
+      "fallback"
+    ),
+    explorerUrl: "https://explorer.tempo.xyz",
+    explorerApiUrl: "https://explorer.tempo.xyz/api",
+    isTestnet: false,
+    isEnabled: false, // Disabled until mainnet launches
+  },
+  // Solana chains (non-EVM - uses SolanaProviderManager)
+  {
+    chainId: 101,
+    name: "Solana",
+    symbol: "SOL",
+    defaultPrimaryRpc: getRpcUrl(
+      "solana-mainnet",
+      "CHAIN_SOLANA_MAINNET_PRIMARY_RPC",
+      PUBLIC_RPCS.SOLANA_MAINNET,
+      "primary"
+    ),
+    defaultFallbackRpc: getRpcUrl(
+      "solana-mainnet",
+      "CHAIN_SOLANA_MAINNET_FALLBACK_RPC",
+      PUBLIC_RPCS.SOLANA_MAINNET,
+      "fallback"
+    ),
+    explorerUrl: "https://solscan.io",
+    explorerApiUrl: "https://api.solscan.io",
+    isTestnet: false,
+    isEnabled: true,
+  },
+  {
+    chainId: 103,
+    name: "Solana Devnet",
+    symbol: "SOL",
+    defaultPrimaryRpc: getRpcUrl(
+      "solana-devnet",
+      "CHAIN_SOLANA_DEVNET_PRIMARY_RPC",
+      PUBLIC_RPCS.SOLANA_DEVNET,
+      "primary"
+    ),
+    defaultFallbackRpc: getRpcUrl(
+      "solana-devnet",
+      "CHAIN_SOLANA_DEVNET_FALLBACK_RPC",
+      PUBLIC_RPCS.SOLANA_DEVNET,
+      "fallback"
+    ),
+    explorerUrl: "https://solscan.io/?cluster=devnet",
+    explorerApiUrl: "https://api-devnet.solscan.io",
+    isTestnet: true,
     isEnabled: true,
   },
 ];
