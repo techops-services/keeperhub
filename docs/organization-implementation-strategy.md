@@ -15,9 +15,9 @@ All custom code follows the KeeperHub fork policy (everything in `/keeperhub` di
 
 ---
 
-## Phase 1: Enable Organization Plugin
+## Phase 1: Enable Organization Plugin **(implemented)**
 
-### Server Configuration
+### Server Configuration **(implemented)**
 
 **`lib/auth.ts`** (Modify with markers)
 
@@ -193,7 +193,7 @@ export const auth = betterAuth({
 });
 ```
 
-### Client Configuration
+### Client Configuration **(implemented)**
 
 **`lib/auth-client.ts`** (Modify with markers)
 
@@ -269,19 +269,37 @@ export const authClient = createAuthClient({
 export const { signIn, signOut, signUp, useSession } = authClient;
 ```
 
-### Database Migration
+### Database Migration **(implemented)**
 
-Run better-auth CLI to generate organization tables:
+**Step 1: Generate organization schema**
 
 ```bash
-npx @better-auth/cli migrate
+# Generate schema (for Drizzle adapter) - creates auth-schema.ts
+npx @better-auth/cli generate
 ```
 
-This creates:
-- `organization` - Organization records
+**Note:** The `migrate` command only works with Kysely adapter. Since we use Drizzle, we use `generate` then manually integrate.
+
+**Step 2: Integrate organization tables into existing schema**
+
+The generated `auth-schema.ts` contains organization tables. Since we already have Better Auth tables in `lib/db/schema.ts`, we need to:
+
+1. Add organization tables from `auth-schema.ts` to `lib/db/schema.ts` with keeperhub markers
+2. Add `activeOrganizationId` field to existing `sessions` table
+3. Export organization tables and relations
+
+Tables to add:
+- `organization` - Organization records (id, name, slug, logo, metadata)
 - `member` - User-organization memberships with roles
-- `invitation` - Pending invitations
-- Updates `session` table with `activeOrganizationId`
+- `invitation` - Pending invitations (email, role, status, expiresAt)
+
+**Step 3: Push schema to database**
+
+```bash
+pnpm db:push
+```
+
+This applies all changes to the database.
 
 ---
 
@@ -1689,7 +1707,7 @@ test("complete organization flow", async ({ page, context }) => {
 
 1. **Deploy schema changes:**
    ```bash
-   npx @better-auth/cli migrate
+   npx @better-auth/cli generate
    pnpm db:push
    ```
 
