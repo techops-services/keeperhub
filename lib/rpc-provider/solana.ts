@@ -1,10 +1,13 @@
-import { ethers } from "ethers";
+import { type Commitment, Connection } from "@solana/web3.js";
 
 /**
- * Interface for metrics collection - allows dependency injection
- * so both server-side (console/structured) and frontend (no-op) can use this
+ * Solana RPC Provider Manager
+ *
+ * Similar to the EVM RpcProviderManager but uses @solana/web3.js Connection
+ * instead of ethers.JsonRpcProvider.
  */
-export type RpcMetricsCollector = {
+
+export type SolanaRpcMetricsCollector = {
   recordPrimaryAttempt(chainName: string): void;
   recordPrimaryFailure(chainName: string): void;
   recordFallbackAttempt(chainName: string): void;
@@ -12,61 +15,43 @@ export type RpcMetricsCollector = {
   recordFailoverEvent(chainName: string): void;
 };
 
-/**
- * Callback for failover state changes - allows UI to react to failover events
- */
-export type FailoverStateChangeCallback = (
+export type SolanaFailoverStateChangeCallback = (
   chainName: string,
   isUsingFallback: boolean,
   reason: "failover" | "recovery"
 ) => void;
 
-/**
- * No-op metrics collector for environments without metrics (e.g., frontend)
- */
-export const noopMetricsCollector: RpcMetricsCollector = {
-  recordPrimaryAttempt: () => {
-    /* noop */
-  },
-  recordPrimaryFailure: () => {
-    /* noop */
-  },
-  recordFallbackAttempt: () => {
-    /* noop */
-  },
-  recordFallbackFailure: () => {
-    /* noop */
-  },
-  recordFailoverEvent: () => {
-    /* noop */
-  },
+export const noopSolanaMetricsCollector: SolanaRpcMetricsCollector = {
+  recordPrimaryAttempt: () => undefined,
+  recordPrimaryFailure: () => undefined,
+  recordFallbackAttempt: () => undefined,
+  recordFallbackFailure: () => undefined,
+  recordFailoverEvent: () => undefined,
 };
 
-/**
- * Console-based metrics collector for debugging
- */
-export const consoleMetricsCollector: RpcMetricsCollector = {
+export const consoleSolanaMetricsCollector: SolanaRpcMetricsCollector = {
   recordPrimaryAttempt: (chain) =>
-    console.debug(`[RPC Metrics] Primary attempt: ${chain}`),
+    console.debug(`[Solana RPC Metrics] Primary attempt: ${chain}`),
   recordPrimaryFailure: (chain) =>
-    console.debug(`[RPC Metrics] Primary failure: ${chain}`),
+    console.debug(`[Solana RPC Metrics] Primary failure: ${chain}`),
   recordFallbackAttempt: (chain) =>
-    console.debug(`[RPC Metrics] Fallback attempt: ${chain}`),
+    console.debug(`[Solana RPC Metrics] Fallback attempt: ${chain}`),
   recordFallbackFailure: (chain) =>
-    console.debug(`[RPC Metrics] Fallback failure: ${chain}`),
+    console.debug(`[Solana RPC Metrics] Fallback failure: ${chain}`),
   recordFailoverEvent: (chain) =>
-    console.debug(`[RPC Metrics] Failover event: ${chain}`),
+    console.debug(`[Solana RPC Metrics] Failover event: ${chain}`),
 };
 
-export type RpcProviderConfig = {
+export type SolanaProviderConfig = {
   primaryRpcUrl: string;
   fallbackRpcUrl?: string;
   maxRetries?: number;
   timeoutMs?: number;
   chainName?: string;
+  commitment?: Commitment;
 };
 
-export type RpcProviderMetrics = {
+export type SolanaProviderMetrics = {
   primaryAttempts: number;
   primaryFailures: number;
   fallbackAttempts: number;
@@ -75,32 +60,33 @@ export type RpcProviderMetrics = {
   lastFailoverTime: Date | null;
 };
 
-export type RpcProviderManagerOptions = {
-  config: RpcProviderConfig;
-  metricsCollector?: RpcMetricsCollector;
-  onFailoverStateChange?: FailoverStateChangeCallback;
+export type SolanaProviderManagerOptions = {
+  config: SolanaProviderConfig;
+  metricsCollector?: SolanaRpcMetricsCollector;
+  onFailoverStateChange?: SolanaFailoverStateChangeCallback;
 };
 
-export class RpcProviderManager {
-  private primaryProvider: ethers.JsonRpcProvider | null = null;
-  private fallbackProvider: ethers.JsonRpcProvider | null = null;
+export class SolanaProviderManager {
+  private primaryConnection: Connection | null = null;
+  private fallbackConnection: Connection | null = null;
   private readonly config: Required<
-    Omit<RpcProviderConfig, "fallbackRpcUrl">
+    Omit<SolanaProviderConfig, "fallbackRpcUrl">
   > & {
     fallbackRpcUrl?: string;
   };
-  private readonly metrics: RpcProviderMetrics;
-  private readonly metricsCollector: RpcMetricsCollector;
+  private readonly metrics: SolanaProviderMetrics;
+  private readonly metricsCollector: SolanaRpcMetricsCollector;
   private isUsingFallback = false;
-  private onFailoverStateChange?: FailoverStateChangeCallback;
+  private onFailoverStateChange?: SolanaFailoverStateChangeCallback;
 
   private static readonly DEFAULT_MAX_RETRIES = 3;
   private static readonly DEFAULT_TIMEOUT_MS = 30_000;
+  private static readonly DEFAULT_COMMITMENT: Commitment = "confirmed";
 
-  constructor(options: RpcProviderManagerOptions) {
+  constructor(options: SolanaProviderManagerOptions) {
     const {
       config,
-      metricsCollector = noopMetricsCollector,
+      metricsCollector = noopSolanaMetricsCollector,
       onFailoverStateChange,
     } = options;
     this.onFailoverStateChange = onFailoverStateChange;
@@ -108,9 +94,11 @@ export class RpcProviderManager {
     this.config = {
       primaryRpcUrl: config.primaryRpcUrl,
       fallbackRpcUrl: config.fallbackRpcUrl,
-      maxRetries: config.maxRetries ?? RpcProviderManager.DEFAULT_MAX_RETRIES,
-      timeoutMs: config.timeoutMs ?? RpcProviderManager.DEFAULT_TIMEOUT_MS,
-      chainName: config.chainName ?? "unknown",
+      maxRetries:
+        config.maxRetries ?? SolanaProviderManager.DEFAULT_MAX_RETRIES,
+      timeoutMs: config.timeoutMs ?? SolanaProviderManager.DEFAULT_TIMEOUT_MS,
+      chainName: config.chainName ?? "solana",
+      commitment: config.commitment ?? SolanaProviderManager.DEFAULT_COMMITMENT,
     };
 
     this.metricsCollector = metricsCollector;
@@ -125,49 +113,47 @@ export class RpcProviderManager {
     };
   }
 
-  private createProvider(url: string): ethers.JsonRpcProvider {
-    const fetchRequest = new ethers.FetchRequest(url);
-    fetchRequest.timeout = 5000;
-
-    const provider = new ethers.JsonRpcProvider(fetchRequest, undefined, {
-      cacheTimeout: -1,
+  private createConnection(url: string): Connection {
+    return new Connection(url, {
+      commitment: this.config.commitment,
+      confirmTransactionInitialTimeout: this.config.timeoutMs,
     });
-
-    return provider;
   }
 
-  private getPrimaryProvider(): ethers.JsonRpcProvider {
-    if (!this.primaryProvider) {
-      this.primaryProvider = this.createProvider(this.config.primaryRpcUrl);
+  private getPrimaryConnection(): Connection {
+    if (!this.primaryConnection) {
+      this.primaryConnection = this.createConnection(this.config.primaryRpcUrl);
     }
-    return this.primaryProvider;
+    return this.primaryConnection;
   }
 
-  private getFallbackProvider(): ethers.JsonRpcProvider | null {
-    if (!this.fallbackProvider && this.config.fallbackRpcUrl) {
-      this.fallbackProvider = this.createProvider(this.config.fallbackRpcUrl);
+  private getFallbackConnection(): Connection | null {
+    if (!this.fallbackConnection && this.config.fallbackRpcUrl) {
+      this.fallbackConnection = this.createConnection(
+        this.config.fallbackRpcUrl
+      );
     }
-    return this.fallbackProvider;
+    return this.fallbackConnection;
   }
 
-  getProvider(): ethers.JsonRpcProvider {
-    if (this.isUsingFallback && this.fallbackProvider) {
-      return this.fallbackProvider;
+  getConnection(): Connection {
+    if (this.isUsingFallback && this.fallbackConnection) {
+      return this.fallbackConnection;
     }
-    return this.getPrimaryProvider();
+    return this.getPrimaryConnection();
   }
 
   async executeWithFailover<T>(
-    operation: (provider: ethers.JsonRpcProvider) => Promise<T>
+    operation: (connection: Connection) => Promise<T>
   ): Promise<T> {
     this.metrics.totalRequests += 1;
 
     // If we've already switched to fallback, use it directly
     if (this.isUsingFallback) {
-      const fallbackProvider = this.getFallbackProvider();
-      if (fallbackProvider) {
-        const fallbackResult = await this.tryProvider(
-          fallbackProvider,
+      const fallbackConnection = this.getFallbackConnection();
+      if (fallbackConnection) {
+        const fallbackResult = await this.tryConnection(
+          fallbackConnection,
           operation,
           "fallback",
           this.config.maxRetries
@@ -177,11 +163,10 @@ export class RpcProviderManager {
           return fallbackResult.result as T;
         }
 
-        // Fallback failed - try primary again in case it recovered
         console.warn(
           JSON.stringify({
             level: "warn",
-            event: "RPC_FALLBACK_FAILED",
+            event: "SOLANA_RPC_FALLBACK_FAILED",
             message: `Fallback RPC failed for ${this.config.chainName}, attempting primary recovery`,
             chain: this.config.chainName,
             timestamp: new Date().toISOString(),
@@ -190,9 +175,9 @@ export class RpcProviderManager {
       }
     }
 
-    const primaryProvider = this.getPrimaryProvider();
-    const primaryResult = await this.tryProvider(
-      primaryProvider,
+    const primaryConnection = this.getPrimaryConnection();
+    const primaryResult = await this.tryConnection(
+      primaryConnection,
       operation,
       "primary",
       this.config.maxRetries
@@ -203,7 +188,7 @@ export class RpcProviderManager {
         console.info(
           JSON.stringify({
             level: "info",
-            event: "RPC_FAILOVER_RECOVERY",
+            event: "SOLANA_RPC_FAILOVER_RECOVERY",
             message: `Primary RPC recovered for ${this.config.chainName}, switching back from fallback`,
             chain: this.config.chainName,
             previousState: "fallback",
@@ -217,13 +202,13 @@ export class RpcProviderManager {
       return primaryResult.result as T;
     }
 
-    const fallbackProvider = this.getFallbackProvider();
-    if (fallbackProvider) {
+    const fallbackConnection = this.getFallbackConnection();
+    if (fallbackConnection) {
       this.metrics.lastFailoverTime = new Date();
       this.metricsCollector.recordFailoverEvent(this.config.chainName);
 
-      const fallbackResult = await this.tryProvider(
-        fallbackProvider,
+      const fallbackResult = await this.tryConnection(
+        fallbackConnection,
         operation,
         "fallback",
         this.config.maxRetries
@@ -234,7 +219,7 @@ export class RpcProviderManager {
           console.warn(
             JSON.stringify({
               level: "warn",
-              event: "RPC_FAILOVER_ACTIVATED",
+              event: "SOLANA_RPC_FAILOVER_ACTIVATED",
               message: `Primary RPC failed for ${this.config.chainName}, switching to fallback`,
               chain: this.config.chainName,
               previousState: "primary",
@@ -252,7 +237,7 @@ export class RpcProviderManager {
       console.error(
         JSON.stringify({
           level: "error",
-          event: "RPC_BOTH_ENDPOINTS_FAILED",
+          event: "SOLANA_RPC_BOTH_ENDPOINTS_FAILED",
           message: `Both primary and fallback RPC failed for ${this.config.chainName}`,
           chain: this.config.chainName,
           primaryError: primaryResult.error,
@@ -261,24 +246,26 @@ export class RpcProviderManager {
         })
       );
       throw new Error(
-        `RPC failed on both endpoints. Primary: ${primaryResult.error}. Fallback: ${fallbackResult.error}`
+        `Solana RPC failed on both endpoints. Primary: ${primaryResult.error}. Fallback: ${fallbackResult.error}`
       );
     }
 
-    throw new Error(`RPC failed on primary endpoint: ${primaryResult.error}`);
+    throw new Error(
+      `Solana RPC failed on primary endpoint: ${primaryResult.error}`
+    );
   }
 
-  private async tryProvider<T>(
-    provider: ethers.JsonRpcProvider,
-    operation: (p: ethers.JsonRpcProvider) => Promise<T>,
-    providerType: "primary" | "fallback",
+  private async tryConnection<T>(
+    connection: Connection,
+    operation: (c: Connection) => Promise<T>,
+    connectionType: "primary" | "fallback",
     maxRetries: number
   ): Promise<{ success: boolean; result?: T; error?: string }> {
     let lastError: Error | undefined;
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        if (providerType === "primary") {
+        if (connectionType === "primary") {
           this.metrics.primaryAttempts += 1;
           this.metricsCollector.recordPrimaryAttempt(this.config.chainName);
         } else {
@@ -287,7 +274,7 @@ export class RpcProviderManager {
         }
 
         const result = await this.withTimeout(
-          operation(provider),
+          operation(connection),
           this.config.timeoutMs
         );
 
@@ -295,7 +282,7 @@ export class RpcProviderManager {
       } catch (error: unknown) {
         lastError = error instanceof Error ? error : new Error(String(error));
 
-        if (providerType === "primary") {
+        if (connectionType === "primary") {
           this.metrics.primaryFailures += 1;
           this.metricsCollector.recordPrimaryFailure(this.config.chainName);
         } else {
@@ -333,7 +320,7 @@ export class RpcProviderManager {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  getMetrics(): Readonly<RpcProviderMetrics> {
+  getMetrics(): Readonly<SolanaProviderMetrics> {
     return { ...this.metrics };
   }
 
@@ -341,80 +328,73 @@ export class RpcProviderManager {
     return this.isUsingFallback;
   }
 
-  getCurrentProviderType(): "primary" | "fallback" {
+  getCurrentConnectionType(): "primary" | "fallback" {
     return this.isUsingFallback ? "fallback" : "primary";
   }
 
-  /**
-   * Register a callback for failover state changes.
-   * Useful for updating UI when failover occurs.
-   */
-  setFailoverStateChangeCallback(callback: FailoverStateChangeCallback): void {
+  setFailoverStateChangeCallback(
+    callback: SolanaFailoverStateChangeCallback
+  ): void {
     this.onFailoverStateChange = callback;
   }
 
-  /**
-   * Get the chain name this manager is configured for
-   */
   getChainName(): string {
     return this.config.chainName;
   }
 }
 
 // Cache managers by RPC URL combination to persist failover state across requests
-const managerCache = new Map<string, RpcProviderManager>();
+const solanaManagerCache = new Map<string, SolanaProviderManager>();
 
-export type CreateRpcProviderManagerOptions = {
+export type CreateSolanaProviderManagerOptions = {
   primaryRpcUrl: string;
   fallbackRpcUrl?: string;
   maxRetries?: number;
   timeoutMs?: number;
   chainName?: string;
-  metricsCollector?: RpcMetricsCollector;
-  onFailoverStateChange?: FailoverStateChangeCallback;
+  commitment?: Commitment;
+  metricsCollector?: SolanaRpcMetricsCollector;
+  onFailoverStateChange?: SolanaFailoverStateChangeCallback;
 };
 
-export function createRpcProviderManager(
-  options: CreateRpcProviderManagerOptions
-): RpcProviderManager {
+export function createSolanaProviderManager(
+  options: CreateSolanaProviderManagerOptions
+): SolanaProviderManager {
   const cacheKey = `${options.primaryRpcUrl}|${options.fallbackRpcUrl || ""}`;
 
-  let manager = managerCache.get(cacheKey);
+  let manager = solanaManagerCache.get(cacheKey);
   if (!manager) {
-    manager = new RpcProviderManager({
+    manager = new SolanaProviderManager({
       config: {
         primaryRpcUrl: options.primaryRpcUrl,
         fallbackRpcUrl: options.fallbackRpcUrl,
         maxRetries: options.maxRetries,
         timeoutMs: options.timeoutMs,
         chainName: options.chainName,
+        commitment: options.commitment,
       },
       metricsCollector: options.metricsCollector,
       onFailoverStateChange: options.onFailoverStateChange,
     });
-    managerCache.set(cacheKey, manager);
+    solanaManagerCache.set(cacheKey, manager);
     console.info(
       JSON.stringify({
         level: "info",
-        event: "RPC_PROVIDER_CREATED",
-        message: `Created RPC provider manager for ${options.chainName || "unknown"}`,
-        chain: options.chainName || "unknown",
+        event: "SOLANA_RPC_PROVIDER_CREATED",
+        message: `Created Solana RPC provider manager for ${options.chainName || "solana"}`,
+        chain: options.chainName || "solana",
         hasFallback: !!options.fallbackRpcUrl,
         timestamp: new Date().toISOString(),
       })
     );
   } else if (options.onFailoverStateChange) {
-    // Update callback on existing manager if provided
     manager.setFailoverStateChangeCallback(options.onFailoverStateChange);
   }
 
   return manager;
 }
 
-/**
- * Get the current failover state for all cached managers
- */
-export function getAllFailoverStates(): Map<
+export function getAllSolanaFailoverStates(): Map<
   string,
   { chainName: string; isUsingFallback: boolean }
 > {
@@ -422,7 +402,7 @@ export function getAllFailoverStates(): Map<
     string,
     { chainName: string; isUsingFallback: boolean }
   >();
-  managerCache.forEach((manager, key) => {
+  solanaManagerCache.forEach((manager, key) => {
     states.set(key, {
       chainName: manager.getChainName(),
       isUsingFallback: manager.isCurrentlyUsingFallback(),
@@ -431,10 +411,6 @@ export function getAllFailoverStates(): Map<
   return states;
 }
 
-export function clearRpcProviderManagerCache(): void {
-  managerCache.clear();
+export function clearSolanaProviderManagerCache(): void {
+  solanaManagerCache.clear();
 }
-
-// Re-export Solana provider
-// biome-ignore lint/performance/noBarrelFile: Intentional barrel for module API
-export * from "./solana";
