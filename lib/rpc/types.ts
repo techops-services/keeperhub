@@ -8,8 +8,12 @@ export type ChainConfig = {
   symbol: string;
   primaryRpcUrl: string;
   fallbackRpcUrl?: string;
+  primaryWssUrl?: string;
+  fallbackWssUrl?: string;
   explorerUrl?: string;
   explorerApiUrl?: string;
+  explorerAbiApiUrl?: string;
+  explorerBalanceApiUrl?: string;
   isTestnet: boolean;
 };
 
@@ -18,6 +22,8 @@ export type ResolvedRpcConfig = {
   chainName: string;
   primaryRpcUrl: string;
   fallbackRpcUrl?: string;
+  primaryWssUrl?: string;
+  fallbackWssUrl?: string;
   source: "user" | "default";
 };
 

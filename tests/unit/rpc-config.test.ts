@@ -7,6 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getRpcUrl,
+  getWssUrl,
   PUBLIC_RPCS,
   parseRpcConfig,
   type RpcConfig,
@@ -28,17 +29,17 @@ describe("RPC Config Resolution", () => {
     it("should parse valid JSON config", () => {
       const json = JSON.stringify({
         "eth-mainnet": {
-          primary: "https://primary.example.com",
-          fallback: "https://fallback.example.com",
+          primaryRpcUrl: "https://primary.example.com",
+          fallbackRpcUrl: "https://fallback.example.com",
         },
       });
 
       const config = parseRpcConfig(json);
 
-      expect(config["eth-mainnet"]?.primary).toBe(
+      expect(config["eth-mainnet"]?.primaryRpcUrl).toBe(
         "https://primary.example.com"
       );
-      expect(config["eth-mainnet"]?.fallback).toBe(
+      expect(config["eth-mainnet"]?.fallbackRpcUrl).toBe(
         "https://fallback.example.com"
       );
     });
@@ -60,17 +61,19 @@ describe("RPC Config Resolution", () => {
 
     it("should parse config with all chains", () => {
       const json = JSON.stringify({
-        "eth-mainnet": { primary: "https://eth.example.com" },
-        sepolia: { primary: "https://sepolia.example.com" },
-        "base-mainnet": { primary: "https://base.example.com" },
-        "solana-mainnet": { primary: "https://solana.example.com" },
+        "eth-mainnet": { primaryRpcUrl: "https://eth.example.com" },
+        sepolia: { primaryRpcUrl: "https://sepolia.example.com" },
+        "base-mainnet": { primaryRpcUrl: "https://base.example.com" },
+        "solana-mainnet": { primaryRpcUrl: "https://solana.example.com" },
       });
 
       const config = parseRpcConfig(json);
 
       expect(Object.keys(config)).toHaveLength(4);
-      expect(config["eth-mainnet"]?.primary).toBe("https://eth.example.com");
-      expect(config["solana-mainnet"]?.primary).toBe(
+      expect(config["eth-mainnet"]?.primaryRpcUrl).toBe(
+        "https://eth.example.com"
+      );
+      expect(config["solana-mainnet"]?.primaryRpcUrl).toBe(
         "https://solana.example.com"
       );
     });
@@ -79,7 +82,7 @@ describe("RPC Config Resolution", () => {
   describe("getRpcUrl priority", () => {
     it("should prioritize JSON config over env var and public default", () => {
       const rpcConfig: RpcConfig = {
-        "eth-mainnet": { primary: "https://json-primary.example.com" },
+        "eth-mainnet": { primaryRpcUrl: "https://json-primary.example.com" },
       };
 
       const result = getRpcUrl({
@@ -95,7 +98,7 @@ describe("RPC Config Resolution", () => {
 
     it("should use env var when JSON config missing chain", () => {
       const rpcConfig: RpcConfig = {
-        "other-chain": { primary: "https://other.example.com" },
+        "other-chain": { primaryRpcUrl: "https://other.example.com" },
       };
 
       const result = getRpcUrl({
@@ -111,7 +114,7 @@ describe("RPC Config Resolution", () => {
 
     it("should use env var when JSON config missing type", () => {
       const rpcConfig: RpcConfig = {
-        "eth-mainnet": { fallback: "https://json-fallback.example.com" },
+        "eth-mainnet": { fallbackRpcUrl: "https://json-fallback.example.com" },
       };
 
       const result = getRpcUrl({
@@ -156,8 +159,8 @@ describe("RPC Config Resolution", () => {
     it("should handle fallback type correctly", () => {
       const rpcConfig: RpcConfig = {
         "eth-mainnet": {
-          primary: "https://json-primary.example.com",
-          fallback: "https://json-fallback.example.com",
+          primaryRpcUrl: "https://json-primary.example.com",
+          fallbackRpcUrl: "https://json-fallback.example.com",
         },
       };
 
@@ -176,7 +179,7 @@ describe("RPC Config Resolution", () => {
   describe("mixed configuration scenarios", () => {
     it("should handle partial JSON config with env var fallbacks", () => {
       const rpcConfig: RpcConfig = {
-        "eth-mainnet": { primary: "https://json-eth.example.com" },
+        "eth-mainnet": { primaryRpcUrl: "https://json-eth.example.com" },
         // solana-mainnet not in JSON
       };
 
@@ -202,7 +205,7 @@ describe("RPC Config Resolution", () => {
 
     it("should handle JSON with only primary, env var for fallback", () => {
       const rpcConfig: RpcConfig = {
-        "eth-mainnet": { primary: "https://json-primary.example.com" },
+        "eth-mainnet": { primaryRpcUrl: "https://json-primary.example.com" },
       };
 
       const primaryResult = getRpcUrl({
@@ -258,7 +261,7 @@ describe("RPC Config Resolution", () => {
       public: publicDefault,
     }) => {
       const rpcConfig: RpcConfig = {
-        [json]: { primary: `https://${json}.json.example.com` },
+        [json]: { primaryRpcUrl: `https://${json}.json.example.com` },
       };
 
       const result = getRpcUrl({
@@ -295,7 +298,7 @@ describe("RPC Config Resolution", () => {
   describe("edge cases", () => {
     it("should handle empty string in JSON config as falsy", () => {
       const rpcConfig: RpcConfig = {
-        "eth-mainnet": { primary: "" },
+        "eth-mainnet": { primaryRpcUrl: "" },
       };
 
       const result = getRpcUrl({
@@ -312,7 +315,7 @@ describe("RPC Config Resolution", () => {
 
     it("should handle null-ish values gracefully", () => {
       const rpcConfig: RpcConfig = {
-        "eth-mainnet": { primary: undefined },
+        "eth-mainnet": { primaryRpcUrl: undefined },
       };
 
       const result = getRpcUrl({
@@ -346,36 +349,36 @@ describe("RPC Config Resolution", () => {
     it("should resolve all chains from complete JSON config", () => {
       const fullConfig: RpcConfig = {
         "eth-mainnet": {
-          primary: "https://eth.primary.com",
-          fallback: "https://eth.fallback.com",
+          primaryRpcUrl: "https://eth.primary.com",
+          fallbackRpcUrl: "https://eth.fallback.com",
         },
         sepolia: {
-          primary: "https://sepolia.primary.com",
-          fallback: "https://sepolia.fallback.com",
+          primaryRpcUrl: "https://sepolia.primary.com",
+          fallbackRpcUrl: "https://sepolia.fallback.com",
         },
         "base-mainnet": {
-          primary: "https://base.primary.com",
-          fallback: "https://base.fallback.com",
+          primaryRpcUrl: "https://base.primary.com",
+          fallbackRpcUrl: "https://base.fallback.com",
         },
         "base-sepolia": {
-          primary: "https://base-sep.primary.com",
-          fallback: "https://base-sep.fallback.com",
+          primaryRpcUrl: "https://base-sep.primary.com",
+          fallbackRpcUrl: "https://base-sep.fallback.com",
         },
         "tempo-testnet": {
-          primary: "https://tempo-test.primary.com",
-          fallback: "https://tempo-test.fallback.com",
+          primaryRpcUrl: "https://tempo-test.primary.com",
+          fallbackRpcUrl: "https://tempo-test.fallback.com",
         },
         "tempo-mainnet": {
-          primary: "https://tempo.primary.com",
-          fallback: "https://tempo.fallback.com",
+          primaryRpcUrl: "https://tempo.primary.com",
+          fallbackRpcUrl: "https://tempo.fallback.com",
         },
         "solana-mainnet": {
-          primary: "https://solana.primary.com",
-          fallback: "https://solana.fallback.com",
+          primaryRpcUrl: "https://solana.primary.com",
+          fallbackRpcUrl: "https://solana.fallback.com",
         },
         "solana-devnet": {
-          primary: "https://solana-dev.primary.com",
-          fallback: "https://solana-dev.fallback.com",
+          primaryRpcUrl: "https://solana-dev.primary.com",
+          fallbackRpcUrl: "https://solana-dev.fallback.com",
         },
       };
 
@@ -414,12 +417,12 @@ describe("RPC Config Resolution", () => {
     it("should work with realistic JSON string parsing", () => {
       const jsonString = JSON.stringify({
         "eth-mainnet": {
-          primary: "https://chain.techops.services/eth-mainnet",
-          fallback: "https://eth.llamarpc.com",
+          primaryRpcUrl: "https://chain.techops.services/eth-mainnet",
+          fallbackRpcUrl: "https://eth.llamarpc.com",
         },
         "solana-mainnet": {
-          primary: "https://solana-mainnet.g.alchemy.com/v2/key123",
-          fallback: "https://api.mainnet-beta.solana.com",
+          primaryRpcUrl: "https://solana-mainnet.g.alchemy.com/v2/key123",
+          fallbackRpcUrl: "https://api.mainnet-beta.solana.com",
         },
       });
 
@@ -455,6 +458,367 @@ describe("RPC Config Resolution", () => {
           type: "primary",
         })
       ).toBe(PUBLIC_RPCS.TEMPO_TESTNET);
+    });
+  });
+
+  describe("AWS Parameter Store schema format", () => {
+    it("should parse schema format with all fields", () => {
+      const json = JSON.stringify({
+        "eth-mainnet": {
+          chainId: 1,
+          symbol: "ETH",
+          primaryRpcUrl: "https://chain.techops.live/eth-mainnet",
+          fallbackRpcUrl: "https://eth-mainnet.g.alchemy.com/v2/key",
+          primaryWssUrl: "wss://chain.techops.live/eth-mainnet",
+          fallbackWssUrl: "wss://eth-mainnet.g.alchemy.com/v2/key",
+          isEnabled: true,
+          isTestnet: false,
+        },
+      });
+
+      const config = parseRpcConfig(json);
+
+      expect(config["eth-mainnet"]?.chainId).toBe(1);
+      expect(config["eth-mainnet"]?.symbol).toBe("ETH");
+      expect(config["eth-mainnet"]?.primaryRpcUrl).toBe(
+        "https://chain.techops.live/eth-mainnet"
+      );
+      expect(config["eth-mainnet"]?.fallbackRpcUrl).toBe(
+        "https://eth-mainnet.g.alchemy.com/v2/key"
+      );
+      expect(config["eth-mainnet"]?.primaryWssUrl).toBe(
+        "wss://chain.techops.live/eth-mainnet"
+      );
+      expect(config["eth-mainnet"]?.fallbackWssUrl).toBe(
+        "wss://eth-mainnet.g.alchemy.com/v2/key"
+      );
+      expect(config["eth-mainnet"]?.isEnabled).toBe(true);
+      expect(config["eth-mainnet"]?.isTestnet).toBe(false);
+    });
+
+    it("should use primaryRpcUrl from config", () => {
+      const rpcConfig: RpcConfig = {
+        "eth-mainnet": {
+          primaryRpcUrl: "https://new-schema.example.com",
+        },
+      };
+
+      const result = getRpcUrl({
+        rpcConfig,
+        jsonKey: "eth-mainnet",
+        envValue: "https://env.example.com",
+        publicDefault: PUBLIC_RPCS.ETH_MAINNET,
+        type: "primary",
+      });
+
+      expect(result).toBe("https://new-schema.example.com");
+    });
+
+    it("should use fallbackRpcUrl from config", () => {
+      const rpcConfig: RpcConfig = {
+        "eth-mainnet": {
+          fallbackRpcUrl: "https://new-schema-fallback.example.com",
+        },
+      };
+
+      const result = getRpcUrl({
+        rpcConfig,
+        jsonKey: "eth-mainnet",
+        envValue: "https://env.example.com",
+        publicDefault: PUBLIC_RPCS.ETH_MAINNET,
+        type: "fallback",
+      });
+
+      expect(result).toBe("https://new-schema-fallback.example.com");
+    });
+
+    it("should fall back to env var when RPC URL fields missing", () => {
+      const rpcConfig: RpcConfig = {
+        "eth-mainnet": {
+          chainId: 1,
+          symbol: "ETH",
+          // No RPC URLs
+        },
+      };
+
+      const primaryResult = getRpcUrl({
+        rpcConfig,
+        jsonKey: "eth-mainnet",
+        envValue: "https://env-primary.example.com",
+        publicDefault: PUBLIC_RPCS.ETH_MAINNET,
+        type: "primary",
+      });
+
+      const fallbackResult = getRpcUrl({
+        rpcConfig,
+        jsonKey: "eth-mainnet",
+        envValue: "https://env-fallback.example.com",
+        publicDefault: PUBLIC_RPCS.ETH_MAINNET,
+        type: "fallback",
+      });
+
+      expect(primaryResult).toBe("https://env-primary.example.com");
+      expect(fallbackResult).toBe("https://env-fallback.example.com");
+    });
+
+    it("should fall through to env var when new schema field is missing", () => {
+      const rpcConfig: RpcConfig = {
+        "eth-mainnet": {
+          chainId: 1,
+          symbol: "ETH",
+          // No primaryRpcUrl or primary
+        },
+      };
+
+      const result = getRpcUrl({
+        rpcConfig,
+        jsonKey: "eth-mainnet",
+        envValue: "https://env-fallback.example.com",
+        publicDefault: PUBLIC_RPCS.ETH_MAINNET,
+        type: "primary",
+      });
+
+      expect(result).toBe("https://env-fallback.example.com");
+    });
+
+    it("should work with realistic Parameter Store JSON", () => {
+      const parameterStoreJson = JSON.stringify({
+        "eth-mainnet": {
+          chainId: 1,
+          symbol: "ETH",
+          primaryRpcUrl: "https://chain.techops.live/eth-mainnet",
+          fallbackRpcUrl:
+            "https://eth-mainnet.g.alchemy.com/v2/s_8VpY02izssHI4yW2uyC1XWkrMCdS7a",
+          primaryWssUrl: "wss://chain.techops.live/eth-mainnet",
+          fallbackWssUrl:
+            "wss://eth-mainnet.g.alchemy.com/v2/s_8VpY02izssHI4yW2uyC1XWkrMCdS7a",
+          isEnabled: true,
+          isTestnet: false,
+        },
+        sepolia: {
+          chainId: 11_155_111,
+          symbol: "ETH",
+          primaryRpcUrl: "https://chain.techops.live/eth-sepolia",
+          fallbackRpcUrl: "https://rpc.sepolia.org",
+          primaryWssUrl: "wss://chain.techops.live/eth-sepolia",
+          fallbackWssUrl: "wss://rpc.sepolia.org",
+          isEnabled: true,
+          isTestnet: true,
+        },
+      });
+
+      const config = parseRpcConfig(parameterStoreJson);
+
+      // Verify eth-mainnet
+      expect(
+        getRpcUrl({
+          rpcConfig: config,
+          jsonKey: "eth-mainnet",
+          envValue: undefined,
+          publicDefault: PUBLIC_RPCS.ETH_MAINNET,
+          type: "primary",
+        })
+      ).toBe("https://chain.techops.live/eth-mainnet");
+
+      expect(
+        getRpcUrl({
+          rpcConfig: config,
+          jsonKey: "eth-mainnet",
+          envValue: undefined,
+          publicDefault: PUBLIC_RPCS.ETH_MAINNET,
+          type: "fallback",
+        })
+      ).toBe(
+        "https://eth-mainnet.g.alchemy.com/v2/s_8VpY02izssHI4yW2uyC1XWkrMCdS7a"
+      );
+
+      // Verify sepolia
+      expect(
+        getRpcUrl({
+          rpcConfig: config,
+          jsonKey: "sepolia",
+          envValue: undefined,
+          publicDefault: PUBLIC_RPCS.SEPOLIA,
+          type: "primary",
+        })
+      ).toBe("https://chain.techops.live/eth-sepolia");
+    });
+  });
+
+  describe("getWssUrl", () => {
+    it("should return primary WSS URL", () => {
+      const rpcConfig: RpcConfig = {
+        "eth-mainnet": {
+          primaryWssUrl: "wss://chain.techops.live/eth-mainnet",
+          fallbackWssUrl: "wss://eth.fallback.com",
+        },
+      };
+
+      const result = getWssUrl({
+        rpcConfig,
+        jsonKey: "eth-mainnet",
+        type: "primary",
+      });
+
+      expect(result).toBe("wss://chain.techops.live/eth-mainnet");
+    });
+
+    it("should return fallback WSS URL", () => {
+      const rpcConfig: RpcConfig = {
+        "eth-mainnet": {
+          primaryWssUrl: "wss://chain.techops.live/eth-mainnet",
+          fallbackWssUrl: "wss://eth.fallback.com",
+        },
+      };
+
+      const result = getWssUrl({
+        rpcConfig,
+        jsonKey: "eth-mainnet",
+        type: "fallback",
+      });
+
+      expect(result).toBe("wss://eth.fallback.com");
+    });
+
+    it("should return undefined when WSS URL not configured", () => {
+      const rpcConfig: RpcConfig = {
+        "eth-mainnet": {
+          primaryRpcUrl: "https://chain.techops.live/eth-mainnet",
+          // No WSS URLs
+        },
+      };
+
+      const result = getWssUrl({
+        rpcConfig,
+        jsonKey: "eth-mainnet",
+        type: "primary",
+      });
+
+      expect(result).toBeUndefined();
+    });
+
+    it("should return undefined when chain not in config", () => {
+      const rpcConfig: RpcConfig = {};
+
+      const result = getWssUrl({
+        rpcConfig,
+        jsonKey: "eth-mainnet",
+        type: "primary",
+      });
+
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe("Full schema integration", () => {
+    it("should resolve all field types from complete config", () => {
+      const fullConfig: RpcConfig = {
+        "eth-mainnet": {
+          chainId: 1,
+          symbol: "ETH",
+          primaryRpcUrl: "https://chain.techops.live/eth-mainnet",
+          fallbackRpcUrl: "https://eth.fallback.com",
+          primaryWssUrl: "wss://chain.techops.live/eth-mainnet",
+          fallbackWssUrl: "wss://eth.fallback.com",
+          isEnabled: true,
+          isTestnet: false,
+        },
+      };
+
+      // RPC URLs
+      expect(
+        getRpcUrl({
+          rpcConfig: fullConfig,
+          jsonKey: "eth-mainnet",
+          envValue: undefined,
+          publicDefault: PUBLIC_RPCS.ETH_MAINNET,
+          type: "primary",
+        })
+      ).toBe("https://chain.techops.live/eth-mainnet");
+
+      expect(
+        getRpcUrl({
+          rpcConfig: fullConfig,
+          jsonKey: "eth-mainnet",
+          envValue: undefined,
+          publicDefault: PUBLIC_RPCS.ETH_MAINNET,
+          type: "fallback",
+        })
+      ).toBe("https://eth.fallback.com");
+
+      // WSS URLs
+      expect(
+        getWssUrl({
+          rpcConfig: fullConfig,
+          jsonKey: "eth-mainnet",
+          type: "primary",
+        })
+      ).toBe("wss://chain.techops.live/eth-mainnet");
+
+      expect(
+        getWssUrl({
+          rpcConfig: fullConfig,
+          jsonKey: "eth-mainnet",
+          type: "fallback",
+        })
+      ).toBe("wss://eth.fallback.com");
+    });
+
+    it("should handle multiple chains", () => {
+      const multiChainConfig: RpcConfig = {
+        "eth-mainnet": {
+          chainId: 1,
+          symbol: "ETH",
+          primaryRpcUrl: "https://eth.example.com",
+          primaryWssUrl: "wss://eth.example.com",
+          isEnabled: true,
+          isTestnet: false,
+        },
+        sepolia: {
+          chainId: 11_155_111,
+          symbol: "ETH",
+          primaryRpcUrl: "https://sepolia.example.com",
+          primaryWssUrl: "wss://sepolia.example.com",
+          isEnabled: true,
+          isTestnet: true,
+        },
+      };
+
+      expect(
+        getRpcUrl({
+          rpcConfig: multiChainConfig,
+          jsonKey: "eth-mainnet",
+          envValue: undefined,
+          publicDefault: PUBLIC_RPCS.ETH_MAINNET,
+          type: "primary",
+        })
+      ).toBe("https://eth.example.com");
+
+      expect(
+        getRpcUrl({
+          rpcConfig: multiChainConfig,
+          jsonKey: "sepolia",
+          envValue: undefined,
+          publicDefault: PUBLIC_RPCS.SEPOLIA,
+          type: "primary",
+        })
+      ).toBe("https://sepolia.example.com");
+
+      expect(
+        getWssUrl({
+          rpcConfig: multiChainConfig,
+          jsonKey: "eth-mainnet",
+          type: "primary",
+        })
+      ).toBe("wss://eth.example.com");
+
+      expect(
+        getWssUrl({
+          rpcConfig: multiChainConfig,
+          jsonKey: "sepolia",
+          type: "primary",
+        })
+      ).toBe("wss://sepolia.example.com");
     });
   });
 });

@@ -242,8 +242,12 @@ export const chains = pgTable(
     symbol: text("symbol").notNull(), // e.g., "ETH"
     defaultPrimaryRpc: text("default_primary_rpc").notNull(),
     defaultFallbackRpc: text("default_fallback_rpc"),
+    defaultPrimaryWss: text("default_primary_wss"), // WebSocket URL
+    defaultFallbackWss: text("default_fallback_wss"),
     explorerUrl: text("explorer_url"), // e.g., "https://etherscan.io"
-    explorerApiUrl: text("explorer_api_url"), // For ABI fetching
+    explorerApiUrl: text("explorer_api_url"), // For ABI fetching (legacy)
+    explorerAbiApiUrl: text("explorer_abi_api_url"), // Base URL for ABI API
+    explorerBalanceApiUrl: text("explorer_balance_api_url"), // Base URL for balance API
     isTestnet: boolean("is_testnet").default(false),
     isEnabled: boolean("is_enabled").default(true), // Can disable chains
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -265,6 +269,8 @@ export const userRpcPreferences = pgTable(
     chainId: integer("chain_id").notNull(), // References chains.chainId
     primaryRpcUrl: text("primary_rpc_url").notNull(),
     fallbackRpcUrl: text("fallback_rpc_url"),
+    primaryWssUrl: text("primary_wss_url"), // WebSocket URL override
+    fallbackWssUrl: text("fallback_wss_url"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },

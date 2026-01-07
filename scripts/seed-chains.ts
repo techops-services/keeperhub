@@ -16,6 +16,7 @@ import postgres from "postgres";
 import { chains, type NewChain } from "../lib/db/schema";
 import {
   createRpcUrlResolver,
+  getWssUrl,
   PUBLIC_RPCS,
   parseRpcConfig,
 } from "../lib/rpc/rpc-config";
@@ -49,8 +50,20 @@ const DEFAULT_CHAINS: NewChain[] = [
       PUBLIC_RPCS.ETH_MAINNET,
       "fallback"
     ),
+    defaultPrimaryWss: getWssUrl({
+      rpcConfig,
+      jsonKey: "eth-mainnet",
+      type: "primary",
+    }),
+    defaultFallbackWss: getWssUrl({
+      rpcConfig,
+      jsonKey: "eth-mainnet",
+      type: "fallback",
+    }),
     explorerUrl: "https://etherscan.io",
     explorerApiUrl: "https://api.etherscan.io/v2/api",
+    explorerAbiApiUrl: "https://api.etherscan.io/v2/api",
+    explorerBalanceApiUrl: "https://api.etherscan.io/v2/api",
     isTestnet: false,
     isEnabled: true,
   },
@@ -70,8 +83,20 @@ const DEFAULT_CHAINS: NewChain[] = [
       PUBLIC_RPCS.SEPOLIA,
       "fallback"
     ),
+    defaultPrimaryWss: getWssUrl({
+      rpcConfig,
+      jsonKey: "sepolia",
+      type: "primary",
+    }),
+    defaultFallbackWss: getWssUrl({
+      rpcConfig,
+      jsonKey: "sepolia",
+      type: "fallback",
+    }),
     explorerUrl: "https://sepolia.etherscan.io",
     explorerApiUrl: "https://api-sepolia.etherscan.io/v2/api",
+    explorerAbiApiUrl: "https://api-sepolia.etherscan.io/v2/api",
+    explorerBalanceApiUrl: "https://api-sepolia.etherscan.io/v2/api",
     isTestnet: true,
     isEnabled: true,
   },
@@ -91,8 +116,20 @@ const DEFAULT_CHAINS: NewChain[] = [
       PUBLIC_RPCS.BASE_MAINNET,
       "fallback"
     ),
+    defaultPrimaryWss: getWssUrl({
+      rpcConfig,
+      jsonKey: "base-mainnet",
+      type: "primary",
+    }),
+    defaultFallbackWss: getWssUrl({
+      rpcConfig,
+      jsonKey: "base-mainnet",
+      type: "fallback",
+    }),
     explorerUrl: "https://basescan.org",
     explorerApiUrl: "https://api.basescan.org/api",
+    explorerAbiApiUrl: "https://api.basescan.org/api",
+    explorerBalanceApiUrl: "https://api.basescan.org/api",
     isTestnet: false,
     isEnabled: true,
   },
@@ -112,8 +149,20 @@ const DEFAULT_CHAINS: NewChain[] = [
       PUBLIC_RPCS.BASE_SEPOLIA,
       "fallback"
     ),
+    defaultPrimaryWss: getWssUrl({
+      rpcConfig,
+      jsonKey: "base-sepolia",
+      type: "primary",
+    }),
+    defaultFallbackWss: getWssUrl({
+      rpcConfig,
+      jsonKey: "base-sepolia",
+      type: "fallback",
+    }),
     explorerUrl: "https://sepolia.basescan.org",
     explorerApiUrl: "https://api-sepolia.basescan.org/api",
+    explorerAbiApiUrl: "https://api-sepolia.basescan.org/api",
+    explorerBalanceApiUrl: "https://api-sepolia.basescan.org/api",
     isTestnet: true,
     isEnabled: true,
   },
@@ -133,8 +182,20 @@ const DEFAULT_CHAINS: NewChain[] = [
       PUBLIC_RPCS.TEMPO_TESTNET,
       "fallback"
     ),
+    defaultPrimaryWss: getWssUrl({
+      rpcConfig,
+      jsonKey: "tempo-testnet",
+      type: "primary",
+    }),
+    defaultFallbackWss: getWssUrl({
+      rpcConfig,
+      jsonKey: "tempo-testnet",
+      type: "fallback",
+    }),
     explorerUrl: "https://explorer.testnet.tempo.xyz",
     explorerApiUrl: "https://explorer.testnet.tempo.xyz/api",
+    explorerAbiApiUrl: "https://explorer.testnet.tempo.xyz/api",
+    explorerBalanceApiUrl: "https://explorer.testnet.tempo.xyz/api",
     isTestnet: true,
     isEnabled: true,
   },
@@ -154,8 +215,20 @@ const DEFAULT_CHAINS: NewChain[] = [
       PUBLIC_RPCS.TEMPO_MAINNET,
       "fallback"
     ),
+    defaultPrimaryWss: getWssUrl({
+      rpcConfig,
+      jsonKey: "tempo-mainnet",
+      type: "primary",
+    }),
+    defaultFallbackWss: getWssUrl({
+      rpcConfig,
+      jsonKey: "tempo-mainnet",
+      type: "fallback",
+    }),
     explorerUrl: "https://explorer.tempo.xyz",
     explorerApiUrl: "https://explorer.tempo.xyz/api",
+    explorerAbiApiUrl: "https://explorer.tempo.xyz/api",
+    explorerBalanceApiUrl: "https://explorer.tempo.xyz/api",
     isTestnet: false,
     isEnabled: false, // Disabled until mainnet launches
   },
@@ -176,8 +249,20 @@ const DEFAULT_CHAINS: NewChain[] = [
       PUBLIC_RPCS.SOLANA_MAINNET,
       "fallback"
     ),
+    defaultPrimaryWss: getWssUrl({
+      rpcConfig,
+      jsonKey: "solana-mainnet",
+      type: "primary",
+    }),
+    defaultFallbackWss: getWssUrl({
+      rpcConfig,
+      jsonKey: "solana-mainnet",
+      type: "fallback",
+    }),
     explorerUrl: "https://solscan.io",
     explorerApiUrl: "https://api.solscan.io",
+    explorerAbiApiUrl: "https://api.solscan.io",
+    explorerBalanceApiUrl: "https://api.solscan.io",
     isTestnet: false,
     isEnabled: true,
   },
@@ -197,8 +282,20 @@ const DEFAULT_CHAINS: NewChain[] = [
       PUBLIC_RPCS.SOLANA_DEVNET,
       "fallback"
     ),
+    defaultPrimaryWss: getWssUrl({
+      rpcConfig,
+      jsonKey: "solana-devnet",
+      type: "primary",
+    }),
+    defaultFallbackWss: getWssUrl({
+      rpcConfig,
+      jsonKey: "solana-devnet",
+      type: "fallback",
+    }),
     explorerUrl: "https://solscan.io/?cluster=devnet",
     explorerApiUrl: "https://api-devnet.solscan.io",
+    explorerAbiApiUrl: "https://api-devnet.solscan.io",
+    explorerBalanceApiUrl: "https://api-devnet.solscan.io",
     isTestnet: true,
     isEnabled: true,
   },

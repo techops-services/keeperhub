@@ -143,6 +143,12 @@ describe("Web3 Plugin Steps Integration", () => {
           "0x1234567890123456789012345678901234567890"
         );
       }
+
+      // Verify userId is passed to getRpcProvider for user RPC preferences
+      expect(getRpcProvider).toHaveBeenCalledWith({
+        chainId: 1,
+        userId: "user_123",
+      });
     });
 
     it("should successfully check balance on sepolia", async () => {

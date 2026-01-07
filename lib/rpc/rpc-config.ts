@@ -6,10 +6,18 @@
  *   2. Individual env vars (CHAIN_ETH_MAINNET_PRIMARY_RPC, etc.)
  *   3. Public RPC defaults (no API keys required)
  *
- * JSON config format (CHAIN_RPC_CONFIG):
+ * JSON config format (CHAIN_RPC_CONFIG from AWS Parameter Store):
  *   {
- *     "eth-mainnet": { "primary": "https://...", "fallback": "https://..." },
- *     "solana-mainnet": { "primary": "https://...", "fallback": "https://..." }
+ *     "eth-mainnet": {
+ *       "chainId": 1,
+ *       "symbol": "ETH",
+ *       "primaryRpcUrl": "https://...",
+ *       "fallbackRpcUrl": "https://...",
+ *       "primaryWssUrl": "wss://...",
+ *       "fallbackWssUrl": "wss://...",
+ *       "isEnabled": true,
+ *       "isTestnet": false
+ *     }
  *   }
  */
 
@@ -29,9 +37,23 @@ export const PUBLIC_RPCS = {
 } as const;
 
 /**
+ * Type for RPC configuration entry
+ */
+export type RpcConfigEntry = {
+  chainId?: number;
+  symbol?: string;
+  primaryRpcUrl?: string;
+  fallbackRpcUrl?: string;
+  primaryWssUrl?: string;
+  fallbackWssUrl?: string;
+  isEnabled?: boolean;
+  isTestnet?: boolean;
+};
+
+/**
  * Type for RPC configuration object
  */
-export type RpcConfig = Record<string, { primary?: string; fallback?: string }>;
+export type RpcConfig = Record<string, RpcConfigEntry>;
 
 /**
  * Options for getRpcUrl function
@@ -66,7 +88,49 @@ export function parseRpcConfig(envValue: string | undefined): RpcConfig {
  */
 export function getRpcUrl(options: GetRpcUrlOptions): string {
   const { rpcConfig, jsonKey, envValue, publicDefault, type } = options;
-  return rpcConfig[jsonKey]?.[type] || envValue || publicDefault;
+  const entry = rpcConfig[jsonKey];
+
+  if (!entry) {
+    return envValue || publicDefault;
+  }
+
+  if (type === "primary" && entry.primaryRpcUrl) {
+    return entry.primaryRpcUrl;
+  }
+  if (type === "fallback" && entry.fallbackRpcUrl) {
+    return entry.fallbackRpcUrl;
+  }
+
+  return envValue || publicDefault;
+}
+
+/**
+ * Options for getWssUrl function
+ */
+export type GetWssUrlOptions = {
+  rpcConfig: RpcConfig;
+  jsonKey: string;
+  type: "primary" | "fallback";
+};
+
+/**
+ * Get WebSocket URL from JSON config (new schema only)
+ *
+ * @param options - Configuration options
+ * @returns The resolved WSS URL, or undefined if not configured
+ */
+export function getWssUrl(options: GetWssUrlOptions): string | undefined {
+  const { rpcConfig, jsonKey, type } = options;
+  const entry = rpcConfig[jsonKey];
+
+  if (!entry) {
+    return;
+  }
+
+  if (type === "primary") {
+    return entry.primaryWssUrl;
+  }
+  return entry.fallbackWssUrl;
 }
 
 /**

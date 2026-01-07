@@ -55,6 +55,10 @@ export async function resolveRpcConfig(
         chainName: chain.name,
         primaryRpcUrl: userPref.primaryRpcUrl,
         fallbackRpcUrl: userPref.fallbackRpcUrl || undefined,
+        primaryWssUrl:
+          userPref.primaryWssUrl || chain.defaultPrimaryWss || undefined,
+        fallbackWssUrl:
+          userPref.fallbackWssUrl || chain.defaultFallbackWss || undefined,
         source: "user",
       };
     }
@@ -66,6 +70,8 @@ export async function resolveRpcConfig(
     chainName: chain.name,
     primaryRpcUrl: chain.defaultPrimaryRpc,
     fallbackRpcUrl: chain.defaultFallbackRpc || undefined,
+    primaryWssUrl: chain.defaultPrimaryWss || undefined,
+    fallbackWssUrl: chain.defaultFallbackWss || undefined,
     source: "default",
   };
 }
@@ -103,6 +109,10 @@ export async function resolveAllRpcConfigs(
         chainName: chain.name,
         primaryRpcUrl: userPref.primaryRpcUrl,
         fallbackRpcUrl: userPref.fallbackRpcUrl || undefined,
+        primaryWssUrl:
+          userPref.primaryWssUrl || chain.defaultPrimaryWss || undefined,
+        fallbackWssUrl:
+          userPref.fallbackWssUrl || chain.defaultFallbackWss || undefined,
         source: "user" as const,
       };
     }
@@ -112,6 +122,8 @@ export async function resolveAllRpcConfigs(
       chainName: chain.name,
       primaryRpcUrl: chain.defaultPrimaryRpc,
       fallbackRpcUrl: chain.defaultFallbackRpc || undefined,
+      primaryWssUrl: chain.defaultPrimaryWss || undefined,
+      fallbackWssUrl: chain.defaultFallbackWss || undefined,
       source: "default" as const,
     };
   });

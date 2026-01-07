@@ -1,35 +1,76 @@
+import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
 import { NextResponse } from "next/server";
 import { apiError } from "@/keeperhub/lib/api-error";
 import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { chains } from "@/lib/db/schema";
 
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
 
-/**
- * Get Etherscan API URL and chainid based on network (using v2 API)
- * V2 uses a single base URL with chainid parameter instead of network-specific subdomains
- */
-function getEtherscanApiConfig(network: string): {
-  baseUrl: string;
-  chainid: string;
-} {
-  const configs: Record<string, { baseUrl: string; chainid: string }> = {
-    mainnet: {
-      baseUrl: "https://api.etherscan.io/v2/api",
-      chainid: "1",
-    },
-    sepolia: {
-      baseUrl: "https://api.etherscan.io/v2/api",
-      chainid: "11155111",
-    },
-  };
+// Chain ID mapping for network names
+const NETWORK_TO_CHAIN_ID: Record<string, number> = {
+  mainnet: 1,
+  sepolia: 11_155_111,
+  base: 8453,
+  "base-sepolia": 84_532,
+};
 
-  const config = configs[network];
-  if (!config) {
+/**
+ * Get explorer API config from database based on network name
+ * Falls back to legacy hardcoded config if database lookup fails
+ */
+async function getExplorerApiConfig(network: string): Promise<{
+  baseUrl: string;
+  chainId: number;
+}> {
+  const chainId = NETWORK_TO_CHAIN_ID[network];
+
+  if (!chainId) {
     throw new Error(`Unsupported network: ${network}`);
   }
 
-  return config;
+  // Try to get config from database
+  const chainResults = await db
+    .select()
+    .from(chains)
+    .where(eq(chains.chainId, chainId))
+    .limit(1);
+
+  const chain = chainResults[0];
+
+  if (chain?.explorerAbiApiUrl) {
+    return {
+      baseUrl: chain.explorerAbiApiUrl,
+      chainId: chain.chainId,
+    };
+  }
+
+  // Fallback to explorerApiUrl (legacy field)
+  if (chain?.explorerApiUrl) {
+    return {
+      baseUrl: chain.explorerApiUrl,
+      chainId: chain.chainId,
+    };
+  }
+
+  // Last resort: hardcoded fallback for known networks
+  const fallbackConfigs: Record<string, string> = {
+    mainnet: "https://api.etherscan.io/v2/api",
+    sepolia: "https://api.etherscan.io/v2/api",
+    base: "https://api.basescan.org/api",
+    "base-sepolia": "https://api-sepolia.basescan.org/api",
+  };
+
+  const fallbackUrl = fallbackConfigs[network];
+  if (!fallbackUrl) {
+    throw new Error(`No ABI API configured for network: ${network}`);
+  }
+
+  return {
+    baseUrl: fallbackUrl,
+    chainId,
+  };
 }
 
 /**
@@ -120,12 +161,12 @@ async function fetchAbiFromEtherscan(
 
   console.log("[Etherscan] Contract address validated");
 
-  const { baseUrl, chainid } = getEtherscanApiConfig(network);
+  const { baseUrl, chainId } = await getExplorerApiConfig(network);
   console.log("[Etherscan] Base URL:", baseUrl);
-  console.log("[Etherscan] Chain ID:", chainid);
+  console.log("[Etherscan] Chain ID:", chainId);
 
   const url = new URL(baseUrl);
-  url.searchParams.set("chainid", chainid);
+  url.searchParams.set("chainid", String(chainId));
   url.searchParams.set("module", "contract");
   url.searchParams.set("action", "getabi");
   url.searchParams.set("address", contractAddress);

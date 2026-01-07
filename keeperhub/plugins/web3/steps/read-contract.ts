@@ -1,9 +1,31 @@
 import "server-only";
 
+import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
+import { db } from "@/lib/db";
+import { workflowExecutions } from "@/lib/db/schema";
 import { getChainIdFromNetwork, getRpcProvider } from "@/lib/rpc";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
+
+/**
+ * Get userId from executionId by querying the workflowExecutions table
+ */
+async function getUserIdFromExecution(
+  executionId: string | undefined
+): Promise<string | undefined> {
+  if (!executionId) {
+    return;
+  }
+
+  const execution = await db
+    .select({ userId: workflowExecutions.userId })
+    .from(workflowExecutions)
+    .where(eq(workflowExecutions.id, executionId))
+    .limit(1);
+
+  return execution[0]?.userId;
+}
 
 type ReadContractResult =
   | { success: true; result: unknown }
@@ -31,9 +53,20 @@ async function stepHandler(
     network: input.network,
     abiFunction: input.abiFunction,
     hasFunctionArgs: !!input.functionArgs,
+    executionId: input._context?.executionId,
   });
 
-  const { contractAddress, network, abi, abiFunction, functionArgs } = input;
+  const { contractAddress, network, abi, abiFunction, functionArgs, _context } =
+    input;
+
+  // Get userId from execution context (for user RPC preferences)
+  const userId = await getUserIdFromExecution(_context?.executionId);
+  if (userId) {
+    console.log(
+      "[Read Contract] Using user RPC preferences for userId:",
+      userId
+    );
+  }
 
   // Validate contract address
   if (!ethers.isAddress(contractAddress)) {
@@ -129,7 +162,7 @@ async function stepHandler(
 
   // Call the contract function with failover
   try {
-    const rpcProvider = await getRpcProvider({ chainId });
+    const rpcProvider = await getRpcProvider({ chainId, userId });
     console.log("[Read Contract] Using RPC provider for chain:", chainId);
 
     const result = await rpcProvider.executeWithFailover(async (provider) => {

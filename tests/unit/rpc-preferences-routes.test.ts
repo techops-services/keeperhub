@@ -72,11 +72,15 @@ describe("RPC Preferences API Routes", () => {
     symbol: "ETH",
     defaultPrimaryRpc: "https://eth.example.com",
     defaultFallbackRpc: "https://eth-backup.example.com",
+    defaultPrimaryWss: null,
+    defaultFallbackWss: null,
     isEnabled: true,
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),
     explorerUrl: "https://etherscan.io",
     explorerApiUrl: "https://api.etherscan.io",
+    explorerAbiApiUrl: "https://api.etherscan.io/v2/api",
+    explorerBalanceApiUrl: "https://api.etherscan.io/v2/api",
     isTestnet: false,
   };
 
@@ -86,6 +90,8 @@ describe("RPC Preferences API Routes", () => {
     chainId: 1,
     primaryRpcUrl: "https://custom-eth.example.com",
     fallbackRpcUrl: "https://custom-eth-backup.example.com",
+    primaryWssUrl: null,
+    fallbackWssUrl: null,
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),
   };

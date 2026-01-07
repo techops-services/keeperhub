@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install dev build type-check lint fix deploy-to-local-kubernetes setup-local-kubernetes check-local-kubernetes status logs restart teardown db-create db-migrate db-studio build-scheduler-images deploy-scheduler scheduler-status scheduler-logs runner-logs teardown-scheduler test test-unit test-integration test-e2e hybrid-setup hybrid-up hybrid-deploy hybrid-deploy-only hybrid-status hybrid-down hybrid-reset hybrid-logs dev-up dev-down dev-logs
+.PHONY: help install dev build type-check lint fix deploy-to-local-kubernetes setup-local-kubernetes check-local-kubernetes status logs restart teardown db-create db-migrate db-studio build-scheduler-images deploy-scheduler scheduler-status scheduler-logs runner-logs teardown-scheduler test test-unit test-integration test-e2e test-e2e-hybrid hybrid-setup hybrid-up hybrid-deploy hybrid-deploy-only hybrid-status hybrid-down hybrid-reset hybrid-logs dev-up dev-down dev-logs
 
 # Development
 install:
@@ -147,6 +147,17 @@ test-e2e:
 	kill $$PF_PID_DB 2>/dev/null || true; \
 	kill $$PF_PID_SQS 2>/dev/null || true
 
+test-e2e-hybrid:
+	@echo "Running E2E tests against hybrid deployment (Docker Compose + Minikube)..."
+	@echo "Checking services are running..."
+	@docker compose ps --format '{{.Service}} {{.State}}' | grep -q "db running" || (echo "Error: Database not running. Run 'make hybrid-up' first." && exit 1)
+	@docker compose ps --format '{{.Service}} {{.State}}' | grep -q "localstack running" || (echo "Error: LocalStack not running. Run 'make hybrid-up' first." && exit 1)
+	@echo "Services OK. Running tests..."
+	DATABASE_URL="postgresql://postgres:postgres@localhost:5433/keeperhub" \
+	AWS_ENDPOINT_URL="http://localhost:4566" \
+	SQS_QUEUE_URL="http://localhost:4566/000000000000/keeperhub-workflow-queue" \
+	pnpm test -- --run tests/e2e/
+
 # =============================================================================
 # Docker Compose - Dev Profile (No K8s Jobs)
 # =============================================================================
@@ -189,12 +200,33 @@ hybrid-up:
 	@echo "  make hybrid-deploy"
 
 hybrid-deploy:
+	# Start Docker Compose services (db, localstack, app)
+	@echo "Starting Docker Compose services..."
+	docker compose --profile minikube up -d
+	# Wait for database to be ready
+	@echo "Waiting for database to be ready..."
+	@for i in 1 2 3 4 5 6 7 8 9 10; do \
+		if docker compose exec -T db pg_isready -U postgres > /dev/null 2>&1; then \
+			echo "Database is ready!"; \
+			break; \
+		fi; \
+		if [ $$i -eq 10 ]; then \
+			echo "Error: Database not ready after 10 attempts."; \
+			exit 1; \
+		fi; \
+		echo "Waiting for database... (attempt $$i/10)"; \
+		sleep 2; \
+	done
+	# Run database migrations and seed chains
+	@echo "Setting up database schema and seeding chains..."
+	@DATABASE_URL="postgresql://postgres:postgres@localhost:5433/keeperhub" pnpm db:push || echo "Schema push completed (or already up to date)"
+	@DATABASE_URL="postgresql://postgres:postgres@localhost:5433/keeperhub" npx tsx scripts/seed-chains.ts || echo "Chains seeded (or already exist)"
 	# Deploy scheduler to Minikube (builds images if needed)
 	chmod +x ./deploy/local/hybrid/deploy.sh
 	./deploy/local/hybrid/deploy.sh --build
 
 hybrid-deploy-only:
-	# Deploy scheduler to Minikube (skip image build)
+	# Deploy scheduler to Minikube (skip image build, skip db setup)
 	chmod +x ./deploy/local/hybrid/deploy.sh
 	./deploy/local/hybrid/deploy.sh
 
@@ -294,6 +326,7 @@ help:
 	@echo "    test-unit                  - Run unit tests"
 	@echo "    test-integration           - Run integration tests"
 	@echo "    test-e2e                   - Run E2E tests against local kubernetes"
+	@echo "    test-e2e-hybrid            - Run E2E tests against hybrid deployment"
 	@echo ""
 	@echo "Recommended workflow:"
 	@echo "  1. For UI/API dev (no workflow testing): make dev-up"

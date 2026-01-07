@@ -19,6 +19,8 @@ export type ResolvedRpcConfigResponse = {
   chainName: string;
   primaryRpcUrl: string;
   fallbackRpcUrl: string | null;
+  primaryWssUrl: string | null;
+  fallbackWssUrl: string | null;
   source: "user" | "default";
 };
 
@@ -60,6 +62,8 @@ export async function GET(request: Request) {
         chainName: config.chainName,
         primaryRpcUrl: config.primaryRpcUrl,
         fallbackRpcUrl: config.fallbackRpcUrl ?? null,
+        primaryWssUrl: config.primaryWssUrl ?? null,
+        fallbackWssUrl: config.fallbackWssUrl ?? null,
         source: config.source,
       })),
     };

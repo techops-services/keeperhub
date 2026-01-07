@@ -1,9 +1,31 @@
 import "server-only";
 
+import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
+import { db } from "@/lib/db";
+import { workflowExecutions } from "@/lib/db/schema";
 import { getChainIdFromNetwork, getRpcProvider } from "@/lib/rpc";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
+
+/**
+ * Get userId from executionId by querying the workflowExecutions table
+ */
+async function getUserIdFromExecution(
+  executionId: string | undefined
+): Promise<string | undefined> {
+  if (!executionId) {
+    return;
+  }
+
+  const execution = await db
+    .select({ userId: workflowExecutions.userId })
+    .from(workflowExecutions)
+    .where(eq(workflowExecutions.id, executionId))
+    .limit(1);
+
+  return execution[0]?.userId;
+}
 
 type CheckBalanceResult =
   | { success: true; balance: string; balanceWei: string; address: string }
@@ -25,9 +47,19 @@ async function stepHandler(
   console.log("[Check Balance] Starting step with input:", {
     network: input.network,
     address: input.address,
+    executionId: input._context?.executionId,
   });
 
-  const { network, address } = input;
+  const { network, address, _context } = input;
+
+  // Get userId from execution context (for user RPC preferences)
+  const userId = await getUserIdFromExecution(_context?.executionId);
+  if (userId) {
+    console.log(
+      "[Check Balance] Using user RPC preferences for userId:",
+      userId
+    );
+  }
 
   // Validate address
   if (!ethers.isAddress(address)) {
@@ -53,7 +85,7 @@ async function stepHandler(
 
   // Check balance using RPC provider with failover
   try {
-    const rpcProvider = await getRpcProvider({ chainId });
+    const rpcProvider = await getRpcProvider({ chainId, userId });
     console.log("[Check Balance] Using RPC provider for chain:", chainId);
 
     const balance = await rpcProvider.executeWithFailover(async (provider) => {
