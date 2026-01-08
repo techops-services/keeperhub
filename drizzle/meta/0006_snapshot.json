@@ -1,5 +1,5 @@
 {
-  "id": "256694f6-5862-4a8a-8bd1-736100a821fb",
+  "id": "ae2f912f-52ab-4638-b9dd-6a652657d562",
   "prevId": "35b30a54-f8e1-4fcd-a3f6-989e046bd76d",
   "version": "7",
   "dialect": "postgresql",
@@ -93,8 +93,12 @@
           "name": "accounts_user_id_users_id_fk",
           "tableFrom": "accounts",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -159,8 +163,12 @@
           "name": "api_keys_user_id_users_id_fk",
           "tableFrom": "api_keys",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -231,6 +239,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "chain_type": {
+          "name": "chain_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'evm'"
+        },
         "default_primary_rpc": {
           "name": "default_primary_rpc",
           "type": "text",
@@ -243,14 +258,14 @@
           "primaryKey": false,
           "notNull": false
         },
-        "explorer_url": {
-          "name": "explorer_url",
+        "default_primary_wss": {
+          "name": "default_primary_wss",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "explorer_api_url": {
-          "name": "explorer_api_url",
+        "default_fallback_wss": {
+          "name": "default_fallback_wss",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -307,7 +322,131 @@
         "chains_chain_id_unique": {
           "name": "chains_chain_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["chain_id"]
+          "columns": [
+            "chain_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.explorer_configs": {
+      "name": "explorer_configs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "chain_id": {
+          "name": "chain_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chain_type": {
+          "name": "chain_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'evm'"
+        },
+        "explorer_url": {
+          "name": "explorer_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "explorer_api_type": {
+          "name": "explorer_api_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "explorer_api_url": {
+          "name": "explorer_api_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "explorer_tx_path": {
+          "name": "explorer_tx_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'/tx/{hash}'"
+        },
+        "explorer_address_path": {
+          "name": "explorer_address_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'/address/{address}'"
+        },
+        "explorer_contract_path": {
+          "name": "explorer_contract_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_explorer_configs_chain_id": {
+          "name": "idx_explorer_configs_chain_id",
+          "columns": [
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "explorer_configs_chain_id_chains_chain_id_fk": {
+          "name": "explorer_configs_chain_id_chains_chain_id_fk",
+          "tableFrom": "explorer_configs",
+          "tableTo": "chains",
+          "columnsFrom": [
+            "chain_id"
+          ],
+          "columnsTo": [
+            "chain_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "explorer_configs_chain_id_unique": {
+          "name": "explorer_configs_chain_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "chain_id"
+          ]
         }
       },
       "policies": {},
@@ -376,8 +515,12 @@
           "name": "integrations_user_id_users_id_fk",
           "tableFrom": "integrations",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -442,8 +585,12 @@
           "name": "para_wallets_user_id_users_id_fk",
           "tableFrom": "para_wallets",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -453,7 +600,9 @@
         "para_wallets_user_id_unique": {
           "name": "para_wallets_user_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["user_id"]
+          "columns": [
+            "user_id"
+          ]
         }
       },
       "policies": {},
@@ -519,8 +668,12 @@
           "name": "sessions_user_id_users_id_fk",
           "tableFrom": "sessions",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -530,7 +683,9 @@
         "sessions_token_unique": {
           "name": "sessions_token_unique",
           "nullsNotDistinct": false,
-          "columns": ["token"]
+          "columns": [
+            "token"
+          ]
         }
       },
       "policies": {},
@@ -567,6 +722,18 @@
         },
         "fallback_rpc_url": {
           "name": "fallback_rpc_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "primary_wss_url": {
+          "name": "primary_wss_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fallback_wss_url": {
+          "name": "fallback_wss_url",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -629,8 +796,12 @@
           "name": "user_rpc_preferences_user_id_users_id_fk",
           "tableFrom": "user_rpc_preferences",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -703,7 +874,9 @@
         "users_email_unique": {
           "name": "users_email_unique",
           "nullsNotDistinct": false,
-          "columns": ["email"]
+          "columns": [
+            "email"
+          ]
         }
       },
       "policies": {},
@@ -850,8 +1023,12 @@
           "name": "workflow_execution_logs_execution_id_workflow_executions_id_fk",
           "tableFrom": "workflow_execution_logs",
           "tableTo": "workflow_executions",
-          "columnsFrom": ["execution_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "execution_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -977,8 +1154,12 @@
           "name": "workflow_executions_workflow_id_workflows_id_fk",
           "tableFrom": "workflow_executions",
           "tableTo": "workflows",
-          "columnsFrom": ["workflow_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "workflow_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -986,8 +1167,12 @@
           "name": "workflow_executions_user_id_users_id_fk",
           "tableFrom": "workflow_executions",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1117,8 +1302,12 @@
           "name": "workflow_schedules_workflow_id_workflows_id_fk",
           "tableFrom": "workflow_schedules",
           "tableTo": "workflows",
-          "columnsFrom": ["workflow_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "workflow_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1128,7 +1317,9 @@
         "workflow_schedules_workflow_id_unique": {
           "name": "workflow_schedules_workflow_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["workflow_id"]
+          "columns": [
+            "workflow_id"
+          ]
         }
       },
       "policies": {},
@@ -1203,8 +1394,12 @@
           "name": "workflows_user_id_users_id_fk",
           "tableFrom": "workflows",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
