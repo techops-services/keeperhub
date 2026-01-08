@@ -3,6 +3,8 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { anonymous, genericOAuth, organization } from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 import { eq } from "drizzle-orm";
+import { nanoid } from "nanoid";
+import { randomUUID } from "crypto";
 import { isAiGatewayManagedKeysEnabled } from "./ai-gateway/config";
 import { db } from "./db";
 import {
@@ -158,10 +160,6 @@ const plugins = [
       const fromUserId = data.anonymousUser.user.id;
       const toUserId = data.newUser.user.id;
 
-      console.log(
-        `[Anonymous Migration] Deleting trial workflows for user ${fromUserId}`
-      );
-
       try {
         // Delete anonymous workflows (not migrated per requirements)
         await db.delete(workflows).where(eq(workflows.userId, fromUserId));
@@ -176,9 +174,6 @@ const plugins = [
           .delete(integrations)
           .where(eq(integrations.userId, fromUserId));
 
-        console.log(
-          `[Anonymous Migration] Trial workflows deleted. User ${toUserId} starts fresh.`
-        );
       } catch (error) {
         console.error("[Anonymous Migration] Error:", error);
         throw error;
@@ -230,20 +225,14 @@ const plugins = [
     // Hooks for custom business logic
     organizationHooks: {
       async afterCreateOrganization({ organization: org, user }) {
-        console.log(`[Organization] Created: ${org.name} by ${user.name}`);
-        // TODO: Initialize default resources (e.g., welcome workflow template)
         await Promise.resolve();
       },
 
       async afterAddMember({ user, organization: org }) {
-        console.log(`[Organization] User ${user.email} joined ${org.name}`);
         await Promise.resolve();
       },
 
       async afterAcceptInvitation({ user, organization: org }) {
-        console.log(
-          `[Invitation] ${user.email} accepted invite to ${org.name}`
-        );
         await Promise.resolve();
       },
     },
@@ -277,7 +266,6 @@ const plugins = [
                   }
                 );
                 const profile = await response.json();
-                console.log("[Vercel OAuth] userinfo response:", profile);
                 return {
                   id: profile.sub,
                   email: profile.email,
@@ -303,6 +291,84 @@ export const auth = betterAuth({
     level: "debug",
     disabled: false,
   },
+  // start custom keeperhub code //
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          const timestamp = new Date().toISOString();
+
+          // Generate unique slug from user name/email
+          const baseName = user.name || user.email?.split("@")[0] || "User";
+          const slug = `${baseName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${nanoid(6)}`;
+
+          try {
+
+            const orgId = randomUUID();
+            const memberId = randomUUID();
+
+            // Create organization directly in database (we don't have auth context here)
+            const [org] = await db
+              .insert(organizationTable)
+              .values({
+                id: orgId,
+                name: `${baseName}'s Organization`,
+                slug,
+                createdAt: new Date(),
+              })
+              .returning();
+
+            // Add user as owner member
+            await db.insert(memberTable).values({
+              id: memberId,
+              organizationId: org.id,
+              userId: user.id,
+              role: "owner",
+              createdAt: new Date(),
+            });
+
+          } catch (error) {
+            console.error(error);
+          }
+        },
+      },
+    },
+    session: {
+      create: {
+        after: async (session) => {
+          const timestamp = new Date().toISOString();
+
+          // If session already has an active organization, skip
+          if (session.activeOrganizationId) {
+            return;
+          }
+
+
+          try {
+            // Find the user's first organization
+            const [member] = await db
+              .select()
+              .from(memberTable)
+              .where(eq(memberTable.userId, session.userId))
+              .limit(1);
+
+            if (member) {
+
+              // Set as active organization in the session
+              await db
+                .update(sessions)
+                .set({ activeOrganizationId: member.organizationId })
+                .where(eq(sessions.id, session.id));
+
+            }
+          } catch (error) {
+            console.error(error);
+          }
+        },
+      },
+    },
+  },
+  // end keeperhub code //
   onAPIError: {
     onError: (error, ctx) => {
       console.error("[Better Auth API Error]", {

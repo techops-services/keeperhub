@@ -475,7 +475,10 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
     e.preventDefault();
     setError("");
     setLoading(true);
+    const timestamp = new Date().toISOString();
+
     try {
+
       const { isAllowlisted } = await api.beta.checkEmail(email);
       if (!isAllowlisted) {
         setError(
@@ -484,23 +487,35 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
         setLoading(false);
         return;
       }
+
       const signUpResponse = await signUp.email({
         email,
         password,
         name: email.split("@")[0],
       });
+
       if (signUpResponse.error) {
         setError(signUpResponse.error.message || "Sign up failed");
         return;
       }
+
       const signInResponse = await signIn.email({ email, password });
+
       if (signInResponse.error) {
         setError(signInResponse.error.message || "Sign in failed");
         return;
       }
+
+      // Fetch fresh session to see if org is there
+      const session = await authClient.getSession();
+
       toast.success("Account created successfully!");
       setOpen(false);
+
+      // // Force page refresh to reload org context
+      window.location.reload();
     } catch (err) {
+      console.error(`[Signup Dialog] ${timestamp} Error:`, err);
       setError(err instanceof Error ? err.message : "Failed to create account");
     } finally {
       setLoading(false);
