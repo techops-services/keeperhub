@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
 import { db } from "@/lib/db";
 import { workflowExecutions } from "@/lib/db/schema";
-import { getChainIdFromNetwork, getRpcProvider } from "@/lib/rpc";
+import { getChainIdFromNetwork, resolveRpcConfig } from "@/lib/rpc";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
 
@@ -83,16 +83,34 @@ async function stepHandler(
     };
   }
 
-  // Check balance using RPC provider with failover
+  // Resolve RPC config (with user preferences)
+  let rpcUrl: string;
   try {
-    const rpcProvider = await getRpcProvider({ chainId, userId });
-    console.log("[Check Balance] Using RPC provider for chain:", chainId);
+    const rpcConfig = await resolveRpcConfig(chainId, userId);
+    if (!rpcConfig) {
+      throw new Error(`Chain ${chainId} not found or not enabled`);
+    }
+    rpcUrl = rpcConfig.primaryRpcUrl;
+    console.log(
+      "[Check Balance] Using RPC URL:",
+      rpcUrl,
+      "source:",
+      rpcConfig.source
+    );
+  } catch (error) {
+    console.error("[Check Balance] Failed to resolve RPC config:", error);
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
+  }
 
-    const balance = await rpcProvider.executeWithFailover(async (provider) => {
-      console.log("[Check Balance] Checking balance for address:", address);
-      return await provider.getBalance(address);
-    });
+  // Check balance
+  try {
+    const provider = new ethers.JsonRpcProvider(rpcUrl);
+    console.log("[Check Balance] Checking balance for address:", address);
 
+    const balance = await provider.getBalance(address);
     const balanceEth = ethers.formatEther(balance);
 
     console.log("[Check Balance] Balance retrieved successfully:", {

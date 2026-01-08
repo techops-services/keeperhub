@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
 import { db } from "@/lib/db";
 import { workflowExecutions } from "@/lib/db/schema";
-import { getChainIdFromNetwork, getRpcProvider } from "@/lib/rpc";
+import { getChainIdFromNetwork, resolveRpcConfig } from "@/lib/rpc";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
 
@@ -160,34 +160,49 @@ async function stepHandler(
     };
   }
 
-  // Call the contract function with failover
+  // Resolve RPC config (with user preferences)
+  let rpcUrl: string;
   try {
-    const rpcProvider = await getRpcProvider({ chainId, userId });
-    console.log("[Read Contract] Using RPC provider for chain:", chainId);
+    const rpcConfig = await resolveRpcConfig(chainId, userId);
+    if (!rpcConfig) {
+      throw new Error(`Chain ${chainId} not found or not enabled`);
+    }
+    rpcUrl = rpcConfig.primaryRpcUrl;
+    console.log(
+      "[Read Contract] Using RPC URL:",
+      rpcUrl,
+      "source:",
+      rpcConfig.source
+    );
+  } catch (error) {
+    console.error("[Read Contract] Failed to resolve RPC config:", error);
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
+  }
 
-    const result = await rpcProvider.executeWithFailover(async (provider) => {
-      // Create contract instance
-      const contract = new ethers.Contract(
-        contractAddress,
-        parsedAbi,
-        provider
-      );
-      console.log("[Read Contract] Contract instance created");
+  // Call the contract function
+  try {
+    const provider = new ethers.JsonRpcProvider(rpcUrl);
 
-      // Check if function exists
-      if (typeof contract[abiFunction] !== "function") {
-        throw new Error(`Function '${abiFunction}' not found in contract ABI`);
-      }
+    // Create contract instance
+    const contract = new ethers.Contract(contractAddress, parsedAbi, provider);
+    console.log("[Read Contract] Contract instance created");
 
-      console.log(
-        "[Read Contract] Calling function:",
-        abiFunction,
-        "with args:",
-        args
-      );
+    // Check if function exists
+    if (typeof contract[abiFunction] !== "function") {
+      throw new Error(`Function '${abiFunction}' not found in contract ABI`);
+    }
 
-      return await contract[abiFunction](...args);
-    });
+    console.log(
+      "[Read Contract] Calling function:",
+      abiFunction,
+      "with args:",
+      args
+    );
+
+    const result = await contract[abiFunction](...args);
 
     console.log("[Read Contract] Function call successful, result:", result);
 
