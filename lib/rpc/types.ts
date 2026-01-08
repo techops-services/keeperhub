@@ -6,15 +6,23 @@ export type ChainConfig = {
   chainId: number;
   name: string;
   symbol: string;
+  chainType: string;
   primaryRpcUrl: string;
   fallbackRpcUrl?: string;
   primaryWssUrl?: string;
   fallbackWssUrl?: string;
-  explorerUrl?: string;
-  explorerApiUrl?: string;
-  explorerAbiApiUrl?: string;
-  explorerBalanceApiUrl?: string;
   isTestnet: boolean;
+};
+
+export type ExplorerConfigType = {
+  chainId: number;
+  chainType: string;
+  explorerUrl?: string;
+  explorerApiType?: string;
+  explorerApiUrl?: string;
+  explorerTxPath?: string;
+  explorerAddressPath?: string;
+  explorerContractPath?: string;
 };
 
 export type ResolvedRpcConfig = {

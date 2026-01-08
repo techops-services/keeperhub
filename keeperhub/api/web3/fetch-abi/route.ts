@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { apiError } from "@/keeperhub/lib/api-error";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { chains } from "@/lib/db/schema";
+import { explorerConfigs } from "@/lib/db/schema";
 
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
 
@@ -30,27 +30,19 @@ async function getExplorerApiConfig(network: string): Promise<{
     throw new Error(`Unsupported network: ${network}`);
   }
 
-  // Try to get config from database
-  const chainResults = await db
+  // Try to get config from explorer_configs table
+  const explorerResults = await db
     .select()
-    .from(chains)
-    .where(eq(chains.chainId, chainId))
+    .from(explorerConfigs)
+    .where(eq(explorerConfigs.chainId, chainId))
     .limit(1);
 
-  const chain = chainResults[0];
+  const explorer = explorerResults[0];
 
-  if (chain?.explorerAbiApiUrl) {
+  if (explorer?.explorerApiUrl) {
     return {
-      baseUrl: chain.explorerAbiApiUrl,
-      chainId: chain.chainId,
-    };
-  }
-
-  // Fallback to explorerApiUrl (legacy field)
-  if (chain?.explorerApiUrl) {
-    return {
-      baseUrl: chain.explorerApiUrl,
-      chainId: chain.chainId,
+      baseUrl: explorer.explorerApiUrl,
+      chainId: explorer.chainId,
     };
   }
 

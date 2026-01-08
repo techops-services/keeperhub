@@ -13,7 +13,12 @@ import "dotenv/config";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { chains, type NewChain } from "../lib/db/schema";
+import {
+  chains,
+  explorerConfigs,
+  type NewChain,
+  type NewExplorerConfig,
+} from "../lib/db/schema";
 import {
   createRpcUrlResolver,
   getWssUrl,
@@ -38,6 +43,7 @@ const DEFAULT_CHAINS: NewChain[] = [
     chainId: 1,
     name: "Ethereum Mainnet",
     symbol: "ETH",
+    chainType: "evm",
     defaultPrimaryRpc: getRpcUrl(
       "eth-mainnet",
       "CHAIN_ETH_MAINNET_PRIMARY_RPC",
@@ -60,10 +66,6 @@ const DEFAULT_CHAINS: NewChain[] = [
       jsonKey: "eth-mainnet",
       type: "fallback",
     }),
-    explorerUrl: "https://etherscan.io",
-    explorerApiUrl: "https://api.etherscan.io/v2/api",
-    explorerAbiApiUrl: "https://api.etherscan.io/v2/api",
-    explorerBalanceApiUrl: "https://api.etherscan.io/v2/api",
     isTestnet: false,
     isEnabled: true,
   },
@@ -71,6 +73,7 @@ const DEFAULT_CHAINS: NewChain[] = [
     chainId: 11_155_111,
     name: "Sepolia Testnet",
     symbol: "ETH",
+    chainType: "evm",
     defaultPrimaryRpc: getRpcUrl(
       "sepolia",
       "CHAIN_SEPOLIA_PRIMARY_RPC",
@@ -93,10 +96,6 @@ const DEFAULT_CHAINS: NewChain[] = [
       jsonKey: "sepolia",
       type: "fallback",
     }),
-    explorerUrl: "https://sepolia.etherscan.io",
-    explorerApiUrl: "https://api-sepolia.etherscan.io/v2/api",
-    explorerAbiApiUrl: "https://api-sepolia.etherscan.io/v2/api",
-    explorerBalanceApiUrl: "https://api-sepolia.etherscan.io/v2/api",
     isTestnet: true,
     isEnabled: true,
   },
@@ -104,6 +103,7 @@ const DEFAULT_CHAINS: NewChain[] = [
     chainId: 8453,
     name: "Base",
     symbol: "ETH",
+    chainType: "evm",
     defaultPrimaryRpc: getRpcUrl(
       "base-mainnet",
       "CHAIN_BASE_MAINNET_PRIMARY_RPC",
@@ -126,10 +126,6 @@ const DEFAULT_CHAINS: NewChain[] = [
       jsonKey: "base-mainnet",
       type: "fallback",
     }),
-    explorerUrl: "https://basescan.org",
-    explorerApiUrl: "https://api.basescan.org/api",
-    explorerAbiApiUrl: "https://api.basescan.org/api",
-    explorerBalanceApiUrl: "https://api.basescan.org/api",
     isTestnet: false,
     isEnabled: true,
   },
@@ -137,6 +133,7 @@ const DEFAULT_CHAINS: NewChain[] = [
     chainId: 84_532,
     name: "Base Sepolia",
     symbol: "ETH",
+    chainType: "evm",
     defaultPrimaryRpc: getRpcUrl(
       "base-sepolia",
       "CHAIN_BASE_SEPOLIA_PRIMARY_RPC",
@@ -159,10 +156,6 @@ const DEFAULT_CHAINS: NewChain[] = [
       jsonKey: "base-sepolia",
       type: "fallback",
     }),
-    explorerUrl: "https://sepolia.basescan.org",
-    explorerApiUrl: "https://api-sepolia.basescan.org/api",
-    explorerAbiApiUrl: "https://api-sepolia.basescan.org/api",
-    explorerBalanceApiUrl: "https://api-sepolia.basescan.org/api",
     isTestnet: true,
     isEnabled: true,
   },
@@ -170,6 +163,7 @@ const DEFAULT_CHAINS: NewChain[] = [
     chainId: 42_429,
     name: "Tempo Testnet",
     symbol: "USD",
+    chainType: "evm",
     defaultPrimaryRpc: getRpcUrl(
       "tempo-testnet",
       "CHAIN_TEMPO_TESTNET_PRIMARY_RPC",
@@ -192,10 +186,6 @@ const DEFAULT_CHAINS: NewChain[] = [
       jsonKey: "tempo-testnet",
       type: "fallback",
     }),
-    explorerUrl: "https://explorer.testnet.tempo.xyz",
-    explorerApiUrl: "https://explorer.testnet.tempo.xyz/api",
-    explorerAbiApiUrl: "https://explorer.testnet.tempo.xyz/api",
-    explorerBalanceApiUrl: "https://explorer.testnet.tempo.xyz/api",
     isTestnet: true,
     isEnabled: true,
   },
@@ -203,6 +193,7 @@ const DEFAULT_CHAINS: NewChain[] = [
     chainId: 42_420,
     name: "Tempo",
     symbol: "USD",
+    chainType: "evm",
     defaultPrimaryRpc: getRpcUrl(
       "tempo-mainnet",
       "CHAIN_TEMPO_MAINNET_PRIMARY_RPC",
@@ -225,10 +216,6 @@ const DEFAULT_CHAINS: NewChain[] = [
       jsonKey: "tempo-mainnet",
       type: "fallback",
     }),
-    explorerUrl: "https://explorer.tempo.xyz",
-    explorerApiUrl: "https://explorer.tempo.xyz/api",
-    explorerAbiApiUrl: "https://explorer.tempo.xyz/api",
-    explorerBalanceApiUrl: "https://explorer.tempo.xyz/api",
     isTestnet: false,
     isEnabled: false, // Disabled until mainnet launches
   },
@@ -237,6 +224,7 @@ const DEFAULT_CHAINS: NewChain[] = [
     chainId: 101,
     name: "Solana",
     symbol: "SOL",
+    chainType: "solana",
     defaultPrimaryRpc: getRpcUrl(
       "solana-mainnet",
       "CHAIN_SOLANA_MAINNET_PRIMARY_RPC",
@@ -259,10 +247,6 @@ const DEFAULT_CHAINS: NewChain[] = [
       jsonKey: "solana-mainnet",
       type: "fallback",
     }),
-    explorerUrl: "https://solscan.io",
-    explorerApiUrl: "https://api.solscan.io",
-    explorerAbiApiUrl: "https://api.solscan.io",
-    explorerBalanceApiUrl: "https://api.solscan.io",
     isTestnet: false,
     isEnabled: true,
   },
@@ -270,6 +254,7 @@ const DEFAULT_CHAINS: NewChain[] = [
     chainId: 103,
     name: "Solana Devnet",
     symbol: "SOL",
+    chainType: "solana",
     defaultPrimaryRpc: getRpcUrl(
       "solana-devnet",
       "CHAIN_SOLANA_DEVNET_PRIMARY_RPC",
@@ -292,12 +277,100 @@ const DEFAULT_CHAINS: NewChain[] = [
       jsonKey: "solana-devnet",
       type: "fallback",
     }),
-    explorerUrl: "https://solscan.io/?cluster=devnet",
-    explorerApiUrl: "https://api-devnet.solscan.io",
-    explorerAbiApiUrl: "https://api-devnet.solscan.io",
-    explorerBalanceApiUrl: "https://api-devnet.solscan.io",
     isTestnet: true,
     isEnabled: true,
+  },
+];
+
+// Explorer configurations for each chain (KEEP-1154)
+const EXPLORER_CONFIGS: NewExplorerConfig[] = [
+  // Ethereum Mainnet - Etherscan
+  {
+    chainId: 1,
+    chainType: "evm",
+    explorerUrl: "https://etherscan.io",
+    explorerApiType: "etherscan",
+    explorerApiUrl: "https://api.etherscan.io/v2/api",
+    explorerTxPath: "/tx/{hash}",
+    explorerAddressPath: "/address/{address}",
+    explorerContractPath: "/address/{address}#code",
+  },
+  // Sepolia Testnet - Etherscan
+  {
+    chainId: 11_155_111,
+    chainType: "evm",
+    explorerUrl: "https://sepolia.etherscan.io",
+    explorerApiType: "etherscan",
+    explorerApiUrl: "https://api-sepolia.etherscan.io/v2/api",
+    explorerTxPath: "/tx/{hash}",
+    explorerAddressPath: "/address/{address}",
+    explorerContractPath: "/address/{address}#code",
+  },
+  // Base - Etherscan (Basescan)
+  {
+    chainId: 8453,
+    chainType: "evm",
+    explorerUrl: "https://basescan.org",
+    explorerApiType: "etherscan",
+    explorerApiUrl: "https://api.basescan.org/api",
+    explorerTxPath: "/tx/{hash}",
+    explorerAddressPath: "/address/{address}",
+    explorerContractPath: "/address/{address}#code",
+  },
+  // Base Sepolia - Etherscan
+  {
+    chainId: 84_532,
+    chainType: "evm",
+    explorerUrl: "https://sepolia.basescan.org",
+    explorerApiType: "etherscan",
+    explorerApiUrl: "https://api-sepolia.basescan.org/api",
+    explorerTxPath: "/tx/{hash}",
+    explorerAddressPath: "/address/{address}",
+    explorerContractPath: "/address/{address}#code",
+  },
+  // Tempo Testnet - Blockscout
+  {
+    chainId: 42_429,
+    chainType: "evm",
+    explorerUrl: "https://explorer.testnet.tempo.xyz",
+    explorerApiType: "blockscout",
+    explorerApiUrl: "https://explorer.testnet.tempo.xyz/api",
+    explorerTxPath: "/tx/{hash}",
+    explorerAddressPath: "/address/{address}",
+    explorerContractPath: "/address/{address}?tab=contract",
+  },
+  // Tempo Mainnet - Blockscout
+  {
+    chainId: 42_420,
+    chainType: "evm",
+    explorerUrl: "https://explorer.tempo.xyz",
+    explorerApiType: "blockscout",
+    explorerApiUrl: "https://explorer.tempo.xyz/api",
+    explorerTxPath: "/tx/{hash}",
+    explorerAddressPath: "/address/{address}",
+    explorerContractPath: "/address/{address}?tab=contract",
+  },
+  // Solana Mainnet - Solscan
+  {
+    chainId: 101,
+    chainType: "solana",
+    explorerUrl: "https://solscan.io",
+    explorerApiType: "solscan",
+    explorerApiUrl: "https://api.solscan.io",
+    explorerTxPath: "/tx/{hash}",
+    explorerAddressPath: "/account/{address}",
+    explorerContractPath: "/account/{address}#anchorProgramIDL",
+  },
+  // Solana Devnet - Solscan
+  {
+    chainId: 103,
+    chainType: "solana",
+    explorerUrl: "https://solscan.io/?cluster=devnet",
+    explorerApiType: "solscan",
+    explorerApiUrl: "https://api-devnet.solscan.io",
+    explorerTxPath: "/tx/{hash}",
+    explorerAddressPath: "/account/{address}",
+    explorerContractPath: "/account/{address}#anchorProgramIDL",
   },
 ];
 
@@ -330,7 +403,30 @@ async function seedChains() {
     console.log(`  + ${chain.name} (${chain.chainId}) inserted`);
   }
 
-  console.log("Done!");
+  console.log(`\nSeeding ${EXPLORER_CONFIGS.length} explorer configs...`);
+
+  for (const config of EXPLORER_CONFIGS) {
+    // Check if explorer config already exists for this chain
+    const existing = await db
+      .select()
+      .from(explorerConfigs)
+      .where(eq(explorerConfigs.chainId, config.chainId))
+      .limit(1);
+
+    if (existing.length > 0) {
+      console.log(
+        `  - Explorer config for chain ${config.chainId} already exists, skipping`
+      );
+      continue;
+    }
+
+    await db.insert(explorerConfigs).values(config);
+    console.log(
+      `  + Explorer config for chain ${config.chainId} (${config.explorerApiType}) inserted`
+    );
+  }
+
+  console.log("\nDone!");
   await client.end();
   process.exit(0);
 }

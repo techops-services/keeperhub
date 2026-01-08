@@ -3,32 +3,40 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // Mock server-only module
 vi.mock("server-only", () => ({}));
 
-// Mock ethers
-vi.mock("ethers", () => ({
-  ethers: {
-    isAddress: vi.fn(
-      (addr: string) => addr.startsWith("0x") && addr.length === 42
-    ),
-    formatEther: vi.fn((wei: bigint) => (Number(wei) / 1e18).toString()),
-    parseEther: vi.fn((eth: string) =>
-      BigInt(Math.floor(Number.parseFloat(eth) * 1e18))
-    ),
-    Contract: vi.fn().mockImplementation(() => ({
-      balanceOf: vi.fn().mockResolvedValue(BigInt(1_000_000_000_000_000_000)),
-      transfer: vi.fn().mockResolvedValue({
-        hash: "0xtxhash123",
-        wait: vi.fn().mockResolvedValue({
+// Mock ethers with proper class constructors
+vi.mock("ethers", () => {
+  const mockGetBalance = vi
+    .fn()
+    .mockResolvedValue(BigInt(5_000_000_000_000_000_000));
+
+  return {
+    ethers: {
+      isAddress: vi.fn(
+        (addr: string) => addr.startsWith("0x") && addr.length === 42
+      ),
+      formatEther: vi.fn((wei: bigint) => (Number(wei) / 1e18).toString()),
+      parseEther: vi.fn((eth: string) =>
+        BigInt(Math.floor(Number.parseFloat(eth) * 1e18))
+      ),
+      Contract: class MockContract {
+        balanceOf = vi
+          .fn()
+          .mockResolvedValue(BigInt(1_000_000_000_000_000_000));
+        transfer = vi.fn().mockResolvedValue({
           hash: "0xtxhash123",
-          blockNumber: 12_345,
-          status: 1,
-        }),
-      }),
-    })),
-    JsonRpcProvider: vi.fn().mockImplementation(() => ({
-      getBalance: vi.fn().mockResolvedValue(BigInt(5_000_000_000_000_000_000)),
-    })),
-  },
-}));
+          wait: vi.fn().mockResolvedValue({
+            hash: "0xtxhash123",
+            blockNumber: 12_345,
+            status: 1,
+          }),
+        });
+      },
+      JsonRpcProvider: class MockJsonRpcProvider {
+        getBalance = mockGetBalance;
+      },
+    },
+  };
+});
 
 // Mock RPC provider
 vi.mock("@/lib/rpc", () => ({
@@ -106,11 +114,7 @@ vi.mock("@/lib/utils", () => ({
 
 // Now import the step functions after all mocks are set up
 import { checkBalanceStep } from "@/keeperhub/plugins/web3/steps/check-balance";
-import {
-  getChainIdFromNetwork,
-  getRpcProvider,
-  resolveRpcConfig,
-} from "@/lib/rpc";
+import { getChainIdFromNetwork, resolveRpcConfig } from "@/lib/rpc";
 
 // Helper to create test context
 const createTestContext = () => ({
@@ -144,11 +148,9 @@ describe("Web3 Plugin Steps Integration", () => {
         );
       }
 
-      // Verify userId is passed to getRpcProvider for user RPC preferences
-      expect(getRpcProvider).toHaveBeenCalledWith({
-        chainId: 1,
-        userId: "user_123",
-      });
+      // Verify resolveRpcConfig is called with userId for user RPC preferences
+      // The step uses resolveRpcConfig + new ethers.JsonRpcProvider(), not getRpcProvider
+      expect(resolveRpcConfig).toHaveBeenCalledWith(1, "user_123");
     });
 
     it("should successfully check balance on sepolia", async () => {
@@ -199,11 +201,8 @@ describe("Web3 Plugin Steps Integration", () => {
     });
 
     it("should handle RPC provider errors", async () => {
-      vi.mocked(getRpcProvider).mockResolvedValueOnce({
-        executeWithFailover: vi
-          .fn()
-          .mockRejectedValue(new Error("RPC connection failed")),
-      } as unknown as Awaited<ReturnType<typeof getRpcProvider>>);
+      // Mock resolveRpcConfig to return null (chain not found/disabled)
+      vi.mocked(resolveRpcConfig).mockResolvedValueOnce(null);
 
       const input = {
         network: "mainnet",
@@ -215,24 +214,19 @@ describe("Web3 Plugin Steps Integration", () => {
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error).toContain("Failed to check balance");
+        expect(result.error).toContain("not found or not enabled");
       }
     });
 
-    it("should use failover when primary RPC fails", async () => {
-      vi.mocked(getRpcProvider).mockResolvedValueOnce({
-        executeWithFailover: vi.fn(
-          async (operation: (provider: unknown) => Promise<unknown>) => {
-            // Simulate failover by returning success after mock "failover"
-            const mockProvider = {
-              getBalance: vi
-                .fn()
-                .mockResolvedValue(BigInt(3_000_000_000_000_000_000)),
-            };
-            return await operation(mockProvider);
-          }
-        ),
-      } as unknown as Awaited<ReturnType<typeof getRpcProvider>>);
+    it("should use user RPC preferences when available", async () => {
+      // Mock resolveRpcConfig to return user-configured RPC
+      vi.mocked(resolveRpcConfig).mockResolvedValueOnce({
+        chainId: 1,
+        chainName: "Ethereum Mainnet",
+        primaryRpcUrl: "https://user-custom-rpc.example.com",
+        fallbackRpcUrl: "https://user-backup.example.com",
+        source: "user",
+      });
 
       const input = {
         network: "mainnet",
@@ -243,9 +237,8 @@ describe("Web3 Plugin Steps Integration", () => {
       const result = await checkBalanceStep(input);
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.balance).toBe("3");
-      }
+      // Verify user preferences were used
+      expect(resolveRpcConfig).toHaveBeenCalledWith(1, "user_123");
     });
   });
 });

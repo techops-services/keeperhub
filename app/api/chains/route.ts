@@ -1,15 +1,19 @@
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { getAllChains, getEnabledChains } from "@/lib/rpc/chain-service";
+import { db } from "@/lib/db";
+import { chains, explorerConfigs } from "@/lib/db/schema";
 
 export type ChainResponse = {
   id: string;
   chainId: number;
   name: string;
   symbol: string;
+  chainType: string;
   defaultPrimaryRpc: string;
   defaultFallbackRpc: string | null;
   explorerUrl: string | null;
   explorerApiUrl: string | null;
+  explorerApiType: string | null;
   isTestnet: boolean;
   isEnabled: boolean;
 };
@@ -18,7 +22,7 @@ export type GetChainsResponse = ChainResponse[];
 
 /**
  * GET /api/chains
- * List all available chains
+ * List all available chains with explorer configuration
  *
  * Query params:
  * - includeDisabled: "true" to include disabled chains (default: false)
@@ -28,19 +32,30 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const includeDisabled = searchParams.get("includeDisabled") === "true";
 
-    const chains = includeDisabled
-      ? await getAllChains()
-      : await getEnabledChains();
+    // Query chains with optional explorer config join
+    const query = db
+      .select({
+        chain: chains,
+        explorer: explorerConfigs,
+      })
+      .from(chains)
+      .leftJoin(explorerConfigs, eq(chains.chainId, explorerConfigs.chainId));
 
-    const response: GetChainsResponse = chains.map((chain) => ({
+    const results = includeDisabled
+      ? await query
+      : await query.where(eq(chains.isEnabled, true));
+
+    const response: GetChainsResponse = results.map(({ chain, explorer }) => ({
       id: chain.id,
       chainId: chain.chainId,
       name: chain.name,
       symbol: chain.symbol,
+      chainType: chain.chainType,
       defaultPrimaryRpc: chain.defaultPrimaryRpc,
       defaultFallbackRpc: chain.defaultFallbackRpc,
-      explorerUrl: chain.explorerUrl,
-      explorerApiUrl: chain.explorerApiUrl,
+      explorerUrl: explorer?.explorerUrl ?? null,
+      explorerApiUrl: explorer?.explorerApiUrl ?? null,
+      explorerApiType: explorer?.explorerApiType ?? null,
       isTestnet: chain.isTestnet ?? false,
       isEnabled: chain.isEnabled ?? true,
     }));

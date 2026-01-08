@@ -70,6 +70,7 @@ describe("RPC Preferences API Routes", () => {
     chainId: 1,
     name: "Ethereum Mainnet",
     symbol: "ETH",
+    chainType: "evm",
     defaultPrimaryRpc: "https://eth.example.com",
     defaultFallbackRpc: "https://eth-backup.example.com",
     defaultPrimaryWss: null,
@@ -77,10 +78,6 @@ describe("RPC Preferences API Routes", () => {
     isEnabled: true,
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),
-    explorerUrl: "https://etherscan.io",
-    explorerApiUrl: "https://api.etherscan.io",
-    explorerAbiApiUrl: "https://api.etherscan.io/v2/api",
-    explorerBalanceApiUrl: "https://api.etherscan.io/v2/api",
     isTestnet: false,
   };
 

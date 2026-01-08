@@ -81,9 +81,9 @@ describe.skipIf(SKIP_INFRA_TESTS)(
           chainId: 11_155_111,
           name: "Sepolia Testnet",
           symbol: "ETH",
+          chainType: "evm",
           defaultPrimaryRpc: "https://rpc.sepolia.org",
           defaultFallbackRpc: "https://ethereum-sepolia.publicnode.com",
-          explorerUrl: "https://sepolia.etherscan.io",
           isTestnet: true,
           isEnabled: true,
         });

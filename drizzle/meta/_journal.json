@@ -57,6 +57,13 @@
       "when": 1767779440247,
       "tag": "0007_amusing_tony_stark",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1767868800000,
+      "tag": "0008_explorer_configs",
+      "breakpoints": true
     }
   ]
 }

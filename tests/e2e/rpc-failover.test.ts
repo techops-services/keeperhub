@@ -64,10 +64,9 @@ describe.skipIf(shouldSkip)("RPC Failover E2E", () => {
         chainId: 11_155_111,
         name: "Sepolia Testnet",
         symbol: "ETH",
+        chainType: "evm",
         defaultPrimaryRpc: "https://chain.techops.services/eth-sepolia",
         defaultFallbackRpc: "https://rpc.sepolia.org",
-        explorerUrl: "https://sepolia.etherscan.io",
-        explorerApiUrl: "https://api-sepolia.etherscan.io/v2/api",
         isTestnet: true,
         isEnabled: true,
       });
