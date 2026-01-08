@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 import { api } from "@/lib/api-client";
-import { signIn, signUp } from "@/lib/auth-client";
+import { authClient, signIn, signUp } from "@/lib/auth-client";
 import {
   getEnabledAuthProviders,
   getSingleProvider,
@@ -481,6 +481,7 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
         setError(
           "This app is currently in closed beta. This email has not been approved yet."
         );
+        setLoading(false);
         return;
       }
       const signUpResponse = await signUp.email({
@@ -696,6 +697,7 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
               }}
             />
           )}
+
         </div>
       </DialogContent>
     </Dialog>

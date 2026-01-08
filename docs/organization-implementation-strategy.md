@@ -10,8 +10,39 @@ This document outlines the technical implementation strategy for adding multi-or
 - Session-based active organization tracking
 - Hooks for custom business logic
 - Database schema managed by better-auth migrations
+- **Automatic organization creation** on user signup
+
+**User Flows:**
+1. **New User Signup** → Auto-create personal organization → Start using app immediately
+2. **Invitation Flow** → User receives invite → Joins existing organization
+3. **Multi-Org Users** → Switch between organizations via dropdown
 
 All custom code follows the KeeperHub fork policy (everything in `/keeperhub` directory).
+
+---
+
+## 🎯 Auto-Create Implementation Summary
+
+**Key Decision: Automatic Organization Creation**
+
+Instead of requiring users to manually set up an organization during sign-up, we automatically create a personal organization for every new user. This simplifies the onboarding flow and matches standard SaaS patterns (Slack, GitHub, Notion).
+
+**Implementation:**
+- Server-side hook: `afterSignUp` in better-auth organization plugin
+- Creates `"{Name}'s Organization"` with unique slug
+- Sets as active organization automatically
+- User starts with full access (owner role)
+
+**Benefits:**
+- ✅ Simple UX: Sign up → Start using immediately
+- ✅ No edge cases: Every user always has an org
+- ✅ No modal/redirect complexity
+- ✅ Reliable: Server-side, atomic with signup
+
+**User can still:**
+- Create additional organizations later
+- Join other organizations via invitation
+- Rename/customize their auto-created organization
 
 ---
 
@@ -140,8 +171,33 @@ const plugins = [
 
     // Hooks for custom business logic
     organizationHooks: {
+      // AUTO-CREATE: Create personal organization for new users
+      async afterSignUp({ user }) {
+        // Generate unique slug from user name/email
+        const baseName = user.name || user.email?.split("@")[0] || "User";
+        const slug = `${baseName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${nanoid(6)}`;
+
+        console.log(`[Auto-Create] Creating organization for new user ${user.email}`);
+
+        // Create organization
+        const org = await auth.api.createOrganization({
+          name: `${baseName}'s Organization`,
+          slug,
+          userId: user.id,
+        });
+
+        // Set as active organization
+        await auth.api.setActiveOrganization({
+          userId: user.id,
+          organizationId: org.id,
+        });
+
+        console.log(`[Auto-Create] Organization "${org.name}" created and set as active for ${user.email}`);
+      },
+
       async afterCreateOrganization({ organization, member, user }) {
         console.log(`[Organization] Created: ${organization.name} by ${user.name}`);
+        // Note: This runs for both auto-created AND manually created orgs
         // TODO: Initialize default resources (e.g., welcome workflow template)
       },
 
@@ -555,9 +611,13 @@ export function usePermissions() {
 }
 ```
 
-### Organization Setup Flow
+### Organization Creation Modal (Optional - For Additional Orgs)
 
-**`keeperhub/components/onboarding/organization-setup.tsx`**
+**Note:** With auto-create, new users get a personal organization automatically. This component is **optional** and used for:
+- Creating additional organizations (from org switcher)
+- Accepting invitations to join existing organizations
+
+**`keeperhub/components/organization/create-org-modal.tsx`**
 
 ```tsx
 "use client";

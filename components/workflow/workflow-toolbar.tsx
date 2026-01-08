@@ -87,6 +87,9 @@ import { WorkflowIssuesOverlay } from "../overlays/workflow-issues-overlay";
 
 import { WorkflowIcon } from "../ui/workflow-icon";
 import { UserMenu } from "../workflows/user-menu";
+// start custom keeperhub code //
+import { OrgSwitcher } from "@/keeperhub/components/organization/org-switcher";
+// end keeperhub code //
 
 type WorkflowToolbarProps = {
   workflowId?: string;
@@ -1567,6 +1570,9 @@ export const WorkflowToolbar = ({
                   onDuplicate={actions.handleDuplicate}
                 />
               )}
+              {/* start custom keeperhub code // */}
+              <OrgSwitcher />
+              {/* end keeperhub code // */}
               <UserMenu />
             </div>
           </div>
@@ -1616,6 +1622,9 @@ export const WorkflowToolbar = ({
                 onDuplicate={actions.handleDuplicate}
               />
             )}
+            {/* start custom keeperhub code // */}
+            <OrgSwitcher />
+            {/* end keeperhub code // */}
             <UserMenu />
           </div>
         </div>
