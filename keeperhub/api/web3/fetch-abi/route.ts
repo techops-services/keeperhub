@@ -5,32 +5,22 @@ import { apiError } from "@/keeperhub/lib/api-error";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { explorerConfigs } from "@/lib/db/schema";
+import { getChainIdFromNetwork } from "@/lib/rpc";
 
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
 
-// Chain ID mapping for network names
-const NETWORK_TO_CHAIN_ID: Record<string, number> = {
-  mainnet: 1,
-  sepolia: 11_155_111,
-  base: 8453,
-  "base-sepolia": 84_532,
-};
-
 /**
- * Get explorer API config from database based on network name
- * Falls back to legacy hardcoded config if database lookup fails
+ * Get explorer API config from database based on network/chainId
+ * Supports both numeric chain IDs and legacy network names
  */
 async function getExplorerApiConfig(network: string): Promise<{
   baseUrl: string;
   chainId: number;
 }> {
-  const chainId = NETWORK_TO_CHAIN_ID[network];
+  // Parse network - supports numeric strings, numbers, and legacy names
+  const chainId = getChainIdFromNetwork(network);
 
-  if (!chainId) {
-    throw new Error(`Unsupported network: ${network}`);
-  }
-
-  // Try to get config from explorer_configs table
+  // Get config from explorer_configs table
   const explorerResults = await db
     .select()
     .from(explorerConfigs)
@@ -46,23 +36,9 @@ async function getExplorerApiConfig(network: string): Promise<{
     };
   }
 
-  // Last resort: hardcoded fallback for known networks
-  const fallbackConfigs: Record<string, string> = {
-    mainnet: "https://api.etherscan.io/v2/api",
-    sepolia: "https://api.etherscan.io/v2/api",
-    base: "https://api.basescan.org/api",
-    "base-sepolia": "https://api-sepolia.basescan.org/api",
-  };
-
-  const fallbackUrl = fallbackConfigs[network];
-  if (!fallbackUrl) {
-    throw new Error(`No ABI API configured for network: ${network}`);
-  }
-
-  return {
-    baseUrl: fallbackUrl,
-    chainId,
-  };
+  throw new Error(
+    `No explorer API configured for chain ${chainId}. Please contact support.`
+  );
 }
 
 /**

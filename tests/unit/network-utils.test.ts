@@ -23,10 +23,27 @@ describe("getChainIdFromNetwork", () => {
       expect(getChainIdFromNetwork("base-mainnet")).toBe(8453);
     });
 
+    it("should return chain ID for base-sepolia", () => {
+      expect(getChainIdFromNetwork("base-sepolia")).toBe(84_532);
+    });
+
+    it("should return chain ID for tempo networks", () => {
+      expect(getChainIdFromNetwork("tempo-testnet")).toBe(42_429);
+      expect(getChainIdFromNetwork("tempo")).toBe(42_420);
+      expect(getChainIdFromNetwork("tempo-mainnet")).toBe(42_420);
+    });
+
+    it("should return chain ID for solana networks", () => {
+      expect(getChainIdFromNetwork("solana")).toBe(101);
+      expect(getChainIdFromNetwork("solana-mainnet")).toBe(101);
+      expect(getChainIdFromNetwork("solana-devnet")).toBe(103);
+    });
+
     it("should be case insensitive", () => {
       expect(getChainIdFromNetwork("MAINNET")).toBe(1);
       expect(getChainIdFromNetwork("Sepolia")).toBe(11_155_111);
       expect(getChainIdFromNetwork("BASE")).toBe(8453);
+      expect(getChainIdFromNetwork("BASE-SEPOLIA")).toBe(84_532);
     });
 
     it("should throw for unsupported network", () => {
@@ -55,6 +72,20 @@ describe("getChainIdFromNetwork", () => {
       expect(getChainIdFromNetwork(42_161)).toBe(42_161); // Arbitrum
     });
   });
+
+  describe("with numeric string chain IDs", () => {
+    it("should parse numeric strings to chain IDs", () => {
+      expect(getChainIdFromNetwork("1")).toBe(1);
+      expect(getChainIdFromNetwork("8453")).toBe(8453);
+      expect(getChainIdFromNetwork("11155111")).toBe(11_155_111);
+      expect(getChainIdFromNetwork("84532")).toBe(84_532);
+    });
+
+    it("should handle any valid numeric string", () => {
+      expect(getChainIdFromNetwork("137")).toBe(137); // Polygon
+      expect(getChainIdFromNetwork("42161")).toBe(42_161); // Arbitrum
+    });
+  });
 });
 
 describe("getNetworkName", () => {
@@ -62,6 +93,11 @@ describe("getNetworkName", () => {
     expect(getNetworkName(1)).toBe("Ethereum Mainnet");
     expect(getNetworkName(11_155_111)).toBe("Sepolia Testnet");
     expect(getNetworkName(8453)).toBe("Base");
+    expect(getNetworkName(84_532)).toBe("Base Sepolia");
+    expect(getNetworkName(42_429)).toBe("Tempo Testnet");
+    expect(getNetworkName(42_420)).toBe("Tempo");
+    expect(getNetworkName(101)).toBe("Solana");
+    expect(getNetworkName(103)).toBe("Solana Devnet");
   });
 
   it("should return generic name for unknown chain IDs", () => {
@@ -72,14 +108,22 @@ describe("getNetworkName", () => {
 });
 
 describe("SUPPORTED_CHAIN_IDS", () => {
-  it("should have correct values", () => {
+  it("should have correct values for EVM chains", () => {
     expect(SUPPORTED_CHAIN_IDS.MAINNET).toBe(1);
     expect(SUPPORTED_CHAIN_IDS.SEPOLIA).toBe(11_155_111);
     expect(SUPPORTED_CHAIN_IDS.BASE).toBe(8453);
+    expect(SUPPORTED_CHAIN_IDS.BASE_SEPOLIA).toBe(84_532);
+    expect(SUPPORTED_CHAIN_IDS.TEMPO_TESTNET).toBe(42_429);
+    expect(SUPPORTED_CHAIN_IDS.TEMPO_MAINNET).toBe(42_420);
   });
 
-  it("should be frozen/readonly", () => {
-    // TypeScript enforces this at compile time, but we can verify values exist
-    expect(Object.keys(SUPPORTED_CHAIN_IDS)).toHaveLength(3);
+  it("should have correct values for Solana chains", () => {
+    expect(SUPPORTED_CHAIN_IDS.SOLANA_MAINNET).toBe(101);
+    expect(SUPPORTED_CHAIN_IDS.SOLANA_DEVNET).toBe(103);
+  });
+
+  it("should have all expected chains", () => {
+    // 8 total chains: MAINNET, SEPOLIA, BASE, BASE_SEPOLIA, TEMPO_TESTNET, TEMPO_MAINNET, SOLANA_MAINNET, SOLANA_DEVNET
+    expect(Object.keys(SUPPORTED_CHAIN_IDS)).toHaveLength(8);
   });
 });

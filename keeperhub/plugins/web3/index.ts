@@ -52,14 +52,10 @@ const web3Plugin: IntegrationPlugin = {
         {
           key: "network",
           label: "Network",
-          type: "select",
+          type: "chain-select",
+          chainTypeFilter: "evm",
           placeholder: "Select network",
           required: true,
-          options: [
-            { label: "Ethereum Mainnet", value: "mainnet" },
-            { label: "Sepolia Testnet", value: "sepolia" },
-            { label: "Base", value: "base" },
-          ],
         },
         {
           key: "address",
@@ -96,14 +92,10 @@ const web3Plugin: IntegrationPlugin = {
         {
           key: "network",
           label: "Network",
-          type: "select",
+          type: "chain-select",
+          chainTypeFilter: "evm",
           placeholder: "Select network",
           required: true,
-          options: [
-            { label: "Ethereum Mainnet", value: "mainnet" },
-            { label: "Sepolia Testnet", value: "sepolia" },
-            { label: "Base", value: "base" },
-          ],
         },
         {
           key: "amount",
@@ -149,14 +141,10 @@ const web3Plugin: IntegrationPlugin = {
         {
           key: "network",
           label: "Network",
-          type: "select",
+          type: "chain-select",
+          chainTypeFilter: "evm",
           placeholder: "Select network",
           required: true,
-          options: [
-            { label: "Ethereum Mainnet", value: "mainnet" },
-            { label: "Sepolia Testnet", value: "sepolia" },
-            { label: "Base", value: "base" },
-          ],
         },
         {
           key: "contractAddress",
@@ -221,14 +209,10 @@ const web3Plugin: IntegrationPlugin = {
         {
           key: "network",
           label: "Network",
-          type: "select",
+          type: "chain-select",
+          chainTypeFilter: "evm",
           placeholder: "Select network",
           required: true,
-          options: [
-            { label: "Ethereum Mainnet", value: "mainnet" },
-            { label: "Sepolia Testnet", value: "sepolia" },
-            { label: "Base", value: "base" },
-          ],
         },
         {
           key: "contractAddress",

@@ -36,9 +36,17 @@ export type ResolvedRpcConfig = {
 };
 
 export const SUPPORTED_CHAIN_IDS = {
+  // EVM Mainnets
   MAINNET: 1,
-  SEPOLIA: 11_155_111,
   BASE: 8453,
+  TEMPO_MAINNET: 42_420,
+  // EVM Testnets
+  SEPOLIA: 11_155_111,
+  BASE_SEPOLIA: 84_532,
+  TEMPO_TESTNET: 42_429,
+  // Solana
+  SOLANA_MAINNET: 101,
+  SOLANA_DEVNET: 103,
 } as const;
 
 export type SupportedChainId =
