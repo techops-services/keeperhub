@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
+import { refetchOrganizations } from "@/keeperhub/lib/refetch-organizations";
 import { api } from "@/lib/api-client";
 import { authClient, signIn, signUp } from "@/lib/auth-client";
 import {
@@ -456,14 +457,30 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
     e.preventDefault();
     setError("");
     setLoading(true);
+
     try {
       const response = await signIn.email({ email, password });
       if (response.error) {
         setError(response.error.message || "Sign in failed");
         return;
       }
+
+
+
+      // Small delay to ensure session is fully established
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+
+      // Fetch fresh session to get the active organization
+      await authClient.getSession();
+
+
+      // Trigger all organization hooks to refetch their data
+      refetchOrganizations();
+
       toast.success("Signed in successfully!");
       setOpen(false);
+
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed");
     } finally {
@@ -478,7 +495,6 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
     const timestamp = new Date().toISOString();
 
     try {
-
       const { isAllowlisted } = await api.beta.checkEmail(email);
       if (!isAllowlisted) {
         setError(
@@ -506,16 +522,21 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
         return;
       }
 
-      // Fetch fresh session to see if org is there
-      const session = await authClient.getSession();
+      // Small delay to let the server-side session hook set activeOrganizationId
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+
+      // Fetch fresh session to get the updated activeOrganizationId
+      await authClient.getSession();
+
+
+      // Trigger all organization hooks to refetch their data
+      refetchOrganizations();
 
       toast.success("Account created successfully!");
       setOpen(false);
 
-      // // Force page refresh to reload org context
-      window.location.reload();
     } catch (err) {
-      console.error(`[Signup Dialog] ${timestamp} Error:`, err);
       setError(err instanceof Error ? err.message : "Failed to create account");
     } finally {
       setLoading(false);
@@ -712,7 +733,6 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
               }}
             />
           )}
-
         </div>
       </DialogContent>
     </Dialog>

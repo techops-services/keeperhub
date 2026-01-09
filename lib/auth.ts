@@ -1,10 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { anonymous, genericOAuth, organization } from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { randomUUID } from "crypto";
 import { isAiGatewayManagedKeysEnabled } from "./ai-gateway/config";
 import { db } from "./db";
 import {
@@ -158,7 +158,6 @@ const plugins = [
       // When anonymous user links account, DELETE their trial workflows
       // (Anonymous workflows have no real utility in org context)
       const fromUserId = data.anonymousUser.user.id;
-      const toUserId = data.newUser.user.id;
 
       try {
         // Delete anonymous workflows (not migrated per requirements)
@@ -173,7 +172,6 @@ const plugins = [
         await db
           .delete(integrations)
           .where(eq(integrations.userId, fromUserId));
-
       } catch (error) {
         console.error("[Anonymous Migration] Error:", error);
         throw error;
@@ -224,15 +222,15 @@ const plugins = [
 
     // Hooks for custom business logic
     organizationHooks: {
-      async afterCreateOrganization({ organization: org, user }) {
+      async afterCreateOrganization() {
         await Promise.resolve();
       },
 
-      async afterAddMember({ user, organization: org }) {
+      async afterAddMember() {
         await Promise.resolve();
       },
 
-      async afterAcceptInvitation({ user, organization: org }) {
+      async afterAcceptInvitation() {
         await Promise.resolve();
       },
     },
@@ -296,14 +294,11 @@ export const auth = betterAuth({
     user: {
       create: {
         after: async (user) => {
-          const timestamp = new Date().toISOString();
-
           // Generate unique slug from user name/email
           const baseName = user.name || user.email?.split("@")[0] || "User";
           const slug = `${baseName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${nanoid(6)}`;
 
           try {
-
             const orgId = randomUUID();
             const memberId = randomUUID();
 
@@ -326,7 +321,6 @@ export const auth = betterAuth({
               role: "owner",
               createdAt: new Date(),
             });
-
           } catch (error) {
             console.error(error);
           }
@@ -336,13 +330,10 @@ export const auth = betterAuth({
     session: {
       create: {
         after: async (session) => {
-          const timestamp = new Date().toISOString();
-
           // If session already has an active organization, skip
           if (session.activeOrganizationId) {
             return;
           }
-
 
           try {
             // Find the user's first organization
@@ -353,13 +344,11 @@ export const auth = betterAuth({
               .limit(1);
 
             if (member) {
-
               // Set as active organization in the session
               await db
                 .update(sessions)
                 .set({ activeOrganizationId: member.organizationId })
                 .where(eq(sessions.id, session.id));
-
             }
           } catch (error) {
             console.error(error);

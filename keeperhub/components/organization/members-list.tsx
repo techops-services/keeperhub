@@ -1,24 +1,8 @@
 "use client";
 
+import { Trash2 } from "lucide-react";
+import Image from "next/image";
 import { useState } from "react";
-import { authClient } from "@/lib/auth-client";
-import { useActiveMember } from "@/keeperhub/lib/hooks/use-organization";
-import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,9 +14,26 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useActiveMember } from "@/keeperhub/lib/hooks/use-organization";
+import { authClient } from "@/lib/auth-client";
 
-interface Member {
+type Member = {
   id: string;
   user: {
     name: string;
@@ -41,12 +42,12 @@ interface Member {
   };
   role: string;
   createdAt: Date;
-}
+};
 
-interface MembersListProps {
+type MembersListProps = {
   members: Member[];
   onUpdate: () => void;
-}
+};
 
 export function MembersList({ members, onUpdate }: MembersListProps) {
   const { isAdmin, member: currentMember } = useActiveMember();
@@ -67,7 +68,7 @@ export function MembersList({ members, onUpdate }: MembersListProps) {
     }
   };
 
-  const handleRemove = async (memberId: string, email: string) => {
+  const handleRemove = async (_memberId: string, email: string) => {
     try {
       await authClient.organization.removeMember({
         memberIdOrEmail: email,
@@ -80,7 +81,7 @@ export function MembersList({ members, onUpdate }: MembersListProps) {
 
   if (!isAdmin) {
     return (
-      <div className="text-sm text-muted-foreground">
+      <div className="text-muted-foreground text-sm">
         Only admins and owners can manage members.
       </div>
     );
@@ -102,15 +103,17 @@ export function MembersList({ members, onUpdate }: MembersListProps) {
             <TableCell>
               <div className="flex items-center gap-2">
                 {member.user.image && (
-                  <img
-                    src={member.user.image}
+                  <Image
                     alt={member.user.name}
-                    className="w-8 h-8 rounded-full"
+                    className="h-8 w-8 rounded-full"
+                    height={32}
+                    src={member.user.image}
+                    width={32}
                   />
                 )}
                 <div>
                   <div className="font-medium">{member.user.name}</div>
-                  <div className="text-sm text-muted-foreground">
+                  <div className="text-muted-foreground text-sm">
                     {member.user.email}
                   </div>
                 </div>
@@ -118,13 +121,13 @@ export function MembersList({ members, onUpdate }: MembersListProps) {
             </TableCell>
             <TableCell>
               <Select
-                value={member.role}
-                onValueChange={(role) => handleRoleChange(member.id, role)}
                 disabled={
                   !isAdmin ||
                   member.id === currentMember?.id ||
                   updating === member.id
                 }
+                onValueChange={(role) => handleRoleChange(member.id, role)}
+                value={member.role}
               >
                 <SelectTrigger className="w-[120px]">
                   <SelectValue />
@@ -143,7 +146,7 @@ export function MembersList({ members, onUpdate }: MembersListProps) {
               {member.id !== currentMember?.id && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="icon">
+                    <Button size="icon" variant="ghost">
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </AlertDialogTrigger>
@@ -158,8 +161,10 @@ export function MembersList({ members, onUpdate }: MembersListProps) {
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
                       <AlertDialogAction
-                        onClick={() => handleRemove(member.id, member.user.email)}
                         className="bg-destructive text-destructive-foreground"
+                        onClick={() =>
+                          handleRemove(member.id, member.user.email)
+                        }
                       >
                         Remove
                       </AlertDialogAction>

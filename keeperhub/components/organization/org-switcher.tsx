@@ -1,39 +1,61 @@
 "use client";
 
 import { Check, ChevronsUpDown } from "lucide-react";
-import { useOrganization, useOrganizations } from "@/keeperhub/lib/hooks/use-organization";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Command,
   CommandGroup,
   CommandItem,
   CommandList,
-  CommandSeparator,
 } from "@/components/ui/command";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useState } from "react";
+import {
+  useOrganization,
+  useOrganizations,
+} from "@/keeperhub/lib/hooks/use-organization";
+import { useSession } from "@/lib/auth-client";
 import { ManageOrgsModal } from "./manage-orgs-modal";
 
 export function OrgSwitcher() {
+  const { data: session } = useSession();
   const { organization, switchOrganization } = useOrganization();
   const { organizations } = useOrganizations();
   const [open, setOpen] = useState(false);
 
-  if (!organization) return null;
+  // Don't show anything if user is not logged in
+  if (!session?.user) {
+    return null;
+  }
+
+  // Handle edge case: user has no active organization
+  if (!organization) {
+    return (
+      <div className="flex items-center gap-2">
+        <div className="text-muted-foreground text-sm">
+          No organization found
+        </div>
+        <ManageOrgsModal
+          defaultShowCreateForm={true}
+          triggerText="Create Organization"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center gap-2">
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover onOpenChange={setOpen} open={open}>
         <PopoverTrigger asChild>
           <Button
-            variant="outline"
-            role="combobox"
             aria-expanded={open}
             className="w-[200px] justify-between"
+            role="combobox"
+            variant="outline"
           >
             <span className="truncate">{organization.name}</span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />

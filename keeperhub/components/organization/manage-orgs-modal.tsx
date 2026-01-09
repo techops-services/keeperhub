@@ -1,8 +1,27 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { authClient } from "@/lib/auth-client";
-import { useOrganization, useOrganizations, useActiveMember } from "@/keeperhub/lib/hooks/use-organization";
+import {
+  Copy,
+  LogOut,
+  Mail,
+  Plus,
+  Settings,
+  Trash2,
+  UserPlus,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,35 +34,32 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Settings, Plus, Mail, LogOut, Trash2, UserPlus, Copy } from "lucide-react";
-import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+  useActiveMember,
+  useOrganization,
+  useOrganizations,
+} from "@/keeperhub/lib/hooks/use-organization";
+import { authClient } from "@/lib/auth-client";
 
-export function ManageOrgsModal() {
+type ManageOrgsModalProps = {
+  triggerText?: string;
+  defaultShowCreateForm?: boolean;
+};
+
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex modal with multiple states - refactoring would split related logic
+export function ManageOrgsModal({
+  triggerText,
+  defaultShowCreateForm = false,
+}: ManageOrgsModalProps = {}) {
   const [open, setOpen] = useState(false);
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(defaultShowCreateForm);
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
@@ -65,11 +81,18 @@ export function ManageOrgsModal() {
   const [inviteId, setInviteId] = useState<string | null>(null);
 
   // Invitations state
-  const [userInvitations, setUserInvitations] = useState<any[]>([]);
-  const [loadingInvitations, setLoadingInvitations] = useState(false);
+  type Invitation = {
+    id: string;
+    organization?: { name?: string };
+    role?: string;
+    expiresAt?: Date | string;
+    inviter?: { user?: { name?: string } };
+  };
+  const [userInvitations, setUserInvitations] = useState<Invitation[]>([]);
+  const [, setLoadingInvitations] = useState(false);
   const [processingInvite, setProcessingInvite] = useState<string | null>(null);
 
-  const fetchInvitations = async () => {
+  const fetchInvitations = useCallback(async () => {
     setLoadingInvitations(true);
     try {
       const result = await authClient.organization.listUserInvitations();
@@ -81,14 +104,14 @@ export function ManageOrgsModal() {
     } finally {
       setLoadingInvitations(false);
     }
-  };
+  }, []);
 
   // Fetch invitations when modal opens
   useEffect(() => {
     if (open) {
       fetchInvitations();
     }
-  }, [open]);
+  }, [open, fetchInvitations]);
 
   const handleOrgNameChange = (value: string) => {
     setOrgName(value);
@@ -98,7 +121,9 @@ export function ManageOrgsModal() {
   };
 
   const handleCreateOrg = async () => {
-    if (!orgName || !orgSlug) return;
+    if (!(orgName && orgSlug)) {
+      return;
+    }
 
     setCreateLoading(true);
     try {
@@ -112,7 +137,7 @@ export function ManageOrgsModal() {
         return;
       }
 
-      const orgId = (data as any)?.id;
+      const orgId = (data as { id: string } | null)?.id;
       if (orgId) {
         await authClient.organization.setActive({ organizationId: orgId });
         toast.success(`Organization "${orgName}" created`);
@@ -121,15 +146,17 @@ export function ManageOrgsModal() {
         setShowCreateForm(false);
         router.refresh();
       }
-    } catch (err: any) {
-      toast.error(err.message || "An error occurred");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setCreateLoading(false);
     }
   };
 
   const handleInviteMember = async () => {
-    if (!inviteEmail) return;
+    if (!inviteEmail) {
+      return;
+    }
 
     setInviteLoading(true);
     try {
@@ -143,28 +170,36 @@ export function ManageOrgsModal() {
         return;
       }
 
-      const invitationId = (data as any)?.id || (data as any)?.invitation?.id;
+      const invitationData = data as {
+        id?: string;
+        invitation?: { id?: string };
+      } | null;
+      const invitationId = invitationData?.id || invitationData?.invitation?.id;
       if (invitationId) {
         setInviteId(invitationId);
         toast.success(`Invitation sent to ${inviteEmail}`);
         setInviteEmail("");
       }
-    } catch (err: any) {
-      toast.error(err.message || "An error occurred");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setInviteLoading(false);
     }
   };
 
   const copyInviteLink = () => {
-    if (!inviteId) return;
+    if (!inviteId) {
+      return;
+    }
     const link = `${window.location.origin}/accept-invite/${inviteId}`;
     navigator.clipboard.writeText(link);
     toast.success("Invite link copied");
   };
 
   const copyInviteCode = () => {
-    if (!inviteId) return;
+    if (!inviteId) {
+      return;
+    }
     navigator.clipboard.writeText(inviteId);
     toast.success("Invite code copied");
   };
@@ -184,8 +219,8 @@ export function ManageOrgsModal() {
       toast.success("Invitation accepted");
       fetchInvitations();
       router.refresh();
-    } catch (err: any) {
-      toast.error(err.message || "An error occurred");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setProcessingInvite(null);
     }
@@ -205,15 +240,17 @@ export function ManageOrgsModal() {
 
       toast.success("Invitation rejected");
       fetchInvitations();
-    } catch (err: any) {
-      toast.error(err.message || "An error occurred");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setProcessingInvite(null);
     }
   };
 
   const handleLeaveOrg = async () => {
-    if (!organization) return;
+    if (!organization) {
+      return;
+    }
 
     try {
       const { error } = await authClient.organization.leave({
@@ -230,19 +267,21 @@ export function ManageOrgsModal() {
       setOpen(false);
 
       // Switch to another org if available
-      const otherOrg = organizations.find(org => org.id !== organization.id);
+      const otherOrg = organizations.find((org) => org.id !== organization.id);
       if (otherOrg) {
         await switchOrganization(otherOrg.id);
       }
 
       router.refresh();
-    } catch (err: any) {
-      toast.error(err.message || "An error occurred");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "An error occurred");
     }
   };
 
   const handleDeleteOrg = async () => {
-    if (!organization) return;
+    if (!organization) {
+      return;
+    }
 
     try {
       const { error } = await authClient.organization.delete({
@@ -259,26 +298,32 @@ export function ManageOrgsModal() {
       setOpen(false);
 
       // Switch to another org if available
-      const otherOrg = organizations.find(org => org.id !== organization.id);
+      const otherOrg = organizations.find((org) => org.id !== organization.id);
       if (otherOrg) {
         await switchOrganization(otherOrg.id);
       }
 
       router.refresh();
-    } catch (err: any) {
-      toast.error(err.message || "An error occurred");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "An error occurred");
     }
   };
 
   return (
     <>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog onOpenChange={setOpen} open={open}>
         <DialogTrigger asChild>
-          <Button variant="ghost" size="sm">
-            <Settings className="h-4 w-4" />
-          </Button>
+          {triggerText ? (
+            <Button size="sm" variant="default">
+              {triggerText}
+            </Button>
+          ) : (
+            <Button size="sm" variant="ghost">
+              <Settings className="h-4 w-4" />
+            </Button>
+          )}
         </DialogTrigger>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-h-[80vh] max-w-2xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Manage Organizations</DialogTitle>
             <DialogDescription>
@@ -286,117 +331,112 @@ export function ManageOrgsModal() {
             </DialogDescription>
           </DialogHeader>
 
-          <Tabs defaultValue="organizations" className="w-full">
+          <Tabs className="w-full" defaultValue="organizations">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="organizations">Organizations</TabsTrigger>
               <TabsTrigger value="invitations">
                 Invitations
                 {userInvitations && userInvitations.length > 0 && (
-                  <span className="ml-2 px-2 py-0.5 text-xs bg-primary text-primary-foreground rounded-full">
+                  <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-primary-foreground text-xs">
                     {userInvitations.length}
                   </span>
                 )}
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="organizations" className="space-y-4">
+            <TabsContent className="space-y-4" value="organizations">
               {/* Create Organization Section */}
-              <div className="border rounded-lg p-4 space-y-3">
-                {!showCreateForm ? (
-                  <Button
-                    onClick={() => setShowCreateForm(true)}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create New Organization
-                  </Button>
-                ) : (
+              <div className="space-y-3 rounded-lg border p-4">
+                {showCreateForm ? (
                   <div className="space-y-3">
                     <div className="space-y-2">
                       <Label htmlFor="org-name">Organization Name</Label>
                       <Input
+                        disabled={createLoading}
                         id="org-name"
-                        value={orgName}
                         onChange={(e) => handleOrgNameChange(e.target.value)}
                         placeholder="Acme Inc."
-                        disabled={createLoading}
+                        value={orgName}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="org-slug">Slug (URL identifier)</Label>
                       <Input
+                        disabled={createLoading}
                         id="org-slug"
-                        value={orgSlug}
                         onChange={(e) => setOrgSlug(e.target.value)}
                         placeholder="acme-inc"
-                        disabled={createLoading}
+                        value={orgSlug}
                       />
                     </div>
                     <div className="flex gap-2">
                       <Button
+                        className="flex-1"
+                        disabled={createLoading}
                         onClick={() => {
                           setShowCreateForm(false);
                           setOrgName("");
                           setOrgSlug("");
                         }}
                         variant="outline"
-                        className="flex-1"
-                        disabled={createLoading}
                       >
                         Cancel
                       </Button>
                       <Button
-                        onClick={handleCreateOrg}
                         className="flex-1"
                         disabled={createLoading || !orgName || !orgSlug}
+                        onClick={handleCreateOrg}
                       >
                         {createLoading ? "Creating..." : "Create"}
                       </Button>
                     </div>
                   </div>
+                ) : (
+                  <Button
+                    className="w-full"
+                    onClick={() => setShowCreateForm(true)}
+                    variant="outline"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create New Organization
+                  </Button>
                 )}
               </div>
 
               {/* Current Organization Section */}
               {organization && (
-                <div className="border rounded-lg p-4 space-y-4">
+                <div className="space-y-4 rounded-lg border p-4">
                   <div>
-                    <h3 className="font-semibold text-lg">{organization.name}</h3>
-                    <p className="text-sm text-muted-foreground">
+                    <h3 className="font-semibold text-lg">
+                      {organization.name}
+                    </h3>
+                    <p className="text-muted-foreground text-sm">
                       {isOwner ? "Owner" : "Member"}
                     </p>
                   </div>
 
                   {/* Invite Members Section */}
                   <div className="space-y-3">
-                    {!showInviteForm ? (
-                      <Button
-                        onClick={() => setShowInviteForm(true)}
-                        variant="outline"
-                        className="w-full"
-                      >
-                        <UserPlus className="mr-2 h-4 w-4" />
-                        Invite Members
-                      </Button>
-                    ) : (
+                    {showInviteForm ? (
                       <div className="space-y-3">
                         <div className="space-y-2">
                           <Label htmlFor="invite-email">Email Address</Label>
                           <Input
+                            disabled={inviteLoading}
                             id="invite-email"
-                            type="email"
-                            value={inviteEmail}
                             onChange={(e) => setInviteEmail(e.target.value)}
                             placeholder="colleague@example.com"
-                            disabled={inviteLoading}
+                            type="email"
+                            value={inviteEmail}
                           />
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="invite-role">Role</Label>
                           <Select
+                            onValueChange={(v) =>
+                              setInviteRole(v as "member" | "admin")
+                            }
                             value={inviteRole}
-                            onValueChange={(v: any) => setInviteRole(v)}
                           >
                             <SelectTrigger>
                               <SelectValue />
@@ -412,23 +452,25 @@ export function ManageOrgsModal() {
                           </Select>
                         </div>
                         {inviteId && (
-                          <div className="space-y-2 p-3 border rounded-lg bg-muted">
-                            <p className="text-sm font-medium">Invitation Created</p>
+                          <div className="space-y-2 rounded-lg border bg-muted p-3">
+                            <p className="font-medium text-sm">
+                              Invitation Created
+                            </p>
                             <div className="flex gap-2">
                               <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={copyInviteLink}
                                 className="flex-1"
+                                onClick={copyInviteLink}
+                                size="sm"
+                                variant="outline"
                               >
                                 <Copy className="mr-2 h-3 w-3" />
                                 Copy Link
                               </Button>
                               <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={copyInviteCode}
                                 className="flex-1"
+                                onClick={copyInviteCode}
+                                size="sm"
+                                variant="outline"
                               >
                                 <Copy className="mr-2 h-3 w-3" />
                                 Copy Code
@@ -438,49 +480,58 @@ export function ManageOrgsModal() {
                         )}
                         <div className="flex gap-2">
                           <Button
+                            className="flex-1"
+                            disabled={inviteLoading}
                             onClick={() => {
                               setShowInviteForm(false);
                               setInviteEmail("");
                               setInviteId(null);
                             }}
                             variant="outline"
-                            className="flex-1"
-                            disabled={inviteLoading}
                           >
                             Cancel
                           </Button>
                           <Button
-                            onClick={handleInviteMember}
                             className="flex-1"
                             disabled={inviteLoading || !inviteEmail}
+                            onClick={handleInviteMember}
                           >
                             <Mail className="mr-2 h-4 w-4" />
                             {inviteLoading ? "Sending..." : "Send Invitation"}
                           </Button>
                         </div>
                       </div>
+                    ) : (
+                      <Button
+                        className="w-full"
+                        onClick={() => setShowInviteForm(true)}
+                        variant="outline"
+                      >
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Invite Members
+                      </Button>
                     )}
                   </div>
 
                   {/* Leave/Delete Organization */}
-                  <div className="pt-3 border-t space-y-2">
-                    {!isOwner ? (
+                  <div className="space-y-2 border-t pt-3">
+                    {isOwner ? (
                       <Button
-                        onClick={() => setShowLeaveDialog(true)}
-                        variant="outline"
-                        className="w-full text-orange-600 hover:text-orange-700"
-                      >
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Leave Organization
-                      </Button>
-                    ) : (
-                      <Button
+                        className="w-full text-destructive hover:text-destructive"
                         onClick={() => setShowDeleteDialog(true)}
                         variant="outline"
-                        className="w-full text-destructive hover:text-destructive"
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
                         Delete Organization
+                      </Button>
+                    ) : (
+                      <Button
+                        className="w-full text-orange-600 hover:text-orange-700"
+                        onClick={() => setShowLeaveDialog(true)}
+                        variant="outline"
+                      >
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Leave Organization
                       </Button>
                     )}
                   </div>
@@ -488,46 +539,46 @@ export function ManageOrgsModal() {
               )}
             </TabsContent>
 
-            <TabsContent value="invitations" className="space-y-4">
+            <TabsContent className="space-y-4" value="invitations">
               {!userInvitations || userInvitations.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
+                <div className="py-8 text-center text-muted-foreground">
                   No pending invitations
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {userInvitations.map((invitation: any) => (
+                  {userInvitations.map((invitation) => (
                     <div
+                      className="space-y-3 rounded-lg border p-4"
                       key={invitation.id}
-                      className="border rounded-lg p-4 space-y-3"
                     >
                       <div>
                         <h3 className="font-semibold">
                           {invitation.organization?.name || "Organization"}
                         </h3>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-muted-foreground text-sm">
                           Role: {invitation.role}
                         </p>
                         {invitation.inviter?.user?.name && (
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-muted-foreground text-sm">
                             Invited by: {invitation.inviter.user.name}
                           </p>
                         )}
                       </div>
                       <div className="flex gap-2">
                         <Button
-                          onClick={() => handleAcceptInvitation(invitation.id)}
                           className="flex-1"
                           disabled={processingInvite === invitation.id}
+                          onClick={() => handleAcceptInvitation(invitation.id)}
                         >
                           {processingInvite === invitation.id
                             ? "Accepting..."
                             : "Accept"}
                         </Button>
                         <Button
-                          onClick={() => handleRejectInvitation(invitation.id)}
-                          variant="outline"
                           className="flex-1"
                           disabled={processingInvite === invitation.id}
+                          onClick={() => handleRejectInvitation(invitation.id)}
+                          variant="outline"
                         >
                           {processingInvite === invitation.id
                             ? "Rejecting..."
@@ -544,7 +595,7 @@ export function ManageOrgsModal() {
       </Dialog>
 
       {/* Leave Organization Dialog */}
-      <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
+      <AlertDialog onOpenChange={setShowLeaveDialog} open={showLeaveDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Leave Organization</AlertDialogTitle>
@@ -556,8 +607,8 @@ export function ManageOrgsModal() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleLeaveOrg}
               className="bg-orange-600 hover:bg-orange-700"
+              onClick={handleLeaveOrg}
             >
               Leave Organization
             </AlertDialogAction>
@@ -566,7 +617,7 @@ export function ManageOrgsModal() {
       </AlertDialog>
 
       {/* Delete Organization Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <AlertDialog onOpenChange={setShowDeleteDialog} open={showDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Organization</AlertDialogTitle>
@@ -579,8 +630,8 @@ export function ManageOrgsModal() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={handleDeleteOrg}
-              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
             >
               Delete Organization
             </AlertDialogAction>

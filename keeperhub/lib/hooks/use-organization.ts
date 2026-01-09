@@ -1,11 +1,28 @@
 "use client";
 
-import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { registerOrganizationRefetch } from "@/keeperhub/lib/refetch-organizations";
+import { authClient } from "@/lib/auth-client";
 
 export function useOrganization() {
-  const { data: activeOrg, isPending, error } = authClient.useActiveOrganization();
+  const {
+    data: activeOrg,
+    isPending,
+    error,
+    refetch,
+  } = authClient.useActiveOrganization();
   const router = useRouter();
+
+  // Register this hook's refetch callback so it can be triggered externally
+  useEffect(
+    () =>
+      registerOrganizationRefetch(() => {
+        console.log("[useOrganization] Refetching active organization...");
+        refetch();
+      }),
+    [refetch]
+  );
 
   const switchOrganization = async (orgId: string) => {
     await authClient.organization.setActive({ organizationId: orgId });
@@ -17,15 +34,27 @@ export function useOrganization() {
     isLoading: isPending,
     error,
     switchOrganization,
+    refetch, // Keep exposing refetch for direct use
   };
 }
 
 export function useOrganizations() {
-  const { data: orgs, isPending } = authClient.useListOrganizations();
+  const { data: orgs, isPending, refetch } = authClient.useListOrganizations();
+
+  // Register this hook's refetch callback so it can be triggered externally
+  useEffect(
+    () =>
+      registerOrganizationRefetch(() => {
+        console.log("[useOrganizations] Refetching organization list...");
+        refetch();
+      }),
+    [refetch]
+  );
 
   return {
     organizations: orgs || [],
     isLoading: isPending,
+    refetch, // Keep exposing refetch for direct use
   };
 }
 
@@ -38,7 +67,7 @@ export function useActiveMember() {
 
   // Find the current user's member record in the active organization
   const member = activeOrg?.members?.find(
-    (m: any) => m.userId === session?.user?.id
+    (m: { userId: string }) => m.userId === session?.user?.id
   );
 
   return {
@@ -57,7 +86,11 @@ export function usePermissions() {
         permissions: { [resource]: actions },
       });
       // Handle both data.success and direct success property
-      return (result as any)?.data?.success || (result as any)?.success || false;
+      const typedResult = result as {
+        data?: { success?: boolean };
+        success?: boolean;
+      } | null;
+      return typedResult?.data?.success || typedResult?.success;
     } catch (error) {
       console.error("Permission check failed:", error);
       return false;
@@ -68,12 +101,11 @@ export function usePermissions() {
     role: "owner" | "admin" | "member",
     resource: string,
     actions: string[]
-  ) => {
-    return authClient.organization.checkRolePermission({
+  ) =>
+    authClient.organization.checkRolePermission({
       role,
       permissions: { [resource]: actions },
     });
-  };
 
   return {
     checkPermission,

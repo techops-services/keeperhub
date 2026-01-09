@@ -1,7 +1,8 @@
 "use client";
 
+import { Copy, Mail, UserPlus } from "lucide-react";
 import { useState } from "react";
-import { authClient } from "@/lib/auth-client";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,8 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Copy, Mail, UserPlus } from "lucide-react";
-import { toast } from "sonner";
+import { authClient } from "@/lib/auth-client";
 
 export function InviteModal() {
   const [open, setOpen] = useState(false);
@@ -45,7 +45,11 @@ export function InviteModal() {
       }
 
       // Type-safe handling of invitation ID
-      const invitationId = (data as any)?.id || (data as any)?.invitation?.id;
+      const invitationData = data as {
+        id?: string;
+        invitation?: { id?: string };
+      } | null;
+      const invitationId = invitationData?.id || invitationData?.invitation?.id;
       if (invitationId) {
         setInviteId(invitationId);
         toast.success(`Invitation sent to ${email}`);
@@ -53,28 +57,32 @@ export function InviteModal() {
       } else {
         toast.error("Invitation created but ID not returned");
       }
-    } catch (err: any) {
-      toast.error(err.message || "An error occurred");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setLoading(false);
     }
   };
 
   const copyInviteLink = () => {
-    if (!inviteId) return;
+    if (!inviteId) {
+      return;
+    }
     const link = `${window.location.origin}/accept-invite/${inviteId}`;
     navigator.clipboard.writeText(link);
     toast.success("Invite link copied to clipboard");
   };
 
   const copyInviteCode = () => {
-    if (!inviteId) return;
+    if (!inviteId) {
+      return;
+    }
     navigator.clipboard.writeText(inviteId);
     toast.success("Invite code copied to clipboard");
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog onOpenChange={setOpen} open={open}>
       <DialogTrigger asChild>
         <Button>
           <UserPlus className="mr-2 h-4 w-4" />
@@ -92,17 +100,20 @@ export function InviteModal() {
           <div className="space-y-2">
             <Label htmlFor="email">Email Address</Label>
             <Input
+              disabled={loading}
               id="email"
-              type="email"
-              value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="colleague@example.com"
-              disabled={loading}
+              type="email"
+              value={email}
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="role">Role</Label>
-            <Select value={role} onValueChange={(v: any) => setRole(v)}>
+            <Select
+              onValueChange={(v) => setRole(v as "member" | "admin")}
+              value={role}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -117,23 +128,23 @@ export function InviteModal() {
             </Select>
           </div>
           {inviteId && (
-            <div className="space-y-2 p-4 border rounded-lg bg-muted">
-              <p className="text-sm font-medium">Invitation Created</p>
+            <div className="space-y-2 rounded-lg border bg-muted p-4">
+              <p className="font-medium text-sm">Invitation Created</p>
               <div className="flex gap-2">
                 <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={copyInviteLink}
                   className="flex-1"
+                  onClick={copyInviteLink}
+                  size="sm"
+                  variant="outline"
                 >
                   <Copy className="mr-2 h-3 w-3" />
                   Copy Link
                 </Button>
                 <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={copyInviteCode}
                   className="flex-1"
+                  onClick={copyInviteCode}
+                  size="sm"
+                  variant="outline"
                 >
                   <Copy className="mr-2 h-3 w-3" />
                   Copy Code
@@ -143,13 +154,10 @@ export function InviteModal() {
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
+          <Button onClick={() => setOpen(false)} variant="outline">
             Close
           </Button>
-          <Button
-            onClick={handleInvite}
-            disabled={loading || !email}
-          >
+          <Button disabled={loading || !email} onClick={handleInvite}>
             <Mail className="mr-2 h-4 w-4" />
             {loading ? "Sending..." : "Send Invitation"}
           </Button>

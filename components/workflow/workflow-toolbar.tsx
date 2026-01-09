@@ -33,13 +33,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+// start custom keeperhub code //
+import { OrgSwitcher } from "@/keeperhub/components/organization/org-switcher";
 import { api } from "@/lib/api-client";
 import { authClient, useSession } from "@/lib/auth-client";
-
 import { getCustomLogo } from "@/lib/extension-registry";
-
 import { integrationsAtom } from "@/lib/integrations-store";
-
 import type { IntegrationType } from "@/lib/types/integration";
 import {
   addNodeAtom,
@@ -77,18 +76,15 @@ import {
   getIntegrationLabels,
 } from "@/plugins";
 import { Panel } from "../ai-elements/panel";
-
 import { ConfigurationOverlay } from "../overlays/configuration-overlay";
 import { ConfirmOverlay } from "../overlays/confirm-overlay";
 import { ExportWorkflowOverlay } from "../overlays/export-workflow-overlay";
 import { MakePublicOverlay } from "../overlays/make-public-overlay";
 import { useOverlay } from "../overlays/overlay-provider";
 import { WorkflowIssuesOverlay } from "../overlays/workflow-issues-overlay";
-
 import { WorkflowIcon } from "../ui/workflow-icon";
 import { UserMenu } from "../workflows/user-menu";
-// start custom keeperhub code //
-import { OrgSwitcher } from "@/keeperhub/components/organization/org-switcher";
+
 // end keeperhub code //
 
 type WorkflowToolbarProps = {

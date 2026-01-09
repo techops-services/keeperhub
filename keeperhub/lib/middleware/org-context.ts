@@ -34,7 +34,6 @@ export type OrgContext = {
 };
 
 export async function getOrgContext(): Promise<OrgContext> {
-  const timestamp = new Date().toISOString();
   const session = await auth.api.getSession({
     headers: await headers(),
   });

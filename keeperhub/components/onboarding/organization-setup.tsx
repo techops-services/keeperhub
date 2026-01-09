@@ -1,12 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { authClient } from "@/lib/auth-client";
 
 export function OrganizationSetup() {
   const router = useRouter();
@@ -30,10 +36,12 @@ export function OrganizationSetup() {
     setError("");
 
     try {
-      const { data, error: createError } = await authClient.organization.create({
-        name,
-        slug,
-      });
+      const { data, error: createError } = await authClient.organization.create(
+        {
+          name,
+          slug,
+        }
+      );
 
       if (createError) {
         setError(createError.message || "Failed to create organization");
@@ -42,12 +50,12 @@ export function OrganizationSetup() {
 
       // Set as active organization - data contains the org directly
       await authClient.organization.setActive({
-        organizationId: (data as any)?.id,
+        organizationId: (data as { id: string } | null)?.id ?? "",
       });
 
       router.push("/dashboard");
-    } catch (err: any) {
-      setError(err.message || "An error occurred");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setLoading(false);
     }
@@ -59,9 +67,10 @@ export function OrganizationSetup() {
 
     try {
       // Accept invitation directly - getInvitation might not be needed
-      const { error: acceptError } = await authClient.organization.acceptInvitation({
-        invitationId: inviteCode,
-      });
+      const { error: acceptError } =
+        await authClient.organization.acceptInvitation({
+          invitationId: inviteCode,
+        });
 
       if (acceptError) {
         setError(acceptError.message || "Invalid or expired invitation code");
@@ -69,8 +78,8 @@ export function OrganizationSetup() {
       }
 
       router.push("/dashboard");
-    } catch (err: any) {
-      setError(err.message || "An error occurred");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setLoading(false);
     }
@@ -78,7 +87,7 @@ export function OrganizationSetup() {
 
   if (mode === "choice") {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex min-h-screen items-center justify-center">
         <Card className="w-[400px]">
           <CardHeader>
             <CardTitle>Welcome!</CardTitle>
@@ -88,17 +97,17 @@ export function OrganizationSetup() {
           </CardHeader>
           <CardContent className="space-y-3">
             <Button
-              onClick={() => setMode("create")}
               className="w-full"
+              onClick={() => setMode("create")}
               size="lg"
             >
               Create Organization
             </Button>
             <Button
-              onClick={() => setMode("join")}
-              variant="outline"
               className="w-full"
+              onClick={() => setMode("join")}
               size="lg"
+              variant="outline"
             >
               Join Organization
             </Button>
@@ -110,7 +119,7 @@ export function OrganizationSetup() {
 
   if (mode === "create") {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex min-h-screen items-center justify-center">
         <Card className="w-[400px]">
           <CardHeader>
             <CardTitle>Create Organization</CardTitle>
@@ -122,37 +131,37 @@ export function OrganizationSetup() {
             <div className="space-y-2">
               <Label htmlFor="name">Organization Name</Label>
               <Input
+                disabled={loading}
                 id="name"
-                value={name}
                 onChange={(e) => handleNameChange(e.target.value)}
                 placeholder="Acme Inc."
-                disabled={loading}
+                value={name}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="slug">Slug (URL identifier)</Label>
               <Input
+                disabled={loading}
                 id="slug"
-                value={slug}
                 onChange={(e) => setSlug(e.target.value)}
                 placeholder="acme-inc"
-                disabled={loading}
+                value={slug}
               />
             </div>
-            {error && <p className="text-sm text-red-500">{error}</p>}
+            {error && <p className="text-red-500 text-sm">{error}</p>}
             <div className="flex gap-2">
               <Button
-                onClick={() => setMode("choice")}
-                variant="outline"
                 className="flex-1"
                 disabled={loading}
+                onClick={() => setMode("choice")}
+                variant="outline"
               >
                 Back
               </Button>
               <Button
-                onClick={handleCreate}
                 className="flex-1"
                 disabled={loading || !name || !slug}
+                onClick={handleCreate}
               >
                 {loading ? "Creating..." : "Create"}
               </Button>
@@ -165,7 +174,7 @@ export function OrganizationSetup() {
 
   // mode === "join"
   return (
-    <div className="flex items-center justify-center min-h-screen">
+    <div className="flex min-h-screen items-center justify-center">
       <Card className="w-[400px]">
         <CardHeader>
           <CardTitle>Join Organization</CardTitle>
@@ -177,27 +186,27 @@ export function OrganizationSetup() {
           <div className="space-y-2">
             <Label htmlFor="code">Invitation Code</Label>
             <Input
+              disabled={loading}
               id="code"
-              value={inviteCode}
               onChange={(e) => setInviteCode(e.target.value)}
               placeholder="abc123xyz"
-              disabled={loading}
+              value={inviteCode}
             />
           </div>
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          {error && <p className="text-red-500 text-sm">{error}</p>}
           <div className="flex gap-2">
             <Button
-              onClick={() => setMode("choice")}
-              variant="outline"
               className="flex-1"
               disabled={loading}
+              onClick={() => setMode("choice")}
+              variant="outline"
             >
               Back
             </Button>
             <Button
-              onClick={handleJoin}
               className="flex-1"
               disabled={loading || !inviteCode}
+              onClick={handleJoin}
             >
               {loading ? "Joining..." : "Join"}
             </Button>
