@@ -1,6 +1,15 @@
 "use client";
 
-import { Key, LogOut, Moon, Plug, Settings, Sun, Wallet } from "lucide-react";
+import {
+  Github,
+  Key,
+  LogOut,
+  Moon,
+  Plug,
+  Settings,
+  Sun,
+  Wallet,
+} from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import {
@@ -26,7 +35,10 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+// start custom keeperhub code //
+import { FeedbackOverlay } from "@/keeperhub/components/overlays/feedback-overlay";
 import { WalletOverlay } from "@/keeperhub/components/overlays/wallet-overlay";
+// end keeperhub code //
 import { api } from "@/lib/api-client";
 import { signOut, useSession } from "@/lib/auth-client";
 
@@ -137,6 +149,12 @@ export const UserMenu = () => {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {/* start custom keeperhub code */}
+        <DropdownMenuItem onClick={() => openOverlay(FeedbackOverlay)}>
+          <Github className="size-4" />
+          <span>Report an issue</span>
+        </DropdownMenuItem>
+        {/* end keeperhub code */}
         {!isOAuthUser && (
           <DropdownMenuItem onClick={() => openOverlay(SettingsOverlay)}>
             <Settings className="size-4" />
@@ -151,11 +169,12 @@ export const UserMenu = () => {
           <Key className="size-4" />
           <span>API Keys</span>
         </DropdownMenuItem>
-        {/* KeeperHub: Wallet overlay */}
+        {/* start custom keeperhub code */}
         <DropdownMenuItem onClick={() => openOverlay(WalletOverlay)}>
           <Wallet className="size-4" />
           <span>Wallet</span>
         </DropdownMenuItem>
+        {/* end keeperhub code */}
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
             <Sun className="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />

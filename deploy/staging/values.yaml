@@ -137,6 +137,14 @@ env:
   FROM_ADDRESS:
     type: kv
     value: "noreply@keeperhub.com"
+  # Feedback service (internal cluster communication)
+  FEEDBACK_SERVICE_URL:
+    type: kv
+    value: "http://keeperhub-feedback-staging.keeperhub:3001"
+  FEEDBACK_API_KEY:
+    type: parameterStore
+    name: feedback-api-key
+    parameter_name: /eks/maker-staging/keeperhub-feedback/feedback-api-key
 
 externalSecrets:
   clusterSecretStoreName: maker-staging
