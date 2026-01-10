@@ -140,7 +140,7 @@ env:
   # Feedback service (internal cluster communication)
   FEEDBACK_SERVICE_URL:
     type: kv
-    value: "http://keeperhub-feedback-common.keeperhub:3001"
+    value: "http://keeperhub-feedback-common.keeperhub:3001/api/feedback"
   FEEDBACK_API_KEY:
     type: parameterStore
     name: feedback-api-key
