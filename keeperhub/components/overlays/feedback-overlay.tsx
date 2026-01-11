@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { toast } from "sonner";
 import { CheckCircle2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Overlay } from "@/components/overlays/overlay";
 import { useOverlay } from "@/components/overlays/overlay-provider";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 type FeedbackOverlayProps = {
@@ -90,7 +90,9 @@ export function FeedbackOverlay({ overlayId }: FeedbackOverlayProps) {
 
   const handlePaste = useCallback((e: ClipboardEvent) => {
     const items = e.clipboardData?.items;
-    if (!items) return;
+    if (!items) {
+      return;
+    }
 
     for (const item of items) {
       if (item.type.startsWith("image/")) {
@@ -117,12 +119,12 @@ export function FeedbackOverlay({ overlayId }: FeedbackOverlayProps) {
         title="Thank you!"
       >
         <div className="flex flex-col items-center justify-center py-8 text-center">
-          <CheckCircle2 className="size-12 text-green-500 mb-4" />
-          <p className="text-muted-foreground mb-4">
+          <CheckCircle2 className="mb-4 size-12 text-green-500" />
+          <p className="mb-4 text-muted-foreground">
             Your issue has been created and will help us improve
           </p>
           <a
-            className="text-primary underline text-sm"
+            className="text-primary text-sm underline"
             href="https://github.com/techops-services/keeperhub/issues?q=is%3Aopen+is%3Aissue+label%3Auser-feedback"
             rel="noopener noreferrer"
             target="_blank"
@@ -147,7 +149,7 @@ export function FeedbackOverlay({ overlayId }: FeedbackOverlayProps) {
       overlayId={overlayId}
       title="Submit a new issue"
     >
-      <Label className="-mt-2 mb-4 block text-sm font-medium">
+      <Label className="-mt-2 mb-4 block font-medium text-sm">
         The issue will be visible in our public GitHub repository
       </Label>
 
@@ -160,12 +162,12 @@ export function FeedbackOverlay({ overlayId }: FeedbackOverlayProps) {
           {/* Message textarea */}
           <div className="space-y-2">
             <Textarea
-              id="feedback-message"
-              placeholder="Let us know what's on your mind..."
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={4}
               className="resize-none"
+              id="feedback-message"
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Let us know what's on your mind..."
+              rows={4}
+              value={message}
             />
           </div>
 
@@ -175,16 +177,16 @@ export function FeedbackOverlay({ overlayId }: FeedbackOverlayProps) {
               const isSelected = categories.includes(option.value);
               return (
                 <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => toggleCategory(option.value)}
                   className={cn(
-                    "rounded-full px-3 py-1 text-sm font-medium transition-colors",
+                    "rounded-full px-3 py-1 font-medium text-sm transition-colors",
                     "border focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
                     isSelected
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-muted text-foreground/70 border-border hover:bg-muted/80"
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-muted text-foreground/70 hover:bg-muted/80"
                   )}
+                  key={option.value}
+                  onClick={() => toggleCategory(option.value)}
+                  type="button"
                 >
                   {option.label}
                 </button>
@@ -194,44 +196,61 @@ export function FeedbackOverlay({ overlayId }: FeedbackOverlayProps) {
 
           {/* Screenshot */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Screenshot (optional)</Label>
+            <Label className="font-medium text-sm">Screenshot (optional)</Label>
             {screenshot ? (
               <div className="relative rounded-md border bg-muted/50 p-2">
+                {/* biome-ignore lint/performance/noImgElement: Next.js Image doesn't support blob URLs */}
+                {/* biome-ignore lint/correctness/useImageSize: Dynamic blob preview has variable dimensions */}
                 <img
-                  src={URL.createObjectURL(screenshot)}
                   alt="Screenshot preview"
                   className="max-h-32 rounded object-contain"
+                  src={URL.createObjectURL(screenshot)}
                 />
                 <button
-                  type="button"
-                  onClick={() => setScreenshot(null)}
+                  aria-label="Remove screenshot"
                   className="absolute top-1 right-1 rounded-full bg-background/80 p-1 text-muted-foreground hover:text-foreground"
+                  onClick={() => setScreenshot(null)}
+                  type="button"
                 >
-                  <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <svg
+                    aria-hidden="true"
+                    className="size-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      d="M6 18L18 6M6 6l12 12"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                    />
                   </svg>
                 </button>
-                <p className="mt-1 text-xs text-muted-foreground truncate">
+                <p className="mt-1 truncate text-muted-foreground text-xs">
                   {screenshot.name || "Pasted image"}
                 </p>
               </div>
             ) : (
-              <div className="rounded-md border border-dashed border-border bg-muted/30 p-4 text-center">
-                <p className="text-sm text-foreground">
-                  Paste screenshot with <kbd className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">⌘V</kbd>
+              <div className="rounded-md border border-border border-dashed bg-muted/30 p-4 text-center">
+                <p className="text-foreground text-sm">
+                  Paste screenshot with{" "}
+                  <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                    ⌘V
+                  </kbd>
                 </p>
                 <label
+                  className="mt-2 inline-block cursor-pointer text-muted-foreground text-xs underline hover:text-foreground"
                   htmlFor="screenshot"
-                  className="mt-2 inline-block text-xs text-muted-foreground hover:text-foreground cursor-pointer underline"
                 >
                   or upload file
                 </label>
                 <input
-                  id="screenshot"
-                  type="file"
                   accept="image/*"
-                  onChange={handleFileChange}
                   className="hidden"
+                  id="screenshot"
+                  onChange={handleFileChange}
+                  type="file"
                 />
               </div>
             )}

@@ -22,11 +22,10 @@ let mockQueryResult: unknown[] = [];
 
 // Create a thenable object that also has .where() method
 const createQueryBuilder = () => {
-  const queryBuilder = {
+  const promise = Promise.resolve(mockQueryResult);
+  const queryBuilder = Object.assign(promise, {
     where: vi.fn(() => Promise.resolve(mockQueryResult)),
-    // Make the query itself awaitable (for includeDisabled=true case)
-    then: (resolve: (value: unknown[]) => void) => resolve(mockQueryResult),
-  };
+  });
   return queryBuilder;
 };
 
@@ -66,7 +65,7 @@ const mockChains = {
   sepoliaWithExplorer: {
     chain: {
       id: "chain_11155111",
-      chainId: 11155111,
+      chainId: 11_155_111,
       name: "Sepolia Testnet",
       symbol: "ETH",
       chainType: "evm",
@@ -102,7 +101,7 @@ const mockChains = {
   tempoDisabled: {
     chain: {
       id: "chain_42420",
-      chainId: 42420,
+      chainId: 42_420,
       name: "Tempo",
       symbol: "USD",
       chainType: "evm",
@@ -186,7 +185,7 @@ describe("/api/chains route", () => {
 
       // Verify disabled chain is included
       const tempoChain = data.find(
-        (c: { chainId: number }) => c.chainId === 42420
+        (c: { chainId: number }) => c.chainId === 42_420
       );
       expect(tempoChain).toBeDefined();
       expect(tempoChain.isEnabled).toBe(false);
@@ -209,10 +208,19 @@ describe("/api/chains route", () => {
       expect(chain).toHaveProperty("name", "Ethereum Mainnet");
       expect(chain).toHaveProperty("symbol", "ETH");
       expect(chain).toHaveProperty("chainType", "evm");
-      expect(chain).toHaveProperty("defaultPrimaryRpc", "https://eth.example.com");
-      expect(chain).toHaveProperty("defaultFallbackRpc", "https://eth-backup.example.com");
+      expect(chain).toHaveProperty(
+        "defaultPrimaryRpc",
+        "https://eth.example.com"
+      );
+      expect(chain).toHaveProperty(
+        "defaultFallbackRpc",
+        "https://eth-backup.example.com"
+      );
       expect(chain).toHaveProperty("explorerUrl", "https://etherscan.io");
-      expect(chain).toHaveProperty("explorerApiUrl", "https://api.etherscan.io/v2/api");
+      expect(chain).toHaveProperty(
+        "explorerApiUrl",
+        "https://api.etherscan.io/v2/api"
+      );
       expect(chain).toHaveProperty("explorerApiType", "etherscan");
       expect(chain).toHaveProperty("isTestnet", false);
       expect(chain).toHaveProperty("isEnabled", true);
