@@ -5,6 +5,7 @@ import { ethers } from "ethers";
 import { initializeParaSigner } from "@/keeperhub/lib/para/wallet-helpers";
 import { db } from "@/lib/db";
 import { workflowExecutions } from "@/lib/db/schema";
+import { getChainIdFromNetwork, resolveRpcConfig } from "@/lib/rpc";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
 
@@ -43,23 +44,6 @@ async function getUserIdFromExecution(
   }
 
   return execution[0].userId;
-}
-
-/**
- * Get RPC URL based on network selection
- */
-function getRpcUrl(network: string): string {
-  const RPC_URLS: Record<string, string> = {
-    mainnet: "https://chain.techops.services/eth-mainnet",
-    sepolia: "https://chain.techops.services/eth-sepolia",
-  };
-
-  const rpcUrl = RPC_URLS[network];
-  if (!rpcUrl) {
-    throw new Error(`Unsupported network: ${network}`);
-  }
-
-  return rpcUrl;
 }
 
 /**
@@ -188,13 +172,27 @@ async function stepHandler(
     };
   }
 
-  // Get RPC URL
+  // Get chain ID and resolve RPC config (with user preferences)
+  let chainId: number;
   let rpcUrl: string;
   try {
-    rpcUrl = getRpcUrl(network);
-    console.log("[Write Contract] Using RPC URL for network:", network);
+    chainId = getChainIdFromNetwork(network);
+    console.log("[Write Contract] Resolved chain ID:", chainId);
+
+    const rpcConfig = await resolveRpcConfig(chainId, userId);
+    if (!rpcConfig) {
+      throw new Error(`Chain ${chainId} not found or not enabled`);
+    }
+
+    rpcUrl = rpcConfig.primaryRpcUrl;
+    console.log(
+      "[Write Contract] Using RPC URL:",
+      rpcUrl,
+      "source:",
+      rpcConfig.source
+    );
   } catch (error) {
-    console.error("[Write Contract] Failed to get RPC URL:", error);
+    console.error("[Write Contract] Failed to resolve RPC config:", error);
     return {
       success: false,
       error: getErrorMessage(error),

@@ -52,13 +52,10 @@ const web3Plugin: IntegrationPlugin = {
         {
           key: "network",
           label: "Network",
-          type: "select",
+          type: "chain-select",
+          chainTypeFilter: "evm",
           placeholder: "Select network",
           required: true,
-          options: [
-            { label: "Ethereum Mainnet", value: "mainnet" },
-            { label: "Sepolia Testnet", value: "sepolia" },
-          ],
         },
         {
           key: "address",
@@ -77,7 +74,29 @@ const web3Plugin: IntegrationPlugin = {
       category: "Web3",
       stepFunction: "transferFundsStep",
       stepImportPath: "transfer-funds",
+      outputFields: [
+        {
+          field: "success",
+          description: "Whether the transfer succeeded",
+        },
+        {
+          field: "transactionHash",
+          description: "The transaction hash of the successful transfer",
+        },
+        {
+          field: "error",
+          description: "Error message if the transfer failed",
+        },
+      ],
       configFields: [
+        {
+          key: "network",
+          label: "Network",
+          type: "chain-select",
+          chainTypeFilter: "evm",
+          placeholder: "Select network",
+          required: true,
+        },
         {
           key: "amount",
           label: "Amount (ETH)",
@@ -122,13 +141,10 @@ const web3Plugin: IntegrationPlugin = {
         {
           key: "network",
           label: "Network",
-          type: "select",
+          type: "chain-select",
+          chainTypeFilter: "evm",
           placeholder: "Select network",
           required: true,
-          options: [
-            { label: "Ethereum Mainnet", value: "mainnet" },
-            { label: "Sepolia Testnet", value: "sepolia" },
-          ],
         },
         {
           key: "contractAddress",
@@ -193,13 +209,10 @@ const web3Plugin: IntegrationPlugin = {
         {
           key: "network",
           label: "Network",
-          type: "select",
+          type: "chain-select",
+          chainTypeFilter: "evm",
           placeholder: "Select network",
           required: true,
-          options: [
-            { label: "Ethereum Mainnet", value: "mainnet" },
-            { label: "Sepolia Testnet", value: "sepolia" },
-          ],
         },
         {
           key: "contractAddress",

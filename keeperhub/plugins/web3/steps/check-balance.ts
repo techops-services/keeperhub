@@ -1,8 +1,31 @@
 import "server-only";
 
+import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
+import { db } from "@/lib/db";
+import { workflowExecutions } from "@/lib/db/schema";
+import { getChainIdFromNetwork, resolveRpcConfig } from "@/lib/rpc";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
+
+/**
+ * Get userId from executionId by querying the workflowExecutions table
+ */
+async function getUserIdFromExecution(
+  executionId: string | undefined
+): Promise<string | undefined> {
+  if (!executionId) {
+    return;
+  }
+
+  const execution = await db
+    .select({ userId: workflowExecutions.userId })
+    .from(workflowExecutions)
+    .where(eq(workflowExecutions.id, executionId))
+    .limit(1);
+
+  return execution[0]?.userId;
+}
 
 type CheckBalanceResult =
   | { success: true; balance: string; balanceWei: string; address: string }
@@ -16,23 +39,6 @@ export type CheckBalanceCoreInput = {
 export type CheckBalanceInput = StepInput & CheckBalanceCoreInput;
 
 /**
- * Get RPC URL based on network selection
- */
-function getRpcUrl(network: string): string {
-  const RPC_URLS: Record<string, string> = {
-    mainnet: "https://chain.techops.services/eth-mainnet",
-    sepolia: "https://chain.techops.services/eth-sepolia",
-  };
-
-  const rpcUrl = RPC_URLS[network];
-  if (!rpcUrl) {
-    throw new Error(`Unsupported network: ${network}`);
-  }
-
-  return rpcUrl;
-}
-
-/**
  * Core check balance logic
  */
 async function stepHandler(
@@ -41,9 +47,19 @@ async function stepHandler(
   console.log("[Check Balance] Starting step with input:", {
     network: input.network,
     address: input.address,
+    executionId: input._context?.executionId,
   });
 
-  const { network, address } = input;
+  const { network, address, _context } = input;
+
+  // Get userId from execution context (for user RPC preferences)
+  const userId = await getUserIdFromExecution(_context?.executionId);
+  if (userId) {
+    console.log(
+      "[Check Balance] Using user RPC preferences for userId:",
+      userId
+    );
+  }
 
   // Validate address
   if (!ethers.isAddress(address)) {
@@ -54,13 +70,35 @@ async function stepHandler(
     };
   }
 
-  // Get RPC URL
+  // Get chain ID from network name
+  let chainId: number;
+  try {
+    chainId = getChainIdFromNetwork(network);
+    console.log("[Check Balance] Resolved chain ID:", chainId);
+  } catch (error) {
+    console.error("[Check Balance] Failed to resolve network:", error);
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
+  }
+
+  // Resolve RPC config (with user preferences)
   let rpcUrl: string;
   try {
-    rpcUrl = getRpcUrl(network);
-    console.log("[Check Balance] Using RPC URL for network:", network);
+    const rpcConfig = await resolveRpcConfig(chainId, userId);
+    if (!rpcConfig) {
+      throw new Error(`Chain ${chainId} not found or not enabled`);
+    }
+    rpcUrl = rpcConfig.primaryRpcUrl;
+    console.log(
+      "[Check Balance] Using RPC URL:",
+      rpcUrl,
+      "source:",
+      rpcConfig.source
+    );
   } catch (error) {
-    console.error("[Check Balance] Failed to get RPC URL:", error);
+    console.error("[Check Balance] Failed to resolve RPC config:", error);
     return {
       success: false,
       error: getErrorMessage(error),
@@ -72,19 +110,19 @@ async function stepHandler(
     const provider = new ethers.JsonRpcProvider(rpcUrl);
     console.log("[Check Balance] Checking balance for address:", address);
 
-    const balanceWei = await provider.getBalance(address);
-    const balanceEth = ethers.formatEther(balanceWei);
+    const balance = await provider.getBalance(address);
+    const balanceEth = ethers.formatEther(balance);
 
     console.log("[Check Balance] Balance retrieved successfully:", {
       address,
-      balanceWei: balanceWei.toString(),
+      balanceWei: balance.toString(),
       balanceEth,
     });
 
     return {
       success: true,
       balance: balanceEth,
-      balanceWei: balanceWei.toString(),
+      balanceWei: balance.toString(),
       address,
     };
   } catch (error) {

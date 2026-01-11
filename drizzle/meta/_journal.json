@@ -43,6 +43,13 @@
       "when": 1766014034869,
       "tag": "0005_cooing_owl",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1767567302805,
+      "tag": "0006_faulty_thunderbird",
+      "breakpoints": true
     }
   ]
 }

@@ -3,6 +3,10 @@ shared_env: &shared_env
     type: parameterStore
     name: db-url
     parameter_name: /eks/maker-staging/keeperhub/db-url
+  CHAIN_RPC_CONFIG:
+    type: parameterStore
+    name: chain-rpc-config
+    parameter_name: /eks/maker-staging/keeperhub/chain-rpc-config
 
 replicaCount: 1
 
@@ -190,6 +194,10 @@ cronjob:
           type: parameterStore
           name: db-url
           parameter_name: /eks/maker-staging/keeperhub/db-url
+        CHAIN_RPC_CONFIG:
+          type: parameterStore
+          name: chain-rpc-config
+          parameter_name: /eks/maker-staging/keeperhub/chain-rpc-config
       schedule: "* * * * *"
       command: ["/bin/sh"]
       args:

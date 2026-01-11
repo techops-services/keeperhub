@@ -4,8 +4,12 @@ import postgres from "postgres";
 import {
   accounts,
   apiKeys,
+  chains,
+  chainsRelations,
   integrations,
   sessions,
+  userRpcPreferences,
+  userRpcPreferencesRelations,
   users,
   verifications,
   workflowExecutionLogs,
@@ -30,6 +34,10 @@ const schema = {
   workflowSchedulesRelations,
   apiKeys,
   integrations,
+  chains,
+  chainsRelations,
+  userRpcPreferences,
+  userRpcPreferencesRelations,
 };
 
 const connectionString =
