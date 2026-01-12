@@ -82,5 +82,9 @@ html.dark [class*="popover"] {
 html.dark nav,
 html.dark nav > div,
 html.dark header {
-  border-color: rgb(30, 41, 59) !important; /* slate-800 - matches existing Nextra border */
+  border-color: rgb(
+    30,
+    41,
+    59
+  ) !important; /* slate-800 - matches existing Nextra border */
 }
