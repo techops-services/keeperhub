@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install dev build type-check lint fix deploy-to-local-kubernetes setup-local-kubernetes check-local-kubernetes status logs restart teardown db-create db-migrate db-studio build-scheduler-images deploy-scheduler scheduler-status scheduler-logs runner-logs teardown-scheduler test test-unit test-integration test-e2e test-e2e-hybrid hybrid-setup hybrid-up hybrid-deploy hybrid-deploy-only hybrid-status hybrid-down hybrid-reset hybrid-logs dev-up dev-down dev-logs
+.PHONY: help install dev build type-check lint fix deploy-to-local-kubernetes setup-local-kubernetes check-local-kubernetes status logs restart teardown db-create db-migrate db-studio build-scheduler-images deploy-scheduler scheduler-status scheduler-logs runner-logs teardown-scheduler test test-unit test-integration test-e2e test-e2e-hybrid hybrid-setup hybrid-up hybrid-deploy hybrid-deploy-only hybrid-status hybrid-down hybrid-reset hybrid-logs dev-setup dev-up dev-down dev-logs dev-migrate
 
 # Development
 install:
@@ -182,7 +182,20 @@ dev-logs:
 	docker compose --profile dev logs -f
 
 dev-migrate:
-	docker compose run --rm migrator
+	docker compose --profile dev --profile migrator run --rm migrator
+
+dev-setup:
+	@echo "Setting up dev environment (first time)..."
+	docker compose --profile dev up -d
+	@echo "Waiting for services to be healthy..."
+	@sleep 5
+	@echo "Running database migrations..."
+	docker compose --profile dev --profile migrator run --rm migrator
+	@echo ""
+	@echo "Dev environment ready!"
+	@echo "  App: http://localhost:3000"
+	@echo ""
+	@echo "For subsequent starts, use: make dev-up"
 
 # =============================================================================
 # Hybrid Mode (Docker Compose + Minikube for K8s Jobs)
@@ -282,10 +295,11 @@ help:
 	@echo "    fix                        - Fix linting issues"
 	@echo ""
 	@echo "  Docker Compose - Dev Profile (no K8s Jobs, ~2-3GB RAM):"
-	@echo "    dev-up                     - Start dev profile (db, app, dispatcher, executor)"
+	@echo "    dev-setup                  - First time setup (services + migrations)"
+	@echo "    dev-up                     - Start dev profile (fast, no migrations)"
 	@echo "    dev-down                   - Stop dev profile"
 	@echo "    dev-logs                   - Follow dev profile logs"
-	@echo "    dev-migrate                - Run database migrations"
+	@echo "    dev-migrate                - Run database migrations manually"
 	@echo ""
 	@echo "  Hybrid Mode (Docker Compose + Minikube, ~4-5GB RAM):"
 	@echo "    hybrid-setup               - Full setup (compose, minikube, scheduler)"
