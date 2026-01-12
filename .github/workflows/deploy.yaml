@@ -64,6 +64,9 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.REGION }}
+          role-to-assume: "arn:aws:iam::068992353948:role/TerraformCloud"
+          role-session-name: keeperhub-prod-deploy
+          role-skip-session-tagging: true
 
       - name: Login to AWS ECR
         id: login-ecr
@@ -78,7 +81,7 @@ jobs:
         if: ${{ !contains(github.event.head_commit.message , '[skip build]') }}
         shell: bash
         run: |
-          echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+          echo "sha_short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Build, tag, and push app image to ECR
         id: build-app-image
@@ -198,6 +201,7 @@ jobs:
         if: ${{ !contains(github.event.head_commit.message , '[skip deploy]') }}
         run: |
           kubectl apply -f deploy/${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}/rbac.yaml
+          sed -i 's|${SERVICE_ACCOUNT_ROLE_ARN}|'"$SERVICE_ACCOUNT_ROLE_ARN"'|g' $JOB_SPAWNER_HELM_FILE
 
       - name: Deploying Service to Kubernetes with Helm
         id: deploy
