@@ -1,6 +1,6 @@
 "use client";
 
-import { Key, LogOut, Moon, Plug, Settings, Sun, Wallet } from "lucide-react";
+import { Key, LogOut, Moon, Plug, Settings, Sun, Users, Wallet } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import {
@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { WalletOverlay } from "@/keeperhub/components/overlays/wallet-overlay";
+import { ManageOrgsModal } from "@/keeperhub/components/organization/manage-orgs-modal";
 import { api } from "@/lib/api-client";
 import { signOut, useSession } from "@/lib/auth-client";
 
@@ -35,6 +36,7 @@ export const UserMenu = () => {
   const { theme, setTheme } = useTheme();
   const { open: openOverlay } = useOverlay();
   const [providerId, setProviderId] = useState<string | null>(null);
+  const [orgModalOpen, setOrgModalOpen] = useState(false);
 
   // Fetch provider info when session is available
   useEffect(() => {
@@ -110,6 +112,7 @@ export const UserMenu = () => {
   }
 
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
@@ -143,6 +146,10 @@ export const UserMenu = () => {
             <span>Settings</span>
           </DropdownMenuItem>
         )}
+        <DropdownMenuItem onClick={() => setOrgModalOpen(true)}>
+          <Users className="size-4" />
+          <span>Organization</span>
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => openOverlay(IntegrationsOverlay)}>
           <Plug className="size-4" />
           <span>Connections</span>
@@ -179,5 +186,10 @@ export const UserMenu = () => {
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    <ManageOrgsModal
+      open={orgModalOpen}
+      onOpenChange={setOrgModalOpen}
+    />
+  </>
   );
 };

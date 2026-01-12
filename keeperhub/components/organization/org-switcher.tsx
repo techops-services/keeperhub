@@ -19,7 +19,6 @@ import {
   useOrganizations,
 } from "@/keeperhub/lib/hooks/use-organization";
 import { useSession } from "@/lib/auth-client";
-import { ManageOrgsModal } from "./manage-orgs-modal";
 
 export function OrgSwitcher() {
   const { data: session } = useSession();
@@ -35,58 +34,49 @@ export function OrgSwitcher() {
   // Handle edge case: user has no active organization
   if (!organization) {
     return (
-      <div className="flex items-center gap-2">
-        <div className="text-muted-foreground text-sm">
-          No organization found
-        </div>
-        <ManageOrgsModal
-          defaultShowCreateForm={true}
-          triggerText="Create Organization"
-        />
+      <div className="text-muted-foreground text-sm">
+        No organization found
       </div>
     );
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <Popover onOpenChange={setOpen} open={open}>
-        <PopoverTrigger asChild>
-          <Button
-            aria-expanded={open}
-            className="w-[200px] justify-between"
-            role="combobox"
-            variant="outline"
-          >
-            <span className="truncate">{organization.name}</span>
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[200px] p-0">
-          <Command>
-            <CommandList>
-              <CommandGroup>
-                {organizations.map((org) => (
-                  <CommandItem
-                    key={org.id}
-                    onSelect={async () => {
-                      await switchOrganization(org.id);
-                      setOpen(false);
-                    }}
-                  >
-                    <Check
-                      className={`mr-2 h-4 w-4 ${
-                        organization.id === org.id ? "opacity-100" : "opacity-0"
-                      }`}
-                    />
-                    {org.name}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
-      <ManageOrgsModal />
-    </div>
+    <Popover onOpenChange={setOpen} open={open}>
+      <PopoverTrigger asChild>
+        <Button
+          aria-expanded={open}
+          className="w-[200px] justify-between"
+          role="combobox"
+          variant="outline"
+        >
+          <span className="truncate">{organization.name}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[200px] p-0">
+        <Command>
+          <CommandList>
+            <CommandGroup>
+              {organizations.map((org) => (
+                <CommandItem
+                  key={org.id}
+                  onSelect={async () => {
+                    await switchOrganization(org.id);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={`mr-2 h-4 w-4 ${
+                      organization.id === org.id ? "opacity-100" : "opacity-0"
+                    }`}
+                  />
+                  {org.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }

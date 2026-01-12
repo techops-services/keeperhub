@@ -51,14 +51,22 @@ import { authClient } from "@/lib/auth-client";
 type ManageOrgsModalProps = {
   triggerText?: string;
   defaultShowCreateForm?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 };
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex modal with multiple states - refactoring would split related logic
 export function ManageOrgsModal({
   triggerText,
   defaultShowCreateForm = false,
+  open: externalOpen,
+  onOpenChange: externalOnOpenChange,
 }: ManageOrgsModalProps = {}) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+
+  // Use external state if provided, otherwise use internal state
+  const open = externalOpen !== undefined ? externalOpen : internalOpen;
+  const setOpen = externalOnOpenChange || setInternalOpen;
   const [showCreateForm, setShowCreateForm] = useState(defaultShowCreateForm);
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -312,17 +320,20 @@ export function ManageOrgsModal({
   return (
     <>
       <Dialog onOpenChange={setOpen} open={open}>
-        <DialogTrigger asChild>
-          {triggerText ? (
-            <Button size="sm" variant="default">
-              {triggerText}
-            </Button>
-          ) : (
-            <Button size="sm" variant="ghost">
-              <Settings className="h-4 w-4" />
-            </Button>
-          )}
-        </DialogTrigger>
+        {/* Only show trigger when not controlled externally */}
+        {externalOpen === undefined && (
+          <DialogTrigger asChild>
+            {triggerText ? (
+              <Button size="sm" variant="default">
+                {triggerText}
+              </Button>
+            ) : (
+              <Button size="sm" variant="ghost">
+                <Settings className="h-4 w-4" />
+              </Button>
+            )}
+          </DialogTrigger>
+        )}
         <DialogContent className="max-h-[80vh] max-w-2xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Manage Organizations</DialogTitle>
