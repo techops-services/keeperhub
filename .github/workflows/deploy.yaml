@@ -24,6 +24,39 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0
+
+      - name: Detect changed paths
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            migrator:
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'Dockerfile'
+              - 'lib/db/**'
+              - 'keeperhub/db/**'
+              - 'drizzle/**'
+              - 'drizzle.config.ts'
+            scheduler:
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'Dockerfile'
+              - 'scripts/schedule-*.ts'
+              - 'scripts/job-spawner.ts'
+              - 'lib/**'
+              - 'keeperhub/**'
+              - 'tsconfig.json'
+            workflow-runner:
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'Dockerfile'
+              - 'scripts/workflow-runner.ts'
+              - 'lib/**'
+              - 'plugins/**'
+              - 'keeperhub/**'
+              - 'tsconfig.json'
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -67,7 +100,7 @@ jobs:
 
       - name: Build, tag, and push migrator image to ECR
         id: build-migrator
-        if: ${{ !contains(github.event.head_commit.message , '[skip build]') }}
+        if: ${{ !contains(github.event.head_commit.message, '[skip build]') && (steps.changes.outputs.migrator == 'true' || github.event_name == 'workflow_dispatch') }}
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -83,7 +116,7 @@ jobs:
 
       - name: Build, tag, and push scheduler image to ECR
         id: build-scheduler
-        if: ${{ !contains(github.event.head_commit.message , '[skip build]') }}
+        if: ${{ !contains(github.event.head_commit.message, '[skip build]') && (steps.changes.outputs.scheduler == 'true' || github.event_name == 'workflow_dispatch') }}
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -100,7 +133,7 @@ jobs:
 
       - name: Build, tag, and push workflow-runner image to ECR
         id: build-workflow-runner
-        if: ${{ !contains(github.event.head_commit.message , '[skip build]') }}
+        if: ${{ !contains(github.event.head_commit.message, '[skip build]') && (steps.changes.outputs.workflow-runner == 'true' || github.event_name == 'workflow_dispatch') }}
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -113,6 +146,28 @@ jobs:
           cache-from: |
             type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-app
           cache-to: type=inline
+
+      # Re-tag existing images when builds are skipped (creates new tag pointing to -latest)
+      - name: Re-tag migrator image if build skipped
+        if: ${{ !contains(github.event.head_commit.message, '[skip build]') && steps.changes.outputs.migrator != 'true' && github.event_name != 'workflow_dispatch' }}
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:migrator-${{ steps.vars.outputs.sha_short }} \
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:migrator-latest
+
+      - name: Re-tag scheduler image if build skipped
+        if: ${{ !contains(github.event.head_commit.message, '[skip build]') && steps.changes.outputs.scheduler != 'true' && github.event_name != 'workflow_dispatch' }}
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:scheduler-${{ steps.vars.outputs.sha_short }} \
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:scheduler-latest
+
+      - name: Re-tag workflow-runner image if build skipped
+        if: ${{ !contains(github.event.head_commit.message, '[skip build]') && steps.changes.outputs.workflow-runner != 'true' && github.event_name != 'workflow_dispatch' }}
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:workflow-runner-${{ steps.vars.outputs.sha_short }} \
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:workflow-runner-latest
 
       - name: Replace variables in the Helm values file
         id: replace-vars
@@ -136,6 +191,16 @@ jobs:
         run: |
           sed -i 's|${ECR_REGISTRY}|'"$ECR_REGISTRY"'|g' $JOB_SPAWNER_HELM_FILE
           sed -i 's|${IMAGE_TAG}|'"$IMAGE_TAG"'|g' $JOB_SPAWNER_HELM_FILE
+
+      - name: Configure kubectl
+        if: ${{ !contains(github.event.head_commit.message , '[skip deploy]') }}
+        run: |
+          aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.REGION }}
+
+      - name: Apply RBAC for Job Spawner
+        if: ${{ !contains(github.event.head_commit.message , '[skip deploy]') }}
+        run: |
+          kubectl apply -f deploy/${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}/rbac.yaml
           sed -i 's|${SERVICE_ACCOUNT_ROLE_ARN}|'"$SERVICE_ACCOUNT_ROLE_ARN"'|g' $JOB_SPAWNER_HELM_FILE
 
       - name: Deploying Service to Kubernetes with Helm

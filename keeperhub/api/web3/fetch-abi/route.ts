@@ -1,35 +1,44 @@
+import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
 import { NextResponse } from "next/server";
 import { apiError } from "@/keeperhub/lib/api-error";
 import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { explorerConfigs } from "@/lib/db/schema";
+import { getChainIdFromNetwork } from "@/lib/rpc";
 
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
 
 /**
- * Get Etherscan API URL and chainid based on network (using v2 API)
- * V2 uses a single base URL with chainid parameter instead of network-specific subdomains
+ * Get explorer API config from database based on network/chainId
+ * Supports both numeric chain IDs and legacy network names
  */
-function getEtherscanApiConfig(network: string): {
+async function getExplorerApiConfig(network: string): Promise<{
   baseUrl: string;
-  chainid: string;
-} {
-  const configs: Record<string, { baseUrl: string; chainid: string }> = {
-    mainnet: {
-      baseUrl: "https://api.etherscan.io/v2/api",
-      chainid: "1",
-    },
-    sepolia: {
-      baseUrl: "https://api.etherscan.io/v2/api",
-      chainid: "11155111",
-    },
-  };
+  chainId: number;
+}> {
+  // Parse network - supports numeric strings, numbers, and legacy names
+  const chainId = getChainIdFromNetwork(network);
 
-  const config = configs[network];
-  if (!config) {
-    throw new Error(`Unsupported network: ${network}`);
+  // Get config from explorer_configs table
+  const explorerResults = await db
+    .select()
+    .from(explorerConfigs)
+    .where(eq(explorerConfigs.chainId, chainId))
+    .limit(1);
+
+  const explorer = explorerResults[0];
+
+  if (explorer?.explorerApiUrl) {
+    return {
+      baseUrl: explorer.explorerApiUrl,
+      chainId: explorer.chainId,
+    };
   }
 
-  return config;
+  throw new Error(
+    `No explorer API configured for chain ${chainId}. Please contact support.`
+  );
 }
 
 /**
@@ -120,12 +129,12 @@ async function fetchAbiFromEtherscan(
 
   console.log("[Etherscan] Contract address validated");
 
-  const { baseUrl, chainid } = getEtherscanApiConfig(network);
+  const { baseUrl, chainId } = await getExplorerApiConfig(network);
   console.log("[Etherscan] Base URL:", baseUrl);
-  console.log("[Etherscan] Chain ID:", chainid);
+  console.log("[Etherscan] Chain ID:", chainId);
 
   const url = new URL(baseUrl);
-  url.searchParams.set("chainid", chainid);
+  url.searchParams.set("chainid", String(chainId));
   url.searchParams.set("module", "contract");
   url.searchParams.set("action", "getabi");
   url.searchParams.set("address", contractAddress);

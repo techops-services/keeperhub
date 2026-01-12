@@ -43,6 +43,16 @@ jobs:
           # Fetch main
           git fetch origin main
 
+          # Check if staging is already up-to-date with main using merge-base
+          MERGE_BASE=$(git merge-base HEAD origin/main)
+          MAIN_HEAD=$(git rev-parse origin/main)
+
+          if [ "$MERGE_BASE" = "$MAIN_HEAD" ]; then
+            echo "Staging is already up-to-date with main. Nothing to merge."
+            echo "merge_status=no_changes" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
           # Attempt merge but do not commit yet (allow us to fix lockfile)
           # We accept 'theirs' (main) for upstream files, but this might conflict with local logic
           # So we use standard merge. If it fails ONLY on lockfile, we fix it.
@@ -101,6 +111,15 @@ jobs:
         run: |
           curl -H "Content-Type: application/json" \
           -d "{\"username\": \"KeeperHub Merge Bot\", \"content\": \"**Daily Merge Successful**\n\nBranch \`main\` has been merged into \`staging\`.\nLockfiles were automatically regenerated.\"}" \
+          $DISCORD_WEBHOOK
+
+      - name: Notify Discord (No Changes)
+        if: steps.merge_process.outputs.merge_status == 'no_changes'
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          curl -H "Content-Type: application/json" \
+          -d "{\"username\": \"KeeperHub Merge Bot\", \"content\": \"**Daily Merge Check Complete**\n\nNo changes to merge - \`staging\` is already up to date with \`main\`.\"}" \
           $DISCORD_WEBHOOK
 
       - name: Notify Discord (Conflict/Failure)

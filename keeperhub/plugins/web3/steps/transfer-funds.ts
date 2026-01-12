@@ -3,8 +3,10 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
 import { initializeParaSigner } from "@/keeperhub/lib/para/wallet-helpers";
+import { getOrganizationIdFromExecution } from "@/keeperhub/lib/workflow-helpers";
 import { db } from "@/lib/db";
 import { workflowExecutions } from "@/lib/db/schema";
+import { getChainIdFromNetwork, resolveRpcConfig } from "@/lib/rpc";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
 
@@ -13,34 +15,12 @@ type TransferFundsResult =
   | { success: false; error: string };
 
 export type TransferFundsCoreInput = {
+  network: string;
   amount: string;
   recipientAddress: string;
 };
 
 export type TransferFundsInput = StepInput & TransferFundsCoreInput;
-
-/**
- * Get userId from executionId by querying the workflowExecutions table
- */
-async function getUserIdFromExecution(
-  executionId: string | undefined
-): Promise<string> {
-  if (!executionId) {
-    throw new Error("Execution ID is required to get user ID");
-  }
-
-  const execution = await db
-    .select({ userId: workflowExecutions.userId })
-    .from(workflowExecutions)
-    .where(eq(workflowExecutions.id, executionId))
-    .limit(1);
-
-  if (execution.length === 0) {
-    throw new Error(`Execution not found: ${executionId}`);
-  }
-
-  return execution[0].userId;
-}
 
 /**
  * Core transfer logic
@@ -49,20 +29,17 @@ async function stepHandler(
   input: TransferFundsInput
 ): Promise<TransferFundsResult> {
   console.log("[Transfer Funds] Starting step with input:", {
+    network: input.network,
     amount: input.amount,
     recipientAddress: input.recipientAddress,
     hasContext: !!input._context,
     executionId: input._context?.executionId,
   });
 
-  const { amount, recipientAddress, _context } = input;
+  const { network, amount, recipientAddress, _context } = input;
 
   // Validate recipient address
   if (!ethers.isAddress(recipientAddress)) {
-    console.error(
-      "[Transfer Funds] Invalid recipient address:",
-      recipientAddress
-    );
     return {
       success: false,
       error: `Invalid recipient address: ${recipientAddress}`,
@@ -71,7 +48,6 @@ async function stepHandler(
 
   // Validate amount
   if (!amount || amount.trim() === "") {
-    console.error("[Transfer Funds] Amount is missing");
     return {
       success: false,
       error: "Amount is required",
@@ -81,35 +57,44 @@ async function stepHandler(
   let amountInWei: bigint;
   try {
     amountInWei = ethers.parseEther(amount);
-    console.log("[Transfer Funds] Amount parsed:", {
-      amount,
-      amountInWei: amountInWei.toString(),
-    });
   } catch (error) {
-    console.error("[Transfer Funds] Failed to parse amount:", error);
     return {
       success: false,
       error: `Invalid amount format: ${getErrorMessage(error)}`,
     };
   }
 
-  // Get userId from executionId (passed via _context)
+  // Get organizationId from executionId (passed via _context)
   if (!_context?.executionId) {
-    console.error("[Transfer Funds] No execution ID in context");
     return {
       success: false,
-      error: "Execution ID is required to identify the user",
+      error: "Execution ID is required to identify the organization",
     };
   }
 
+  let organizationId: string;
+  try {
+    organizationId = await getOrganizationIdFromExecution(_context.executionId);
+  } catch (error) {
+    console.error("[Transfer Funds] Failed to get organization ID:", error);
+    return {
+      success: false,
+      error: `Failed to get organization ID: ${getErrorMessage(error)}`,
+    };
+  }
+
+  // Get userId from execution for RPC preferences
   let userId: string;
   try {
-    console.log(
-      "[Transfer Funds] Looking up user from execution:",
-      _context.executionId
-    );
-    userId = await getUserIdFromExecution(_context.executionId);
-    console.log("[Transfer Funds] Found userId:", userId);
+    const execution = await db
+      .select({ userId: workflowExecutions.userId })
+      .from(workflowExecutions)
+      .where(eq(workflowExecutions.id, _context.executionId))
+      .then((rows) => rows[0]);
+    if (!execution) {
+      throw new Error("Execution not found");
+    }
+    userId = execution.userId;
   } catch (error) {
     console.error("[Transfer Funds] Failed to get user ID:", error);
     return {
@@ -118,58 +103,74 @@ async function stepHandler(
     };
   }
 
-  // Sepolia testnet RPC URL
-  // TODO: Make this configurable in the future
-  const SEPOLIA_RPC_URL = "https://chain.techops.services/eth-sepolia";
+  // Get chain ID and resolve RPC config (with user preferences)
+  let chainId: number;
+  let rpcUrl: string;
+  try {
+    chainId = getChainIdFromNetwork(network);
+    console.log("[Transfer Funds] Resolved chain ID:", chainId);
+
+    const rpcConfig = await resolveRpcConfig(chainId, userId);
+    if (!rpcConfig) {
+      throw new Error(`Chain ${chainId} not found or not enabled`);
+    }
+
+    rpcUrl = rpcConfig.primaryRpcUrl;
+    console.log(
+      "[Transfer Funds] Using RPC URL:",
+      rpcUrl,
+      "source:",
+      rpcConfig.source
+    );
+  } catch (error) {
+    console.error("[Transfer Funds] Failed to resolve RPC config:", error);
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
+  }
 
   let signer: Awaited<ReturnType<typeof initializeParaSigner>> | null = null;
   try {
-    console.log("[Transfer Funds] Initializing Para signer for user:", userId);
-    signer = await initializeParaSigner(userId, SEPOLIA_RPC_URL);
+    console.log(
+      "[Transfer Funds] Initializing Para signer for organization:",
+      organizationId
+    );
+    signer = await initializeParaSigner(organizationId, rpcUrl);
     const signerAddress = await signer.getAddress();
     console.log(
       "[Transfer Funds] Signer initialized successfully:",
       signerAddress
     );
   } catch (error) {
-    console.error("[Transfer Funds] Failed to initialize wallet:", error);
+    console.error(
+      "[Transfer Funds] Failed to initialize organization wallet:",
+      error
+    );
     return {
       success: false,
-      error: `Failed to initialize wallet: ${getErrorMessage(error)}`,
+      error: `Failed to initialize organization wallet: ${getErrorMessage(error)}`,
     };
   }
 
   // Send transaction
   try {
-    console.log("[Transfer Funds] Sending transaction:", {
-      to: recipientAddress,
-      value: amountInWei.toString(),
-    });
-
     const tx = await signer.sendTransaction({
       to: recipientAddress,
       value: amountInWei,
     });
 
-    console.log("[Transfer Funds] Transaction sent, hash:", tx.hash);
-    console.log("[Transfer Funds] Waiting for confirmation...");
-
     // Wait for transaction to be mined
     const receipt = await tx.wait();
 
     if (!receipt) {
-      console.error("[Transfer Funds] No receipt received");
       return {
         success: false,
         error: "Transaction sent but receipt not available",
       };
     }
 
-    console.log("[Transfer Funds] Transaction confirmed:", {
-      hash: receipt.hash,
-      status: receipt.status,
-      blockNumber: receipt.blockNumber,
-    });
+    console.log("[Transfer Funds] Transaction confirmed:", receipt.hash);
 
     return {
       success: true,

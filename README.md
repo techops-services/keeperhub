@@ -64,6 +64,23 @@ AI_MODEL=gpt-4o  # Options: gpt-4o, gpt-4o-mini, gpt-3.5-turbo
 # AI_MODEL=claude-3-5-sonnet-20241022  # Or other Claude models
 ```
 
+### Environment Setup
+
+1. Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Fill in your API keys and tokens in `.env`
+
+3. (Recommended) Use [direnv](https://direnv.net/) to auto-load environment variables:
+   ```bash
+   brew install direnv
+   echo 'eval "$(direnv hook zsh)"' >> ~/.zshrc
+   source ~/.zshrc
+   direnv allow
+   ```
+
 ### Installation
 
 ```bash
@@ -100,11 +117,11 @@ pnpm dev
 Full development stack with scheduled workflow execution (no K8s Jobs):
 
 ```bash
-# Start all services
-make dev-up
+# First time setup (starts services + runs migrations)
+make dev-setup
 
-# Run database migrations
-make dev-migrate
+# Subsequent starts (faster, skips migrations)
+make dev-up
 
 # View logs
 make dev-logs
@@ -322,10 +339,11 @@ pnpm test -- --watch  # Run tests in watch mode
 make help
 
 # Docker Compose (Dev Mode)
-make dev-up           # Start dev profile
+make dev-setup        # First time setup (services + migrations)
+make dev-up           # Start dev profile (fast, no migrations)
 make dev-down         # Stop dev profile
 make dev-logs         # Follow logs
-make dev-migrate      # Run migrations
+make dev-migrate      # Run migrations manually
 
 # Hybrid Mode (Docker + Minikube)
 make hybrid-setup     # Full setup
@@ -425,6 +443,21 @@ const searchResult = await firecrawlSearchStep({
   query: "AI workflow builders",
   limit: 5,
 });
+```
+
+## MCP Servers (Claude Code)
+
+The project includes MCP server configurations in `.mcp.json` for enhanced Claude Code development:
+
+- **terraform** - Terraform Cloud workspace management
+- **mcp-obsidian** - Obsidian vault integration
+- **chrome-devtools** - Browser automation and debugging
+- **memory** - Persistent memory across sessions
+
+Required environment variables (set in `.env`):
+```bash
+TFE_TOKEN=       # Terraform Cloud API token
+OBSIDIAN_API_KEY= # Obsidian Local REST API key
 ```
 
 ## Tech Stack

@@ -1,0 +1,90 @@
+:root {
+  --nextra-primary-hue: 142deg;
+  --nextra-primary-saturation: 70%;
+}
+
+/* Match KeeperHub app dark background */
+.dark {
+  --nextra-bg: 15, 23, 42; /* #0f172a - slate-900 */
+}
+
+html.dark {
+  background-color: rgb(15, 23, 42);
+}
+
+html.dark body {
+  background-color: rgb(15, 23, 42);
+}
+
+/* Sidebar background */
+html.dark .nextra-sidebar-container,
+html.dark aside {
+  background-color: rgb(15, 23, 42) !important;
+}
+
+/* Navbar background - all elements */
+html.dark nav,
+html.dark header,
+html.dark nav > *,
+html.dark [class*="navbar"],
+html.dark [class*="nav-container"] {
+  background-color: rgb(15, 23, 42) !important;
+}
+
+/* Content area */
+html.dark main {
+  background-color: rgb(15, 23, 42);
+}
+
+/* TOC background */
+html.dark .nextra-toc {
+  background-color: rgb(15, 23, 42);
+}
+
+/* Sidebar footer controls (dark mode toggle, collapse button) */
+html.dark aside > div:last-child,
+html.dark [class*="sidebar"] > div:last-child,
+html.dark .nextra-sidebar-footer {
+  background-color: rgb(15, 23, 42) !important;
+}
+
+/* Target the bottom bar with dark mode toggle */
+html.dark div[class*="sticky"][class*="bottom"] {
+  background-color: rgb(15, 23, 42) !important;
+}
+
+/* Override any black backgrounds - EXCEPT code blocks */
+html.dark
+[class*="bg-black"]:not(pre):not(code):not([class*="code"]):not(
+  [class*="highlight"]
+),
+html.dark
+  .bg-neutral-900:not(pre):not(code):not([class*="code"]):not(
+    [class*="highlight"]
+  ) {
+  background-color: rgb(15, 23, 42) !important;
+}
+
+/* Mobile menu overlay and backdrop */
+html.dark [class*="overlay"],
+html.dark [class*="backdrop"]:not([class*="code"]) {
+  background-color: rgba(15, 23, 42, 0.8) !important;
+}
+
+/* Dropdown menus */
+html.dark [role="menu"],
+html.dark [class*="dropdown"],
+html.dark [class*="popover"] {
+  background-color: rgb(15, 23, 42) !important;
+}
+
+/* Make nav border span full width with consistent color */
+html.dark nav,
+html.dark nav > div,
+html.dark header {
+  border-color: rgb(
+    30,
+    41,
+    59
+  ) !important; /* slate-800 - matches existing Nextra border */
+}

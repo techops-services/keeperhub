@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,7 +11,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
+import { useActiveMember } from "@/keeperhub/lib/hooks/use-organization";
+import { useSession } from "@/lib/auth-client";
 
 type WalletDialogProps = {
   open: boolean;
@@ -33,12 +38,20 @@ type ChainBalance = {
 };
 
 export function WalletDialog({ open, onOpenChange }: WalletDialogProps) {
+  const { data: session } = useSession();
+  const { isAdmin } = useActiveMember();
+
   const [walletLoading, setWalletLoading] = useState(true);
   const [walletData, setWalletData] = useState<WalletData | null>(null);
   const [balances, setBalances] = useState<ChainBalance[]>([
     { chain: "mainnet", balance: "0", loading: true },
     { chain: "sepolia", balance: "0", loading: true },
   ]);
+
+  // Create wallet state
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [email, setEmail] = useState("");
+  const [creating, setCreating] = useState(false);
 
   const fetchBalances = useCallback(async (address: string) => {
     const chains = [
@@ -127,8 +140,54 @@ export function WalletDialog({ open, onOpenChange }: WalletDialogProps) {
   useEffect(() => {
     if (open) {
       loadWallet();
+      // Prefill email with current user's email
+      if (session?.user?.email) {
+        setEmail(session.user.email);
+      }
+      // Debug logging
+      console.log("[WalletDialog] Dialog opened", {
+        isAdmin,
+        hasSession: !!session,
+        email: session?.user?.email,
+      });
     }
-  }, [open, loadWallet]);
+  }, [open, loadWallet, session?.user?.email, isAdmin, session]);
+
+  const handleCreateWallet = async () => {
+    if (!email) {
+      toast.error("Email is required");
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const response = await fetch("/api/user/wallet", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to create wallet");
+      }
+
+      toast.success("Wallet created successfully!");
+      setShowCreateForm(false);
+      // Reload wallet data
+      await loadWallet();
+    } catch (error) {
+      console.error("Failed to create wallet:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create wallet"
+      );
+    } finally {
+      setCreating(false);
+    }
+  };
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
@@ -137,9 +196,11 @@ export function WalletDialog({ open, onOpenChange }: WalletDialogProps) {
         showCloseButton={false}
       >
         <DialogHeader>
-          <DialogTitle>Wallet</DialogTitle>
+          <DialogTitle>Organization Wallet</DialogTitle>
           <DialogDescription>
-            View your wallet address and balances across different chains
+            {walletData?.hasWallet
+              ? "View your organization's wallet address and balances across different chains"
+              : "Create a wallet for your organization to use in workflows"}
           </DialogDescription>
         </DialogHeader>
 
@@ -204,10 +265,94 @@ export function WalletDialog({ open, onOpenChange }: WalletDialogProps) {
             </>
           )}
           {!(walletLoading || walletData?.hasWallet) && (
-            <div className="rounded-lg border bg-muted/50 p-4">
-              <p className="text-muted-foreground text-sm">
-                No wallet found. Create a wallet in Settings to get started.
-              </p>
+            <div className="space-y-4">
+              {/* Debug info */}
+              {process.env.NODE_ENV === "development" && (
+                <div className="rounded-lg border border-yellow-500 bg-yellow-50 p-2 text-xs dark:bg-yellow-900/20">
+                  <strong>Debug:</strong> isAdmin={String(isAdmin)},
+                  showCreateForm={String(showCreateForm)}, hasEmail=
+                  {String(!!email)}
+                </div>
+              )}
+
+              {!isAdmin && (
+                <div className="rounded-lg border bg-muted/50 p-4">
+                  <p className="text-muted-foreground text-sm">
+                    No wallet found for this organization. Only organization
+                    admins and owners can create wallets.
+                  </p>
+                </div>
+              )}
+              {isAdmin && showCreateForm && (
+                <div className="space-y-4">
+                  <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
+                    <div>
+                      <h3 className="mb-2 font-medium text-sm">
+                        Create Organization Wallet
+                      </h3>
+                      <p className="mb-4 text-muted-foreground text-xs">
+                        This wallet will be shared by all members of your
+                        organization. Only admins and owners can manage it.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="wallet-email">Email Address</Label>
+                      <Input
+                        disabled={creating}
+                        id="wallet-email"
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="you@example.com"
+                        type="email"
+                        value={email}
+                      />
+                      <p className="text-muted-foreground text-xs">
+                        This email will be associated with the organization's
+                        wallet for identification purposes.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      className="flex-1"
+                      disabled={creating}
+                      onClick={() => setShowCreateForm(false)}
+                      variant="outline"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      disabled={creating || !email}
+                      onClick={handleCreateWallet}
+                    >
+                      {creating ? (
+                        <>
+                          <Spinner className="mr-2 h-4 w-4" />
+                          Creating...
+                        </>
+                      ) : (
+                        "Create Wallet"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {isAdmin && !showCreateForm && (
+                <div className="space-y-4">
+                  <div className="rounded-lg border bg-muted/50 p-4">
+                    <p className="text-muted-foreground text-sm">
+                      No wallet found for this organization. Create a wallet to
+                      use Web3 features in your workflows.
+                    </p>
+                  </div>
+                  <Button
+                    className="w-full"
+                    onClick={() => setShowCreateForm(true)}
+                  >
+                    Create Organization Wallet
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -1,8 +1,31 @@
 import "server-only";
 
+import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
+import { db } from "@/lib/db";
+import { workflowExecutions } from "@/lib/db/schema";
+import { getChainIdFromNetwork, resolveRpcConfig } from "@/lib/rpc";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
+
+/**
+ * Get userId from executionId by querying the workflowExecutions table
+ */
+async function getUserIdFromExecution(
+  executionId: string | undefined
+): Promise<string | undefined> {
+  if (!executionId) {
+    return;
+  }
+
+  const execution = await db
+    .select({ userId: workflowExecutions.userId })
+    .from(workflowExecutions)
+    .where(eq(workflowExecutions.id, executionId))
+    .limit(1);
+
+  return execution[0]?.userId;
+}
 
 type ReadContractResult =
   | { success: true; result: unknown }
@@ -19,23 +42,6 @@ export type ReadContractCoreInput = {
 export type ReadContractInput = StepInput & ReadContractCoreInput;
 
 /**
- * Get RPC URL based on network selection
- */
-function getRpcUrl(network: string): string {
-  const RPC_URLS: Record<string, string> = {
-    mainnet: "https://chain.techops.services/eth-mainnet",
-    sepolia: "https://chain.techops.services/eth-sepolia",
-  };
-
-  const rpcUrl = RPC_URLS[network];
-  if (!rpcUrl) {
-    throw new Error(`Unsupported network: ${network}`);
-  }
-
-  return rpcUrl;
-}
-
-/**
  * Core read contract logic
  */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Contract interaction requires extensive validation
@@ -47,9 +53,20 @@ async function stepHandler(
     network: input.network,
     abiFunction: input.abiFunction,
     hasFunctionArgs: !!input.functionArgs,
+    executionId: input._context?.executionId,
   });
 
-  const { contractAddress, network, abi, abiFunction, functionArgs } = input;
+  const { contractAddress, network, abi, abiFunction, functionArgs, _context } =
+    input;
+
+  // Get userId from execution context (for user RPC preferences)
+  const userId = await getUserIdFromExecution(_context?.executionId);
+  if (userId) {
+    console.log(
+      "[Read Contract] Using user RPC preferences for userId:",
+      userId
+    );
+  }
 
   // Validate contract address
   if (!ethers.isAddress(contractAddress)) {
@@ -130,50 +147,60 @@ async function stepHandler(
     }
   }
 
-  // Get RPC URL
-  let rpcUrl: string;
+  // Get chain ID from network name
+  let chainId: number;
   try {
-    rpcUrl = getRpcUrl(network);
-    console.log("[Read Contract] Using RPC URL for network:", network);
+    chainId = getChainIdFromNetwork(network);
+    console.log("[Read Contract] Resolved chain ID:", chainId);
   } catch (error) {
-    console.error("[Read Contract] Failed to get RPC URL:", error);
+    console.error("[Read Contract] Failed to resolve network:", error);
     return {
       success: false,
       error: getErrorMessage(error),
     };
   }
 
-  // Create provider and contract instance
-  let contract: ethers.Contract;
+  // Resolve RPC config (with user preferences)
+  let rpcUrl: string;
   try {
-    const provider = new ethers.JsonRpcProvider(rpcUrl);
-    contract = new ethers.Contract(contractAddress, parsedAbi, provider);
-    console.log("[Read Contract] Contract instance created");
+    const rpcConfig = await resolveRpcConfig(chainId, userId);
+    if (!rpcConfig) {
+      throw new Error(`Chain ${chainId} not found or not enabled`);
+    }
+    rpcUrl = rpcConfig.primaryRpcUrl;
+    console.log(
+      "[Read Contract] Using RPC URL:",
+      rpcUrl,
+      "source:",
+      rpcConfig.source
+    );
   } catch (error) {
-    console.error("[Read Contract] Failed to create contract instance:", error);
+    console.error("[Read Contract] Failed to resolve RPC config:", error);
     return {
       success: false,
-      error: `Failed to create contract instance: ${getErrorMessage(error)}`,
+      error: getErrorMessage(error),
     };
   }
 
   // Call the contract function
   try {
+    const provider = new ethers.JsonRpcProvider(rpcUrl);
+
+    // Create contract instance
+    const contract = new ethers.Contract(contractAddress, parsedAbi, provider);
+    console.log("[Read Contract] Contract instance created");
+
+    // Check if function exists
+    if (typeof contract[abiFunction] !== "function") {
+      throw new Error(`Function '${abiFunction}' not found in contract ABI`);
+    }
+
     console.log(
       "[Read Contract] Calling function:",
       abiFunction,
       "with args:",
       args
     );
-
-    // Check if function exists
-    if (typeof contract[abiFunction] !== "function") {
-      console.error("[Read Contract] Function not found:", abiFunction);
-      return {
-        success: false,
-        error: `Function '${abiFunction}' not found in contract ABI`,
-      };
-    }
 
     const result = await contract[abiFunction](...args);
 

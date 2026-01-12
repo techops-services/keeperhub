@@ -9,7 +9,7 @@ export default defineConfig({
     globals: true,
     environment: "node",
     include: ["**/*.test.ts", "**/*.test.tsx"],
-    exclude: ["node_modules", ".next", "e2e"],
+    exclude: ["node_modules", ".next", "e2e", ".pnpm-store"],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
