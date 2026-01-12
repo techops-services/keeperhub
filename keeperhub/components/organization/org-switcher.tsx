@@ -34,9 +34,7 @@ export function OrgSwitcher() {
   // Handle edge case: user has no active organization
   if (!organization) {
     return (
-      <div className="text-muted-foreground text-sm">
-        No organization found
-      </div>
+      <div className="text-muted-foreground text-sm">No organization found</div>
     );
   }
 

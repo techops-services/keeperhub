@@ -22,7 +22,6 @@ export type TransferFundsCoreInput = {
 
 export type TransferFundsInput = StepInput & TransferFundsCoreInput;
 
-
 /**
  * Core transfer logic
  */
@@ -133,7 +132,10 @@ async function stepHandler(
 
   let signer: Awaited<ReturnType<typeof initializeParaSigner>> | null = null;
   try {
-    console.log("[Transfer Funds] Initializing Para signer for organization:", organizationId);
+    console.log(
+      "[Transfer Funds] Initializing Para signer for organization:",
+      organizationId
+    );
     signer = await initializeParaSigner(organizationId, rpcUrl);
     const signerAddress = await signer.getAddress();
     console.log(
@@ -141,7 +143,10 @@ async function stepHandler(
       signerAddress
     );
   } catch (error) {
-    console.error("[Transfer Funds] Failed to initialize organization wallet:", error);
+    console.error(
+      "[Transfer Funds] Failed to initialize organization wallet:",
+      error
+    );
     return {
       success: false,
       error: `Failed to initialize organization wallet: ${getErrorMessage(error)}`,

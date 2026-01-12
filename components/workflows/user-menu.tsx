@@ -36,10 +36,10 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ManageOrgsModal } from "@/keeperhub/components/organization/manage-orgs-modal";
 // start custom keeperhub code //
 import { FeedbackOverlay } from "@/keeperhub/components/overlays/feedback-overlay";
 import { WalletOverlay } from "@/keeperhub/components/overlays/wallet-overlay";
-import { ManageOrgsModal } from "@/keeperhub/components/organization/manage-orgs-modal";
 // end keeperhub code //
 import { api } from "@/lib/api-client";
 import { signOut, useSession } from "@/lib/auth-client";
@@ -126,90 +126,89 @@ export const UserMenu = () => {
 
   return (
     <>
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          className="relative h-9 w-9 rounded-full border p-0"
-          variant="ghost"
-        >
-          <Avatar className="h-9 w-9">
-            <AvatarImage
-              alt={session?.user?.name || ""}
-              src={session?.user?.image || ""}
-            />
-            <AvatarFallback>{getUserInitials()}</AvatarFallback>
-          </Avatar>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>
-          <div className="flex flex-col space-y-1">
-            <p className="font-medium text-sm leading-none">
-              {session?.user?.name || "User"}
-            </p>
-            <p className="text-muted-foreground text-xs leading-none">
-              {session?.user?.email}
-            </p>
-          </div>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {/* start custom keeperhub code */}
-        <DropdownMenuItem onClick={() => openOverlay(FeedbackOverlay)}>
-          <Github className="size-4" />
-          <span>Report an issue</span>
-        </DropdownMenuItem>
-        {/* end keeperhub code */}
-        {!isOAuthUser && (
-          <DropdownMenuItem onClick={() => openOverlay(SettingsOverlay)}>
-            <Settings className="size-4" />
-            <span>Settings</span>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            className="relative h-9 w-9 rounded-full border p-0"
+            variant="ghost"
+          >
+            <Avatar className="h-9 w-9">
+              <AvatarImage
+                alt={session?.user?.name || ""}
+                src={session?.user?.image || ""}
+              />
+              <AvatarFallback>{getUserInitials()}</AvatarFallback>
+            </Avatar>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel>
+            <div className="flex flex-col space-y-1">
+              <p className="font-medium text-sm leading-none">
+                {session?.user?.name || "User"}
+              </p>
+              <p className="text-muted-foreground text-xs leading-none">
+                {session?.user?.email}
+              </p>
+            </div>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {/* start custom keeperhub code */}
+          <DropdownMenuItem onClick={() => openOverlay(FeedbackOverlay)}>
+            <Github className="size-4" />
+            <span>Report an issue</span>
           </DropdownMenuItem>
-        )}
-        <DropdownMenuItem onClick={() => setOrgModalOpen(true)}>
-          <Users className="size-4" />
-          <span>Organization</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => openOverlay(IntegrationsOverlay)}>
-          <Plug className="size-4" />
-          <span>Connections</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => openOverlay(ApiKeysOverlay)}>
-          <Key className="size-4" />
-          <span>API Keys</span>
-        </DropdownMenuItem>
-        {/* start custom keeperhub code */}
-        <DropdownMenuItem onClick={() => openOverlay(WalletOverlay)}>
-          <Wallet className="size-4" />
-          <span>Wallet</span>
-        </DropdownMenuItem>
-        {/* end keeperhub code */}
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            <Sun className="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-            <Moon className="absolute size-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-            <span>Theme</span>
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
-            <DropdownMenuRadioGroup onValueChange={setTheme} value={theme}>
-              <DropdownMenuRadioItem value="light">Light</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="dark">Dark</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="system">
-                System
-              </DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleLogout}>
-          <LogOut className="size-4" />
-          <span>Logout</span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-    <ManageOrgsModal
-      open={orgModalOpen}
-      onOpenChange={setOrgModalOpen}
-    />
-  </>
+          {/* end keeperhub code */}
+          {!isOAuthUser && (
+            <DropdownMenuItem onClick={() => openOverlay(SettingsOverlay)}>
+              <Settings className="size-4" />
+              <span>Settings</span>
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem onClick={() => setOrgModalOpen(true)}>
+            <Users className="size-4" />
+            <span>Organization</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => openOverlay(IntegrationsOverlay)}>
+            <Plug className="size-4" />
+            <span>Connections</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => openOverlay(ApiKeysOverlay)}>
+            <Key className="size-4" />
+            <span>API Keys</span>
+          </DropdownMenuItem>
+          {/* start custom keeperhub code */}
+          <DropdownMenuItem onClick={() => openOverlay(WalletOverlay)}>
+            <Wallet className="size-4" />
+            <span>Wallet</span>
+          </DropdownMenuItem>
+          {/* end keeperhub code */}
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <Sun className="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+              <Moon className="absolute size-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+              <span>Theme</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuRadioGroup onValueChange={setTheme} value={theme}>
+                <DropdownMenuRadioItem value="light">
+                  Light
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="dark">Dark</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="system">
+                  System
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleLogout}>
+            <LogOut className="size-4" />
+            <span>Logout</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ManageOrgsModal onOpenChange={setOrgModalOpen} open={orgModalOpen} />
+    </>
   );
 };

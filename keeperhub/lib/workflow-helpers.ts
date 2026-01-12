@@ -40,7 +40,7 @@ export async function getOrganizationIdFromExecution(
 
   if (!organizationId) {
     throw new Error(
-      `Workflow has no organization. This workflow may be from an anonymous user or migration is incomplete.`
+      "Workflow has no organization. This workflow may be from an anonymous user or migration is incomplete."
     );
   }
 

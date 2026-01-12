@@ -465,22 +465,17 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
         return;
       }
 
-
-
       // Small delay to ensure session is fully established
       await new Promise((resolve) => setTimeout(resolve, 300));
 
-
       // Fetch fresh session to get the active organization
       await authClient.getSession();
-
 
       // Trigger all organization hooks to refetch their data
       refetchOrganizations();
 
       toast.success("Signed in successfully!");
       setOpen(false);
-
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed");
     } finally {
@@ -492,7 +487,6 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const timestamp = new Date().toISOString();
 
     try {
       const { isAllowlisted } = await api.beta.checkEmail(email);
@@ -525,17 +519,14 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
       // Small delay to let the server-side session hook set activeOrganizationId
       await new Promise((resolve) => setTimeout(resolve, 300));
 
-
       // Fetch fresh session to get the updated activeOrganizationId
       await authClient.getSession();
-
 
       // Trigger all organization hooks to refetch their data
       refetchOrganizations();
 
       toast.success("Account created successfully!");
       setOpen(false);
-
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create account");
     } finally {

@@ -24,7 +24,6 @@ export type WriteContractCoreInput = {
 
 export type WriteContractInput = StepInput & WriteContractCoreInput;
 
-
 /**
  * Core write contract logic
  */
@@ -174,7 +173,10 @@ async function stepHandler(
   try {
     signer = await initializeParaSigner(organizationId, rpcUrl);
   } catch (error) {
-    console.error("[Write Contract] Failed to initialize organization wallet:", error);
+    console.error(
+      "[Write Contract] Failed to initialize organization wallet:",
+      error
+    );
     return {
       success: false,
       error: `Failed to initialize organization wallet: ${getErrorMessage(error)}`,
@@ -186,7 +188,10 @@ async function stepHandler(
   try {
     contract = new ethers.Contract(contractAddress, parsedAbi, signer);
   } catch (error) {
-    console.error("[Write Contract] Failed to create contract instance:", error);
+    console.error(
+      "[Write Contract] Failed to create contract instance:",
+      error
+    );
     return {
       success: false,
       error: `Failed to create contract instance: ${getErrorMessage(error)}`,
