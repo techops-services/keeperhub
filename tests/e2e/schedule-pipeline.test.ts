@@ -64,6 +64,11 @@ describe.skipIf(SKIP_INFRA_TESTS)("Schedule Pipeline E2E", () => {
       );
       // biome-ignore lint/style/noNonNullAssertion: AWS SDK returns QueueUrl on successful creation
       testQueueUrl = createResult.QueueUrl!;
+      // Normalize the URL to use localhost (LocalStack may return host.minikube.internal)
+      testQueueUrl = testQueueUrl.replace(
+        "host.minikube.internal",
+        "localhost"
+      );
     } catch (_error) {
       // Queue may already exist
       testQueueUrl = `${AWS_ENDPOINT}/000000000000/${TEST_QUEUE_NAME}`;

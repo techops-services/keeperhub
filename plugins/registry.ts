@@ -28,10 +28,14 @@ export type ActionConfigFieldBase = {
     | "text" // Regular text input
     | "number" // Number input
     | "select" // Dropdown select
+    | "chain-select" // Dynamic chain selector that fetches from /api/chains
     | "schema-builder" // Schema builder for structured output
     | "abi-function-select" // Dynamic dropdown that parses ABI and shows functions
     | "abi-function-args" // Dynamic inputs for function arguments based on selected ABI function
     | "abi-with-auto-fetch"; // ABI textarea with automatic fetch from Etherscan
+
+  // For chain-select: filter by chain type (e.g., "evm" or "solana")
+  chainTypeFilter?: string;
 
   // Placeholder text
   placeholder?: string;

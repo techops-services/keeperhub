@@ -3,6 +3,10 @@ shared_env: &shared_env
     type: parameterStore
     name: db-url
     parameter_name: /eks/maker-staging/keeperhub/db-url
+  CHAIN_RPC_CONFIG:
+    type: parameterStore
+    name: chain-rpc-config
+    parameter_name: /eks/maker-staging/keeperhub/chain-rpc-config
 
 replicaCount: 1
 
@@ -48,7 +52,9 @@ deployment:
         - |
           echo "Running database migrations..."
           pnpm db:push
-          echo "Migrations completed successfully"
+          echo "Seeding chains..."
+          pnpm db:seed
+          echo "Migrations and seeding completed successfully"
       env: *shared_env
 
 serviceAccount:
@@ -137,6 +143,14 @@ env:
   FROM_ADDRESS:
     type: kv
     value: "noreply@keeperhub.com"
+  # Feedback service (internal cluster communication)
+  FEEDBACK_SERVICE_URL:
+    type: kv
+    value: "http://keeperhub-feedback-common.keeperhub:3001/api/feedback"
+  FEEDBACK_API_KEY:
+    type: parameterStore
+    name: feedback-api-key
+    parameter_name: /eks/maker-staging/keeperhub-feedback/feedback-api-key
 
 externalSecrets:
   clusterSecretStoreName: maker-staging
@@ -182,6 +196,10 @@ cronjob:
           type: parameterStore
           name: db-url
           parameter_name: /eks/maker-staging/keeperhub/db-url
+        CHAIN_RPC_CONFIG:
+          type: parameterStore
+          name: chain-rpc-config
+          parameter_name: /eks/maker-staging/keeperhub/chain-rpc-config
       schedule: "* * * * *"
       command: ["/bin/sh"]
       args:
