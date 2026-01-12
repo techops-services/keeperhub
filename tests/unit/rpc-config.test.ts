@@ -6,6 +6,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  getConfigValue,
   getRpcUrl,
   getWssUrl,
   PUBLIC_RPCS,
@@ -819,6 +820,128 @@ describe("RPC Config Resolution", () => {
           type: "primary",
         })
       ).toBe("wss://sepolia.example.com");
+    });
+  });
+
+  describe("getConfigValue", () => {
+    it("should return symbol from config when present", () => {
+      const rpcConfig: RpcConfig = {
+        "base-mainnet": {
+          symbol: "BASE",
+          chainId: 8453,
+        },
+      };
+
+      expect(getConfigValue(rpcConfig, "base-mainnet", "symbol", "ETH")).toBe(
+        "BASE"
+      );
+    });
+
+    it("should return default when symbol not in config", () => {
+      const rpcConfig: RpcConfig = {
+        "base-mainnet": {
+          chainId: 8453,
+        },
+      };
+
+      expect(getConfigValue(rpcConfig, "base-mainnet", "symbol", "ETH")).toBe(
+        "ETH"
+      );
+    });
+
+    it("should return default when chain not in config", () => {
+      const rpcConfig: RpcConfig = {};
+
+      expect(getConfigValue(rpcConfig, "base-mainnet", "symbol", "BASE")).toBe(
+        "BASE"
+      );
+    });
+
+    it("should return chainId from config when present", () => {
+      const rpcConfig: RpcConfig = {
+        "eth-mainnet": {
+          chainId: 1,
+          symbol: "ETH",
+        },
+      };
+
+      expect(getConfigValue(rpcConfig, "eth-mainnet", "chainId", 0)).toBe(1);
+    });
+
+    it("should return isEnabled from config when present", () => {
+      const rpcConfig: RpcConfig = {
+        "tempo-mainnet": {
+          isEnabled: false,
+        },
+      };
+
+      expect(
+        getConfigValue(rpcConfig, "tempo-mainnet", "isEnabled", true)
+      ).toBe(false);
+    });
+
+    it("should return isTestnet from config when present", () => {
+      const rpcConfig: RpcConfig = {
+        sepolia: {
+          isTestnet: true,
+        },
+      };
+
+      expect(getConfigValue(rpcConfig, "sepolia", "isTestnet", false)).toBe(
+        true
+      );
+    });
+
+    it("should handle undefined value in config by returning default", () => {
+      const rpcConfig: RpcConfig = {
+        "base-mainnet": {
+          symbol: undefined,
+        },
+      };
+
+      expect(getConfigValue(rpcConfig, "base-mainnet", "symbol", "BASE")).toBe(
+        "BASE"
+      );
+    });
+
+    it("should work with all chain metadata fields", () => {
+      const rpcConfig: RpcConfig = {
+        "tempo-testnet": {
+          chainId: 42_429,
+          symbol: "TEMPO",
+          isEnabled: true,
+          isTestnet: true,
+        },
+      };
+
+      expect(getConfigValue(rpcConfig, "tempo-testnet", "chainId", 0)).toBe(
+        42_429
+      );
+      expect(getConfigValue(rpcConfig, "tempo-testnet", "symbol", "USD")).toBe(
+        "TEMPO"
+      );
+      expect(
+        getConfigValue(rpcConfig, "tempo-testnet", "isEnabled", false)
+      ).toBe(true);
+      expect(
+        getConfigValue(rpcConfig, "tempo-testnet", "isTestnet", false)
+      ).toBe(true);
+    });
+
+    it("should return false boolean from config (not treat as falsy)", () => {
+      const rpcConfig: RpcConfig = {
+        "tempo-mainnet": {
+          isEnabled: false,
+          isTestnet: false,
+        },
+      };
+
+      expect(
+        getConfigValue(rpcConfig, "tempo-mainnet", "isEnabled", true)
+      ).toBe(false);
+      expect(
+        getConfigValue(rpcConfig, "tempo-mainnet", "isTestnet", true)
+      ).toBe(false);
     });
   });
 });

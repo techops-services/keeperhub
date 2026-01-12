@@ -21,6 +21,7 @@ import {
 } from "../lib/db/schema";
 import {
   createRpcUrlResolver,
+  getConfigValue,
   getWssUrl,
   PUBLIC_RPCS,
   parseRpcConfig,
@@ -38,18 +39,18 @@ const rpcConfig = (() => {
 // Create resolver function for this script
 const getRpcUrl = createRpcUrlResolver(rpcConfig);
 
-/**
- * Get symbol from CHAIN_RPC_CONFIG if available, otherwise use default
- */
-function getSymbol(jsonKey: string, defaultSymbol: string): string {
-  return rpcConfig[jsonKey]?.symbol ?? defaultSymbol;
-}
+// Helper to get config value with rpcConfig pre-bound
+const getChainConfig = <T>(
+  jsonKey: string,
+  field: "chainId" | "symbol" | "isEnabled" | "isTestnet",
+  defaultValue: T
+): T => getConfigValue(rpcConfig, jsonKey, field, defaultValue);
 
 const DEFAULT_CHAINS: NewChain[] = [
   {
-    chainId: 1,
+    chainId: getChainConfig("eth-mainnet", "chainId", 1),
     name: "Ethereum Mainnet",
-    symbol: getSymbol("eth-mainnet", "ETH"),
+    symbol: getChainConfig("eth-mainnet", "symbol", "ETH"),
     chainType: "evm",
     defaultPrimaryRpc: getRpcUrl(
       "eth-mainnet",
@@ -73,13 +74,13 @@ const DEFAULT_CHAINS: NewChain[] = [
       jsonKey: "eth-mainnet",
       type: "fallback",
     }),
-    isTestnet: false,
-    isEnabled: true,
+    isTestnet: getChainConfig("eth-mainnet", "isTestnet", false),
+    isEnabled: getChainConfig("eth-mainnet", "isEnabled", true),
   },
   {
-    chainId: 11_155_111,
+    chainId: getChainConfig("sepolia", "chainId", 11_155_111),
     name: "Sepolia Testnet",
-    symbol: getSymbol("sepolia", "ETH"),
+    symbol: getChainConfig("sepolia", "symbol", "ETH"),
     chainType: "evm",
     defaultPrimaryRpc: getRpcUrl(
       "sepolia",
@@ -103,13 +104,13 @@ const DEFAULT_CHAINS: NewChain[] = [
       jsonKey: "sepolia",
       type: "fallback",
     }),
-    isTestnet: true,
-    isEnabled: true,
+    isTestnet: getChainConfig("sepolia", "isTestnet", true),
+    isEnabled: getChainConfig("sepolia", "isEnabled", true),
   },
   {
-    chainId: 8453,
+    chainId: getChainConfig("base-mainnet", "chainId", 8453),
     name: "Base",
-    symbol: getSymbol("base-mainnet", "BASE"),
+    symbol: getChainConfig("base-mainnet", "symbol", "BASE"),
     chainType: "evm",
     defaultPrimaryRpc: getRpcUrl(
       "base-mainnet",
@@ -133,13 +134,13 @@ const DEFAULT_CHAINS: NewChain[] = [
       jsonKey: "base-mainnet",
       type: "fallback",
     }),
-    isTestnet: false,
-    isEnabled: true,
+    isTestnet: getChainConfig("base-mainnet", "isTestnet", false),
+    isEnabled: getChainConfig("base-mainnet", "isEnabled", true),
   },
   {
-    chainId: 84_532,
+    chainId: getChainConfig("base-sepolia", "chainId", 84_532),
     name: "Base Sepolia",
-    symbol: getSymbol("base-sepolia", "BASE"),
+    symbol: getChainConfig("base-sepolia", "symbol", "BASE"),
     chainType: "evm",
     defaultPrimaryRpc: getRpcUrl(
       "base-sepolia",
@@ -163,13 +164,13 @@ const DEFAULT_CHAINS: NewChain[] = [
       jsonKey: "base-sepolia",
       type: "fallback",
     }),
-    isTestnet: true,
-    isEnabled: true,
+    isTestnet: getChainConfig("base-sepolia", "isTestnet", true),
+    isEnabled: getChainConfig("base-sepolia", "isEnabled", true),
   },
   {
-    chainId: 42_429,
+    chainId: getChainConfig("tempo-testnet", "chainId", 42_429),
     name: "Tempo Testnet",
-    symbol: getSymbol("tempo-testnet", "TEMPO"),
+    symbol: getChainConfig("tempo-testnet", "symbol", "TEMPO"),
     chainType: "evm",
     defaultPrimaryRpc: getRpcUrl(
       "tempo-testnet",
@@ -193,13 +194,13 @@ const DEFAULT_CHAINS: NewChain[] = [
       jsonKey: "tempo-testnet",
       type: "fallback",
     }),
-    isTestnet: true,
-    isEnabled: true,
+    isTestnet: getChainConfig("tempo-testnet", "isTestnet", true),
+    isEnabled: getChainConfig("tempo-testnet", "isEnabled", true),
   },
   {
-    chainId: 42_420,
+    chainId: getChainConfig("tempo-mainnet", "chainId", 42_420),
     name: "Tempo",
-    symbol: getSymbol("tempo-mainnet", "TEMPO"),
+    symbol: getChainConfig("tempo-mainnet", "symbol", "TEMPO"),
     chainType: "evm",
     defaultPrimaryRpc: getRpcUrl(
       "tempo-mainnet",
@@ -223,14 +224,14 @@ const DEFAULT_CHAINS: NewChain[] = [
       jsonKey: "tempo-mainnet",
       type: "fallback",
     }),
-    isTestnet: false,
-    isEnabled: false, // Disabled until mainnet launches
+    isTestnet: getChainConfig("tempo-mainnet", "isTestnet", false),
+    isEnabled: getChainConfig("tempo-mainnet", "isEnabled", false),
   },
   // Solana chains (non-EVM - uses SolanaProviderManager)
   {
-    chainId: 101,
+    chainId: getChainConfig("solana-mainnet", "chainId", 101),
     name: "Solana",
-    symbol: getSymbol("solana-mainnet", "SOL"),
+    symbol: getChainConfig("solana-mainnet", "symbol", "SOL"),
     chainType: "solana",
     defaultPrimaryRpc: getRpcUrl(
       "solana-mainnet",
@@ -254,13 +255,13 @@ const DEFAULT_CHAINS: NewChain[] = [
       jsonKey: "solana-mainnet",
       type: "fallback",
     }),
-    isTestnet: false,
-    isEnabled: true,
+    isTestnet: getChainConfig("solana-mainnet", "isTestnet", false),
+    isEnabled: getChainConfig("solana-mainnet", "isEnabled", true),
   },
   {
-    chainId: 103,
+    chainId: getChainConfig("solana-devnet", "chainId", 103),
     name: "Solana Devnet",
-    symbol: getSymbol("solana-devnet", "SOL"),
+    symbol: getChainConfig("solana-devnet", "symbol", "SOL"),
     chainType: "solana",
     defaultPrimaryRpc: getRpcUrl(
       "solana-devnet",
@@ -284,8 +285,8 @@ const DEFAULT_CHAINS: NewChain[] = [
       jsonKey: "solana-devnet",
       type: "fallback",
     }),
-    isTestnet: true,
-    isEnabled: true,
+    isTestnet: getChainConfig("solana-devnet", "isTestnet", true),
+    isEnabled: getChainConfig("solana-devnet", "isEnabled", true),
   },
 ];
 
