@@ -1,0 +1,14 @@
+{
+  "index": "Home",
+  "intro": "Introduction",
+  "getting-started": "Getting Started",
+  "keepers": "Nodes",
+  "workflows": "Workflows",
+  "keeper-runs": "Keeper Runs",
+  "notifications": "Notifications",
+  "wallet-management": "Wallet Management",
+  "users-teams-orgs": "Users and Organizations",
+  "practices": "Best Practices",
+  "api": "API Reference",
+  "FAQ": "FAQ"
+}

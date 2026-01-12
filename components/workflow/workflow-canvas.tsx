@@ -17,7 +17,6 @@ import { Canvas } from "@/components/ai-elements/canvas";
 import { Connection } from "@/components/ai-elements/connection";
 import { Controls } from "@/components/ai-elements/controls";
 import { AIPrompt } from "@/components/ai-elements/prompt";
-import { WorkflowToolbar } from "@/components/workflow/workflow-toolbar";
 import "@xyflow/react/dist/style.css";
 
 import { PlayCircle, Zap } from "lucide-react";
@@ -77,7 +76,6 @@ const edgeTypes = {
   temporary: Edge.Temporary,
 };
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: React Flow canvas requires complex setup
 export function WorkflowCanvas() {
   const [nodes, setNodes] = useAtom(nodesAtom);
   const [edges, setEdges] = useAtom(edgesAtom);
@@ -101,7 +99,6 @@ export function WorkflowCanvas() {
     useReactFlow();
 
   const connectingNodeId = useRef<string | null>(null);
-  const connectingHandleType = useRef<"source" | "target" | null>(null);
   const justCreatedNodeFromConnection = useRef(false);
   const viewportInitialized = useRef(false);
   const [isCanvasReady, setIsCanvasReady] = useState(false);
@@ -228,27 +225,6 @@ export function WorkflowCanvas() {
     []
   );
 
-  const nodeHasHandle = useCallback(
-    (nodeId: string, handleType: "source" | "target") => {
-      const node = nodes.find((n) => n.id === nodeId);
-
-      if (!node) {
-        return false;
-      }
-
-      if (node.type === "add") {
-        return false;
-      }
-
-      if (handleType === "target") {
-        return node.type !== "trigger";
-      }
-
-      return true;
-    },
-    [nodes]
-  );
-
   const isValidConnection = useCallback(
     (connection: XYFlowConnection | XYFlowEdge) => {
       // Ensure we have both source and target
@@ -294,7 +270,6 @@ export function WorkflowCanvas() {
   const onConnectStart = useCallback(
     (_event: MouseEvent | TouchEvent, params: OnConnectStartParams) => {
       connectingNodeId.current = params.nodeId;
-      connectingHandleType.current = params.handleType;
     },
     []
   );
@@ -329,125 +304,6 @@ export function WorkflowCanvas() {
     []
   );
 
-  const handleConnectionToExistingNode = useCallback(
-    (nodeElement: Element) => {
-      const targetNodeId = nodeElement.getAttribute("data-id");
-      const fromSource = connectingHandleType.current === "source";
-      const requiredHandle = fromSource ? "target" : "source";
-      const connectingId = connectingNodeId.current;
-
-      if (
-        targetNodeId &&
-        connectingId &&
-        targetNodeId !== connectingId &&
-        nodeHasHandle(targetNodeId, requiredHandle)
-      ) {
-        const sourceId = fromSource ? connectingId : targetNodeId;
-        const targetId = fromSource ? targetNodeId : connectingId;
-        onConnect({
-          source: sourceId,
-          target: targetId,
-          sourceHandle: null,
-          targetHandle: null,
-        });
-      }
-    },
-    [nodeHasHandle, onConnect]
-  );
-
-  const handleConnectionToNewNode = useCallback(
-    (event: MouseEvent | TouchEvent, clientX: number, clientY: number) => {
-      const sourceNodeId = connectingNodeId.current;
-      if (!sourceNodeId) {
-        return;
-      }
-
-      const { adjustedX, adjustedY } = calculateMenuPosition(
-        event,
-        clientX,
-        clientY
-      );
-
-      // Get the action template
-      const actionTemplate = nodeTemplates.find((t) => t.type === "action");
-      if (!actionTemplate) {
-        return;
-      }
-
-      // Get the position in the flow coordinate system
-      const position = screenToFlowPosition({
-        x: adjustedX,
-        y: adjustedY,
-      });
-
-      // Center the node vertically at the cursor position
-      // Node height is 192px (h-48 in Tailwind)
-      const nodeHeight = 192;
-      position.y -= nodeHeight / 2;
-
-      const newNode: WorkflowNode = {
-        id: nanoid(),
-        type: actionTemplate.type,
-        position,
-        data: {
-          label: actionTemplate.label,
-          description: actionTemplate.description,
-          type: actionTemplate.type,
-          config: actionTemplate.defaultConfig,
-          status: "idle",
-        },
-        selected: true,
-      };
-
-      addNode(newNode);
-      setSelectedNode(newNode.id);
-      setActiveTab("properties");
-
-      // Deselect all other nodes and select only the new node
-      // Need to do this after a delay because panOnDrag will clear selection
-      setTimeout(() => {
-        setNodes((currentNodes) =>
-          currentNodes.map((n) => ({
-            ...n,
-            selected: n.id === newNode.id,
-          }))
-        );
-      }, 50);
-
-      // Create connection from the source node to the new node
-      const fromSource = connectingHandleType.current === "source";
-
-      const newEdge = {
-        id: nanoid(),
-        source: fromSource ? sourceNodeId : newNode.id,
-        target: fromSource ? newNode.id : sourceNodeId,
-        type: "animated",
-      };
-      setEdges([...edges, newEdge]);
-      setHasUnsavedChanges(true);
-      // Trigger immediate autosave for the new edge
-      triggerAutosave({ immediate: true });
-
-      // Set flag to prevent immediate deselection
-      justCreatedNodeFromConnection.current = true;
-      setTimeout(() => {
-        justCreatedNodeFromConnection.current = false;
-      }, 100);
-    },
-    [
-      calculateMenuPosition,
-      screenToFlowPosition,
-      addNode,
-      edges,
-      setEdges,
-      setNodes,
-      setSelectedNode,
-      setActiveTab,
-      setHasUnsavedChanges,
-      triggerAutosave,
-    ]
-  );
-
   const onConnectEnd = useCallback(
     (event: MouseEvent | TouchEvent) => {
       if (!connectingNodeId.current) {
@@ -469,28 +325,96 @@ export function WorkflowCanvas() {
         return;
       }
 
-      const nodeElement = target.closest(".react-flow__node");
+      const isNode = target.closest(".react-flow__node");
       const isHandle = target.closest(".react-flow__handle");
 
-      // Create connection on edge dragged over node release
-      if (nodeElement && !isHandle && connectingHandleType.current) {
-        handleConnectionToExistingNode(nodeElement);
-        connectingNodeId.current = null;
-        connectingHandleType.current = null;
-        return;
-      }
+      if (!(isNode || isHandle)) {
+        const { adjustedX, adjustedY } = calculateMenuPosition(
+          event,
+          clientX,
+          clientY
+        );
 
-      if (!(nodeElement || isHandle)) {
-        handleConnectionToNewNode(event, clientX, clientY);
+        // Get the action template
+        const actionTemplate = nodeTemplates.find((t) => t.type === "action");
+        if (!actionTemplate) {
+          return;
+        }
+
+        // Get the position in the flow coordinate system
+        const position = screenToFlowPosition({
+          x: adjustedX,
+          y: adjustedY,
+        });
+
+        // Center the node vertically at the cursor position
+        // Node height is 192px (h-48 in Tailwind)
+        const nodeHeight = 192;
+        position.y -= nodeHeight / 2;
+
+        // Create new action node
+        const newNode: WorkflowNode = {
+          id: nanoid(),
+          type: actionTemplate.type,
+          position,
+          data: {
+            label: actionTemplate.label,
+            description: actionTemplate.description,
+            type: actionTemplate.type,
+            config: actionTemplate.defaultConfig,
+            status: "idle",
+          },
+          selected: true,
+        };
+
+        addNode(newNode);
+        setSelectedNode(newNode.id);
+        setActiveTab("properties");
+
+        // Deselect all other nodes and select only the new node
+        // Need to do this after a delay because panOnDrag will clear selection
+        setTimeout(() => {
+          setNodes((currentNodes) =>
+            currentNodes.map((n) => ({
+              ...n,
+              selected: n.id === newNode.id,
+            }))
+          );
+        }, 50);
+
+        // Create connection from the source node to the new node
+        const newEdge = {
+          id: nanoid(),
+          source: connectingNodeId.current,
+          target: newNode.id,
+          type: "animated",
+        };
+        setEdges([...edges, newEdge]);
+        setHasUnsavedChanges(true);
+        // Trigger immediate autosave for the new edge
+        triggerAutosave({ immediate: true });
+
+        // Set flag to prevent immediate deselection
+        justCreatedNodeFromConnection.current = true;
+        setTimeout(() => {
+          justCreatedNodeFromConnection.current = false;
+        }, 100);
       }
 
       connectingNodeId.current = null;
-      connectingHandleType.current = null;
     },
     [
       getClientPosition,
-      handleConnectionToExistingNode,
-      handleConnectionToNewNode,
+      calculateMenuPosition,
+      screenToFlowPosition,
+      addNode,
+      edges,
+      setEdges,
+      setNodes,
+      setSelectedNode,
+      setActiveTab,
+      setHasUnsavedChanges,
+      triggerAutosave,
     ]
   );
 
@@ -532,11 +456,6 @@ export function WorkflowCanvas() {
           : "opacity 300ms",
       }}
     >
-      {/* Toolbar */}
-      <div className="pointer-events-auto">
-        <WorkflowToolbar workflowId={currentWorkflowId ?? undefined} />
-      </div>
-
       {/* React Flow Canvas */}
       <Canvas
         className="bg-background"

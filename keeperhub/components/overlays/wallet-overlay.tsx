@@ -1,0 +1,333 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
+import { Overlay } from "@/components/overlays/overlay";
+import { useOverlay } from "@/components/overlays/overlay-provider";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Spinner } from "@/components/ui/spinner";
+import { useActiveMember } from "@/keeperhub/lib/hooks/use-organization";
+import { useSession } from "@/lib/auth-client";
+
+type WalletOverlayProps = {
+  overlayId: string;
+};
+
+type WalletData = {
+  hasWallet: boolean;
+  walletAddress?: string;
+  walletId?: string;
+  email?: string;
+  createdAt?: string;
+};
+
+type ChainBalance = {
+  chain: string;
+  balance: string;
+  loading: boolean;
+  error?: string;
+};
+
+export function WalletOverlay({ overlayId }: WalletOverlayProps) {
+  const { closeAll } = useOverlay();
+  const { data: session } = useSession();
+  const { isAdmin } = useActiveMember();
+
+  const [walletLoading, setWalletLoading] = useState(true);
+  const [walletData, setWalletData] = useState<WalletData | null>(null);
+  const [balances, setBalances] = useState<ChainBalance[]>([
+    { chain: "mainnet", balance: "0", loading: true },
+    { chain: "sepolia", balance: "0", loading: true },
+  ]);
+
+  // Create wallet state
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [email, setEmail] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  const fetchBalances = useCallback(async (address: string) => {
+    const chains = [
+      { name: "mainnet", display: "Ethereum Mainnet" },
+      { name: "sepolia", display: "Sepolia Testnet" },
+    ];
+
+    const balancePromises = chains.map(async (chain) => {
+      try {
+        const rpcUrls: Record<string, string> = {
+          mainnet: "https://chain.techops.services/eth-mainnet",
+          sepolia: "https://chain.techops.services/eth-sepolia",
+        };
+
+        const rpcUrl = rpcUrls[chain.name];
+        if (!rpcUrl) {
+          throw new Error(`Unsupported network: ${chain.name}`);
+        }
+
+        const response = await fetch(rpcUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            method: "eth_getBalance",
+            params: [address, "latest"],
+            id: 1,
+          }),
+        });
+
+        const result = await response.json();
+        if (result.error) {
+          throw new Error(result.error.message);
+        }
+
+        const balanceWei = BigInt(result.result);
+        const balanceEth = Number(balanceWei) / 1e18;
+
+        return {
+          chain: chain.name,
+          balance: balanceEth.toFixed(6),
+          loading: false,
+        };
+      } catch (error) {
+        console.error(`Failed to fetch balance for ${chain.name}:`, error);
+        return {
+          chain: chain.name,
+          balance: "0",
+          loading: false,
+          error: error instanceof Error ? error.message : "Failed to fetch",
+        };
+      }
+    });
+
+    const results = await Promise.all(balancePromises);
+    setBalances(results);
+  }, []);
+
+  const loadWallet = useCallback(async () => {
+    setWalletLoading(true);
+    try {
+      const response = await fetch("/api/user/wallet");
+      const data = await response.json();
+
+      if (data.hasWallet) {
+        setWalletData(data);
+        setWalletLoading(false);
+        if (data.walletAddress) {
+          fetchBalances(data.walletAddress);
+        }
+      } else {
+        setWalletData({ hasWallet: false });
+        setWalletLoading(false);
+      }
+    } catch (error) {
+      console.error("Failed to load wallet:", error);
+      setWalletData({ hasWallet: false });
+      setWalletLoading(false);
+    }
+  }, [fetchBalances]);
+
+  useEffect(() => {
+    loadWallet();
+    // Prefill email with current user's email
+    if (session?.user?.email) {
+      setEmail(session.user.email);
+    }
+  }, [loadWallet, session?.user?.email]);
+
+  const handleCreateWallet = async () => {
+    if (!email) {
+      toast.error("Email is required");
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const response = await fetch("/api/user/wallet", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to create wallet");
+      }
+
+      toast.success("Wallet created successfully!");
+      setShowCreateForm(false);
+      // Reload wallet data
+      await loadWallet();
+    } catch (error) {
+      console.error("Failed to create wallet:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create wallet"
+      );
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <Overlay
+      actions={[{ label: "Done", onClick: closeAll }]}
+      overlayId={overlayId}
+      title="Organization Wallet"
+    >
+      <p className="-mt-2 mb-4 text-muted-foreground text-sm">
+        {walletData?.hasWallet
+          ? "View your organization's wallet address and balances across different chains"
+          : "Create a wallet for your organization to use in workflows"}
+      </p>
+
+      {walletLoading && (
+        <div className="flex items-center justify-center py-8">
+          <Spinner />
+        </div>
+      )}
+
+      {!walletLoading && walletData?.hasWallet && (
+        <div className="space-y-4">
+          <div className="rounded-lg border bg-muted/50 p-4">
+            <div className="mb-2 text-muted-foreground text-sm">
+              Wallet Address
+            </div>
+            <code className="break-all font-mono text-sm">
+              {walletData.walletAddress}
+            </code>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="font-medium text-sm">Balances</h3>
+            {balances.map((balance) => {
+              let balanceContent: React.ReactNode;
+              if (balance.loading) {
+                balanceContent = (
+                  <div className="mt-1 text-muted-foreground text-xs">
+                    Loading...
+                  </div>
+                );
+              } else if (balance.error) {
+                balanceContent = (
+                  <div className="mt-1 text-destructive text-xs">
+                    {balance.error}
+                  </div>
+                );
+              } else {
+                balanceContent = (
+                  <div className="mt-1 text-muted-foreground text-xs">
+                    {balance.balance} ETH
+                  </div>
+                );
+              }
+
+              return (
+                <div
+                  className="flex items-center justify-between rounded-lg border bg-muted/50 p-3"
+                  key={balance.chain}
+                >
+                  <div className="flex-1">
+                    <div className="font-medium text-sm">
+                      {balance.chain === "mainnet"
+                        ? "Ethereum Mainnet"
+                        : "Sepolia Testnet"}
+                    </div>
+                    {balanceContent}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {!(walletLoading || walletData?.hasWallet) && (
+        <div className="space-y-4">
+          {!isAdmin && (
+            <div className="rounded-lg border bg-muted/50 p-4">
+              <p className="text-muted-foreground text-sm">
+                No wallet found for this organization. Only organization admins
+                and owners can create wallets.
+              </p>
+            </div>
+          )}
+          {isAdmin && showCreateForm && (
+            <div className="space-y-4">
+              <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
+                <div>
+                  <h3 className="mb-2 font-medium text-sm">
+                    Create Organization Wallet
+                  </h3>
+                  <p className="mb-4 text-muted-foreground text-xs">
+                    This wallet will be shared by all members of your
+                    organization. Only admins and owners can manage it.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="wallet-email">Email Address</Label>
+                  <Input
+                    disabled={creating}
+                    id="wallet-email"
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    type="email"
+                    value={email}
+                  />
+                  <p className="text-muted-foreground text-xs">
+                    This email will be associated with the organization's wallet
+                    for identification purposes.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1"
+                  disabled={creating}
+                  onClick={() => setShowCreateForm(false)}
+                  variant="outline"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1"
+                  disabled={creating || !email}
+                  onClick={handleCreateWallet}
+                >
+                  {creating ? (
+                    <>
+                      <Spinner className="mr-2 h-4 w-4" />
+                      Creating...
+                    </>
+                  ) : (
+                    "Create Wallet"
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+          {isAdmin && !showCreateForm && (
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-muted/50 p-4">
+                <p className="text-muted-foreground text-sm">
+                  No wallet found for this organization. Create a wallet to use
+                  Web3 features in your workflows.
+                </p>
+              </div>
+              <Button
+                className="w-full"
+                onClick={() => setShowCreateForm(true)}
+              >
+                Create Organization Wallet
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+    </Overlay>
+  );
+}

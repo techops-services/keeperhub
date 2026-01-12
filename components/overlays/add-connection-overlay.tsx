@@ -14,6 +14,9 @@ import {
   aiGatewayTeamsLoadingAtom,
 } from "@/lib/ai-gateway/state";
 import { api } from "@/lib/api-client";
+// start keeperhub
+import { getCustomIntegrationFormHandler } from "@/lib/extension-registry";
+// end keeperhub
 import type { IntegrationType } from "@/lib/types/integration";
 import {
   getIntegration,
@@ -254,7 +257,7 @@ export function ConfigureConnectionOverlay({
   const { push, closeAll } = useOverlay();
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{
+  const [_testResult, setTestResult] = useState<{
     status: "success" | "error";
     message: string;
   } | null>(null);
@@ -361,6 +364,18 @@ export function ConfigureConnectionOverlay({
 
   // Render config fields
   const renderConfigFields = () => {
+    // start keeperhub - check for custom form handlers (e.g., web3 wallet)
+    const customHandler = getCustomIntegrationFormHandler(type);
+    if (customHandler) {
+      return customHandler({
+        integrationType: type,
+        isEditMode: false,
+        config,
+        updateConfig,
+      });
+    }
+    // end keeperhub
+
     if (type === "database") {
       return (
         <SecretField
@@ -375,7 +390,9 @@ export function ConfigureConnectionOverlay({
       );
     }
 
-    if (!formFields) return null;
+    if (!formFields) {
+      return null;
+    }
 
     return formFields.map((field) => {
       if (field.type === "password") {

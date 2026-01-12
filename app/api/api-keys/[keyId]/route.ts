@@ -33,7 +33,10 @@ export async function DELETE(
   } catch (error) {
     console.error("Failed to delete API key:", error);
     return NextResponse.json(
-      { error: "Failed to delete API key" },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to delete API key",
+      },
       { status: 500 }
     );
   }

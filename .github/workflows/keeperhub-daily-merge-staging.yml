@@ -1,0 +1,132 @@
+name: Daily Stage Merge
+
+on:
+  schedule:
+    - cron: "15 0 * * *"
+  workflow_dispatch:
+
+jobs:
+  merge-main-to-staging:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout Staging
+        uses: actions/checkout@v6
+        with:
+          ref: staging
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "KeeperHub Sync Bot"
+          git config user.email "bot@techops.services"
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - name: Create Merge Branch
+        id: create_branch
+        run: |
+          BRANCH_NAME="automation/merge-main-$(date +%Y%m%d)"
+          git checkout -b $BRANCH_NAME
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+
+      - name: Merge Main and Fix Lockfile
+        id: merge_process
+        run: |
+          # Fetch main
+          git fetch origin main
+
+          # Check if staging is already up-to-date with main using merge-base
+          MERGE_BASE=$(git merge-base HEAD origin/main)
+          MAIN_HEAD=$(git rev-parse origin/main)
+
+          if [ "$MERGE_BASE" = "$MAIN_HEAD" ]; then
+            echo "Staging is already up-to-date with main. Nothing to merge."
+            echo "merge_status=no_changes" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Attempt merge but do not commit yet (allow us to fix lockfile)
+          # We accept 'theirs' (main) for upstream files, but this might conflict with local logic
+          # So we use standard merge. If it fails ONLY on lockfile, we fix it.
+
+          if git merge origin/main --no-commit --no-ff; then
+            echo "Merge clean."
+          else
+            echo "Merge conflict detected."
+            
+            # Check if pnpm-lock.yaml is the only issue or part of the issue
+            # The strategy is to reset lockfile to OUR version (staging), then regenerate it
+            if [ -f pnpm-lock.yaml ]; then
+              echo "Regenerating lockfile..."
+              git checkout HEAD -- pnpm-lock.yaml
+              pnpm install --no-frozen-lockfile
+              git add pnpm-lock.yaml
+            fi
+
+            # Check if other conflicts remain
+            if git diff --check | grep -q "conflict"; then
+              echo "Non-lockfile conflicts detected. Cannot auto-merge."
+              echo "merge_status=conflict" >> $GITHUB_OUTPUT
+              git merge --abort
+              exit 0 
+            fi
+            
+            # Complete the merge
+            git commit -m "chore: merge upstream main and regenerate lockfile"
+          fi
+
+          echo "merge_status=success" >> $GITHUB_OUTPUT
+
+          # Push the branch
+          git push origin $BRANCH_NAME --force
+
+      - name: Create and Merge PR
+        if: steps.merge_process.outputs.merge_status == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ env.BRANCH_NAME }}
+        run: |
+          # Create PR
+          gh pr create \
+            --base staging \
+            --head $BRANCH \
+            --title "chore: Daily Upstream Merge $(date +%Y-%m-%d)" \
+            --body "Automated merge from main to staging. Lockfile has been regenerated."
+
+          # Auto-merge the PR using squash or merge commit
+          gh pr merge $BRANCH --merge --admin --delete-branch
+
+      - name: Notify Discord (Success)
+        if: steps.merge_process.outputs.merge_status == 'success'
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          curl -H "Content-Type: application/json" \
+          -d "{\"username\": \"KeeperHub Merge Bot\", \"content\": \"**Daily Merge Successful**\n\nBranch \`main\` has been merged into \`staging\`.\nLockfiles were automatically regenerated.\"}" \
+          $DISCORD_WEBHOOK
+
+      - name: Notify Discord (No Changes)
+        if: steps.merge_process.outputs.merge_status == 'no_changes'
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          curl -H "Content-Type: application/json" \
+          -d "{\"username\": \"KeeperHub Merge Bot\", \"content\": \"**Daily Merge Check Complete**\n\nNo changes to merge - \`staging\` is already up to date with \`main\`.\"}" \
+          $DISCORD_WEBHOOK
+
+      - name: Notify Discord (Conflict/Failure)
+        if: steps.merge_process.outputs.merge_status == 'conflict' || failure()
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          curl -H "Content-Type: application/json" \
+          -d "{\"username\": \"KeeperHub Merge Bot\", \"content\": \"**Daily Merge Failed**\n\nManual intervention required.\nThere are conflicts in files other than the lockfile.\n\nPlease merge \`main\` into \`staging\` manually.\"}" \
+          $DISCORD_WEBHOOK

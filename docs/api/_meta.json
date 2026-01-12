@@ -1,0 +1,11 @@
+{
+  "index": "Overview",
+  "authentication": "Authentication",
+  "workflows": "Workflows",
+  "executions": "Executions",
+  "integrations": "Integrations",
+  "chains": "Chains",
+  "user": "User",
+  "api-keys": "API Keys",
+  "errors": "Errors"
+}

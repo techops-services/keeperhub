@@ -19,15 +19,15 @@
     {
       "idx": 2,
       "version": "7",
-      "when": 1764691121867,
-      "tag": "0002_icy_otto_octavius",
+      "when": 1764819076191,
+      "tag": "0002_whole_molly_hayes",
       "breakpoints": true
     },
     {
       "idx": 3,
       "version": "7",
-      "when": 1764694021611,
-      "tag": "0003_clammy_tusk",
+      "when": 1765507190572,
+      "tag": "0003_parched_wendell_rand",
       "breakpoints": true
     },
     {
@@ -35,6 +35,34 @@
       "version": "7",
       "when": 1765834764376,
       "tag": "0004_real_wither",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1766014034869,
+      "tag": "0005_cooing_owl",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1767567302805,
+      "tag": "0006_faulty_thunderbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1767926396353,
+      "tag": "0007_oval_shockwave",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1767927166376,
+      "tag": "0008_breezy_aqueduct",
       "breakpoints": true
     }
   ]

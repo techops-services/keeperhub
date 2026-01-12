@@ -1,0 +1,92 @@
+name: Daily Upstream Sync
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+jobs:
+  sync-and-notify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "KeeperHub Sync Bot"
+          git config user.email "bot@techops.services"
+
+      - name: Add Upstream Remote
+        run: |
+          git remote add upstream https://github.com/vercel-labs/workflow-builder-template.git
+          git fetch upstream main
+
+      - name: Check for Updates and Generate Log
+        id: check_updates
+        run: |
+          CHANGES=$(git log --oneline --no-merges origin/main..upstream/main)
+
+          if [ -z "$CHANGES" ]; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No changes detected."
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            
+            # Format the changes for Discord (limit to 2000 chars roughly)
+            # We treat newlines literally for the Discord JSON payload
+            CLEAN_LOGS=$(echo "$CHANGES" | head -n 15 | sed 's/"/\\"/g')
+            
+            # Save to ENV for the next step to use
+            echo "COMMIT_LOG<<EOF" >> $GITHUB_ENV
+            echo "$CLEAN_LOGS" >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
+            
+            echo "Changes detected."
+          fi
+
+      - name: Sync Repository (Force Push)
+        if: steps.check_updates.outputs.has_changes == 'true'
+        run: |
+          # Hard reset local main to match upstream main
+          git reset --hard upstream/main
+
+          # Force push to origin main
+          # This requires the 'Bypass Ruleset' permission we set up in Part 1
+          git push origin main --force
+
+      - name: Notify Discord (Success)
+        if: steps.check_updates.outputs.has_changes == 'true'
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          LOGS: ${{ env.COMMIT_LOG }}
+        run: |
+          # Send JSON payload to Discord
+          curl -H "Content-Type: application/json" \
+          -d "{\"username\": \"KeeperHub Sync\", \"content\": \"**Daily Sync Successful**\n\n**New Commits from Upstream:**\n\`\`\`\n$LOGS\n\`\`\`\n*(Showing top 15 commits. Check repo for full history)*\"}" \
+          $DISCORD_WEBHOOK
+
+      - name: Notify Discord (No Changes)
+        if: steps.check_updates.outputs.has_changes == 'false'
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          curl -H "Content-Type: application/json" \
+          -d "{\"username\": \"KeeperHub Sync\", \"content\": \"**Daily Sync Report**\n\nNo new updates from upstream today.\"}" \
+          $DISCORD_WEBHOOK
+
+      - name: Notify Discord (Failure)
+        if: failure()
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          curl -H "Content-Type: application/json" \
+          -d "{\"username\": \"KeeperHub Sync\", \"content\": \"**Daily Sync Failed**\n\nPlease check the GitHub Actions logs.\"}" \
+          $DISCORD_WEBHOOK

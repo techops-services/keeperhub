@@ -26,6 +26,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { integrationRequiresCredentials } from "@/keeperhub/lib/integration-helpers";
+// end keeperhub
 import { aiGatewayStatusAtom } from "@/lib/ai-gateway/state";
 import {
   integrationsAtom,
@@ -36,6 +38,7 @@ import {
   findActionById,
   getActionsByCategory,
   getAllIntegrations,
+  getIntegration,
 } from "@/plugins";
 import { ActionConfigRenderer } from "./action-config-renderer";
 import { SchemaBuilder, type SchemaField } from "./schema-builder";
@@ -393,6 +396,14 @@ export function ActionConfig({
     return action?.integration as IntegrationType | undefined;
   }, [actionType]);
 
+  // start keeperhub
+  // Check if integration requires credentials (some like web3 don't)
+  const requiresCredentials = useMemo(
+    () => integrationRequiresCredentials(integrationType),
+    [integrationType]
+  );
+  // end keeperhub
+
   // Check if AI Gateway managed keys should be offered (user can have multiple for different teams)
   const shouldUseManagedKeys =
     integrationType === "ai-gateway" &&
@@ -401,6 +412,7 @@ export function ActionConfig({
 
   // Check if there are existing connections for this integration type
   const hasExistingConnections = useMemo(() => {
+    // biome-ignore lint/style/useBlockStatements: upstream code
     if (!integrationType) return false;
     return globalIntegrations.some((i) => i.type === integrationType);
   }, [integrationType, globalIntegrations]);
@@ -495,7 +507,8 @@ export function ActionConfig({
         </div>
       </div>
 
-      {integrationType && isOwner && (
+      {/* start keeperhub - added requiresCredentials check (upstream: integrationType && isOwner) */}
+      {integrationType && isOwner && requiresCredentials && (
         <div className="space-y-2">
           <div className="ml-1 flex items-center justify-between">
             <div className="flex items-center gap-1">
@@ -511,17 +524,20 @@ export function ActionConfig({
                 </Tooltip>
               </TooltipProvider>
             </div>
-            {hasExistingConnections && (
-              <Button
-                className="size-6"
-                disabled={disabled}
-                onClick={handleAddSecondaryConnection}
-                size="icon"
-                variant="ghost"
-              >
-                <Plus className="size-4" />
-              </Button>
-            )}
+            {/* start keeperhub - hide + button for singleConnection integrations */}
+            {hasExistingConnections &&
+              !getIntegration(integrationType)?.singleConnection && (
+                <Button
+                  className="size-6"
+                  disabled={disabled}
+                  onClick={handleAddSecondaryConnection}
+                  size="icon"
+                  variant="ghost"
+                >
+                  <Plus className="size-4" />
+                </Button>
+              )}
+            {/* end keeperhub */}
           </div>
           <IntegrationSelector
             disabled={disabled}
@@ -531,6 +547,7 @@ export function ActionConfig({
           />
         </div>
       )}
+      {/* end keeperhub */}
 
       {/* System actions - hardcoded config fields */}
       <SystemActionFields

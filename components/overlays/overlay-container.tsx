@@ -60,7 +60,7 @@ const containerVariants: Variants = {
 /**
  * Variants for drawer container
  */
-const drawerContainerVariants: Variants = {
+const _drawerContainerVariants: Variants = {
   hidden: {
     y: "100%",
     opacity: 0.5,
@@ -88,8 +88,12 @@ function getOverlayXPosition(
   isCurrent: boolean,
   isPrevious: boolean
 ): "0%" | "-35%" | "100%" {
-  if (isCurrent) return "0%";
-  if (isPrevious) return "-35%";
+  if (isCurrent) {
+    return "0%";
+  }
+  if (isPrevious) {
+    return "-35%";
+  }
   return "100%";
 }
 
@@ -151,6 +155,7 @@ function DesktopOverlayContainer() {
   });
 
   // Measure content height when it changes, reset on fresh open
+  // biome-ignore lint/correctness/useExhaustiveDependencies: upstream code
   useLayoutEffect(() => {
     const isFreshOpen = isOpen && !wasOpenRef.current;
     wasOpenRef.current = isOpen;
@@ -169,7 +174,7 @@ function DesktopOverlayContainer() {
   }, [stack, isOpen]);
 
   // Use live stack for options checks (only when open)
-  const currentItem = stack[stack.length - 1];
+  const currentItem = stack.at(-1);
   const springTransition = shouldReduceMotion ? { duration: 0.01 } : iosSpring;
   const isPushing = direction === 1;
 
@@ -311,6 +316,7 @@ function MobileOverlayContainer() {
   const currentIndex = renderStack.length - 1;
 
   // Measure content height when it changes, reset on fresh open
+  // biome-ignore lint/correctness/useExhaustiveDependencies: upstream code
   useLayoutEffect(() => {
     const isFreshOpen = isOpen && !wasOpenRef.current;
     wasOpenRef.current = isOpen;
@@ -329,7 +335,7 @@ function MobileOverlayContainer() {
   }, [stack, isOpen]);
 
   // Use live stack for options checks (only when open)
-  const currentItem = stack[stack.length - 1];
+  const currentItem = stack.at(-1);
   const renderCurrentItem = renderStack[currentIndex];
   const springTransition = shouldReduceMotion ? { duration: 0.01 } : iosSpring;
   const isPushing = direction === 1;

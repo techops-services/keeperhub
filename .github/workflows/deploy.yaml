@@ -1,0 +1,230 @@
+on:
+  push:
+    branches:
+      - staging
+      - feat/KEEP-1167-schedule-trigger-mvp
+      # - main
+  workflow_dispatch:
+
+name: deploy-keeperhub
+jobs:
+  build-and-deploy-keeperhub:
+    environment: ${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
+    runs-on: ubuntu-latest
+    env:
+      HELM_FILE: deploy/${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}/values.yaml
+      REGION: ${{ github.ref == 'refs/heads/main' && 'us-east-1' || 'us-east-2' }}
+      CLUSTER_NAME: ${{ github.ref == 'refs/heads/main' && 'maker-prod' || 'maker-staging' }}
+      ENVIRONMENT_TAG: ${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
+      NAMESPACE: keeperhub
+      SERVICE_NAME: keeperhub
+      AWS_ECR_NAME: keeperhub-${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
+      SERVICE_ACCOUNT_ROLE_ARN: ${{ vars.SERVICE_ACCOUNT_ROLE_ARN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Detect changed paths
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            migrator:
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'Dockerfile'
+              - 'lib/db/**'
+              - 'keeperhub/db/**'
+              - 'drizzle/**'
+              - 'drizzle.config.ts'
+            scheduler:
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'Dockerfile'
+              - 'scripts/schedule-*.ts'
+              - 'scripts/job-spawner.ts'
+              - 'lib/**'
+              - 'keeperhub/**'
+              - 'tsconfig.json'
+            workflow-runner:
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'Dockerfile'
+              - 'scripts/workflow-runner.ts'
+              - 'lib/**'
+              - 'plugins/**'
+              - 'keeperhub/**'
+              - 'tsconfig.json'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.REGION }}
+
+      - name: Login to AWS ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        if: ${{ !contains(github.event.head_commit.message , '[skip build]') }}
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract commit hash
+        id: vars
+        if: ${{ !contains(github.event.head_commit.message , '[skip build]') }}
+        shell: bash
+        run: |
+          echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+
+      - name: Build, tag, and push app image to ECR
+        id: build-app-image
+        if: ${{ !contains(github.event.head_commit.message , '[skip build]') }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:app-${{ steps.vars.outputs.sha_short }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:app-latest
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:${{ env.ENVIRONMENT_TAG }}
+          cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-app
+          cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-app,mode=max
+
+      - name: Build, tag, and push migrator image to ECR
+        id: build-migrator
+        if: ${{ !contains(github.event.head_commit.message, '[skip build]') && (steps.changes.outputs.migrator == 'true' || github.event_name == 'workflow_dispatch') }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          target: migrator
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:migrator-${{ steps.vars.outputs.sha_short }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:migrator-latest
+          cache-from: |
+            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-app
+          cache-to: type=inline
+
+      - name: Build, tag, and push scheduler image to ECR
+        id: build-scheduler
+        if: ${{ !contains(github.event.head_commit.message, '[skip build]') && (steps.changes.outputs.scheduler == 'true' || github.event_name == 'workflow_dispatch') }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          target: scheduler
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:scheduler-${{ steps.vars.outputs.sha_short }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:scheduler-latest
+          cache-from: |
+            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-app
+            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:scheduler-latest
+          cache-to: type=inline
+
+      - name: Build, tag, and push workflow-runner image to ECR
+        id: build-workflow-runner
+        if: ${{ !contains(github.event.head_commit.message, '[skip build]') && (steps.changes.outputs.workflow-runner == 'true' || github.event_name == 'workflow_dispatch') }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          target: workflow-runner
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:workflow-runner-${{ steps.vars.outputs.sha_short }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:workflow-runner-latest
+          cache-from: |
+            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-app
+          cache-to: type=inline
+
+      # Re-tag existing images when builds are skipped (creates new tag pointing to -latest)
+      - name: Re-tag migrator image if build skipped
+        if: ${{ !contains(github.event.head_commit.message, '[skip build]') && steps.changes.outputs.migrator != 'true' && github.event_name != 'workflow_dispatch' }}
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:migrator-${{ steps.vars.outputs.sha_short }} \
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:migrator-latest
+
+      - name: Re-tag scheduler image if build skipped
+        if: ${{ !contains(github.event.head_commit.message, '[skip build]') && steps.changes.outputs.scheduler != 'true' && github.event_name != 'workflow_dispatch' }}
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:scheduler-${{ steps.vars.outputs.sha_short }} \
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:scheduler-latest
+
+      - name: Re-tag workflow-runner image if build skipped
+        if: ${{ !contains(github.event.head_commit.message, '[skip build]') && steps.changes.outputs.workflow-runner != 'true' && github.event_name != 'workflow_dispatch' }}
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:workflow-runner-${{ steps.vars.outputs.sha_short }} \
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:workflow-runner-latest
+
+      - name: Replace variables in the Helm values file
+        id: replace-vars
+        if: ${{ !contains(github.event.head_commit.message , '[skip deploy]') }}
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
+          SERVICE_ACCOUNT_ROLE_ARN: ${{ env.SERVICE_ACCOUNT_ROLE_ARN }}
+        run: |
+          sed -i 's|${ECR_REGISTRY}|'"$ECR_REGISTRY"'|g' $HELM_FILE
+          sed -i 's|${IMAGE_TAG}|'"$IMAGE_TAG"'|g' $HELM_FILE
+          sed -i 's|${SERVICE_ACCOUNT_ROLE_ARN}|'"$SERVICE_ACCOUNT_ROLE_ARN"'|g' $HELM_FILE
+
+      - name: Replace variables in the Job Spawner values file
+        id: replace-vars-job-spawner
+        if: ${{ !contains(github.event.head_commit.message , '[skip deploy]') }}
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
+          JOB_SPAWNER_HELM_FILE: deploy/job-spawner/${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}/values.yaml
+        run: |
+          sed -i 's|${ECR_REGISTRY}|'"$ECR_REGISTRY"'|g' $JOB_SPAWNER_HELM_FILE
+          sed -i 's|${IMAGE_TAG}|'"$IMAGE_TAG"'|g' $JOB_SPAWNER_HELM_FILE
+
+      - name: Configure kubectl
+        if: ${{ !contains(github.event.head_commit.message , '[skip deploy]') }}
+        run: |
+          aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.REGION }}
+
+      - name: Apply RBAC for Job Spawner
+        if: ${{ !contains(github.event.head_commit.message , '[skip deploy]') }}
+        run: |
+          kubectl apply -f deploy/${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}/rbac.yaml
+
+      - name: Deploying Service to Kubernetes with Helm
+        id: deploy
+        uses: bitovi/github-actions-deploy-eks-helm@v1.2.10
+        with:
+          cluster-name: ${{ env.CLUSTER_NAME }}
+          config-files: ${{ env.HELM_FILE }}
+          chart-path: techops-services/common
+          namespace: ${{ env.NAMESPACE }}
+          timeout: 5m0s
+          name: ${{ env.SERVICE_NAME }}
+          chart-repository: https://techops-services.github.io/helm-charts
+          version: 0.2.1
+          atomic: true
+
+      - name: Deploying Job Spawner to Kubernetes with Helm
+        id: deploy-job-spawner
+        if: ${{ !contains(github.event.head_commit.message , '[skip deploy]') }}
+        uses: bitovi/github-actions-deploy-eks-helm@v1.2.10
+        with:
+          cluster-name: ${{ env.CLUSTER_NAME }}
+          config-files: deploy/job-spawner/${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}/values.yaml
+          chart-path: techops-services/common
+          namespace: ${{ env.NAMESPACE }}
+          timeout: 5m0s
+          name: keeperhub-job-spawner
+          chart-repository: https://techops-services.github.io/helm-charts
+          version: 0.2.1
+          atomic: true

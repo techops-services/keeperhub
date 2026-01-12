@@ -28,7 +28,14 @@ export type ActionConfigFieldBase = {
     | "text" // Regular text input
     | "number" // Number input
     | "select" // Dropdown select
-    | "schema-builder"; // Schema builder for structured output
+    | "chain-select" // Dynamic chain selector that fetches from /api/chains
+    | "schema-builder" // Schema builder for structured output
+    | "abi-function-select" // Dynamic dropdown that parses ABI and shows functions
+    | "abi-function-args" // Dynamic inputs for function arguments based on selected ABI function
+    | "abi-with-auto-fetch"; // ABI textarea with automatic fetch from Etherscan
+
+  // For chain-select: filter by chain type (e.g., "evm" or "solana")
+  chainTypeFilter?: string;
 
   // Placeholder text
   placeholder?: string;
@@ -56,6 +63,21 @@ export type ActionConfigFieldBase = {
     field: string;
     equals: string;
   };
+
+  // For abi-function-select: which field contains the ABI JSON
+  abiField?: string;
+
+  // For abi-function-select: filter functions by type ("read" or "write")
+  functionFilter?: "read" | "write";
+
+  // For abi-function-args: which field contains the ABI JSON and selected function
+  abiFunctionField?: string;
+
+  // For abi-with-auto-fetch: which field contains the contract address
+  contractAddressField?: string;
+
+  // For abi-with-auto-fetch: which field contains the network
+  networkField?: string;
 };
 
 /**
@@ -92,30 +114,14 @@ export type OutputField = {
 };
 
 /**
- * Result Component Props
- * Props passed to custom result components
- */
-export type ResultComponentProps = {
-  output: unknown;
-  input?: unknown;
-};
-
-/**
  * Output Display Config
  * Specifies how to render step output in the workflow runs panel
  */
-export type OutputDisplayConfig =
-  | {
-      // Built-in display types
+export type OutputDisplayConfig = {
+  // Type of display: image renders as img, video renders as video element, url renders in iframe
   type: "image" | "video" | "url";
   // Field name in the step output that contains the displayable value
   field: string;
-    }
-  | {
-      // Custom component display
-      type: "component";
-      // React component to render the output
-      component: React.ComponentType<ResultComponentProps>;
 };
 
 /**
@@ -168,16 +174,27 @@ export type IntegrationPlugin = {
   // Icon component (should be exported from plugins/[name]/icon.tsx)
   icon: React.ComponentType<{ className?: string }>;
 
+  // Whether this plugin requires credentials/integration setup
+  // Set to false for plugins that don't need authentication (e.g., webhook)
+  // Defaults to true for backward compatibility
+  requiresCredentials?: boolean;
+
+  // Whether only one connection is allowed per user
+  // Set to true for integrations with unique constraints (e.g., web3 wallet)
+  // When true, the "+" button to add more connections will be hidden
+  singleConnection?: boolean;
+
   // Form fields for the integration dialog
   formFields: Array<{
     id: string;
     label: string;
-    type: "text" | "password" | "url";
+    type: "text" | "password" | "url" | "checkbox";
     placeholder?: string;
     helpText?: string;
     helpLink?: { text: string; url: string };
     configKey: string; // Which key in IntegrationConfig to store the value
     envVar?: string; // Environment variable this field maps to (e.g., "RESEND_API_KEY")
+    defaultValue?: string | boolean; // Default value for the field (for checkboxes, use boolean)
   }>;
 
   // Testing configuration (lazy-loaded to avoid bundling Node.js packages in client)

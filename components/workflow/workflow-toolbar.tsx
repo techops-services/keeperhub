@@ -19,7 +19,9 @@ import {
   Undo2,
 } from "lucide-react";
 import { nanoid } from "nanoid";
-import { useRouter } from "next/navigation";
+// start custom KeeperHub code
+import { usePathname, useRouter } from "next/navigation";
+// end custom KeeperHub code
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -31,8 +33,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+// start custom keeperhub code //
+import { OrgSwitcher } from "@/keeperhub/components/organization/org-switcher";
 import { api } from "@/lib/api-client";
 import { authClient, useSession } from "@/lib/auth-client";
+import { getCustomLogo } from "@/lib/extension-registry";
 import { integrationsAtom } from "@/lib/integrations-store";
 import type { IntegrationType } from "@/lib/types/integration";
 import {
@@ -67,11 +72,10 @@ import {
 import {
   findActionById,
   flattenConfigFields,
+  getIntegration,
   getIntegrationLabels,
 } from "@/plugins";
 import { Panel } from "../ai-elements/panel";
-import { DeployButton } from "../deploy-button";
-import { GitHubStarsButton } from "../github-stars-button";
 import { ConfigurationOverlay } from "../overlays/configuration-overlay";
 import { ConfirmOverlay } from "../overlays/confirm-overlay";
 import { ExportWorkflowOverlay } from "../overlays/export-workflow-overlay";
@@ -81,8 +85,11 @@ import { WorkflowIssuesOverlay } from "../overlays/workflow-issues-overlay";
 import { WorkflowIcon } from "../ui/workflow-icon";
 import { UserMenu } from "../workflows/user-menu";
 
+// end keeperhub code //
+
 type WorkflowToolbarProps = {
   workflowId?: string;
+  persistent?: boolean;
 };
 
 // Helper functions to reduce complexity
@@ -313,6 +320,7 @@ function getMissingRequiredFields(
 // Get missing integrations for workflow nodes
 // Uses the plugin registry to determine which integrations are required
 // Also handles built-in actions that aren't in the plugin registry
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Upstream function - preserving original structure for easier merges
 function getMissingIntegrations(
   nodes: WorkflowNode[],
   userIntegrations: Array<{ id: string; type: IntegrationType }>
@@ -340,6 +348,12 @@ function getMissingIntegrations(
       action?.integration || BUILTIN_ACTION_INTEGRATIONS[actionType];
 
     if (!requiredIntegrationType) {
+      continue;
+    }
+
+    // Skip integrations that don't require credentials (e.g., webhook)
+    const plugin = getIntegration(requiredIntegrationType);
+    if (plugin && plugin.requiresCredentials === false) {
       continue;
     }
 
@@ -797,6 +811,7 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
       confirmVariant: "destructive" as const,
       destructive: true,
       onConfirm: async () => {
+        // biome-ignore lint/style/useBlockStatements: upstream code
         if (!currentWorkflowId) return;
         try {
           await api.workflow.delete(currentWorkflowId);
@@ -1319,19 +1334,19 @@ function RunButtonGroup({
 }) {
   return (
     <Button
-      className="border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
+      className="bg-keeperhub-green hover:bg-keeperhub-green-dark disabled:opacity-100 disabled:[&>svg]:text-muted-foreground"
       disabled={
         state.isExecuting || state.nodes.length === 0 || state.isGenerating
       }
       onClick={() => actions.handleExecute()}
-      size="icon"
       title="Run Workflow"
-      variant="secondary"
     >
       {state.isExecuting ? (
         <Loader2 className="size-4 animate-spin" />
       ) : (
-        <Play className="size-4" />
+        <div className="flex items-center gap-2">
+          <Play className="size-4" /> Run
+        </div>
       )}
     </Button>
   );
@@ -1374,21 +1389,40 @@ function WorkflowMenuComponent({
   state: ReturnType<typeof useWorkflowState>;
   actions: ReturnType<typeof useWorkflowActions>;
 }) {
+  // start custom KeeperHub code
+  const pathname = usePathname();
+  const isHubPage = pathname === "/hub";
+  // end custom KeeperHub code
+
   return (
     <div className="flex flex-col gap-1">
       <div className="flex h-9 max-w-[160px] items-center overflow-hidden rounded-md border bg-secondary text-secondary-foreground sm:max-w-none">
         <DropdownMenu onOpenChange={(open) => open && actions.loadWorkflows()}>
           <DropdownMenuTrigger className="flex h-full cursor-pointer items-center gap-2 px-3 font-medium text-sm transition-all hover:bg-black/5 dark:hover:bg-white/5">
-            <WorkflowIcon className="size-4 shrink-0" />
+            {/* start custom KeeperHub code */}
+            {isHubPage ? (
+              <Globe className="size-4 shrink-0" />
+            ) : (
+              <WorkflowIcon className="size-4 shrink-0" />
+            )}
+            {/* end custom KeeperHub code */}
             <p className="truncate font-medium text-sm">
-              {workflowId ? (
-                state.workflowName
-              ) : (
-                <>
-                  <span className="sm:hidden">New</span>
-                  <span className="hidden sm:inline">New Workflow</span>
-                </>
-              )}
+              {/* start custom KeeperHub code */}
+              {(() => {
+                if (isHubPage) {
+                  return "Hub";
+                }
+                if (workflowId) {
+                  return state.workflowName;
+                }
+                return (
+                  <>
+                    <span className="sm:hidden">New</span>
+                    <span className="hidden sm:inline">New Workflow</span>
+                  </>
+                );
+              })()}
+              {/* end custom KeeperHub code */}
             </p>
             <ChevronDown className="size-3 shrink-0 opacity-50" />
           </DropdownMenuTrigger>
@@ -1398,9 +1432,40 @@ function WorkflowMenuComponent({
               className="flex items-center justify-between"
             >
               <a href="/">
-                New Workflow{" "}
-                {!workflowId && <Check className="size-4 shrink-0" />}
+                New Workflow {/* start custom KeeperHub code */}
+                {!(workflowId || isHubPage) && (
+                  <Check className="size-4 shrink-0" />
+                )}
+                {/* end custom KeeperHub code */}
               </a>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="flex items-center justify-between"
+              disabled
+            >
+              <span>All Workflows</span>
+              <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground text-xs">
+                Coming Soon
+              </span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="flex items-center justify-between"
+              onClick={() => state.router.push("/hub")}
+            >
+              <span>Hub</span>
+              {/* start custom KeeperHub code */}
+              {isHubPage && <Check className="size-4 shrink-0" />}
+              {/* end custom KeeperHub code */}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="flex items-center justify-between"
+              disabled
+            >
+              <span>Analytics</span>
+              <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground text-xs">
+                Coming Soon
+              </span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             {state.allWorkflows.length === 0 ? (
@@ -1435,10 +1500,84 @@ function WorkflowMenuComponent({
   );
 }
 
-export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
+export const WorkflowToolbar = ({
+  workflowId,
+  persistent = false,
+}: WorkflowToolbarProps) => {
   const state = useWorkflowState();
   const actions = useWorkflowActions(state);
 
+  // Use prop if provided, otherwise fall back to atom value
+  const effectiveWorkflowId =
+    workflowId ?? state.currentWorkflowId ?? undefined;
+
+  // If persistent mode, use fixed positioning
+  const containerClassName = persistent
+    ? "pointer-events-auto fixed top-0 right-0 left-0 z-50 flex items-center justify-between border-b bg-background px-4 py-3"
+    : "";
+
+  const leftSectionClassName = persistent
+    ? "flex items-center gap-2"
+    : "flex flex-col gap-2 rounded-none border-none bg-transparent p-0 lg:flex-row lg:items-center";
+
+  const rightSectionClassName = persistent
+    ? "flex items-center gap-2"
+    : "pointer-events-auto absolute top-4 right-4 z-10";
+
+  const rightContentClassName = persistent
+    ? "flex items-center gap-2"
+    : "flex flex-col-reverse items-end gap-2 lg:flex-row lg:items-center";
+
+  if (persistent) {
+    return (
+      <div className={containerClassName}>
+        {/* Left side: Logo + Menu */}
+        <div className={leftSectionClassName}>
+          {(() => {
+            const CustomLogo = getCustomLogo();
+            return CustomLogo ? (
+              <CustomLogo className="size-7 shrink-0" />
+            ) : null;
+          })()}
+          <WorkflowMenuComponent
+            actions={actions}
+            state={state}
+            workflowId={effectiveWorkflowId}
+          />
+          {effectiveWorkflowId && !state.isOwner && (
+            <span className="hidden text-muted-foreground text-xs uppercase lg:inline">
+              Read-only
+            </span>
+          )}
+        </div>
+
+        {/* Right side: Actions + User Menu */}
+        <div className={rightSectionClassName}>
+          <div className={rightContentClassName}>
+            <ToolbarActions
+              actions={actions}
+              state={state}
+              workflowId={effectiveWorkflowId}
+            />
+            <div className="flex items-center gap-2">
+              {effectiveWorkflowId && !state.isOwner && (
+                <DuplicateButton
+                  isDuplicating={state.isDuplicating}
+                  onDuplicate={actions.handleDuplicate}
+                />
+              )}
+              {/* start custom keeperhub code // */}
+              <OrgSwitcher />
+              {/* end keeperhub code // */}
+              <UserMenu />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Original non-persistent layout for workflow canvas
   return (
     <>
       <Panel
@@ -1446,12 +1585,18 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
         position="top-left"
       >
         <div className="flex items-center gap-2">
+          {(() => {
+            const CustomLogo = getCustomLogo();
+            return CustomLogo ? (
+              <CustomLogo className="size-7 shrink-0" />
+            ) : null;
+          })()}
           <WorkflowMenuComponent
             actions={actions}
             state={state}
-            workflowId={workflowId}
+            workflowId={effectiveWorkflowId}
           />
-          {workflowId && !state.isOwner && (
+          {effectiveWorkflowId && !state.isOwner && (
             <span className="hidden text-muted-foreground text-xs uppercase lg:inline">
               Read-only
             </span>
@@ -1464,21 +1609,18 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
           <ToolbarActions
             actions={actions}
             state={state}
-            workflowId={workflowId}
+            workflowId={effectiveWorkflowId}
           />
           <div className="flex items-center gap-2">
-            {!workflowId && (
-              <>
-                <GitHubStarsButton />
-                <DeployButton />
-              </>
-            )}
-            {workflowId && !state.isOwner && (
+            {effectiveWorkflowId && !state.isOwner && (
               <DuplicateButton
                 isDuplicating={state.isDuplicating}
                 onDuplicate={actions.handleDuplicate}
               />
             )}
+            {/* start custom keeperhub code // */}
+            <OrgSwitcher />
+            {/* end keeperhub code // */}
             <UserMenu />
           </div>
         </div>

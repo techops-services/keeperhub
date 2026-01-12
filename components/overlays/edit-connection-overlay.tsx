@@ -9,7 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { api, type Integration } from "@/lib/api-client";
+// start keeperhub
+import { getCustomIntegrationFormHandler } from "@/lib/extension-registry";
 import { getIntegration, getIntegrationLabels } from "@/plugins";
+// end keeperhub
 import { ConfirmOverlay } from "./confirm-overlay";
 import { Overlay } from "./overlay";
 import { useOverlay } from "./overlay-provider";
@@ -137,7 +140,7 @@ export function EditConnectionOverlay({
   const { push, closeAll } = useOverlay();
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{
+  const [_testResult, setTestResult] = useState<{
     status: "success" | "error";
     message: string;
   } | null>(null);
@@ -267,6 +270,18 @@ export function EditConnectionOverlay({
 
   // Render config fields
   const renderConfigFields = () => {
+    // start keeperhub - check for custom form handlers (e.g., web3 wallet display)
+    const customHandler = getCustomIntegrationFormHandler(integration.type);
+    if (customHandler) {
+      return customHandler({
+        integrationType: integration.type,
+        isEditMode: true,
+        config,
+        updateConfig,
+      });
+    }
+    // end keeperhub
+
     if (integration.type === "database") {
       return (
         <SecretField
@@ -281,7 +296,9 @@ export function EditConnectionOverlay({
       );
     }
 
-    if (!formFields) return null;
+    if (!formFields) {
+      return null;
+    }
 
     return formFields.map((field) => {
       if (field.type === "password") {

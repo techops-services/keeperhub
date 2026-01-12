@@ -7,6 +7,11 @@
  * the plugins/index.ts file with imports. Also updates the README.md with
  * the current list of available actions.
  *
+ * Plugin Allowlist (Optional):
+ * - Create config/plugin-allowlist.json to control which plugins are enabled
+ * - If the file doesn't exist, all discovered plugins are enabled
+ * - This prevents disabled plugins from being registered while keeping them in the codebase
+ *
  * Additionally generates codegen templates from step files that have
  * a stepHandler function.
  *
@@ -27,7 +32,9 @@ import { dirname, join } from "node:path";
 import ts from "typescript";
 
 const PLUGINS_DIR = join(process.cwd(), "plugins");
+const KEEPERHUB_PLUGINS_DIR = join(process.cwd(), "keeperhub", "plugins");
 const OUTPUT_FILE = join(PLUGINS_DIR, "index.ts");
+const KEEPERHUB_OUTPUT_FILE = join(KEEPERHUB_PLUGINS_DIR, "index.ts");
 const TYPES_FILE = join(process.cwd(), "lib", "types", "integration.ts");
 const STEP_REGISTRY_FILE = join(process.cwd(), "lib", "step-registry.ts");
 const OUTPUT_CONFIGS_FILE = join(
@@ -37,6 +44,11 @@ const OUTPUT_CONFIGS_FILE = join(
 );
 const CODEGEN_REGISTRY_FILE = join(process.cwd(), "lib", "codegen-registry.ts");
 const README_FILE = join(process.cwd(), "README.md");
+const PLUGIN_ALLOWLIST_FILE = join(
+  process.cwd(),
+  "config",
+  "plugin-allowlist.json"
+);
 const PLUGINS_MARKER_REGEX =
   /<!-- PLUGINS:START[^>]*-->[\s\S]*?<!-- PLUGINS:END -->/;
 
@@ -59,6 +71,25 @@ async function formatCode(code: string): Promise<string> {
   }
 }
 
+/**
+ * Load plugin allowlist from config file
+ * Returns null if config doesn't exist (meaning all plugins enabled)
+ */
+function loadPluginAllowlist(): string[] | null {
+  if (!existsSync(PLUGIN_ALLOWLIST_FILE)) {
+    return null; // No allowlist = all plugins enabled
+  }
+
+  try {
+    const content = readFileSync(PLUGIN_ALLOWLIST_FILE, "utf-8");
+    const config = JSON.parse(content);
+    return config.plugins || [];
+  } catch (error) {
+    console.warn(`   Warning: Failed to load plugin allowlist: ${error}`);
+    return null; // Fallback to all plugins on error
+  }
+}
+
 // Track generated codegen templates
 const generatedCodegenTemplates = new Map<
   string,
@@ -66,36 +97,92 @@ const generatedCodegenTemplates = new Map<
 >();
 
 /**
- * Discover all plugin directories
+ * Discover plugins from a specific directory
  */
-function discoverPlugins(): string[] {
-  const entries = readdirSync(PLUGINS_DIR);
+function discoverPluginsFromDir(pluginsDir: string): string[] {
+  if (!existsSync(pluginsDir)) {
+    return [];
+  }
 
-  const plugins = entries.filter((entry) => {
+  const entries = readdirSync(pluginsDir);
+
+  return entries.filter((entry) => {
     // Skip special directories and files
     if (
       entry.startsWith("_") ||
       entry.startsWith(".") ||
       entry === "index.ts" ||
-      entry === "registry.ts"
+      entry === "registry.ts" ||
+      entry.endsWith(".ts") ||
+      entry.endsWith(".md")
     ) {
       return false;
     }
 
     // Only include directories
-    const fullPath = join(PLUGINS_DIR, entry);
+    const fullPath = join(pluginsDir, entry);
     try {
       return statSync(fullPath).isDirectory();
     } catch {
       return false;
     }
   });
-
-  return plugins.sort();
 }
 
 /**
- * Generate the plugins/index.ts file
+ * Discover all plugin directories (returns both all and enabled plugins)
+ * Scans both plugins/ and keeperhub/plugins/ directories
+ */
+function discoverPlugins(): {
+  base: { all: string[]; enabled: string[] };
+  keeperhub: { all: string[]; enabled: string[] };
+} {
+  const allowlist = loadPluginAllowlist();
+
+  // Discover base plugins
+  const basePlugins = discoverPluginsFromDir(PLUGINS_DIR);
+  // Discover KeeperHub plugins
+  const keeperhubPlugins = discoverPluginsFromDir(KEEPERHUB_PLUGINS_DIR);
+
+  let enabledBasePlugins = basePlugins;
+  let enabledKeeperHubPlugins = keeperhubPlugins;
+
+  // Apply allowlist filter if config exists
+  if (allowlist !== null) {
+    enabledBasePlugins = basePlugins.filter((plugin) =>
+      allowlist.includes(plugin)
+    );
+    enabledKeeperHubPlugins = keeperhubPlugins.filter((plugin) =>
+      allowlist.includes(plugin)
+    );
+
+    const disabledCount =
+      basePlugins.length +
+      keeperhubPlugins.length -
+      enabledBasePlugins.length -
+      enabledKeeperHubPlugins.length;
+
+    if (disabledCount > 0) {
+      console.log(
+        `   Allowlist enabled: ${disabledCount} plugin(s) filtered out`
+      );
+    }
+  }
+
+  return {
+    base: {
+      all: basePlugins.sort(),
+      enabled: enabledBasePlugins.sort(),
+    },
+    keeperhub: {
+      all: keeperhubPlugins.sort(),
+      enabled: enabledKeeperHubPlugins.sort(),
+    },
+  };
+}
+
+/**
+ * Generate the plugins/index.ts file (base plugins)
  */
 function generateIndexFile(plugins: string[]): void {
   const imports = plugins.map((plugin) => `import "./${plugin}";`).join("\n");
@@ -114,9 +201,14 @@ function generateIndexFile(plugins: string[]): void {
  * To remove an integration:
  * 1. Delete the plugin directory
  * 2. Run: pnpm discover-plugins (or it runs automatically on build)
+ *
+ * Discovered plugins: ${plugins.join(", ") || "none"}
  */
 
 ${imports || "// No plugins discovered"}
+
+// Import KeeperHub custom plugins
+import "@/keeperhub/plugins";
 
 export type {
   ActionConfigField,
@@ -155,17 +247,80 @@ export {
 }
 
 /**
+ * Generate the keeperhub/plugins/index.ts file (KeeperHub-specific plugins)
+ */
+function generateKeeperHubIndexFile(plugins: string[]): void {
+  const imports = plugins.map((plugin) => `import "./${plugin}";`).join("\n");
+
+  const content = `/**
+ * KeeperHub Plugins Index (Auto-Generated)
+ *
+ * This file is automatically generated by scripts/discover-plugins.ts
+ * DO NOT EDIT MANUALLY - your changes will be overwritten!
+ *
+ * KeeperHub-specific plugins that extend the base workflow builder.
+ * These plugins are loaded in addition to the base plugins.
+ *
+ * Discovered plugins: ${plugins.join(", ") || "none"}
+ */
+
+${imports || "// No KeeperHub plugins discovered"}
+
+// Re-export types from base registry for convenience
+export type {
+  ActionConfigField,
+  ActionConfigFieldBase,
+  ActionConfigFieldGroup,
+  ActionWithFullId,
+  IntegrationPlugin,
+  PluginAction,
+} from "@/plugins/registry";
+
+// biome-ignore lint/performance/noBarrelFile: Intentional re-exports for plugin architecture
+export {
+  computeActionId,
+  findActionById,
+  flattenConfigFields,
+  generateAIActionPrompts,
+  getActionsByCategory,
+  getAllActions,
+  getAllDependencies,
+  getAllEnvVars,
+  getAllIntegrations,
+  getCredentialMapping,
+  getDependenciesForActions,
+  getIntegration,
+  getIntegrationLabels,
+  getIntegrationTypes,
+  getPluginEnvVars,
+  getSortedIntegrationTypes,
+  isFieldGroup,
+  parseActionId,
+  registerIntegration,
+} from "@/plugins/registry";
+`;
+
+  writeFileSync(KEEPERHUB_OUTPUT_FILE, content, "utf-8");
+}
+
+/**
  * Update the README.md with the current list of actions
  */
 async function updateReadme(): Promise<void> {
+  // Import registry first, then plugins
+  const { getAllIntegrations } = await import("../plugins/registry");
+
   // Dynamically import the plugins to populate the registry
   // This works because we already generated plugins/index.ts above
-  await import("@/plugins/index");
-
-  // Now import the registry utilities
-  const { getAllIntegrations } = await import("@/plugins/registry");
+  try {
+    await import("../plugins/index");
+  } catch (error) {
+    console.error("Error importing plugins in updateReadme:", error);
+    throw error;
+  }
 
   const integrations = getAllIntegrations();
+  console.log(`[updateReadme] Found ${integrations.length} integration(s)`);
 
   if (integrations.length === 0) {
     console.log("No integrations found, skipping README update");
@@ -201,20 +356,26 @@ async function updateReadme(): Promise<void> {
 
 /**
  * Generate the lib/types/integration.ts file with dynamic types
+ * Takes discovered plugin names from both base and KeeperHub directories
  */
-async function generateTypesFile(): Promise<void> {
+function generateTypesFile(
+  basePlugins: string[],
+  keeperhubPlugins: string[]
+): void {
   // Ensure the types directory exists
   const typesDir = dirname(TYPES_FILE);
   if (!existsSync(typesDir)) {
     mkdirSync(typesDir, { recursive: true });
   }
 
-  // Get plugin types from registry
-  const { getIntegrationTypes } = await import("@/plugins/registry");
-  const pluginTypes = getIntegrationTypes();
-
-  // Combine plugin types with system types
-  const allTypes = [...pluginTypes, ...SYSTEM_INTEGRATION_TYPES].sort();
+  // Combine all plugin types with system types (dedupe in case of overlap)
+  const allTypes = [
+    ...new Set([
+      ...basePlugins,
+      ...keeperhubPlugins,
+      ...SYSTEM_INTEGRATION_TYPES,
+    ]),
+  ].sort();
 
   // Generate the union type
   const unionType = allTypes.map((t) => `  | "${t}"`).join("\n");
@@ -226,7 +387,7 @@ async function generateTypesFile(): Promise<void> {
  * DO NOT EDIT MANUALLY - your changes will be overwritten!
  *
  * To add a new integration type:
- * 1. Create a plugin in plugins/ directory, OR
+ * 1. Create a plugin in plugins/ or keeperhub/plugins/ directory, OR
  * 2. Add a system integration to SYSTEM_INTEGRATION_TYPES in discover-plugins.ts
  * 3. Run: pnpm discover-plugins
  *
@@ -238,7 +399,7 @@ export type IntegrationType =
 ${unionType};
 
 // Generic config type - plugins define their own keys via formFields[].configKey
-export type IntegrationConfig = Record<string, string | undefined>;
+export type IntegrationConfig = Record<string, string | boolean | undefined>;
 `;
 
   writeFileSync(TYPES_FILE, content, "utf-8");
@@ -503,10 +664,19 @@ async function processStepFilesForCodegen(): Promise<void> {
   );
   const integrations = getAllIntegrations();
 
+  // Determine which plugins are in KeeperHub vs base
+  const keeperhubPluginNames = discoverPluginsFromDir(KEEPERHUB_PLUGINS_DIR);
+  const keeperhubPluginSet = new Set(keeperhubPluginNames);
+
   for (const integration of integrations) {
+    // Determine the correct plugins directory
+    const pluginsDir = keeperhubPluginSet.has(integration.type)
+      ? KEEPERHUB_PLUGINS_DIR
+      : PLUGINS_DIR;
+
     for (const action of integration.actions) {
       const stepFilePath = join(
-        PLUGINS_DIR,
+        pluginsDir,
         integration.type,
         "steps",
         `${action.stepImportPath}.ts`
@@ -595,11 +765,23 @@ export function getAutoGeneratedTemplate(actionId: string): string | undefined {
  * This enables dynamic imports that are statically analyzable by the bundler
  */
 async function generateStepRegistry(): Promise<void> {
-  const { getAllIntegrations, computeActionId } = await import(
-    "@/plugins/registry"
-  );
-  const { LEGACY_ACTION_MAPPINGS } = await import("@/plugins/legacy-mappings");
+  // Import registry FIRST - this is critical! Plugins need the registry to exist before they register
+  const registryModule = await import("../plugins/registry");
+  const { getAllIntegrations, computeActionId } = registryModule;
+
+  // Import plugins to trigger registration (they will use the registry we just imported)
+  try {
+    await import("../plugins/index");
+  } catch (error) {
+    console.error("Error importing plugins:", error);
+    throw error;
+  }
+
+  const { LEGACY_ACTION_MAPPINGS } = await import("../plugins/legacy-mappings");
   const integrations = getAllIntegrations();
+  console.log(
+    `[generateStepRegistry] Found ${integrations.length} integration(s) with ${integrations.reduce((sum, i) => sum + i.actions.length, 0)} total action(s)`
+  );
 
   // Collect all action -> step mappings
   const stepEntries: Array<{
@@ -608,6 +790,7 @@ async function generateStepRegistry(): Promise<void> {
     integration: string;
     stepImportPath: string;
     stepFunction: string;
+    outputConfig?: { type: string; field: string };
   }> = [];
 
   for (const integration of integrations) {
@@ -619,6 +802,7 @@ async function generateStepRegistry(): Promise<void> {
         integration: integration.type,
         stepImportPath: action.stepImportPath,
         stepFunction: action.stepFunction,
+        outputConfig: action.outputConfig,
       });
     }
   }
@@ -634,13 +818,21 @@ async function generateStepRegistry(): Promise<void> {
     legacyLabelsForAction[actionId].push(legacyLabel);
   }
 
+  // Determine which plugins are in KeeperHub vs base
+  const keeperhubPluginNames = discoverPluginsFromDir(KEEPERHUB_PLUGINS_DIR);
+  const keeperhubPluginSet = new Set(keeperhubPluginNames);
+
   // Generate the step importer map with static imports
   // Include both namespaced IDs and legacy label-based IDs for backward compatibility
   const importerEntries = stepEntries
     .flatMap(({ actionId, integration, stepImportPath, stepFunction }) => {
+      // Determine import path based on whether plugin is in keeperhub/ or plugins/
+      const importBase = keeperhubPluginSet.has(integration)
+        ? "@/keeperhub/plugins"
+        : "@/plugins";
       const entries = [
         `  "${actionId}": {
-    importer: () => import("@/plugins/${integration}/steps/${stepImportPath}"),
+    importer: () => import("${importBase}/${integration}/steps/${stepImportPath}"),
     stepFunction: "${stepFunction}",
   },`,
       ];
@@ -649,7 +841,7 @@ async function generateStepRegistry(): Promise<void> {
       for (const legacyLabel of legacyLabels) {
         entries.push(
           `  "${legacyLabel}": {
-    importer: () => import("@/plugins/${integration}/steps/${stepImportPath}"),
+    importer: () => import("${importBase}/${integration}/steps/${stepImportPath}"),
     stepFunction: "${stepFunction}",
   },`
         );
@@ -750,7 +942,7 @@ async function generateOutputDisplayConfigs(): Promise<void> {
   );
   const integrations = getAllIntegrations();
 
-  // Collect output configs (only built-in types, not component types)
+  // Collect output configs
   const outputConfigs: Array<{
     actionId: string;
     type: string;
@@ -759,8 +951,7 @@ async function generateOutputDisplayConfigs(): Promise<void> {
 
   for (const integration of integrations) {
     for (const action of integration.actions) {
-      // Only include built-in config types (image/video/url), not component types
-      if (action.outputConfig && action.outputConfig.type !== "component") {
+      if (action.outputConfig) {
         outputConfigs.push({
           actionId: computeActionId(integration.type, action.slug),
           type: action.outputConfig.type,
@@ -823,25 +1014,50 @@ export function getOutputDisplayConfig(actionType: string): OutputDisplayConfig 
 async function main(): Promise<void> {
   console.log("Discovering plugins...");
 
-  const plugins = discoverPlugins();
+  const { base, keeperhub } = discoverPlugins();
 
-  if (plugins.length === 0) {
-    console.log("No plugins found in plugins/ directory");
+  // Report base plugins
+  if (base.all.length === 0) {
+    console.log("No base plugins found in plugins/ directory");
   } else {
-    console.log(`Found ${plugins.length} plugin(s):`);
-    for (const plugin of plugins) {
+    console.log(`\nBase plugins (${base.enabled.length} enabled):`);
+    for (const plugin of base.enabled) {
       console.log(`   - ${plugin}`);
+    }
+    if (base.all.length > base.enabled.length) {
+      const disabledPlugins = base.all.filter((p) => !base.enabled.includes(p));
+      console.log(`   Disabled: ${disabledPlugins.join(", ")}`);
     }
   }
 
-  console.log("\nGenerating plugins/index.ts...");
-  generateIndexFile(plugins);
+  // Report KeeperHub plugins
+  if (keeperhub.all.length === 0) {
+    console.log("\nNo KeeperHub plugins found in keeperhub/plugins/ directory");
+  } else {
+    console.log(`\nKeeperHub plugins (${keeperhub.enabled.length} enabled):`);
+    for (const plugin of keeperhub.enabled) {
+      console.log(`   - ${plugin}`);
+    }
+    if (keeperhub.all.length > keeperhub.enabled.length) {
+      const disabledPlugins = keeperhub.all.filter(
+        (p) => !keeperhub.enabled.includes(p)
+      );
+      console.log(`   Disabled: ${disabledPlugins.join(", ")}`);
+    }
+  }
+
+  console.log("\nGenerating lib/types/integration.ts...");
+  // Use all plugins for types (both base and keeperhub)
+  generateTypesFile(base.all, keeperhub.all);
+
+  console.log("Generating plugins/index.ts...");
+  generateIndexFile(base.enabled); // Only import enabled base plugins
+
+  console.log("Generating keeperhub/plugins/index.ts...");
+  generateKeeperHubIndexFile(keeperhub.enabled); // Only import enabled KeeperHub plugins
 
   console.log("Updating README.md...");
   await updateReadme();
-
-  console.log("Generating lib/types/integration.ts...");
-  await generateTypesFile();
 
   console.log("Generating lib/step-registry.ts...");
   await generateStepRegistry();

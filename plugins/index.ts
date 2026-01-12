@@ -12,22 +12,14 @@
  * To remove an integration:
  * 1. Delete the plugin directory
  * 2. Run: pnpm discover-plugins (or it runs automatically on build)
+ *
+ * Discovered plugins: slack
  */
 
-import "./ai-gateway";
-import "./blob";
-import "./clerk";
-import "./fal";
-import "./firecrawl";
-import "./github";
-import "./linear";
-import "./perplexity";
-import "./resend";
 import "./slack";
-import "./stripe";
-import "./superagent";
-import "./v0";
-import "./webflow";
+
+// Import KeeperHub custom plugins
+import "@/keeperhub/plugins";
 
 export type {
   ActionConfigField,

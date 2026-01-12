@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import postgres from "postgres";
+// start custom keeperhub code //
+import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 import { auth } from "@/lib/auth";
 import { getIntegration as getIntegrationFromDb } from "@/lib/db/integrations";
 import {
   getCredentialMapping,
   getIntegration as getPluginFromRegistry,
 } from "@/plugins";
+// end keeperhub code //
 
 export type TestConnectionResult = {
   status: "success" | "error";
@@ -25,6 +28,11 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // start custom keeperhub code //
+    const orgContext = await getOrgContext();
+    const organizationId = orgContext.organization?.id || null;
+    // end keeperhub code //
+
     const { integrationId } = await params;
 
     if (!integrationId) {
@@ -36,7 +44,10 @@ export async function POST(
 
     const integration = await getIntegrationFromDb(
       integrationId,
-      session.user.id
+      session.user.id,
+      // start custom keeperhub code //
+      organizationId
+      // end keeperhub code //
     );
 
     if (!integration) {
@@ -47,7 +58,11 @@ export async function POST(
     }
 
     if (integration.type === "database") {
-      const result = await testDatabaseConnection(integration.config.url);
+      const url =
+        typeof integration.config.url === "string"
+          ? integration.config.url
+          : undefined;
+      const result = await testDatabaseConnection(url);
       return NextResponse.json(result);
     }
 
