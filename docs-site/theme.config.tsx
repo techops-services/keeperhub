@@ -1,7 +1,6 @@
-import type { DocsThemeConfig } from "nextra-theme-docs";
 import { KeeperHubLogo } from "./components/keeperhub-logo";
 
-const config: DocsThemeConfig = {
+const config = {
   logo: (
     <span
       style={{
