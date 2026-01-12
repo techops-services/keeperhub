@@ -16,8 +16,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
+import { refetchOrganizations } from "@/keeperhub/lib/refetch-organizations";
 import { api } from "@/lib/api-client";
-import { signIn, signUp } from "@/lib/auth-client";
+import { authClient, signIn, signUp } from "@/lib/auth-client";
 import {
   getEnabledAuthProviders,
   getSingleProvider,
@@ -456,12 +457,23 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
     e.preventDefault();
     setError("");
     setLoading(true);
+
     try {
       const response = await signIn.email({ email, password });
       if (response.error) {
         setError(response.error.message || "Sign in failed");
         return;
       }
+
+      // Small delay to ensure session is fully established
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      // Fetch fresh session to get the active organization
+      await authClient.getSession();
+
+      // Trigger all organization hooks to refetch their data
+      refetchOrganizations();
+
       toast.success("Signed in successfully!");
       setOpen(false);
     } catch (err) {
@@ -475,28 +487,44 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
     e.preventDefault();
     setError("");
     setLoading(true);
+
     try {
       const { isAllowlisted } = await api.beta.checkEmail(email);
       if (!isAllowlisted) {
         setError(
           "This app is currently in closed beta. This email has not been approved yet."
         );
+        setLoading(false);
         return;
       }
+
       const signUpResponse = await signUp.email({
         email,
         password,
         name: email.split("@")[0],
       });
+
       if (signUpResponse.error) {
         setError(signUpResponse.error.message || "Sign up failed");
         return;
       }
+
       const signInResponse = await signIn.email({ email, password });
+
       if (signInResponse.error) {
         setError(signInResponse.error.message || "Sign in failed");
         return;
       }
+
+      // Small delay to let the server-side session hook set activeOrganizationId
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      // Fetch fresh session to get the updated activeOrganizationId
+      await authClient.getSession();
+
+      // Trigger all organization hooks to refetch their data
+      refetchOrganizations();
+
       toast.success("Account created successfully!");
       setOpen(false);
     } catch (err) {

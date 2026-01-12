@@ -10,15 +10,18 @@
 
 import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
 // Note: Using relative paths instead of @/ aliases for drizzle-kit compatibility
-import { users } from "../../lib/db/schema";
+import { organization, users } from "../../lib/db/schema";
 import { generateId } from "../../lib/utils/id";
 
 /**
  * Para Wallets table
  *
- * Stores user wallet information for Para (Web3) integration.
- * Each user can have one wallet (enforced by unique constraint on userId).
+ * Stores organization wallet information for Para (Web3) integration.
+ * Each organization can have one wallet (enforced by unique constraint on organizationId).
  * The userShare is encrypted before storage for security.
+ *
+ * NOTE: userId tracks who created the wallet, but the wallet belongs to the organization.
+ * Only organization admins and owners can create/manage wallets.
  */
 export const paraWallets = pgTable("para_wallets", {
   id: text("id")
@@ -26,8 +29,11 @@ export const paraWallets = pgTable("para_wallets", {
     .$defaultFn(() => generateId()),
   userId: text("user_id")
     .notNull()
-    .unique() // One wallet per user
     .references(() => users.id, { onDelete: "cascade" }),
+  // TODO: Make this NOT NULL after migrating existing user wallets to organizations
+  organizationId: text("organization_id")
+    .unique() // One wallet per organization
+    .references(() => organization.id, { onDelete: "cascade" }),
   email: text("email").notNull(),
   walletId: text("wallet_id").notNull(), // Para wallet ID
   walletAddress: text("wallet_address").notNull(), // EVM address (0x...)

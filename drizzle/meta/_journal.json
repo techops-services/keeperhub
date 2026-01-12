@@ -50,6 +50,20 @@
       "when": 1767567302805,
       "tag": "0006_faulty_thunderbird",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1767926396353,
+      "tag": "0007_oval_shockwave",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1767927166376,
+      "tag": "0008_breezy_aqueduct",
+      "breakpoints": true
     }
   ]
 }

@@ -36,6 +36,9 @@ export const sessions = pgTable("sessions", {
   userId: text("user_id")
     .notNull()
     .references(() => users.id),
+  // start custom keeperhub code //
+  activeOrganizationId: text("active_organization_id"),
+  // end keeperhub code //
 });
 
 export const accounts = pgTable("accounts", {
@@ -65,6 +68,44 @@ export const verifications = pgTable("verifications", {
   updatedAt: timestamp("updated_at"),
 });
 
+// start custom keeperhub code //
+// Organization tables
+export const organization = pgTable("organization", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  logo: text("logo"),
+  createdAt: timestamp("created_at").notNull(),
+  metadata: text("metadata"),
+});
+
+export const member = pgTable("member", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  role: text("role").default("member").notNull(),
+  createdAt: timestamp("created_at").notNull(),
+});
+
+export const invitation = pgTable("invitation", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  role: text("role"),
+  status: text("status").default("pending").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  inviterId: text("inviter_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+});
+// end keeperhub code //
+
 // Workflow visibility type
 export type WorkflowVisibility = "private" | "public";
 
@@ -78,6 +119,12 @@ export const workflows = pgTable("workflows", {
   userId: text("user_id")
     .notNull()
     .references(() => users.id),
+  // start custom keeperhub code //
+  organizationId: text("organization_id").references(() => organization.id, {
+    onDelete: "cascade",
+  }),
+  isAnonymous: boolean("is_anonymous").default(false).notNull(),
+  // end keeperhub code //
   // biome-ignore lint/suspicious/noExplicitAny: JSONB type - structure validated at application level
   nodes: jsonb("nodes").notNull().$type<any[]>(),
   // biome-ignore lint/suspicious/noExplicitAny: JSONB type - structure validated at application level
@@ -98,6 +145,11 @@ export const integrations = pgTable("integrations", {
   userId: text("user_id")
     .notNull()
     .references(() => users.id),
+  // start custom keeperhub code //
+  organizationId: text("organization_id").references(() => organization.id, {
+    onDelete: "cascade",
+  }),
+  // end keeperhub code //
   name: text("name").notNull(),
   type: text("type").notNull().$type<IntegrationType>(),
   // biome-ignore lint/suspicious/noExplicitAny: JSONB type - encrypted credentials stored as JSON
@@ -324,6 +376,36 @@ export const workflowSchedulesRelations = relations(
   })
 );
 
+// start custom keeperhub code //
+// Organization relations
+export const organizationRelations = relations(organization, ({ many }) => ({
+  members: many(member),
+  invitations: many(invitation),
+}));
+
+export const memberRelations = relations(member, ({ one }) => ({
+  organization: one(organization, {
+    fields: [member.organizationId],
+    references: [organization.id],
+  }),
+  user: one(users, {
+    fields: [member.userId],
+    references: [users.id],
+  }),
+}));
+
+export const invitationRelations = relations(invitation, ({ one }) => ({
+  organization: one(organization, {
+    fields: [invitation.organizationId],
+    references: [organization.id],
+  }),
+  inviter: one(users, {
+    fields: [invitation.inviterId],
+    references: [users.id],
+  }),
+}));
+// end keeperhub code //
+
 export const chainsRelations = relations(chains, ({ one, many }) => ({
   explorerConfig: one(explorerConfigs, {
     fields: [chains.chainId],
@@ -369,6 +451,14 @@ export type BetaAccessRequest = typeof betaAccessRequests.$inferSelect;
 export type NewBetaAccessRequest = typeof betaAccessRequests.$inferInsert;
 export type WorkflowSchedule = typeof workflowSchedules.$inferSelect;
 export type NewWorkflowSchedule = typeof workflowSchedules.$inferInsert;
+// start custom keeperhub code //
+export type Organization = typeof organization.$inferSelect;
+export type NewOrganization = typeof organization.$inferInsert;
+export type Member = typeof member.$inferSelect;
+export type NewMember = typeof member.$inferInsert;
+export type Invitation = typeof invitation.$inferSelect;
+export type NewInvitation = typeof invitation.$inferInsert;
+// end keeperhub code //
 export type Chain = typeof chains.$inferSelect;
 export type NewChain = typeof chains.$inferInsert;
 export type ExplorerConfig = typeof explorerConfigs.$inferSelect;
