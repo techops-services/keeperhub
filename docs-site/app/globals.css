@@ -77,3 +77,13 @@ html.dark [class*="dropdown"],
 html.dark [class*="popover"] {
   background-color: rgb(15, 23, 42) !important;
 }
+
+/* Make nav border span full width */
+html.dark nav {
+  border-bottom: 1px solid rgb(51, 65, 85) !important; /* slate-700 */
+}
+
+/* Remove any nested border that may cause the gap */
+html.dark nav > div {
+  border-bottom: none !important;
+}
