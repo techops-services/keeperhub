@@ -6,7 +6,8 @@
         "run",
         "-i",
         "--rm",
-        "-e", "TFE_TOKEN",
+        "-e",
+        "TFE_TOKEN",
         "hashicorp/terraform-mcp-server"
       ]
     },
