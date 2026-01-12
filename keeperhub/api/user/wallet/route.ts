@@ -279,32 +279,50 @@ export async function POST(request: Request) {
       );
     }
 
-    // 3. Create wallet via Para SDK
-    // Note: Using organization-specific email for the wallet
-    const orgEmail = `org-${organizationId}@keeperhub.para`;
-    const { wallet, userShare } = await createParaWallet(orgEmail);
+    // 3. Get email from request body (user-provided, pre-filled with their email)
+    const body = await request.json();
+    const walletEmail = body.email;
+
+    if (!walletEmail || typeof walletEmail !== "string") {
+      return NextResponse.json(
+        { error: "Email is required to create a wallet" },
+        { status: 400 }
+      );
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(walletEmail)) {
+      return NextResponse.json(
+        { error: "Invalid email format" },
+        { status: 400 }
+      );
+    }
+
+    // 4. Create wallet via Para SDK using user-provided email
+    const { wallet, userShare } = await createParaWallet(walletEmail);
 
     // wallet.id and wallet.address are validated in createParaWallet
     const walletId = wallet.id as string;
     const walletAddress = wallet.address as string;
 
-    // 4. Store wallet and create integration
+    // 5. Store wallet and create integration
     await storeWalletAndIntegration({
       userId: user.id,
       organizationId,
-      email: orgEmail,
+      email: walletEmail,
       walletId,
       walletAddress,
       userShare,
     });
 
-    // 5. Return success
+    // 6. Return success
     return NextResponse.json({
       success: true,
       wallet: {
         address: walletAddress,
         walletId,
-        email: orgEmail,
+        email: walletEmail,
         organizationId,
       },
     });
