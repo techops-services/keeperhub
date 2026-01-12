@@ -134,6 +134,28 @@ export function getWssUrl(options: GetWssUrlOptions): string | undefined {
 }
 
 /**
+ * Get a config value from RPC config with fallback to default
+ *
+ * @param rpcConfig - The parsed RPC config object
+ * @param jsonKey - The chain key (e.g., "eth-mainnet", "base-mainnet")
+ * @param field - The field to retrieve (e.g., "symbol", "chainId", "isEnabled")
+ * @param defaultValue - Default value if not found in config
+ * @returns The config value or default
+ */
+export function getConfigValue<T>(
+  rpcConfig: RpcConfig,
+  jsonKey: string,
+  field: keyof RpcConfigEntry,
+  defaultValue: T
+): T {
+  const entry = rpcConfig[jsonKey];
+  if (entry && field in entry && entry[field] !== undefined) {
+    return entry[field] as T;
+  }
+  return defaultValue;
+}
+
+/**
  * Create a pre-configured getRpcUrl helper using process.env
  *
  * This is a convenience function for scripts that need to resolve RPC URLs

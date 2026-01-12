@@ -90,6 +90,14 @@ COPY --from=source /app/keeperhub ./keeperhub
 COPY --from=source /app/package.json ./package.json
 COPY --from=source /app/tsconfig.json ./tsconfig.json
 
+# Copy auto-generated files from builder stage (step-registry.ts, etc. are in .gitignore)
+COPY --from=builder /app/lib/step-registry.ts ./lib/step-registry.ts
+COPY --from=builder /app/lib/codegen-registry.ts ./lib/codegen-registry.ts
+COPY --from=builder /app/lib/output-display-configs.ts ./lib/output-display-configs.ts
+COPY --from=builder /app/lib/types/integration.ts ./lib/types/integration.ts
+COPY --from=builder /app/plugins/index.ts ./plugins/index.ts
+COPY --from=builder /app/keeperhub/plugins/index.ts ./keeperhub/plugins/index.ts
+
 # Create a shim for 'server-only' package - the runner runs outside Next.js
 # so we replace the package with an empty module that doesn't throw
 # We need to replace it in the .pnpm folder where the actual package lives
