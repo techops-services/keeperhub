@@ -38,11 +38,18 @@ const rpcConfig = (() => {
 // Create resolver function for this script
 const getRpcUrl = createRpcUrlResolver(rpcConfig);
 
+/**
+ * Get symbol from CHAIN_RPC_CONFIG if available, otherwise use default
+ */
+function getSymbol(jsonKey: string, defaultSymbol: string): string {
+  return rpcConfig[jsonKey]?.symbol ?? defaultSymbol;
+}
+
 const DEFAULT_CHAINS: NewChain[] = [
   {
     chainId: 1,
     name: "Ethereum Mainnet",
-    symbol: "ETH",
+    symbol: getSymbol("eth-mainnet", "ETH"),
     chainType: "evm",
     defaultPrimaryRpc: getRpcUrl(
       "eth-mainnet",
@@ -72,7 +79,7 @@ const DEFAULT_CHAINS: NewChain[] = [
   {
     chainId: 11_155_111,
     name: "Sepolia Testnet",
-    symbol: "ETH",
+    symbol: getSymbol("sepolia", "ETH"),
     chainType: "evm",
     defaultPrimaryRpc: getRpcUrl(
       "sepolia",
@@ -102,7 +109,7 @@ const DEFAULT_CHAINS: NewChain[] = [
   {
     chainId: 8453,
     name: "Base",
-    symbol: "ETH",
+    symbol: getSymbol("base-mainnet", "BASE"),
     chainType: "evm",
     defaultPrimaryRpc: getRpcUrl(
       "base-mainnet",
@@ -132,7 +139,7 @@ const DEFAULT_CHAINS: NewChain[] = [
   {
     chainId: 84_532,
     name: "Base Sepolia",
-    symbol: "ETH",
+    symbol: getSymbol("base-sepolia", "BASE"),
     chainType: "evm",
     defaultPrimaryRpc: getRpcUrl(
       "base-sepolia",
@@ -162,7 +169,7 @@ const DEFAULT_CHAINS: NewChain[] = [
   {
     chainId: 42_429,
     name: "Tempo Testnet",
-    symbol: "USD",
+    symbol: getSymbol("tempo-testnet", "TEMPO"),
     chainType: "evm",
     defaultPrimaryRpc: getRpcUrl(
       "tempo-testnet",
@@ -192,7 +199,7 @@ const DEFAULT_CHAINS: NewChain[] = [
   {
     chainId: 42_420,
     name: "Tempo",
-    symbol: "USD",
+    symbol: getSymbol("tempo-mainnet", "TEMPO"),
     chainType: "evm",
     defaultPrimaryRpc: getRpcUrl(
       "tempo-mainnet",
@@ -223,7 +230,7 @@ const DEFAULT_CHAINS: NewChain[] = [
   {
     chainId: 101,
     name: "Solana",
-    symbol: "SOL",
+    symbol: getSymbol("solana-mainnet", "SOL"),
     chainType: "solana",
     defaultPrimaryRpc: getRpcUrl(
       "solana-mainnet",
@@ -253,7 +260,7 @@ const DEFAULT_CHAINS: NewChain[] = [
   {
     chainId: 103,
     name: "Solana Devnet",
-    symbol: "SOL",
+    symbol: getSymbol("solana-devnet", "SOL"),
     chainType: "solana",
     defaultPrimaryRpc: getRpcUrl(
       "solana-devnet",
@@ -393,9 +400,23 @@ async function seedChains() {
       .limit(1);
 
     if (existing.length > 0) {
-      console.log(
-        `  - ${chain.name} (${chain.chainId}) already exists, skipping`
-      );
+      // Update existing chain with new values (except id and timestamps)
+      await db
+        .update(chains)
+        .set({
+          name: chain.name,
+          symbol: chain.symbol,
+          chainType: chain.chainType,
+          defaultPrimaryRpc: chain.defaultPrimaryRpc,
+          defaultFallbackRpc: chain.defaultFallbackRpc,
+          defaultPrimaryWss: chain.defaultPrimaryWss,
+          defaultFallbackWss: chain.defaultFallbackWss,
+          isTestnet: chain.isTestnet,
+          isEnabled: chain.isEnabled,
+          updatedAt: new Date(),
+        })
+        .where(eq(chains.chainId, chain.chainId));
+      console.log(`  ~ ${chain.name} (${chain.chainId}) updated`);
       continue;
     }
 
