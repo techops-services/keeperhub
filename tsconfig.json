@@ -38,6 +38,7 @@
     "node_modules",
     "lib/next-boilerplate/**/*.ts",
     "lib/next-boilerplate/**/*.tsx",
-    "tmp/**/*"
+    "tmp/**/*",
+    "docs-site/**/*"
   ]
 }
