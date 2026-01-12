@@ -8,11 +8,7 @@
       "!components/ai-elements",
       "!lib/utils.ts",
       "!hooks/use-mobile.ts",
-      "!plugins",
-      "!app/api/ai-gateway",
-      "!lib/ai-gateway",
-      "!components/workflow/config/action-grid.tsx",
-      "!lib/rpc/index.ts"
+      "!plugins"
     ]
   }
 }

@@ -338,6 +338,7 @@ For more information, visit the [Workflow documentation](https://workflow.is).
     console.error("Failed to prepare workflow download:", error);
     return NextResponse.json(
       {
+        success: false,
         error:
           error instanceof Error
             ? error.message

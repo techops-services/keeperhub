@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
-// start custom keeperhub code //
-import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 import { auth } from "@/lib/auth";
 import { createIntegration, getIntegrations } from "@/lib/db/integrations";
 import type {
   IntegrationConfig,
   IntegrationType,
 } from "@/lib/types/integration";
-// end keeperhub code //
 
 export type GetIntegrationsResponse = {
   id: string;
@@ -47,21 +44,13 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // start custom keeperhub code //
-    const context = await getOrgContext();
-    const organizationId = context.organization?.id || null;
-    // end keeperhub code //
-
     // Get optional type filter from query params
     const { searchParams } = new URL(request.url);
     const typeFilter = searchParams.get("type") as IntegrationType | null;
 
     const integrations = await getIntegrations(
       session.user.id,
-      typeFilter || undefined,
-      // start custom keeperhub code //
-      organizationId
-      // end keeperhub code //
+      typeFilter || undefined
     );
 
     // Return integrations without config for security
@@ -103,11 +92,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // start custom keeperhub code //
-    const context = await getOrgContext();
-    const organizationId = context.organization?.id || null;
-    // end keeperhub code //
-
     const body: CreateIntegrationRequest = await request.json();
 
     if (!(body.type && body.config)) {
@@ -117,15 +101,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const integration = await createIntegration({
-      userId: session.user.id,
-      name: body.name || "",
-      type: body.type,
-      config: body.config,
-      // start custom keeperhub code //
-      organizationId,
-      // end keeperhub code //
-    });
+    const integration = await createIntegration(
+      session.user.id,
+      body.name || "",
+      body.type,
+      body.config
+    );
 
     const response: CreateIntegrationResponse = {
       id: integration.id,

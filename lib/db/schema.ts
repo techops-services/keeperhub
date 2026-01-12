@@ -1,14 +1,5 @@
 import { relations } from "drizzle-orm";
-import {
-  boolean,
-  index,
-  integer,
-  jsonb,
-  pgTable,
-  text,
-  timestamp,
-  uniqueIndex,
-} from "drizzle-orm/pg-core";
+import { boolean, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import type { IntegrationType } from "../types/integration";
 import { generateId } from "../utils/id";
 
@@ -36,9 +27,6 @@ export const sessions = pgTable("sessions", {
   userId: text("user_id")
     .notNull()
     .references(() => users.id),
-  // start custom keeperhub code //
-  activeOrganizationId: text("active_organization_id"),
-  // end keeperhub code //
 });
 
 export const accounts = pgTable("accounts", {
@@ -68,44 +56,6 @@ export const verifications = pgTable("verifications", {
   updatedAt: timestamp("updated_at"),
 });
 
-// start custom keeperhub code //
-// Organization tables
-export const organization = pgTable("organization", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  slug: text("slug").notNull().unique(),
-  logo: text("logo"),
-  createdAt: timestamp("created_at").notNull(),
-  metadata: text("metadata"),
-});
-
-export const member = pgTable("member", {
-  id: text("id").primaryKey(),
-  organizationId: text("organization_id")
-    .notNull()
-    .references(() => organization.id, { onDelete: "cascade" }),
-  userId: text("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  role: text("role").default("member").notNull(),
-  createdAt: timestamp("created_at").notNull(),
-});
-
-export const invitation = pgTable("invitation", {
-  id: text("id").primaryKey(),
-  organizationId: text("organization_id")
-    .notNull()
-    .references(() => organization.id, { onDelete: "cascade" }),
-  email: text("email").notNull(),
-  role: text("role"),
-  status: text("status").default("pending").notNull(),
-  expiresAt: timestamp("expires_at").notNull(),
-  inviterId: text("inviter_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-});
-// end keeperhub code //
-
 // Workflow visibility type
 export type WorkflowVisibility = "private" | "public";
 
@@ -119,12 +69,6 @@ export const workflows = pgTable("workflows", {
   userId: text("user_id")
     .notNull()
     .references(() => users.id),
-  // start custom keeperhub code //
-  organizationId: text("organization_id").references(() => organization.id, {
-    onDelete: "cascade",
-  }),
-  isAnonymous: boolean("is_anonymous").default(false).notNull(),
-  // end keeperhub code //
   // biome-ignore lint/suspicious/noExplicitAny: JSONB type - structure validated at application level
   nodes: jsonb("nodes").notNull().$type<any[]>(),
   // biome-ignore lint/suspicious/noExplicitAny: JSONB type - structure validated at application level
@@ -145,11 +89,6 @@ export const integrations = pgTable("integrations", {
   userId: text("user_id")
     .notNull()
     .references(() => users.id),
-  // start custom keeperhub code //
-  organizationId: text("organization_id").references(() => organization.id, {
-    onDelete: "cascade",
-  }),
-  // end keeperhub code //
   name: text("name").notNull(),
   type: text("type").notNull().$type<IntegrationType>(),
   // biome-ignore lint/suspicious/noExplicitAny: JSONB type - encrypted credentials stored as JSON
@@ -182,14 +121,6 @@ export const workflowExecutions = pgTable("workflow_executions", {
   startedAt: timestamp("started_at").notNull().defaultNow(),
   completedAt: timestamp("completed_at"),
   duration: text("duration"), // Duration in milliseconds
-  // Progress tracking
-  totalSteps: text("total_steps"),
-  completedSteps: text("completed_steps").default("0"),
-  currentNodeId: text("current_node_id"),
-  currentNodeName: text("current_node_name"),
-  lastSuccessfulNodeId: text("last_successful_node_id"),
-  lastSuccessfulNodeName: text("last_successful_node_name"),
-  executionTrace: jsonb("execution_trace").$type<string[]>(),
 });
 
 // Workflow execution logs to track individual node executions
@@ -217,15 +148,6 @@ export const workflowExecutionLogs = pgTable("workflow_execution_logs", {
   timestamp: timestamp("timestamp").notNull().defaultNow(),
 });
 
-// KeeperHub: Para Wallets table (imported from KeeperHub schema extensions)
-// Note: Using relative path instead of @/ alias for drizzle-kit compatibility
-// biome-ignore lint/performance/noBarrelFile: Intentional re-export for schema extensions
-export {
-  type NewParaWallet,
-  type ParaWallet,
-  paraWallets,
-} from "../../keeperhub/db/schema-extensions";
-
 // API Keys table for webhook authentication
 export const apiKeys = pgTable("api_keys", {
   id: text("id")
@@ -241,120 +163,6 @@ export const apiKeys = pgTable("api_keys", {
   lastUsedAt: timestamp("last_used_at"),
 });
 
-// Beta Access Requests - stores emails requesting beta access
-export const betaAccessRequests = pgTable("beta_access_requests", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => generateId()),
-  email: text("email").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-// Workflow Schedules table for scheduled trigger configuration
-export const workflowSchedules = pgTable(
-  "workflow_schedules",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => generateId()),
-    workflowId: text("workflow_id")
-      .notNull()
-      .unique()
-      .references(() => workflows.id, { onDelete: "cascade" }),
-    cronExpression: text("cron_expression").notNull(),
-    timezone: text("timezone").notNull().default("UTC"),
-    enabled: boolean("enabled").notNull().default(true),
-    lastRunAt: timestamp("last_run_at", { withTimezone: true }),
-    lastStatus: text("last_status").$type<"success" | "error" | null>(),
-    lastError: text("last_error"),
-    nextRunAt: timestamp("next_run_at", { withTimezone: true }),
-    runCount: text("run_count").default("0"),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (table) => [
-    index("idx_workflow_schedules_enabled").on(table.enabled),
-    uniqueIndex("idx_workflow_schedules_workflow").on(table.workflowId),
-  ]
-);
-
-// Supported blockchain networks with default RPC endpoints
-export const chains = pgTable(
-  "chains",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => generateId()),
-    chainId: integer("chain_id").notNull().unique(), // e.g., 1, 11155111, 8453
-    name: text("name").notNull(), // e.g., "Ethereum Mainnet"
-    symbol: text("symbol").notNull(), // e.g., "ETH"
-    chainType: text("chain_type").notNull().default("evm"), // "evm" | "solana"
-    defaultPrimaryRpc: text("default_primary_rpc").notNull(),
-    defaultFallbackRpc: text("default_fallback_rpc"),
-    defaultPrimaryWss: text("default_primary_wss"), // WebSocket URL
-    defaultFallbackWss: text("default_fallback_wss"),
-    isTestnet: boolean("is_testnet").default(false),
-    isEnabled: boolean("is_enabled").default(true), // Can disable chains
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  },
-  (table) => [index("idx_chains_chain_id").on(table.chainId)]
-);
-
-// Explorer configuration for each chain (KEEP-1154)
-export const explorerConfigs = pgTable(
-  "explorer_configs",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => generateId()),
-    chainId: integer("chain_id")
-      .notNull()
-      .unique()
-      .references(() => chains.chainId, { onDelete: "cascade" }),
-    chainType: text("chain_type").notNull().default("evm"), // "evm" | "solana" - mirrors chains.chainType
-    explorerUrl: text("explorer_url"), // e.g., "https://etherscan.io"
-    explorerApiType: text("explorer_api_type"), // "etherscan" | "blockscout" | "solscan"
-    explorerApiUrl: text("explorer_api_url"), // Base URL for API calls (ABI, balance, etc.)
-    explorerTxPath: text("explorer_tx_path").default("/tx/{hash}"),
-    explorerAddressPath: text("explorer_address_path").default(
-      "/address/{address}"
-    ),
-    explorerContractPath: text("explorer_contract_path"), // e.g., "/address/{address}#code"
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  },
-  (table) => [index("idx_explorer_configs_chain_id").on(table.chainId)]
-);
-
-// User-specific RPC endpoint overrides
-export const userRpcPreferences = pgTable(
-  "user_rpc_preferences",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => generateId()),
-    userId: text("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    chainId: integer("chain_id").notNull(), // References chains.chainId
-    primaryRpcUrl: text("primary_rpc_url").notNull(),
-    fallbackRpcUrl: text("fallback_rpc_url"),
-    primaryWssUrl: text("primary_wss_url"), // WebSocket URL override
-    fallbackWssUrl: text("fallback_wss_url"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  },
-  (table) => [
-    uniqueIndex("idx_user_rpc_user_chain").on(table.userId, table.chainId),
-    index("idx_user_rpc_user_id").on(table.userId),
-  ]
-);
-
 // Relations
 export const workflowExecutionsRelations = relations(
   workflowExecutions,
@@ -362,74 +170,6 @@ export const workflowExecutionsRelations = relations(
     workflow: one(workflows, {
       fields: [workflowExecutions.workflowId],
       references: [workflows.id],
-    }),
-  })
-);
-
-export const workflowSchedulesRelations = relations(
-  workflowSchedules,
-  ({ one }) => ({
-    workflow: one(workflows, {
-      fields: [workflowSchedules.workflowId],
-      references: [workflows.id],
-    }),
-  })
-);
-
-// start custom keeperhub code //
-// Organization relations
-export const organizationRelations = relations(organization, ({ many }) => ({
-  members: many(member),
-  invitations: many(invitation),
-}));
-
-export const memberRelations = relations(member, ({ one }) => ({
-  organization: one(organization, {
-    fields: [member.organizationId],
-    references: [organization.id],
-  }),
-  user: one(users, {
-    fields: [member.userId],
-    references: [users.id],
-  }),
-}));
-
-export const invitationRelations = relations(invitation, ({ one }) => ({
-  organization: one(organization, {
-    fields: [invitation.organizationId],
-    references: [organization.id],
-  }),
-  inviter: one(users, {
-    fields: [invitation.inviterId],
-    references: [users.id],
-  }),
-}));
-// end keeperhub code //
-
-export const chainsRelations = relations(chains, ({ one, many }) => ({
-  explorerConfig: one(explorerConfigs, {
-    fields: [chains.chainId],
-    references: [explorerConfigs.chainId],
-  }),
-  userRpcPreferences: many(userRpcPreferences),
-}));
-
-export const explorerConfigsRelations = relations(
-  explorerConfigs,
-  ({ one }) => ({
-    chain: one(chains, {
-      fields: [explorerConfigs.chainId],
-      references: [chains.chainId],
-    }),
-  })
-);
-
-export const userRpcPreferencesRelations = relations(
-  userRpcPreferences,
-  ({ one }) => ({
-    user: one(users, {
-      fields: [userRpcPreferences.userId],
-      references: [users.id],
     }),
   })
 );
@@ -444,24 +184,5 @@ export type WorkflowExecution = typeof workflowExecutions.$inferSelect;
 export type NewWorkflowExecution = typeof workflowExecutions.$inferInsert;
 export type WorkflowExecutionLog = typeof workflowExecutionLogs.$inferSelect;
 export type NewWorkflowExecutionLog = typeof workflowExecutionLogs.$inferInsert;
-// ParaWallet types are exported from @/keeperhub/db/schema-extensions
 export type ApiKey = typeof apiKeys.$inferSelect;
 export type NewApiKey = typeof apiKeys.$inferInsert;
-export type BetaAccessRequest = typeof betaAccessRequests.$inferSelect;
-export type NewBetaAccessRequest = typeof betaAccessRequests.$inferInsert;
-export type WorkflowSchedule = typeof workflowSchedules.$inferSelect;
-export type NewWorkflowSchedule = typeof workflowSchedules.$inferInsert;
-// start custom keeperhub code //
-export type Organization = typeof organization.$inferSelect;
-export type NewOrganization = typeof organization.$inferInsert;
-export type Member = typeof member.$inferSelect;
-export type NewMember = typeof member.$inferInsert;
-export type Invitation = typeof invitation.$inferSelect;
-export type NewInvitation = typeof invitation.$inferInsert;
-// end keeperhub code //
-export type Chain = typeof chains.$inferSelect;
-export type NewChain = typeof chains.$inferInsert;
-export type ExplorerConfig = typeof explorerConfigs.$inferSelect;
-export type NewExplorerConfig = typeof explorerConfigs.$inferInsert;
-export type UserRpcPreference = typeof userRpcPreferences.$inferSelect;
-export type NewUserRpcPreference = typeof userRpcPreferences.$inferInsert;

@@ -2,10 +2,6 @@ import "server-only";
 
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
-import {
-  findActionById,
-  getIntegration as getPluginDefinition,
-} from "@/plugins";
 import type { IntegrationConfig, IntegrationType } from "../types/integration";
 import { db } from "./index";
 import { integrations, type NewIntegration } from "./schema";
@@ -112,22 +108,12 @@ export type DecryptedIntegration = {
 
 /**
  * Get all integrations for a user, optionally filtered by type
- * // start custom keeperhub code //
- * Updated to support organization context
- * // end keeperhub code //
  */
 export async function getIntegrations(
   userId: string,
-  type?: IntegrationType,
-  // start custom keeperhub code //
-  organizationId?: string | null
-  // end keeperhub code //
+  type?: IntegrationType
 ): Promise<DecryptedIntegration[]> {
-  // start custom keeperhub code //
-  const conditions = organizationId
-    ? [eq(integrations.organizationId, organizationId)]
-    : [eq(integrations.userId, userId)];
-  // end keeperhub code //
+  const conditions = [eq(integrations.userId, userId)];
 
   if (type) {
     conditions.push(eq(integrations.type, type));
@@ -146,30 +132,17 @@ export async function getIntegrations(
 
 /**
  * Get a single integration by ID
- * // start custom keeperhub code //
- * Updated to support organization context
- * // end keeperhub code //
  */
 export async function getIntegration(
   integrationId: string,
-  userId: string,
-  // start custom keeperhub code //
-  organizationId?: string | null
-  // end keeperhub code //
+  userId: string
 ): Promise<DecryptedIntegration | null> {
-  // start custom keeperhub code //
-  const conditions = organizationId
-    ? [
-        eq(integrations.id, integrationId),
-        eq(integrations.organizationId, organizationId),
-      ]
-    : [eq(integrations.id, integrationId), eq(integrations.userId, userId)];
-  // end keeperhub code //
-
   const result = await db
     .select()
     .from(integrations)
-    .where(and(...conditions))
+    .where(
+      and(eq(integrations.id, integrationId), eq(integrations.userId, userId))
+    )
     .limit(1);
 
   if (result.length === 0) {
@@ -206,24 +179,13 @@ export async function getIntegrationById(
 
 /**
  * Create a new integration
- * // start custom keeperhub code //
- * Updated to support organization context
- * // end keeperhub code //
  */
-type CreateIntegrationOptions = {
-  userId: string;
-  name: string;
-  type: IntegrationType;
-  config: IntegrationConfig;
-  // start custom keeperhub code //
-  organizationId?: string | null;
-  // end keeperhub code //
-};
-
 export async function createIntegration(
-  options: CreateIntegrationOptions
+  userId: string,
+  name: string,
+  type: IntegrationType,
+  config: IntegrationConfig
 ): Promise<DecryptedIntegration> {
-  const { userId, name, type, config, organizationId } = options;
   const encryptedConfig = encryptConfig(config);
 
   const [result] = await db
@@ -233,9 +195,6 @@ export async function createIntegration(
       name,
       type,
       config: encryptedConfig,
-      // start custom keeperhub code //
-      organizationId,
-      // end keeperhub code //
     })
     .returning();
 
@@ -247,9 +206,6 @@ export async function createIntegration(
 
 /**
  * Update an integration
- * // start custom keeperhub code //
- * Updated to support organization context
- * // end keeperhub code //
  */
 export async function updateIntegration(
   integrationId: string,
@@ -257,10 +213,7 @@ export async function updateIntegration(
   updates: {
     name?: string;
     config?: IntegrationConfig;
-  },
-  // start custom keeperhub code //
-  organizationId?: string | null
-  // end keeperhub code //
+  }
 ): Promise<DecryptedIntegration | null> {
   const updateData: Partial<NewIntegration> = {
     updatedAt: new Date(),
@@ -274,19 +227,12 @@ export async function updateIntegration(
     updateData.config = encryptConfig(updates.config);
   }
 
-  // start custom keeperhub code //
-  const conditions = organizationId
-    ? [
-        eq(integrations.id, integrationId),
-        eq(integrations.organizationId, organizationId),
-      ]
-    : [eq(integrations.id, integrationId), eq(integrations.userId, userId)];
-  // end keeperhub code //
-
   const [result] = await db
     .update(integrations)
     .set(updateData)
-    .where(and(...conditions))
+    .where(
+      and(eq(integrations.id, integrationId), eq(integrations.userId, userId))
+    )
     .returning();
 
   if (!result) {
@@ -301,29 +247,16 @@ export async function updateIntegration(
 
 /**
  * Delete an integration
- * // start custom keeperhub code //
- * Updated to support organization context
- * // end keeperhub code //
  */
 export async function deleteIntegration(
   integrationId: string,
-  userId: string,
-  // start custom keeperhub code //
-  organizationId?: string | null
-  // end keeperhub code //
+  userId: string
 ): Promise<boolean> {
-  // start custom keeperhub code //
-  const conditions = organizationId
-    ? [
-        eq(integrations.id, integrationId),
-        eq(integrations.organizationId, organizationId),
-      ]
-    : [eq(integrations.id, integrationId), eq(integrations.userId, userId)];
-  // end keeperhub code //
-
   const result = await db
     .delete(integrations)
-    .where(and(...conditions))
+    .where(
+      and(eq(integrations.id, integrationId), eq(integrations.userId, userId))
+    )
     .returning();
 
   return result.length > 0;
@@ -336,38 +269,12 @@ type WorkflowNodeForValidation = {
   data?: {
     config?: {
       integrationId?: string;
-      actionType?: string;
     };
   };
 };
 
 /**
- * Check if a node's integration ID should be included for validation
- */
-function shouldIncludeIntegrationId(node: WorkflowNodeForValidation): boolean {
-  const actionType = node.data?.config?.actionType;
-
-  // No action type - include for validation
-  if (!actionType || typeof actionType !== "string") {
-    return true;
-  }
-
-  const action = findActionById(actionType);
-
-  // Unknown action - include for validation
-  if (!action) {
-    return true;
-  }
-
-  const plugin = getPluginDefinition(action.integration);
-
-  // Only include if plugin requires integration (defaults to true)
-  return plugin?.requiresCredentials !== false;
-}
-
-/**
  * Extract all integration IDs from workflow nodes
- * Only includes nodes whose actions actually require an integration
  */
 export function extractIntegrationIds(
   nodes: WorkflowNodeForValidation[]
@@ -376,11 +283,7 @@ export function extractIntegrationIds(
 
   for (const node of nodes) {
     const integrationId = node.data?.config?.integrationId;
-    if (!integrationId || typeof integrationId !== "string") {
-      continue;
-    }
-
-    if (shouldIncludeIntegrationId(node)) {
+    if (integrationId && typeof integrationId === "string") {
       integrationIds.push(integrationId);
     }
   }
@@ -390,25 +293,18 @@ export function extractIntegrationIds(
 
 /**
  * Validate that all integration IDs in workflow nodes either:
- * 1. Belong to the specified user (or organization), or
+ * 1. Belong to the specified user, or
  * 2. Don't exist (deleted integrations - stale references are allowed)
  *
  * This prevents users from accessing other users' credentials by embedding
  * foreign integration IDs in their workflows, while allowing workflows
  * with references to deleted integrations to still be saved.
  *
- * // start custom keeperhub code //
- * Updated to support organization context
- * // end keeperhub code //
- *
  * @returns Object with `valid` boolean and optional `invalidIds` array
  */
 export async function validateWorkflowIntegrations(
   nodes: WorkflowNodeForValidation[],
-  userId: string,
-  // start custom keeperhub code //
-  organizationId?: string | null
-  // end keeperhub code //
+  userId: string
 ): Promise<{ valid: boolean; invalidIds?: string[] }> {
   const integrationIds = extractIntegrationIds(nodes);
 
@@ -416,31 +312,18 @@ export async function validateWorkflowIntegrations(
     return { valid: true };
   }
 
-  // start custom keeperhub code //
-  // Query for ALL integrations with these IDs (regardless of user/org)
-  // to check if any belong to other users/orgs
+  // Query for ALL integrations with these IDs (regardless of user)
+  // to check if any belong to other users
   const existingIntegrations = await db
-    .select({
-      id: integrations.id,
-      userId: integrations.userId,
-      organizationId: integrations.organizationId,
-    })
+    .select({ id: integrations.id, userId: integrations.userId })
     .from(integrations)
     .where(inArray(integrations.id, integrationIds));
 
-  // Find integrations that exist but belong to a different user/org
+  // Find integrations that exist but belong to a different user
   // (deleted integrations won't appear here, which is fine)
   const invalidIds = existingIntegrations
-    .filter((i) => {
-      if (organizationId) {
-        // For org workflows, check org membership
-        return i.organizationId !== organizationId;
-      }
-      // For anonymous workflows, check user ownership
-      return i.userId !== userId;
-    })
+    .filter((i) => i.userId !== userId)
     .map((i) => i.id);
-  // end keeperhub code //
 
   if (invalidIds.length > 0) {
     return { valid: false, invalidIds };

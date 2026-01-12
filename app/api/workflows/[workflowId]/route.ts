@@ -1,14 +1,9 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-// start custom keeperhub code //
-import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { validateWorkflowIntegrations } from "@/lib/db/integrations";
 import { workflows } from "@/lib/db/schema";
-import { syncWorkflowSchedule } from "@/lib/schedule-service";
-
-// end keeperhub code //
 
 // Helper to strip sensitive data from nodes for public viewing
 function sanitizeNodesForPublicView(
@@ -62,32 +57,18 @@ export async function GET(
 
     const isOwner = session?.user?.id === workflow.userId;
 
-    // start custom keeperhub code //
-    // Check organization membership for private workflows
-    const orgContext = await getOrgContext();
-    const isSameOrg =
-      !workflow.isAnonymous &&
-      workflow.organizationId &&
-      orgContext.organization?.id === workflow.organizationId;
-
-    // Access control:
-    // - Public workflows: anyone can view (sanitized)
-    // - Private workflows: owner or org member can view
-    // - Anonymous workflows: only owner can view
-    if (!isOwner && workflow.visibility !== "public" && !isSameOrg) {
+    // If not owner, check if workflow is public
+    if (!isOwner && workflow.visibility !== "public") {
       return NextResponse.json(
         { error: "Workflow not found" },
         { status: 404 }
       );
     }
 
-    const hasFullAccess = isOwner || isSameOrg;
-    // end keeperhub code //
-
     // For public workflows viewed by non-owners, sanitize sensitive data
     const responseData = {
       ...workflow,
-      nodes: hasFullAccess
+      nodes: isOwner
         ? workflow.nodes
         : sanitizeNodesForPublicView(
             workflow.nodes as Record<string, unknown>[]
@@ -118,52 +99,23 @@ function buildUpdateData(
     updatedAt: new Date(),
   };
 
-  const fields = ["name", "description", "nodes", "edges", "visibility"];
-  for (const field of fields) {
-    if (body[field] !== undefined) {
-      updateData[field] = body[field];
-    }
+  if (body.name !== undefined) {
+    updateData.name = body.name;
+  }
+  if (body.description !== undefined) {
+    updateData.description = body.description;
+  }
+  if (body.nodes !== undefined) {
+    updateData.nodes = body.nodes;
+  }
+  if (body.edges !== undefined) {
+    updateData.edges = body.edges;
+  }
+  if (body.visibility !== undefined) {
+    updateData.visibility = body.visibility;
   }
 
   return updateData;
-}
-
-// Helper to validate visibility value
-function isValidVisibility(visibility: unknown): boolean {
-  return (
-    visibility === undefined ||
-    visibility === "private" ||
-    visibility === "public"
-  );
-}
-
-// Helper to validate workflow access for PATCH/DELETE operations
-async function validateWorkflowAccess(
-  workflowId: string,
-  userId: string,
-  orgContext: { organization?: { id: string } | null }
-): Promise<{
-  workflow: typeof workflows.$inferSelect | null;
-  hasAccess: boolean;
-}> {
-  const existingWorkflow = await db.query.workflows.findFirst({
-    where: eq(workflows.id, workflowId),
-  });
-
-  if (!existingWorkflow) {
-    return { workflow: null, hasAccess: false };
-  }
-
-  const isOwner = existingWorkflow.userId === userId;
-  const isSameOrg =
-    !existingWorkflow.isAnonymous &&
-    existingWorkflow.organizationId &&
-    orgContext.organization?.id === existingWorkflow.organizationId;
-
-  return {
-    workflow: existingWorkflow,
-    hasAccess: isOwner || Boolean(isSameOrg),
-  };
 }
 
 export async function PATCH(
@@ -180,18 +132,20 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // start custom keeperhub code //
-    const orgContext = await getOrgContext();
-    const { workflow: existingWorkflow, hasAccess } =
-      await validateWorkflowAccess(workflowId, session.user.id, orgContext);
+    // Verify ownership
+    const existingWorkflow = await db.query.workflows.findFirst({
+      where: and(
+        eq(workflows.id, workflowId),
+        eq(workflows.userId, session.user.id)
+      ),
+    });
 
-    if (!(existingWorkflow && hasAccess)) {
+    if (!existingWorkflow) {
       return NextResponse.json(
         { error: "Workflow not found" },
         { status: 404 }
       );
     }
-    // end keeperhub code //
 
     const body = await request.json();
 
@@ -199,10 +153,7 @@ export async function PATCH(
     if (Array.isArray(body.nodes)) {
       const validation = await validateWorkflowIntegrations(
         body.nodes,
-        session.user.id,
-        // start custom keeperhub code //
-        orgContext.organization?.id || null
-        // end keeperhub code //
+        session.user.id
       );
       if (!validation.valid) {
         return NextResponse.json(
@@ -213,7 +164,11 @@ export async function PATCH(
     }
 
     // Validate visibility value if provided
-    if (!isValidVisibility(body.visibility)) {
+    if (
+      body.visibility !== undefined &&
+      body.visibility !== "private" &&
+      body.visibility !== "public"
+    ) {
       return NextResponse.json(
         { error: "Invalid visibility value. Must be 'private' or 'public'" },
         { status: 400 }
@@ -233,18 +188,6 @@ export async function PATCH(
         { error: "Workflow not found" },
         { status: 404 }
       );
-    }
-
-    // Sync schedule if nodes were updated
-    if (body.nodes !== undefined) {
-      const syncResult = await syncWorkflowSchedule(workflowId, body.nodes);
-      if (!syncResult.synced) {
-        console.warn(
-          `[Workflow] Schedule sync failed for ${workflowId}:`,
-          syncResult.error
-        );
-        // Don't fail the request, but log the warning
-      }
     }
 
     return NextResponse.json({
@@ -279,21 +222,20 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // start custom keeperhub code //
-    const orgContext = await getOrgContext();
-    const { hasAccess } = await validateWorkflowAccess(
-      workflowId,
-      session.user.id,
-      orgContext
-    );
+    // Verify ownership
+    const existingWorkflow = await db.query.workflows.findFirst({
+      where: and(
+        eq(workflows.id, workflowId),
+        eq(workflows.userId, session.user.id)
+      ),
+    });
 
-    if (!hasAccess) {
+    if (!existingWorkflow) {
       return NextResponse.json(
         { error: "Workflow not found" },
         { status: 404 }
       );
     }
-    // end keeperhub code //
 
     await db.delete(workflows).where(eq(workflows.id, workflowId));
 

@@ -1,11 +1,8 @@
-import { and, desc, eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-// start custom keeperhub code //
-import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { workflows } from "@/lib/db/schema";
-// end keeperhub code //
 
 export async function GET(request: Request) {
   try {
@@ -17,34 +14,11 @@ export async function GET(request: Request) {
       return NextResponse.json([], { status: 200 });
     }
 
-    // start custom keeperhub code //
-    const context = await getOrgContext();
-
-    const userWorkflows =
-      context.isAnonymous || !context.organization
-        ? // Anonymous users or users without org: show trial workflows
-          await db
-            .select()
-            .from(workflows)
-            .where(
-              and(
-                eq(workflows.userId, session.user.id),
-                eq(workflows.isAnonymous, true)
-              )
-            )
-            .orderBy(desc(workflows.updatedAt))
-        : // Authenticated users with org: show org workflows
-          await db
-            .select()
-            .from(workflows)
-            .where(
-              and(
-                eq(workflows.organizationId, context.organization.id),
-                eq(workflows.isAnonymous, false)
-              )
-            )
-            .orderBy(desc(workflows.updatedAt));
-    // end keeperhub code //
+    const userWorkflows = await db
+      .select()
+      .from(workflows)
+      .where(eq(workflows.userId, session.user.id))
+      .orderBy(desc(workflows.updatedAt));
 
     const mappedWorkflows = userWorkflows.map((workflow) => ({
       ...workflow,

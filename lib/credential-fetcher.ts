@@ -29,7 +29,7 @@ const SYSTEM_CREDENTIAL_MAPPERS: Record<
 > = {
   database: (config) => {
     const creds: WorkflowCredentials = {};
-    if (config.url && typeof config.url === "string") {
+    if (config.url) {
       creds.DATABASE_URL = config.url;
     }
     return creds;

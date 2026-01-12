@@ -44,14 +44,7 @@ export async function POST(request: Request) {
     }
 
     if (body.type === "database") {
-      const url = body.config.url;
-      if (typeof url !== "string") {
-        return NextResponse.json(
-          { error: "Database URL must be a string" },
-          { status: 400 }
-        );
-      }
-      const result = await testDatabaseConnection(url);
+      const result = await testDatabaseConnection(body.config.url);
       return NextResponse.json(result);
     }
 

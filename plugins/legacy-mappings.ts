@@ -30,11 +30,5 @@ export const LEGACY_ACTION_MAPPINGS: Record<string, string> = {
   // v0
   "Create Chat": "v0/create-chat",
   "Send Message": "v0/send-message",
-
-  // Web3
-  "Check Balance": "web3/check-balance",
-  "Transfer Funds": "web3/transfer-funds",
-  "Read Contract": "web3/read-contract",
-  "Write Contract": "web3/write-contract",
 };
 

@@ -47,14 +47,14 @@ export async function generateMetadata({
     : `${baseUrl}/og-default.png`;
 
   return {
-    title: `${title} | KeeperHub`,
-    description: `View and explore the "${title}" workflow built with KeeperHub.`,
+    title: `${title} | AI Workflow Builder`,
+    description: `View and explore the "${title}" workflow built with AI Workflow Builder.`,
     openGraph: {
-      title: `${title} | KeeperHub`,
-      description: `View and explore the "${title}" workflow built with KeeperHub.`,
+      title: `${title} | AI Workflow Builder`,
+      description: `View and explore the "${title}" workflow built with AI Workflow Builder.`,
       type: "website",
       url: workflowUrl,
-      siteName: "KeeperHub",
+      siteName: "AI Workflow Builder",
       images: [
         {
           url: ogImageUrl,
@@ -66,8 +66,8 @@ export async function generateMetadata({
     },
     twitter: {
       card: "summary_large_image",
-      title: `${title} | KeeperHub`,
-      description: `View and explore the "${title}" workflow built with KeeperHub.`,
+      title: `${title} | AI Workflow Builder`,
+      description: `View and explore the "${title}" workflow built with AI Workflow Builder.`,
       images: [ogImageUrl],
     },
   };

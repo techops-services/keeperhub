@@ -2,7 +2,6 @@
 
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,9 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
-import { refetchOrganizations } from "@/keeperhub/lib/refetch-organizations";
-import { api } from "@/lib/api-client";
-import { authClient, signIn, signUp } from "@/lib/auth-client";
+import { signIn, signUp } from "@/lib/auth-client";
 import {
   getEnabledAuthProviders,
   getSingleProvider,
@@ -27,8 +24,6 @@ import {
 type AuthDialogProps = {
   children?: ReactNode;
 };
-
-type ModalView = "signin" | "signup" | "request-access" | "request-success";
 
 const VercelIcon = ({ className = "mr-2 h-3 w-3" }: { className?: string }) => (
   <svg
@@ -83,6 +78,25 @@ const GoogleIcon = () => (
   </svg>
 );
 
+const EmailIcon = () => (
+  <svg
+    aria-label="Email"
+    className="mr-2 h-4 w-4"
+    fill="none"
+    role="img"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <title>Email</title>
+    <path
+      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+    />
+  </svg>
+);
+
 type Provider = "email" | "github" | "google" | "vercel";
 
 const getProviderIcon = (provider: Provider, compact = false) => {
@@ -94,8 +108,10 @@ const getProviderIcon = (provider: Provider, compact = false) => {
       return <GitHubIcon />;
     case "google":
       return <GoogleIcon />;
+    case "email":
+      return <EmailIcon />;
     default:
-      return null;
+      return <EmailIcon />;
   }
 };
 
@@ -107,87 +123,64 @@ const getProviderLabel = (provider: Provider) => {
       return "GitHub";
     case "google":
       return "Google";
+    case "email":
+      return "Email";
     default:
       return "Email";
   }
 };
 
-// Social buttons component
-type SocialButtonsProps = {
-  enabledProviders: { vercel: boolean; github: boolean; google: boolean };
-  onSignIn: (provider: "github" | "google" | "vercel") => void;
-  loadingProvider: "github" | "google" | "vercel" | null;
+const getButtonText = (loading: boolean, mode: "signin" | "signup") => {
+  if (loading) {
+    return "Loading...";
+  }
+  return mode === "signup" ? "Sign Up" : "Sign In";
 };
 
-const SocialButtons = ({
-  enabledProviders,
-  onSignIn,
-  loadingProvider,
-}: SocialButtonsProps) => (
-  <div className="flex flex-col gap-2">
-    {enabledProviders.vercel && (
-      <Button
-        className="w-full"
-        disabled={loadingProvider !== null}
-        onClick={() => onSignIn("vercel")}
-        type="button"
-        variant="outline"
-      >
-        <VercelIcon />
-        {loadingProvider === "vercel" ? "Loading..." : "Continue with Vercel"}
-      </Button>
-    )}
-    {enabledProviders.github && (
-      <Button
-        className="w-full"
-        disabled={loadingProvider !== null}
-        onClick={() => onSignIn("github")}
-        type="button"
-        variant="outline"
-      >
-        <GitHubIcon />
-        {loadingProvider === "github" ? "Loading..." : "Continue with GitHub"}
-      </Button>
-    )}
-    {enabledProviders.google && (
-      <Button
-        className="w-full"
-        disabled={loadingProvider !== null}
-        onClick={() => onSignIn("google")}
-        type="button"
-        variant="outline"
-      >
-        <GoogleIcon />
-        {loadingProvider === "google" ? "Loading..." : "Continue with Google"}
-      </Button>
-    )}
-  </div>
-);
-
-// Sign In Form
-type SignInFormProps = {
+type EmailFormProps = {
+  mode: "signin" | "signup";
+  name: string;
   email: string;
   password: string;
   error: string;
   loading: boolean;
-  onEmailChange: (v: string) => void;
-  onPasswordChange: (v: string) => void;
+  onNameChange: (name: string) => void;
+  onEmailChange: (email: string) => void;
+  onPasswordChange: (password: string) => void;
   onSubmit: (e: React.FormEvent) => void;
-  onCreateAccount: () => void;
+  onToggleMode: () => void;
 };
 
-const SignInForm = ({
+const EmailForm = ({
+  mode,
+  name,
   email,
   password,
   error,
   loading,
+  onNameChange,
   onEmailChange,
   onPasswordChange,
   onSubmit,
-  onCreateAccount,
-}: SignInFormProps) => (
+  onToggleMode,
+}: EmailFormProps) => (
   <div className="space-y-4">
     <form className="space-y-4" onSubmit={onSubmit}>
+      {mode === "signup" && (
+        <div className="space-y-2">
+          <Label className="ml-1" htmlFor="name">
+            Name
+          </Label>
+          <Input
+            id="name"
+            onChange={(e) => onNameChange(e.target.value)}
+            placeholder="John Doe"
+            required
+            type="text"
+            value={name}
+          />
+        </div>
+      )}
       <div className="space-y-2">
         <Label className="ml-1" htmlFor="email">
           Email
@@ -208,7 +201,7 @@ const SignInForm = ({
         <Input
           id="password"
           onChange={(e) => onPasswordChange(e.target.value)}
-          placeholder="Enter your password"
+          placeholder="••••••••"
           required
           type="password"
           value={password}
@@ -216,129 +209,191 @@ const SignInForm = ({
       </div>
       {error && <div className="text-destructive text-sm">{error}</div>}
       <Button className="w-full" disabled={loading} type="submit">
-        {loading ? <Spinner className="mr-2 size-4" /> : null}
-        Sign in
+        {getButtonText(loading, mode)}
       </Button>
     </form>
-    <div className="flex items-center justify-center gap-1 text-sm">
-      <span className="text-muted-foreground">New here?</span>
+
+    <div className="flex justify-center">
       <button
-        className="font-medium text-foreground underline underline-offset-2 hover:text-foreground/80"
-        onClick={onCreateAccount}
+        className="text-muted-foreground text-sm hover:text-foreground"
+        onClick={onToggleMode}
         type="button"
       >
-        Create account
+        {mode === "signin"
+          ? "Don't have an account? Sign up"
+          : "Already have an account? Sign in"}
       </button>
     </div>
   </div>
 );
 
-// Request Access Form
-type RequestAccessFormProps = {
-  email: string;
-  error: string;
-  loading: boolean;
-  onEmailChange: (v: string) => void;
-  onSubmit: (e: React.FormEvent) => void;
-  onSignIn: () => void;
+type SocialButtonsProps = {
+  enabledProviders: {
+    vercel: boolean;
+    github: boolean;
+    google: boolean;
+  };
+  onSignIn: (provider: "github" | "google" | "vercel") => void;
+  loadingProvider: "github" | "google" | "vercel" | null;
 };
 
-const RequestAccessForm = ({
-  email,
-  error,
-  loading,
-  onEmailChange,
-  onSubmit,
+const SocialButtons = ({
+  enabledProviders,
   onSignIn,
-}: RequestAccessFormProps) => (
-  <div className="space-y-4">
-    <form className="space-y-4" onSubmit={onSubmit}>
-      <div className="space-y-2">
-        <Label className="ml-1" htmlFor="request-email">
-          Email
-        </Label>
-        <Input
-          id="request-email"
-          onChange={(e) => onEmailChange(e.target.value)}
-          placeholder="you@example.com"
-          required
-          type="email"
-          value={email}
-        />
-      </div>
-      {error && <div className="text-destructive text-sm">{error}</div>}
-      <Button className="w-full" disabled={loading} type="submit">
-        {loading ? <Spinner className="mr-2 size-4" /> : null}
-        Request access
-      </Button>
-    </form>
-    <div className="flex items-center justify-center gap-1 text-sm">
-      <span className="text-muted-foreground">Already have an account?</span>
-      <button
-        className="font-medium text-foreground underline underline-offset-2 hover:text-foreground/80"
-        onClick={onSignIn}
+  loadingProvider,
+}: SocialButtonsProps) => (
+  <div className="flex flex-col gap-2">
+    {enabledProviders.vercel && (
+      <Button
+        className="w-full"
+        disabled={loadingProvider !== null}
+        onClick={() => onSignIn("vercel")}
         type="button"
+        variant="outline"
       >
-        Sign in
-      </button>
-    </div>
+        <VercelIcon />
+        {loadingProvider === "vercel" ? "Loading..." : "Sign In with Vercel"}
+      </Button>
+    )}
+    {enabledProviders.github && (
+      <Button
+        className="w-full"
+        disabled={loadingProvider !== null}
+        onClick={() => onSignIn("github")}
+        type="button"
+        variant="outline"
+      >
+        <GitHubIcon />
+        {loadingProvider === "github" ? "Loading..." : "Sign In with GitHub"}
+      </Button>
+    )}
+    {enabledProviders.google && (
+      <Button
+        className="w-full"
+        disabled={loadingProvider !== null}
+        onClick={() => onSignIn("google")}
+        type="button"
+        variant="outline"
+      >
+        <GoogleIcon />
+        {loadingProvider === "google" ? "Loading..." : "Sign In with Google"}
+      </Button>
+    )}
   </div>
 );
 
-// Request Success View
-type RequestSuccessProps = {
-  email: string;
-  onClose: () => void;
-  onSignIn: () => void;
+type UseAuthHandlers = {
+  handleSocialSignIn: (
+    provider: "github" | "google" | "vercel"
+  ) => Promise<void>;
+  handleEmailAuth: (e: React.FormEvent) => Promise<void>;
+  toggleMode: () => void;
 };
 
-const RequestSuccessView = ({
-  email,
-  onClose,
-  onSignIn,
-}: RequestSuccessProps) => (
-  <div className="space-y-6 py-4 text-center">
-    <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-      <svg
-        aria-label="Success"
-        className="size-6 text-green-600 dark:text-green-400"
-        fill="none"
-        role="img"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <title>Success</title>
-        <path
-          d="M5 13l4 4L19 7"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-        />
-      </svg>
-    </div>
-    <div className="space-y-2">
-      <h3 className="font-semibold text-lg">Request submitted</h3>
-      <p className="text-muted-foreground text-sm">
-        Thanks for your interest. We will email you at{" "}
-        <span className="font-medium text-foreground">{email}</span> when your
-        account is ready.
-      </p>
-    </div>
-    <div className="flex flex-col gap-2">
-      <Button className="w-full" onClick={onClose}>
-        Close
-      </Button>
-      <Button className="w-full" onClick={onSignIn} variant="ghost">
-        Back to sign in
-      </Button>
-    </div>
-  </div>
-);
+type AuthHandlersOptions = {
+  mode: "signin" | "signup";
+  setMode: (newMode: "signin" | "signup") => void;
+  email: string;
+  password: string;
+  name: string;
+  setError: (error: string) => void;
+  setLoading: (loading: boolean) => void;
+  setLoadingProvider: (provider: "github" | "google" | "vercel" | null) => void;
+  setOpen: (open: boolean) => void;
+};
 
-// Single provider button
-let singleProviderSignInInitiated = false;
-export const isSingleProviderSignInInitiated = () =>
-  singleProviderSignInInitiated;
+const useAuthHandlers = (options: AuthHandlersOptions): UseAuthHandlers => {
+  const {
+    mode,
+    setMode,
+    email,
+    password,
+    name,
+    setError,
+    setLoading,
+    setLoadingProvider,
+    setOpen,
+  } = options;
+
+  const handleSocialSignIn = async (
+    provider: "github" | "google" | "vercel"
+  ) => {
+    try {
+      setLoadingProvider(provider);
+      await signIn.social({ provider, callbackURL: window.location.pathname });
+    } catch {
+      toast.error(`Failed to sign in with ${getProviderLabel(provider)}`);
+      setLoadingProvider(null);
+    }
+  };
+
+  const toggleMode = () => {
+    setMode(mode === "signin" ? "signup" : "signin");
+    setError("");
+  };
+
+  const handleSignUp = async () => {
+    const signUpResponse = await signUp.email({
+      email,
+      password,
+      name,
+    });
+    if (signUpResponse.error) {
+      setError(signUpResponse.error.message || "Sign up failed");
+      return false;
+    }
+
+    const signInResponse = await signIn.email({
+      email,
+      password,
+    });
+    if (signInResponse.error) {
+      setError(signInResponse.error.message || "Sign in failed");
+      return false;
+    }
+
+    toast.success("Account created and signed in successfully!");
+    return true;
+  };
+
+  const handleSignIn = async () => {
+    const response = await signIn.email({
+      email,
+      password,
+    });
+    if (response.error) {
+      setError(response.error.message || "Sign in failed");
+      return false;
+    }
+
+    toast.success("Signed in successfully!");
+    return true;
+  };
+
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const success =
+        mode === "signup" ? await handleSignUp() : await handleSignIn();
+      if (success) {
+        setOpen(false);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Authentication failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return {
+    handleSocialSignIn,
+    handleEmailAuth,
+    toggleMode,
+  };
+};
 
 type SingleProviderButtonProps = {
   provider: Provider;
@@ -346,11 +401,19 @@ type SingleProviderButtonProps = {
   onSignIn: (provider: "github" | "google" | "vercel") => Promise<void>;
 };
 
+// Module-level flag to persist sign-in loading state across component remounts
+// This prevents the flash of normal state when OAuth triggers session refresh
+let singleProviderSignInInitiated = false;
+
+export const isSingleProviderSignInInitiated = () =>
+  singleProviderSignInInitiated;
+
 const SingleProviderButton = ({
   provider,
   loadingProvider,
   onSignIn,
 }: SingleProviderButtonProps) => {
+  // Use state to trigger re-renders, but sync with module-level flag
   const [isInitiated, setIsInitiated] = useState(singleProviderSignInInitiated);
   const isLoading = loadingProvider === provider || isInitiated;
 
@@ -378,39 +441,181 @@ const SingleProviderButton = ({
   );
 };
 
-// Helper functions
-const getViewTitle = (view: ModalView) => {
-  switch (view) {
-    case "signin":
-      return "Sign in";
-    case "signup":
-      return "Create account";
-    case "request-access":
-      return "Request access";
-    default:
-      return "Request submitted";
-  }
+type EmailOnlyDialogProps = {
+  children: ReactNode;
+  open: boolean;
+  mode: "signin" | "signup";
+  name: string;
+  email: string;
+  password: string;
+  error: string;
+  loading: boolean;
+  onOpenChange: (open: boolean) => void;
+  onNameChange: (name: string) => void;
+  onEmailChange: (email: string) => void;
+  onPasswordChange: (password: string) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  onToggleMode: () => void;
 };
 
-const getViewDescription = (view: ModalView) => {
-  switch (view) {
-    case "signin":
-      return "Sign in with an email that has been approved for the beta.";
-    case "signup":
-      return "Create your account to get started.";
-    case "request-access":
-      return "We are in closed beta. Enter your email and we will notify you when you can sign up.";
-    default:
-      return null;
-  }
+const EmailOnlyDialog = ({
+  children,
+  open,
+  mode,
+  name,
+  email,
+  password,
+  error,
+  loading,
+  onOpenChange,
+  onNameChange,
+  onEmailChange,
+  onPasswordChange,
+  onSubmit,
+  onToggleMode,
+}: EmailOnlyDialogProps) => (
+  <Dialog onOpenChange={onOpenChange} open={open}>
+    <DialogTrigger asChild>
+      {children || (
+        <Button size="sm" variant="default">
+          Sign In
+        </Button>
+      )}
+    </DialogTrigger>
+    <DialogContent className="sm:max-w-md">
+      <DialogHeader>
+        <DialogTitle>
+          {mode === "signin" ? "Sign In" : "Create Account"}
+        </DialogTitle>
+        <DialogDescription>
+          {mode === "signin"
+            ? "Sign in to your account to continue"
+            : "Create a new account to get started"}
+        </DialogDescription>
+      </DialogHeader>
+
+      <EmailForm
+        email={email}
+        error={error}
+        loading={loading}
+        mode={mode}
+        name={name}
+        onEmailChange={onEmailChange}
+        onNameChange={onNameChange}
+        onPasswordChange={onPasswordChange}
+        onSubmit={onSubmit}
+        onToggleMode={onToggleMode}
+        password={password}
+      />
+    </DialogContent>
+  </Dialog>
+);
+
+type MultiProviderDialogProps = EmailOnlyDialogProps & {
+  enabledProviders: {
+    vercel: boolean;
+    github: boolean;
+    google: boolean;
+    email: boolean;
+  };
+  loadingProvider: "github" | "google" | "vercel" | null;
+  onSignIn: (provider: "github" | "google" | "vercel") => Promise<void>;
+};
+
+const MultiProviderDialog = ({
+  children,
+  open,
+  mode,
+  name,
+  email,
+  password,
+  error,
+  loading,
+  enabledProviders,
+  loadingProvider,
+  onOpenChange,
+  onNameChange,
+  onEmailChange,
+  onPasswordChange,
+  onSubmit,
+  onToggleMode,
+  onSignIn,
+}: MultiProviderDialogProps) => {
+  const hasSocialProviders =
+    enabledProviders.vercel ||
+    enabledProviders.github ||
+    enabledProviders.google;
+
+  return (
+    <Dialog onOpenChange={onOpenChange} open={open}>
+      <DialogTrigger asChild>
+        {children || (
+          <Button size="sm" variant="default">
+            Sign In
+          </Button>
+        )}
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            {mode === "signin" ? "Sign In" : "Create Account"}
+          </DialogTitle>
+          <DialogDescription>
+            {mode === "signin"
+              ? "Choose how you want to sign in to continue"
+              : "Create a new account to get started"}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {hasSocialProviders && (
+            <SocialButtons
+              enabledProviders={enabledProviders}
+              loadingProvider={loadingProvider}
+              onSignIn={onSignIn}
+            />
+          )}
+
+          {enabledProviders.email && hasSocialProviders && (
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <Separator />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Or Sign In with email
+                </span>
+              </div>
+            </div>
+          )}
+
+          {enabledProviders.email && (
+            <EmailForm
+              email={email}
+              error={error}
+              loading={loading}
+              mode={mode}
+              name={name}
+              onEmailChange={onEmailChange}
+              onNameChange={onNameChange}
+              onPasswordChange={onPasswordChange}
+              onSubmit={onSubmit}
+              onToggleMode={onToggleMode}
+              password={password}
+            />
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 };
 
 export const AuthDialog = ({ children }: AuthDialogProps) => {
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState<ModalView>("signin");
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [requestEmail, setRequestEmail] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingProvider, setLoadingProvider] = useState<
@@ -419,134 +624,18 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
 
   const enabledProviders = getEnabledAuthProviders();
   const singleProvider = getSingleProvider();
-  const hasSocialProviders =
-    enabledProviders.vercel ||
-    enabledProviders.github ||
-    enabledProviders.google;
 
-  const resetForm = () => {
-    setEmail("");
-    setPassword("");
-    setRequestEmail("");
-    setError("");
-  };
-
-  const handleOpenChange = (newOpen: boolean) => {
-    setOpen(newOpen);
-    if (!newOpen) {
-      setTimeout(() => {
-        setView("signin");
-        resetForm();
-      }, 200);
-    }
-  };
-
-  const handleSocialSignIn = async (
-    provider: "github" | "google" | "vercel"
-  ) => {
-    try {
-      setLoadingProvider(provider);
-      await signIn.social({ provider, callbackURL: window.location.pathname });
-    } catch {
-      toast.error(`Failed to sign in with ${getProviderLabel(provider)}`);
-      setLoadingProvider(null);
-    }
-  };
-
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    try {
-      const response = await signIn.email({ email, password });
-      if (response.error) {
-        setError(response.error.message || "Sign in failed");
-        return;
-      }
-
-      // Small delay to ensure session is fully established
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      // Fetch fresh session to get the active organization
-      await authClient.getSession();
-
-      // Trigger all organization hooks to refetch their data
-      refetchOrganizations();
-
-      toast.success("Signed in successfully!");
-      setOpen(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign in failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCheckEmailAndSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    try {
-      const { isAllowlisted } = await api.beta.checkEmail(email);
-      if (!isAllowlisted) {
-        setError(
-          "This app is currently in closed beta. This email has not been approved yet."
-        );
-        setLoading(false);
-        return;
-      }
-
-      const signUpResponse = await signUp.email({
-        email,
-        password,
-        name: email.split("@")[0],
-      });
-
-      if (signUpResponse.error) {
-        setError(signUpResponse.error.message || "Sign up failed");
-        return;
-      }
-
-      const signInResponse = await signIn.email({ email, password });
-
-      if (signInResponse.error) {
-        setError(signInResponse.error.message || "Sign in failed");
-        return;
-      }
-
-      // Small delay to let the server-side session hook set activeOrganizationId
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      // Fetch fresh session to get the updated activeOrganizationId
-      await authClient.getSession();
-
-      // Trigger all organization hooks to refetch their data
-      refetchOrganizations();
-
-      toast.success("Account created successfully!");
-      setOpen(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create account");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRequestAccess = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      await api.beta.requestAccess(requestEmail);
-      setView("request-success");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to submit request");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { handleSocialSignIn, handleEmailAuth, toggleMode } = useAuthHandlers({
+    mode,
+    setMode,
+    email,
+    password,
+    name,
+    setError,
+    setLoading,
+    setLoadingProvider,
+    setOpen,
+  });
 
   if (singleProvider && singleProvider !== "email") {
     return (
@@ -558,174 +647,48 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
     );
   }
 
+  if (singleProvider === "email") {
+    return (
+      <EmailOnlyDialog
+        email={email}
+        error={error}
+        loading={loading}
+        mode={mode}
+        name={name}
+        onEmailChange={setEmail}
+        onNameChange={setName}
+        onOpenChange={setOpen}
+        onPasswordChange={setPassword}
+        onSubmit={handleEmailAuth}
+        onToggleMode={toggleMode}
+        open={open}
+        password={password}
+      >
+        {children}
+      </EmailOnlyDialog>
+    );
+  }
+
   return (
-    <Dialog onOpenChange={handleOpenChange} open={open}>
-      <DialogTrigger asChild>
-        {children || (
-          <Button size="sm" variant="default">
-            Sign In
-          </Button>
-        )}
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        {view !== "request-success" && (
-          <DialogHeader>
-            <div className="flex items-center gap-2">
-              <DialogTitle>{getViewTitle(view)}</DialogTitle>
-              <Badge
-                className="rounded-full bg-muted/50 px-2 py-0.5 font-normal text-xs"
-                variant="secondary"
-              >
-                Private beta
-              </Badge>
-            </div>
-            {getViewDescription(view) && (
-              <DialogDescription>{getViewDescription(view)}</DialogDescription>
-            )}
-          </DialogHeader>
-        )}
-
-        <div className="space-y-4">
-          {view === "signin" && (
-            <>
-              {hasSocialProviders && enabledProviders.email && (
-                <>
-                  <SocialButtons
-                    enabledProviders={enabledProviders}
-                    loadingProvider={loadingProvider}
-                    onSignIn={handleSocialSignIn}
-                  />
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <Separator />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-background px-2 text-muted-foreground">
-                        Or continue with email
-                      </span>
-                    </div>
-                  </div>
-                </>
-              )}
-              {hasSocialProviders && !enabledProviders.email && (
-                <SocialButtons
-                  enabledProviders={enabledProviders}
-                  loadingProvider={loadingProvider}
-                  onSignIn={handleSocialSignIn}
-                />
-              )}
-              {enabledProviders.email && (
-                <SignInForm
-                  email={email}
-                  error={error}
-                  loading={loading}
-                  onCreateAccount={() => {
-                    setView("signup");
-                    setError("");
-                  }}
-                  onEmailChange={setEmail}
-                  onPasswordChange={setPassword}
-                  onSubmit={handleSignIn}
-                  password={password}
-                />
-              )}
-            </>
-          )}
-
-          {view === "signup" && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-center gap-1 rounded-lg border bg-muted/50 p-3 text-sm">
-                <span className="text-muted-foreground">Not approved yet?</span>
-                <button
-                  className="font-medium text-foreground underline underline-offset-2 hover:text-foreground/80"
-                  onClick={() => {
-                    setView("request-access");
-                    setError("");
-                  }}
-                  type="button"
-                >
-                  Request access
-                </button>
-              </div>
-              <form className="space-y-4" onSubmit={handleCheckEmailAndSignUp}>
-                <div className="space-y-2">
-                  <Label className="ml-1" htmlFor="signup-email">
-                    Email
-                  </Label>
-                  <Input
-                    id="signup-email"
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    required
-                    type="email"
-                    value={email}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="ml-1" htmlFor="signup-password">
-                    Password
-                  </Label>
-                  <Input
-                    id="signup-password"
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Create a password"
-                    required
-                    type="password"
-                    value={password}
-                  />
-                </div>
-                {error && (
-                  <div className="text-destructive text-sm">{error}</div>
-                )}
-                <Button className="w-full" disabled={loading} type="submit">
-                  {loading ? <Spinner className="mr-2 size-4" /> : null}
-                  Create account
-                </Button>
-              </form>
-              <div className="flex items-center justify-center gap-1 text-sm">
-                <span className="text-muted-foreground">
-                  Already have an account?
-                </span>
-                <button
-                  className="font-medium text-foreground underline underline-offset-2 hover:text-foreground/80"
-                  onClick={() => {
-                    setView("signin");
-                    setError("");
-                  }}
-                  type="button"
-                >
-                  Sign in
-                </button>
-              </div>
-            </div>
-          )}
-
-          {view === "request-access" && (
-            <RequestAccessForm
-              email={requestEmail}
-              error={error}
-              loading={loading}
-              onEmailChange={setRequestEmail}
-              onSignIn={() => {
-                setView("signin");
-                setError("");
-              }}
-              onSubmit={handleRequestAccess}
-            />
-          )}
-
-          {view === "request-success" && (
-            <RequestSuccessView
-              email={requestEmail}
-              onClose={() => setOpen(false)}
-              onSignIn={() => {
-                setView("signin");
-                setRequestEmail("");
-              }}
-            />
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+    <MultiProviderDialog
+      email={email}
+      enabledProviders={enabledProviders}
+      error={error}
+      loading={loading}
+      loadingProvider={loadingProvider}
+      mode={mode}
+      name={name}
+      onEmailChange={setEmail}
+      onNameChange={setName}
+      onOpenChange={setOpen}
+      onPasswordChange={setPassword}
+      onSignIn={handleSocialSignIn}
+      onSubmit={handleEmailAuth}
+      onToggleMode={toggleMode}
+      open={open}
+      password={password}
+    >
+      {children}
+    </MultiProviderDialog>
   );
 };

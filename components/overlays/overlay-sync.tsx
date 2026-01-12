@@ -13,7 +13,7 @@ import { useOverlay } from "./overlay-provider";
  */
 export function OverlaySync() {
   const { stack } = useOverlay();
-  const [_atomStack, setAtomStack] = useAtom(overlayStackAtom);
+  const [atomStack, setAtomStack] = useAtom(overlayStackAtom);
   const isUpdatingFromAtom = useRef(false);
   const isUpdatingFromContext = useRef(false);
 

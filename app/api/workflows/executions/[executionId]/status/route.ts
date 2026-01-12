@@ -54,41 +54,9 @@ export async function GET(
       status: log.status,
     }));
 
-    // Calculate running count for parallel execution visibility
-    const runningCount = nodeStatuses.filter(
-      (n) => n.status === "running"
-    ).length;
-    const totalSteps = Number.parseInt(execution.totalSteps || "0", 10);
-    const completedSteps = Number.parseInt(execution.completedSteps || "0", 10);
-
-    // Build progress data
-    const progress = {
-      totalSteps,
-      completedSteps,
-      runningSteps: runningCount,
-      currentNodeId: execution.currentNodeId,
-      currentNodeName: execution.currentNodeName,
-      percentage:
-        totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0,
-    };
-
-    // Build error context (only when failed)
-    const errorContext =
-      execution.status === "error"
-        ? {
-            failedNodeId: execution.currentNodeId,
-            lastSuccessfulNodeId: execution.lastSuccessfulNodeId,
-            lastSuccessfulNodeName: execution.lastSuccessfulNodeName,
-            executionTrace: execution.executionTrace,
-            error: execution.error,
-          }
-        : null;
-
     return NextResponse.json({
       status: execution.status,
       nodeStatuses,
-      progress,
-      errorContext,
     });
   } catch (error) {
     console.error("Failed to get execution status:", error);

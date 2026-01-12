@@ -1,10 +1,10 @@
 import {
   Geist_Mono as createMono,
-  Anek_Latin as createSans,
+  Geist as createSans,
 } from "next/font/google";
 
 export const sans = createSans({
-  variable: "--font-anek-latin",
+  variable: "--font-geist-sans",
   subsets: ["latin"],
   weight: "variable",
   display: "swap",

@@ -19,7 +19,6 @@
 
 # next.js
 /.next/
-/.next-backup-docker/
 /out/
 /.swc/
 
@@ -38,8 +37,6 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
-!.env.example
-!.envrc
 
 # vercel
 .vercel
@@ -56,13 +53,3 @@ lib/types/integration.ts
 lib/codegen-registry.ts
 lib/step-registry.ts
 lib/output-display-configs.ts
-
-# local kubernetes generated values (from templates)
-deploy/local/values-keeperhub.yaml
-deploy/local/hybrid/schedule-trigger-hybrid.yaml
-
-# pnpm cache
-.pnpm-store/
-
-# tailwindcss logs
-tailwindcss-*.log
