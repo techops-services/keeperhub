@@ -54,8 +54,14 @@ html.dark div[class*="sticky"][class*="bottom"] {
 }
 
 /* Override any black backgrounds - EXCEPT code blocks */
-html.dark [class*="bg-black"]:not(pre):not(code):not([class*="code"]):not([class*="highlight"]),
-html.dark .bg-neutral-900:not(pre):not(code):not([class*="code"]):not([class*="highlight"]) {
+html.dark
+[class*="bg-black"]:not(pre):not(code):not([class*="code"]):not(
+  [class*="highlight"]
+),
+html.dark
+  .bg-neutral-900:not(pre):not(code):not([class*="code"]):not(
+    [class*="highlight"]
+  ) {
   background-color: rgb(15, 23, 42) !important;
 }
 
