@@ -303,13 +303,13 @@ const EXPLORER_CONFIGS: NewExplorerConfig[] = [
     explorerAddressPath: "/address/{address}",
     explorerContractPath: "/address/{address}#code",
   },
-  // Sepolia Testnet - Etherscan
+  // Sepolia Testnet - Etherscan (uses unified V2 API with chainid param)
   {
     chainId: 11_155_111,
     chainType: "evm",
     explorerUrl: "https://sepolia.etherscan.io",
     explorerApiType: "etherscan",
-    explorerApiUrl: "https://api-sepolia.etherscan.io/v2/api",
+    explorerApiUrl: "https://api.etherscan.io/v2/api",
     explorerTxPath: "/tx/{hash}",
     explorerAddressPath: "/address/{address}",
     explorerContractPath: "/address/{address}#code",

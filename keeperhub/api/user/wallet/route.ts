@@ -1,11 +1,12 @@
 import { Environment, Para as ParaServer } from "@getpara/server-sdk";
 import { and, eq } from "drizzle-orm";
+import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { apiError } from "@/keeperhub/lib/api-error";
 import { encryptUserShare } from "@/keeperhub/lib/encryption";
 import {
-  getUserWallet,
-  userHasWallet,
+  getOrganizationWallet,
+  organizationHasWallet,
 } from "@/keeperhub/lib/para/wallet-helpers";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -15,8 +16,8 @@ import { integrations, paraWallets } from "@/lib/db/schema";
 const PARA_API_KEY = process.env.PARA_API_KEY || "";
 const PARA_ENV = process.env.PARA_ENVIRONMENT || "beta";
 
-// Helper: Validate user authentication and email
-async function validateUser(request: Request) {
+// Helper: Validate user authentication, organization membership, and admin permissions
+async function validateUserAndOrganization(request: Request) {
   const session = await auth.api.getSession({
     headers: request.headers,
   });
@@ -44,25 +45,64 @@ async function validateUser(request: Request) {
     };
   }
 
-  return { user };
+  // Get active organization from session
+  const activeOrgId = session.session.activeOrganizationId;
+
+  if (!activeOrgId) {
+    return {
+      error: "No active organization. Please select or create an organization.",
+      status: 400,
+    };
+  }
+
+  // Get user's member record in the active organization
+  const activeMember = await auth.api.getActiveMember({
+    headers: await headers(),
+  });
+
+  if (!activeMember) {
+    return {
+      error: "You are not a member of the active organization",
+      status: 403,
+    };
+  }
+
+  // Check if user has admin or owner role
+  const role = activeMember.role;
+  if (role !== "admin" && role !== "owner") {
+    return {
+      error: "Only organization admins and owners can manage wallets",
+      status: 403,
+    };
+  }
+
+  return { user, organizationId: activeOrgId, member: activeMember };
 }
 
-// Helper: Check if wallet or integration already exists
-async function checkExistingWallet(userId: string) {
-  const hasWallet = await userHasWallet(userId);
+// Helper: Check if wallet or integration already exists for organization
+async function checkExistingWallet(organizationId: string) {
+  const hasWallet = await organizationHasWallet(organizationId);
   if (hasWallet) {
-    return { error: "Wallet already exists for this user", status: 400 };
+    return {
+      error: "Wallet already exists for this organization",
+      status: 400,
+    };
   }
 
   const existingIntegration = await db
     .select()
     .from(integrations)
-    .where(and(eq(integrations.userId, userId), eq(integrations.type, "web3")))
+    .where(
+      and(
+        eq(integrations.organizationId, organizationId),
+        eq(integrations.type, "web3")
+      )
+    )
     .limit(1);
 
   if (existingIntegration.length > 0) {
     return {
-      error: "Web3 integration already exists for this user",
+      error: "Web3 integration already exists for this organization",
       status: 400,
     };
   }
@@ -135,28 +175,39 @@ function getErrorResponse(error: unknown) {
 // Helper: Store wallet in database and create integration
 async function storeWalletAndIntegration(options: {
   userId: string;
+  organizationId: string;
   email: string;
   walletId: string;
   walletAddress: string;
   userShare: string;
 }) {
-  const { userId, email, walletId, walletAddress, userShare } = options;
+  const { userId, organizationId, email, walletId, walletAddress, userShare } =
+    options;
 
   // Store wallet in para_wallets table
   await db.insert(paraWallets).values({
     userId,
+    organizationId,
     email,
     walletId,
     walletAddress,
     userShare: encryptUserShare(userShare),
   });
 
-  console.log(`[Para] ✓ Wallet created: ${walletAddress}`);
+  console.log(
+    `[Para] ✓ Wallet created for organization ${organizationId}: ${walletAddress}`
+  );
 
   // Create Web3 integration record with truncated address as name
   const truncatedAddress = `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
 
-  await createIntegration(userId, truncatedAddress, "web3", {});
+  await createIntegration({
+    userId,
+    organizationId,
+    name: truncatedAddress,
+    type: "web3",
+    config: {},
+  });
 
   console.log(`[Para] ✓ Web3 integration created: ${truncatedAddress}`);
 
@@ -165,6 +216,7 @@ async function storeWalletAndIntegration(options: {
 
 export async function GET(request: Request) {
   try {
+    // Validate user and organization (no admin check for GET)
     const session = await auth.api.getSession({
       headers: request.headers,
     });
@@ -173,16 +225,25 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const hasWallet = await userHasWallet(session.user.id);
+    const activeOrgId = session.session.activeOrganizationId;
+
+    if (!activeOrgId) {
+      return NextResponse.json({
+        hasWallet: false,
+        message: "No active organization selected",
+      });
+    }
+
+    const hasWallet = await organizationHasWallet(activeOrgId);
 
     if (!hasWallet) {
       return NextResponse.json({
         hasWallet: false,
-        message: "No Para wallet found for this user",
+        message: "No Para wallet found for this organization",
       });
     }
 
-    const wallet = await getUserWallet(session.user.id);
+    const wallet = await getOrganizationWallet(activeOrgId);
 
     return NextResponse.json({
       hasWallet: true,
@@ -190,6 +251,7 @@ export async function GET(request: Request) {
       walletId: wallet.walletId,
       email: wallet.email,
       createdAt: wallet.createdAt,
+      organizationId: wallet.organizationId,
     });
   } catch (error) {
     return apiError(error, "Failed to get wallet");
@@ -198,18 +260,18 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    // 1. Validate user
-    const userValidation = await validateUser(request);
-    if ("error" in userValidation) {
+    // 1. Validate user, organization, and admin permissions
+    const validation = await validateUserAndOrganization(request);
+    if ("error" in validation) {
       return NextResponse.json(
-        { error: userValidation.error },
-        { status: userValidation.status }
+        { error: validation.error },
+        { status: validation.status }
       );
     }
-    const { user } = userValidation;
+    const { user, organizationId } = validation;
 
-    // 2. Check if wallet/integration already exists
-    const existingCheck = await checkExistingWallet(user.id);
+    // 2. Check if wallet/integration already exists for this organization
+    const existingCheck = await checkExistingWallet(organizationId);
     if ("error" in existingCheck) {
       return NextResponse.json(
         { error: existingCheck.error },
@@ -218,7 +280,9 @@ export async function POST(request: Request) {
     }
 
     // 3. Create wallet via Para SDK
-    const { wallet, userShare } = await createParaWallet(user.email);
+    // Note: Using organization-specific email for the wallet
+    const orgEmail = `org-${organizationId}@keeperhub.para`;
+    const { wallet, userShare } = await createParaWallet(orgEmail);
 
     // wallet.id and wallet.address are validated in createParaWallet
     const walletId = wallet.id as string;
@@ -227,7 +291,8 @@ export async function POST(request: Request) {
     // 4. Store wallet and create integration
     await storeWalletAndIntegration({
       userId: user.id,
-      email: user.email,
+      organizationId,
+      email: orgEmail,
       walletId,
       walletAddress,
       userShare,
@@ -239,7 +304,8 @@ export async function POST(request: Request) {
       wallet: {
         address: walletAddress,
         walletId,
-        email: user.email,
+        email: orgEmail,
+        organizationId,
       },
     });
   } catch (error) {
@@ -249,21 +315,20 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    // 1. Authenticate user
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // 1. Validate user, organization, and admin permissions
+    const validation = await validateUserAndOrganization(request);
+    if ("error" in validation) {
+      return NextResponse.json(
+        { error: validation.error },
+        { status: validation.status }
+      );
     }
+    const { organizationId } = validation;
 
-    const user = session.user;
-
-    // 2. Delete wallet data
+    // 2. Delete wallet data for this organization
     const deletedWallet = await db
       .delete(paraWallets)
-      .where(eq(paraWallets.userId, user.id))
+      .where(eq(paraWallets.organizationId, organizationId))
       .returning();
 
     if (deletedWallet.length === 0) {
@@ -274,17 +339,22 @@ export async function DELETE(request: Request) {
     }
 
     console.log(
-      `[Para] Wallet deleted for user ${user.id}: ${deletedWallet[0].walletAddress}`
+      `[Para] Wallet deleted for organization ${organizationId}: ${deletedWallet[0].walletAddress}`
     );
 
     // 3. Delete associated Web3 integration record
     await db
       .delete(integrations)
       .where(
-        and(eq(integrations.userId, user.id), eq(integrations.type, "web3"))
+        and(
+          eq(integrations.organizationId, organizationId),
+          eq(integrations.type, "web3")
+        )
       );
 
-    console.log(`[Para] Web3 integration deleted for user ${user.id}`);
+    console.log(
+      `[Para] Web3 integration deleted for organization ${organizationId}`
+    );
 
     return NextResponse.json({
       success: true,

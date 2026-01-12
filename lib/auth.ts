@@ -1,12 +1,22 @@
+import { randomUUID } from "node:crypto";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { anonymous, genericOAuth } from "better-auth/plugins";
+import { anonymous, genericOAuth, organization } from "better-auth/plugins";
+import { createAccessControl } from "better-auth/plugins/access";
 import { eq } from "drizzle-orm";
+import { nanoid } from "nanoid";
 import { isAiGatewayManagedKeysEnabled } from "./ai-gateway/config";
 import { db } from "./db";
 import {
   accounts,
   integrations,
+  invitationRelations,
+  invitation as invitationTable,
+  memberRelations,
+  member as memberTable,
+  organizationRelations,
+  // start custom keeperhub code //
+  organization as organizationTable,
   sessions,
   users,
   verifications,
@@ -14,7 +24,49 @@ import {
   workflowExecutions,
   workflowExecutionsRelations,
   workflows,
+  // end keeperhub code //
 } from "./db/schema";
+
+// start custom keeperhub code //
+// Define custom access control for organization resources
+const statement = {
+  workflow: ["create", "read", "update", "delete"],
+  credential: ["create", "read", "update", "delete"],
+  wallet: ["create", "read", "update", "delete"], // ParaWallet
+  organization: ["read", "update", "delete"],
+  member: ["create", "read", "update", "delete"],
+  invitation: ["create", "cancel"],
+} as const;
+
+const ac = createAccessControl(statement);
+
+// Define role permissions aligned with requirements
+const memberRole = ac.newRole({
+  workflow: ["create", "read", "update", "delete"],
+  credential: ["read"],
+  wallet: ["read"], // Can use wallet, not manage
+  organization: ["read"],
+  member: ["read"],
+});
+
+const adminRole = ac.newRole({
+  workflow: ["create", "read", "update", "delete"],
+  credential: ["create", "read", "update", "delete"],
+  wallet: ["create", "read", "update", "delete"], // Can manage wallets
+  organization: ["update"],
+  member: ["create", "update", "delete"],
+  invitation: ["create", "cancel"],
+});
+
+const ownerRole = ac.newRole({
+  workflow: ["create", "read", "update", "delete"],
+  credential: ["create", "read", "update", "delete"],
+  wallet: ["create", "read", "update", "delete"],
+  organization: ["update", "delete"],
+  member: ["create", "update", "delete"],
+  invitation: ["create", "cancel"],
+});
+// end keeperhub code //
 
 // Construct schema object for drizzle adapter
 const schema = {
@@ -26,6 +78,14 @@ const schema = {
   workflowExecutions,
   workflowExecutionLogs,
   workflowExecutionsRelations,
+  // start custom keeperhub code //
+  organization: organizationTable,
+  member: memberTable,
+  invitation: invitationTable,
+  organizationRelations,
+  memberRelations,
+  invitationRelations,
+  // end keeperhub code //
 };
 
 // Determine the base URL for authentication
@@ -56,45 +116,126 @@ function getBaseURL() {
 const plugins = [
   anonymous({
     async onLinkAccount(data) {
-      // When an anonymous user links to a real account, migrate their data
-      const fromUserId = data.anonymousUser.user.id;
-      const toUserId = data.newUser.user.id;
+      // // When an anonymous user links to a real account, migrate their data
+      // const fromUserId = data.anonymousUser.user.id;
+      // const toUserId = data.newUser.user.id;
 
-      console.log(
-        `[Anonymous Migration] Migrating from user ${fromUserId} to ${toUserId}`
-      );
+      // console.log(
+      //   `[Anonymous Migration] Migrating from user ${fromUserId} to ${toUserId}`
+      // );
+
+      // try {
+      //   // Migrate workflows
+      //   await db
+      //     .update(workflows)
+      //     .set({ userId: toUserId })
+      //     .where(eq(workflows.userId, fromUserId));
+
+      //   // Migrate workflow executions
+      //   await db
+      //     .update(workflowExecutions)
+      //     .set({ userId: toUserId })
+      //     .where(eq(workflowExecutions.userId, fromUserId));
+
+      //   // Migrate integrations
+      //   await db
+      //     .update(integrations)
+      //     .set({ userId: toUserId })
+      //     .where(eq(integrations.userId, fromUserId));
+
+      //   console.log(
+      //     `[Anonymous Migration] Successfully migrated data from ${fromUserId} to ${toUserId}`
+      //   );
+      // } catch (error) {
+      //   console.error(
+      //     "[Anonymous Migration] Error migrating user data:",
+      //     error
+      //   );
+      //   throw error;
+      // }
+
+      // start custom keeperhub code //
+      // When anonymous user links account, DELETE their trial workflows
+      // (Anonymous workflows have no real utility in org context)
+      const fromUserId = data.anonymousUser.user.id;
 
       try {
-        // Migrate workflows
-        await db
-          .update(workflows)
-          .set({ userId: toUserId })
-          .where(eq(workflows.userId, fromUserId));
+        // Delete anonymous workflows (not migrated per requirements)
+        await db.delete(workflows).where(eq(workflows.userId, fromUserId));
 
-        // Migrate workflow executions
+        // Delete workflow executions
         await db
-          .update(workflowExecutions)
-          .set({ userId: toUserId })
+          .delete(workflowExecutions)
           .where(eq(workflowExecutions.userId, fromUserId));
 
-        // Migrate integrations
+        // Delete integrations
         await db
-          .update(integrations)
-          .set({ userId: toUserId })
+          .delete(integrations)
           .where(eq(integrations.userId, fromUserId));
-
-        console.log(
-          `[Anonymous Migration] Successfully migrated data from ${fromUserId} to ${toUserId}`
-        );
       } catch (error) {
-        console.error(
-          "[Anonymous Migration] Error migrating user data:",
-          error
-        );
+        console.error("[Anonymous Migration] Error:", error);
         throw error;
       }
+      // end keeperhub code //
     },
   }),
+  // start custom keeperhub code //
+  organization({
+    // Access control with custom roles
+    ac,
+    roles: {
+      owner: ownerRole,
+      admin: adminRole,
+      member: memberRole,
+    },
+
+    // Email invitation handler (integrate with SendGrid plugin)
+    async sendInvitationEmail(data) {
+      const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL}/accept-invite/${data.id}`;
+
+      // TODO: Use SendGrid plugin to send email
+      // For now, log the invite (email integration in Phase 7)
+      console.log(`[Invitation] Sending to ${data.email}`, {
+        inviter: data.inviter.user.name,
+        organization: data.organization.name,
+        role: data.role,
+        link: inviteLink,
+      });
+
+      // When implementing email, uncomment:
+      // await sendEmail({
+      //   to: data.email,
+      //   template: "organization-invitation",
+      //   data: {
+      //     inviterName: data.inviter.user.name,
+      //     organizationName: data.organization.name,
+      //     role: data.role,
+      //     inviteLink,
+      //   },
+      // });
+      await Promise.resolve();
+    },
+
+    // Invitation settings
+    invitationExpiresIn: 7 * 24 * 60 * 60, // 7 days
+    cancelPendingInvitationsOnReInvite: true,
+
+    // Hooks for custom business logic
+    organizationHooks: {
+      async afterCreateOrganization() {
+        await Promise.resolve();
+      },
+
+      async afterAddMember() {
+        await Promise.resolve();
+      },
+
+      async afterAcceptInvitation() {
+        await Promise.resolve();
+      },
+    },
+  }),
+  // end keeperhub code //
   ...(process.env.VERCEL_CLIENT_ID
     ? [
         genericOAuth({
@@ -123,7 +264,6 @@ const plugins = [
                   }
                 );
                 const profile = await response.json();
-                console.log("[Vercel OAuth] userinfo response:", profile);
                 return {
                   id: profile.sub,
                   email: profile.email,
@@ -149,6 +289,75 @@ export const auth = betterAuth({
     level: "debug",
     disabled: false,
   },
+  // start custom keeperhub code //
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          // Generate unique slug from user name/email
+          const baseName = user.name || user.email?.split("@")[0] || "User";
+          const slug = `${baseName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${nanoid(6)}`;
+
+          try {
+            const orgId = randomUUID();
+            const memberId = randomUUID();
+
+            // Create organization directly in database (we don't have auth context here)
+            const [org] = await db
+              .insert(organizationTable)
+              .values({
+                id: orgId,
+                name: `${baseName}'s Organization`,
+                slug,
+                createdAt: new Date(),
+              })
+              .returning();
+
+            // Add user as owner member
+            await db.insert(memberTable).values({
+              id: memberId,
+              organizationId: org.id,
+              userId: user.id,
+              role: "owner",
+              createdAt: new Date(),
+            });
+          } catch (error) {
+            console.error(error);
+          }
+        },
+      },
+    },
+    session: {
+      create: {
+        after: async (session) => {
+          // If session already has an active organization, skip
+          if (session.activeOrganizationId) {
+            return;
+          }
+
+          try {
+            // Find the user's first organization
+            const [member] = await db
+              .select()
+              .from(memberTable)
+              .where(eq(memberTable.userId, session.userId))
+              .limit(1);
+
+            if (member) {
+              // Set as active organization in the session
+              await db
+                .update(sessions)
+                .set({ activeOrganizationId: member.organizationId })
+                .where(eq(sessions.id, session.id));
+            }
+          } catch (error) {
+            console.error(error);
+          }
+        },
+      },
+    },
+  },
+  // end keeperhub code //
   onAPIError: {
     onError: (error, ctx) => {
       console.error("[Better Auth API Error]", {
