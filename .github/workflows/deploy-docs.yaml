@@ -2,7 +2,7 @@ on:
   push:
     branches:
       - staging
-      - main
+      - prod
     paths:
       - 'docs/**'
       - 'docs-site/**'
@@ -13,16 +13,16 @@ name: deploy-keeperhub-docs
 
 jobs:
   build-and-deploy-docs:
-    environment: ${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
+    environment: ${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}
     runs-on: ubuntu-latest
     env:
-      HELM_FILE: deploy/docs-site/${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}/values.yaml
-      REGION: ${{ github.ref == 'refs/heads/main' && 'us-east-1' || 'us-east-2' }}
-      CLUSTER_NAME: ${{ github.ref == 'refs/heads/main' && 'maker-prod' || 'maker-staging' }}
-      ENVIRONMENT_TAG: ${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
+      HELM_FILE: deploy/docs-site/${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}/values.yaml
+      REGION: ${{ github.ref == 'refs/heads/prod' && 'us-east-1' || 'us-east-2' }}
+      CLUSTER_NAME: ${{ github.ref == 'refs/heads/prod' && 'maker-prod' || 'maker-staging' }}
+      ENVIRONMENT_TAG: ${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}
       NAMESPACE: keeperhub
       SERVICE_NAME: keeperhub-docs
-      AWS_ECR_NAME: keeperhub-docs-${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
+      AWS_ECR_NAME: keeperhub-docs-${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
