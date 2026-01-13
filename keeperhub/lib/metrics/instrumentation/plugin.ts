@@ -5,10 +5,10 @@
  */
 
 import {
-  getMetricsCollector,
-  MetricNames,
-  LabelKeys,
   createTimer,
+  getMetricsCollector,
+  LabelKeys,
+  MetricNames,
 } from "../index";
 
 /**
@@ -44,7 +44,11 @@ export function recordPluginMetrics(options: {
   }
 
   // Record plugin action duration
-  metrics.recordLatency(MetricNames.PLUGIN_ACTION_DURATION, options.durationMs, labels);
+  metrics.recordLatency(
+    MetricNames.PLUGIN_ACTION_DURATION,
+    options.durationMs,
+    labels
+  );
 
   // Record error if failed
   if (!options.success && options.error) {
@@ -168,7 +172,11 @@ export function recordExternalServiceCall(options: {
   }
 
   // Record as generic API latency (could add a dedicated metric if needed)
-  metrics.recordLatency("external.service.latency_ms", options.durationMs, labels);
+  metrics.recordLatency(
+    "external.service.latency_ms",
+    options.durationMs,
+    labels
+  );
 
   if (!options.success && options.error) {
     metrics.recordError(

@@ -5,7 +5,7 @@
  * This is used when METRICS_COLLECTOR=prometheus to ensure metrics appear in both places.
  */
 
-import type { MetricsCollector, MetricLabels, ErrorContext } from "../types";
+import type { ErrorContext, MetricLabels, MetricsCollector } from "../types";
 import { consoleMetricsCollector } from "./console";
 
 /**
@@ -17,7 +17,11 @@ export function createDualWriteCollector(
   prometheusCollector: MetricsCollector
 ): MetricsCollector {
   return {
-    recordLatency(name: string, durationMs: number, labels?: MetricLabels): void {
+    recordLatency(
+      name: string,
+      durationMs: number,
+      labels?: MetricLabels
+    ): void {
       // Write to console for CloudWatch/logs
       consoleMetricsCollector.recordLatency(name, durationMs, labels);
       // Write to Prometheus for scraping

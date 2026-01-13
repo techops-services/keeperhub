@@ -53,11 +53,7 @@ export type MetricsCollector = {
    * @param durationMs - Duration in milliseconds
    * @param labels - Optional labels for dimensions
    */
-  recordLatency(
-    name: string,
-    durationMs: number,
-    labels?: MetricLabels
-  ): void;
+  recordLatency(name: string, durationMs: number, labels?: MetricLabels): void;
 
   /**
    * Increment a counter metric
@@ -65,11 +61,7 @@ export type MetricsCollector = {
    * @param labels - Optional labels for dimensions
    * @param value - Increment value (default: 1)
    */
-  incrementCounter(
-    name: string,
-    labels?: MetricLabels,
-    value?: number
-  ): void;
+  incrementCounter(name: string, labels?: MetricLabels, value?: number): void;
 
   /**
    * Record an error with context

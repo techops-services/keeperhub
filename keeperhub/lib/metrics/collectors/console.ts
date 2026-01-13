@@ -6,10 +6,10 @@
  */
 
 import type {
-  MetricsCollector,
-  MetricLabels,
-  MetricEvent,
   ErrorContext,
+  MetricEvent,
+  MetricLabels,
+  MetricsCollector,
 } from "../types";
 
 /**
@@ -18,7 +18,9 @@ import type {
 function normalizeLabels(
   labels?: MetricLabels
 ): Record<string, string> | undefined {
-  if (!labels) return undefined;
+  if (!labels) {
+    return;
+  }
 
   const normalized: Record<string, string> = {};
   for (const [key, value] of Object.entries(labels)) {
@@ -44,15 +46,21 @@ function extractErrorContext(error: Error | ErrorContext): ErrorContext {
 }
 
 /**
+ * Options for creating a metric event
+ */
+type CreateMetricEventOptions = {
+  name: string;
+  type: MetricEvent["metric"]["type"];
+  value: number;
+  labels?: MetricLabels;
+  level?: MetricEvent["level"];
+};
+
+/**
  * Create a structured metric event
  */
-function createMetricEvent(
-  name: string,
-  type: MetricEvent["metric"]["type"],
-  value: number,
-  labels?: MetricLabels,
-  level: MetricEvent["level"] = "info"
-): MetricEvent {
+function createMetricEvent(options: CreateMetricEventOptions): MetricEvent {
+  const { name, type, value, labels, level = "info" } = options;
   return {
     timestamp: new Date().toISOString(),
     level,
@@ -83,21 +91,18 @@ function createMetricEvent(
  * ```
  */
 export const consoleMetricsCollector: MetricsCollector = {
-  recordLatency(
-    name: string,
-    durationMs: number,
-    labels?: MetricLabels
-  ): void {
-    const event = createMetricEvent(name, "histogram", durationMs, labels);
+  recordLatency(name: string, durationMs: number, labels?: MetricLabels): void {
+    const event = createMetricEvent({
+      name,
+      type: "histogram",
+      value: durationMs,
+      labels,
+    });
     console.info(JSON.stringify(event));
   },
 
-  incrementCounter(
-    name: string,
-    labels?: MetricLabels,
-    value: number = 1
-  ): void {
-    const event = createMetricEvent(name, "counter", value, labels);
+  incrementCounter(name: string, labels?: MetricLabels, value = 1): void {
+    const event = createMetricEvent({ name, type: "counter", value, labels });
     console.info(JSON.stringify(event));
   },
 
@@ -113,7 +118,13 @@ export const consoleMetricsCollector: MetricsCollector = {
       ...(errorContext.code && { error_code: errorContext.code }),
     };
 
-    const event = createMetricEvent(name, "counter", 1, enrichedLabels, "error");
+    const event = createMetricEvent({
+      name,
+      type: "counter",
+      value: 1,
+      labels: enrichedLabels,
+      level: "error",
+    });
 
     // Include full error context in a separate field for debugging
     const eventWithError = {
@@ -125,7 +136,7 @@ export const consoleMetricsCollector: MetricsCollector = {
   },
 
   setGauge(name: string, value: number, labels?: MetricLabels): void {
-    const event = createMetricEvent(name, "gauge", value, labels);
+    const event = createMetricEvent({ name, type: "gauge", value, labels });
     console.info(JSON.stringify(event));
   },
 };
@@ -138,10 +149,18 @@ export function createPrefixedConsoleCollector(
 ): MetricsCollector {
   return {
     recordLatency(name, durationMs, labels) {
-      consoleMetricsCollector.recordLatency(`${prefix}.${name}`, durationMs, labels);
+      consoleMetricsCollector.recordLatency(
+        `${prefix}.${name}`,
+        durationMs,
+        labels
+      );
     },
     incrementCounter(name, labels, value) {
-      consoleMetricsCollector.incrementCounter(`${prefix}.${name}`, labels, value);
+      consoleMetricsCollector.incrementCounter(
+        `${prefix}.${name}`,
+        labels,
+        value
+      );
     },
     recordError(name, error, labels) {
       consoleMetricsCollector.recordError(`${prefix}.${name}`, error, labels);

@@ -8,8 +8,9 @@
  */
 import "server-only";
 
+// biome-ignore lint/performance/noBarrelFile: Intentional API boundary for prometheus exports
 export {
-  prometheusMetricsCollector,
-  getPrometheusMetrics,
   getPrometheusContentType,
+  getPrometheusMetrics,
+  prometheusMetricsCollector,
 } from "./collectors/prometheus";

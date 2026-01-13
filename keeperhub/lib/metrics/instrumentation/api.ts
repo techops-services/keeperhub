@@ -5,10 +5,10 @@
  */
 
 import {
-  getMetricsCollector,
-  MetricNames,
-  LabelKeys,
   createTimer,
+  getMetricsCollector,
+  LabelKeys,
+  MetricNames,
 } from "../index";
 
 /**
@@ -57,8 +57,7 @@ export function startApiMetrics(context: ApiMetricsContext): {
         [LabelKeys.STATUS]: "failure",
       });
 
-      const errorObj =
-        typeof error === "string" ? { message: error } : error;
+      const errorObj = typeof error === "string" ? { message: error } : error;
       metrics.recordError(MetricNames.API_ERRORS_TOTAL, errorObj, {
         ...baseLabels,
         [LabelKeys.STATUS_CODE]: String(statusCode),
@@ -102,7 +101,11 @@ export function recordWebhookMetrics(options: {
     labels[LabelKeys.EXECUTION_ID] = options.executionId;
   }
 
-  metrics.recordLatency(MetricNames.API_WEBHOOK_LATENCY, options.durationMs, labels);
+  metrics.recordLatency(
+    MetricNames.API_WEBHOOK_LATENCY,
+    options.durationMs,
+    labels
+  );
 
   if (!success && options.error) {
     metrics.recordError(
@@ -131,6 +134,8 @@ export function recordStatusPollMetrics(options: {
     [LabelKeys.EXECUTION_ID]: options.executionId,
     [LabelKeys.STATUS_CODE]: String(options.statusCode),
     [LabelKeys.STATUS]: options.statusCode < 400 ? "success" : "failure",
-    ...(options.executionStatus && { execution_status: options.executionStatus }),
+    ...(options.executionStatus && {
+      execution_status: options.executionStatus,
+    }),
   });
 }

@@ -2,15 +2,15 @@ import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { start } from "workflow/api";
+import { createTimer } from "@/keeperhub/lib/metrics";
+// start custom keeperhub code //
+import { recordWebhookMetrics } from "@/keeperhub/lib/metrics/instrumentation/api";
 import { db } from "@/lib/db";
 import { validateWorkflowIntegrations } from "@/lib/db/integrations";
 import { apiKeys, workflowExecutions, workflows } from "@/lib/db/schema";
 import { executeWorkflow } from "@/lib/workflow-executor.workflow";
 import type { WorkflowEdge, WorkflowNode } from "@/lib/workflow-store";
 
-// start custom keeperhub code //
-import { recordWebhookMetrics } from "@/keeperhub/lib/metrics/instrumentation/api";
-import { createTimer } from "@/keeperhub/lib/metrics";
 // end keeperhub code //
 
 // Validate API key and return the user ID if valid
@@ -237,7 +237,8 @@ export async function POST(
       workflowId,
       durationMs: timer(),
       statusCode: 500,
-      error: error instanceof Error ? error.message : "Failed to execute workflow",
+      error:
+        error instanceof Error ? error.message : "Failed to execute workflow",
     });
     // end keeperhub code //
 

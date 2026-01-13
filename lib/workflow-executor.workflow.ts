@@ -4,6 +4,20 @@
  */
 
 import {
+  getMetricsCollector,
+  LabelKeys,
+  MetricNames,
+} from "@/keeperhub/lib/metrics";
+import {
+  decrementConcurrentExecutions,
+  incrementConcurrentExecutions,
+} from "@/keeperhub/lib/metrics/instrumentation/saturation";
+// start custom keeperhub code //
+import {
+  detectTriggerType,
+  recordWorkflowComplete,
+} from "@/keeperhub/lib/metrics/instrumentation/workflow";
+import {
   preValidateConditionExpression,
   validateConditionExpression,
 } from "@/lib/condition-validator";
@@ -17,16 +31,6 @@ import { triggerStep } from "./steps/trigger";
 import { getErrorMessageAsync } from "./utils";
 import type { WorkflowEdge, WorkflowNode } from "./workflow-store";
 
-// start custom keeperhub code //
-import {
-  recordWorkflowComplete,
-  detectTriggerType,
-} from "@/keeperhub/lib/metrics/instrumentation/workflow";
-import {
-  incrementConcurrentExecutions,
-  decrementConcurrentExecutions,
-} from "@/keeperhub/lib/metrics/instrumentation/saturation";
-import { getMetricsCollector, MetricNames, LabelKeys } from "@/keeperhub/lib/metrics";
 // end keeperhub code //
 
 // System actions that don't have plugins - maps to module import functions

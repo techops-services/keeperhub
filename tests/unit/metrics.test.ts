@@ -1,17 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   consoleMetricsCollector,
-  noopMetricsCollector,
-  getMetricsCollector,
-  setMetricsCollector,
-  resetMetricsCollector,
+  createPrefixedConsoleCollector,
   createTimer,
+  getMetricsCollector,
+  LabelKeys,
+  MetricNames,
+  type MetricsCollector,
+  noopMetricsCollector,
+  resetMetricsCollector,
+  setMetricsCollector,
   withLatencyTracking,
   withMetrics,
-  createPrefixedConsoleCollector,
-  MetricNames,
-  LabelKeys,
-  type MetricsCollector,
 } from "@/keeperhub/lib/metrics";
 
 describe("Metrics Collectors", () => {
@@ -27,7 +27,9 @@ describe("Metrics Collectors", () => {
 
   describe("consoleMetricsCollector", () => {
     it("should output JSON for recordLatency", () => {
-      const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {
+        // noop - suppress console output
+      });
 
       consoleMetricsCollector.recordLatency("test.latency", 100, {
         workflow_id: "wf_123",
@@ -45,7 +47,9 @@ describe("Metrics Collectors", () => {
     });
 
     it("should output JSON for incrementCounter", () => {
-      const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {
+        // noop - suppress console output
+      });
 
       consoleMetricsCollector.incrementCounter("test.counter", {
         trigger_type: "webhook",
@@ -61,7 +65,9 @@ describe("Metrics Collectors", () => {
     });
 
     it("should increment counter with custom value", () => {
-      const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {
+        // noop - suppress console output
+      });
 
       consoleMetricsCollector.incrementCounter("test.counter", {}, 5);
 
@@ -70,9 +76,9 @@ describe("Metrics Collectors", () => {
     });
 
     it("should output JSON for recordError with Error object", () => {
-      const consoleSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {
+        // noop - suppress console output
+      });
 
       const error = new Error("Test error message");
       consoleMetricsCollector.recordError("test.errors", error, {
@@ -93,9 +99,9 @@ describe("Metrics Collectors", () => {
     });
 
     it("should output JSON for recordError with ErrorContext", () => {
-      const consoleSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {
+        // noop - suppress console output
+      });
 
       consoleMetricsCollector.recordError(
         "test.errors",
@@ -111,7 +117,9 @@ describe("Metrics Collectors", () => {
     });
 
     it("should output JSON for setGauge", () => {
-      const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {
+        // noop - suppress console output
+      });
 
       consoleMetricsCollector.setGauge("test.gauge", 42, {
         resource: "db_pool",
@@ -126,7 +134,9 @@ describe("Metrics Collectors", () => {
     });
 
     it("should handle labels with different value types", () => {
-      const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {
+        // noop - suppress console output
+      });
 
       consoleMetricsCollector.recordLatency("test.latency", 50, {
         count: 123,
@@ -145,7 +155,9 @@ describe("Metrics Collectors", () => {
     });
 
     it("should handle undefined labels", () => {
-      const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {
+        // noop - suppress console output
+      });
 
       consoleMetricsCollector.recordLatency("test.latency", 50);
 
@@ -180,8 +192,12 @@ describe("Metrics Collectors", () => {
     });
 
     it("should not output to console", () => {
-      const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
-      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {
+        // noop - suppress console output
+      });
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {
+        // noop - suppress console output
+      });
 
       noopMetricsCollector.recordLatency("test", 100);
       noopMetricsCollector.incrementCounter("test");
@@ -195,7 +211,9 @@ describe("Metrics Collectors", () => {
 
   describe("createPrefixedConsoleCollector", () => {
     it("should prefix all metric names", () => {
-      const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {
+        // noop - suppress console output
+      });
       const prefixed = createPrefixedConsoleCollector("myapp");
 
       prefixed.recordLatency("request.duration", 100);
@@ -302,9 +320,7 @@ describe("Metrics Collectors", () => {
       const testError = new Error("Test failure");
 
       await expect(
-        withLatencyTracking(async () => {
-          throw testError;
-        }, "test.operation")
+        withLatencyTracking(() => Promise.reject(testError), "test.operation")
       ).rejects.toThrow("Test failure");
 
       expect(mockCollector.recordLatency).toHaveBeenCalledWith(
@@ -355,16 +371,11 @@ describe("Metrics Collectors", () => {
       const testError = new Error("Operation failed");
 
       await expect(
-        withMetrics(
-          async () => {
-            throw testError;
-          },
-          {
-            latencyMetric: "op.duration",
-            errorMetric: "op.errors",
-            labels: { type: "test" },
-          }
-        )
+        withMetrics(() => Promise.reject(testError), {
+          latencyMetric: "op.duration",
+          errorMetric: "op.errors",
+          labels: { type: "test" },
+        })
       ).rejects.toThrow("Operation failed");
 
       expect(mockCollector.recordLatency).toHaveBeenCalledWith(

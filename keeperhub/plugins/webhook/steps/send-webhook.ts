@@ -1,8 +1,8 @@
 import "server-only";
 
+import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
-import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 
 type SendWebhookResult =
   | { success: true; statusCode: number; response: unknown }
@@ -155,7 +155,11 @@ export async function sendWebhookStep(
   "use step";
 
   return withPluginMetrics(
-    { pluginName: "webhook", actionName: "send-webhook", executionId: input._context?.executionId },
+    {
+      pluginName: "webhook",
+      actionName: "send-webhook",
+      executionId: input._context?.executionId,
+    },
     () => withStepLogging(input, () => stepHandler(input))
   );
 }

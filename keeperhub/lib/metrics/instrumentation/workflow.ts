@@ -5,10 +5,10 @@
  */
 
 import {
-  getMetricsCollector,
-  MetricNames,
-  LabelKeys,
   createTimer,
+  getMetricsCollector,
+  LabelKeys,
+  MetricNames,
   type TriggerType,
 } from "../index";
 
@@ -86,7 +86,11 @@ export function recordWorkflowComplete(options: {
         ? { message: options.error }
         : options.error;
 
-    metrics.recordError(MetricNames.WORKFLOW_EXECUTION_ERRORS, errorObj, labels);
+    metrics.recordError(
+      MetricNames.WORKFLOW_EXECUTION_ERRORS,
+      errorObj,
+      labels
+    );
   }
 }
 
@@ -113,7 +117,11 @@ export function recordStepMetrics(options: {
   }
 
   // Record step duration
-  metrics.recordLatency(MetricNames.WORKFLOW_STEP_DURATION, options.durationMs, labels);
+  metrics.recordLatency(
+    MetricNames.WORKFLOW_STEP_DURATION,
+    options.durationMs,
+    labels
+  );
 
   // Record error if failed
   if (!options.success && options.error) {
@@ -128,13 +136,17 @@ export function recordStepMetrics(options: {
 /**
  * Determine trigger type from workflow nodes
  */
-export function detectTriggerType(nodes: Array<{ data: { type: string; config?: Record<string, unknown> } }>): TriggerType {
+export function detectTriggerType(
+  nodes: Array<{ data: { type: string; config?: Record<string, unknown> } }>
+): TriggerType {
   const triggerNode = nodes.find((n) => n.data.type === "trigger");
   if (!triggerNode) {
     return "manual";
   }
 
-  const triggerType = triggerNode.data.config?.triggerType as string | undefined;
+  const triggerType = triggerNode.data.config?.triggerType as
+    | string
+    | undefined;
 
   if (triggerType === "Webhook") {
     return "webhook";

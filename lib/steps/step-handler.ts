@@ -5,6 +5,8 @@
  */
 import "server-only";
 
+// start custom keeperhub code //
+import { recordStepMetrics } from "@/keeperhub/lib/metrics/instrumentation/workflow";
 import { redactSensitiveData } from "../utils/redact";
 import {
   incrementCompletedSteps,
@@ -13,9 +15,6 @@ import {
   logWorkflowCompleteDb,
   updateCurrentStep,
 } from "../workflow-logging";
-
-// start custom keeperhub code //
-import { recordStepMetrics } from "@/keeperhub/lib/metrics/instrumentation/workflow";
 // end keeperhub code //
 
 export type StepContext = {

@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  recordPluginMetrics,
-  withPluginMetrics,
-  recordExternalServiceCall,
-} from "@/keeperhub/lib/metrics/instrumentation/plugin";
-import {
-  setMetricsCollector,
-  resetMetricsCollector,
   MetricNames,
   type MetricsCollector,
+  resetMetricsCollector,
+  setMetricsCollector,
 } from "@/keeperhub/lib/metrics";
+import {
+  recordExternalServiceCall,
+  recordPluginMetrics,
+  withPluginMetrics,
+} from "@/keeperhub/lib/metrics/instrumentation/plugin";
 
 describe("Plugin Metrics Instrumentation", () => {
   let mockCollector: MetricsCollector;
@@ -162,9 +162,7 @@ describe("Plugin Metrics Instrumentation", () => {
       await expect(
         withPluginMetrics(
           { pluginName: "sendgrid", actionName: "send-email" },
-          async () => {
-            throw testError;
-          }
+          () => Promise.reject(testError)
         )
       ).rejects.toThrow("Connection failed");
 
@@ -184,7 +182,11 @@ describe("Plugin Metrics Instrumentation", () => {
 
     it("should include executionId in labels when provided", async () => {
       await withPluginMetrics(
-        { pluginName: "web3", actionName: "check-balance", executionId: "exec_456" },
+        {
+          pluginName: "web3",
+          actionName: "check-balance",
+          executionId: "exec_456",
+        },
         async () => ({ success: true })
       );
 

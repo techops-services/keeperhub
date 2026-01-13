@@ -1,20 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  incrementConcurrentExecutions,
-  decrementConcurrentExecutions,
-  getConcurrentExecutions,
-  resetConcurrentExecutions,
-  recordQueueDepth,
-  recordDbPoolUtilization,
-  recordSlowQuery,
-  withConcurrentTracking,
-} from "@/keeperhub/lib/metrics/instrumentation/saturation";
-import {
-  setMetricsCollector,
-  resetMetricsCollector,
   MetricNames,
   type MetricsCollector,
+  resetMetricsCollector,
+  setMetricsCollector,
 } from "@/keeperhub/lib/metrics";
+import {
+  decrementConcurrentExecutions,
+  getConcurrentExecutions,
+  incrementConcurrentExecutions,
+  recordDbPoolUtilization,
+  recordQueueDepth,
+  recordSlowQuery,
+  resetConcurrentExecutions,
+  withConcurrentTracking,
+} from "@/keeperhub/lib/metrics/instrumentation/saturation";
 
 describe("Saturation Metrics Instrumentation", () => {
   let mockCollector: MetricsCollector;
@@ -103,9 +103,9 @@ describe("Saturation Metrics Instrumentation", () => {
     it("should increment before and decrement after execution", async () => {
       let duringExecution = 0;
 
-      await withConcurrentTracking(async () => {
+      await withConcurrentTracking(() => {
         duringExecution = getConcurrentExecutions();
-        return "result";
+        return Promise.resolve("result");
       });
 
       expect(duringExecution).toBe(1);
@@ -113,18 +113,16 @@ describe("Saturation Metrics Instrumentation", () => {
     });
 
     it("should return the result of the function", async () => {
-      const result = await withConcurrentTracking(async () => {
-        return { data: "test" };
-      });
+      const result = await withConcurrentTracking(async () => ({
+        data: "test",
+      }));
 
       expect(result).toEqual({ data: "test" });
     });
 
     it("should decrement even when function throws", async () => {
       await expect(
-        withConcurrentTracking(async () => {
-          throw new Error("Test error");
-        })
+        withConcurrentTracking(() => Promise.reject(new Error("Test error")))
       ).rejects.toThrow("Test error");
 
       expect(getConcurrentExecutions()).toBe(0);
@@ -133,11 +131,12 @@ describe("Saturation Metrics Instrumentation", () => {
     it("should track nested concurrent executions", async () => {
       let innerCount = 0;
 
-      await withConcurrentTracking(async () => {
-        await withConcurrentTracking(async () => {
+      await withConcurrentTracking(() =>
+        withConcurrentTracking(() => {
           innerCount = getConcurrentExecutions();
-        });
-      });
+          return Promise.resolve();
+        })
+      );
 
       expect(innerCount).toBe(2);
       expect(getConcurrentExecutions()).toBe(0);

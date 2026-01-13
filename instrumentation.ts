@@ -22,7 +22,9 @@ export async function register() {
       const { setMetricsCollector } = await import("@/keeperhub/lib/metrics");
 
       // Use dual-write to send metrics to both console and Prometheus
-      const dualCollector = createDualWriteCollector(prometheusMetricsCollector);
+      const dualCollector = createDualWriteCollector(
+        prometheusMetricsCollector
+      );
       setMetricsCollector(dualCollector);
       console.log("[Metrics] Prometheus dual-write collector initialized");
     }

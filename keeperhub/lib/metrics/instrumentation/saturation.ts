@@ -4,10 +4,7 @@
  * Track resource utilization metrics for capacity planning and alerting.
  */
 
-import {
-  getMetricsCollector,
-  MetricNames,
-} from "../index";
+import { getMetricsCollector, MetricNames } from "../index";
 
 /**
  * In-memory counter for concurrent workflow executions
@@ -19,7 +16,7 @@ let concurrentExecutions = 0;
  * Increment concurrent execution count and emit gauge
  */
 export function incrementConcurrentExecutions(): void {
-  concurrentExecutions++;
+  concurrentExecutions += 1;
   emitConcurrentExecutionsGauge();
 }
 
@@ -71,9 +68,10 @@ export function recordDbPoolUtilization(options: {
   maxConnections: number;
 }): void {
   const metrics = getMetricsCollector();
-  const utilization = options.maxConnections > 0
-    ? (options.activeConnections / options.maxConnections) * 100
-    : 0;
+  const utilization =
+    options.maxConnections > 0
+      ? (options.activeConnections / options.maxConnections) * 100
+      : 0;
 
   metrics.setGauge(MetricNames.DB_POOL_UTILIZATION, utilization, {
     active: String(options.activeConnections),
@@ -87,7 +85,8 @@ export function recordDbPoolUtilization(options: {
 export function recordSlowQuery(durationMs: number, query?: string): void {
   const metrics = getMetricsCollector();
 
-  if (durationMs > 100) { // Threshold for "slow" query
+  if (durationMs > 100) {
+    // Threshold for "slow" query
     metrics.incrementCounter(MetricNames.DB_QUERY_SLOW_COUNT, {
       threshold: "100ms",
       ...(query && { query_type: categorizeQuery(query) }),
@@ -100,10 +99,18 @@ export function recordSlowQuery(durationMs: number, query?: string): void {
  */
 function categorizeQuery(query: string): string {
   const normalized = query.trim().toLowerCase();
-  if (normalized.startsWith("select")) return "select";
-  if (normalized.startsWith("insert")) return "insert";
-  if (normalized.startsWith("update")) return "update";
-  if (normalized.startsWith("delete")) return "delete";
+  if (normalized.startsWith("select")) {
+    return "select";
+  }
+  if (normalized.startsWith("insert")) {
+    return "insert";
+  }
+  if (normalized.startsWith("update")) {
+    return "update";
+  }
+  if (normalized.startsWith("delete")) {
+    return "delete";
+  }
   return "other";
 }
 

@@ -8,13 +8,13 @@
 import "server-only";
 
 import {
-  Registry,
   Counter,
-  Histogram,
-  Gauge,
   collectDefaultMetrics,
+  Gauge,
+  Histogram,
+  Registry,
 } from "prom-client";
-import type { MetricsCollector, MetricLabels, ErrorContext } from "../types";
+import type { ErrorContext, MetricLabels, MetricsCollector } from "../types";
 
 // Use global singleton to prevent duplicate registration during hot reload
 // This is safe because each pod has its own Node.js process
@@ -33,11 +33,16 @@ if (!registry.getSingleMetric("keeperhub_process_cpu_seconds_total")) {
 }
 
 // Pre-defined label names for each metric
-const WORKFLOW_LABELS = ["workflow_id", "execution_id", "trigger_type", "status"];
+const WORKFLOW_LABELS = [
+  "workflow_id",
+  "execution_id",
+  "trigger_type",
+  "status",
+];
 const STEP_LABELS = ["execution_id", "step_type", "status"];
 const API_LABELS = ["endpoint", "status_code", "status"];
 const PLUGIN_LABELS = ["plugin_name", "action_name", "execution_id", "status"];
-const ERROR_LABELS = ["error_type", "plugin_name", "action_name", "service"];
+const _ERROR_LABELS = ["error_type", "plugin_name", "action_name", "service"];
 const DB_LABELS = ["query_type", "threshold"];
 const POOL_LABELS = ["active", "max"];
 
@@ -51,8 +56,16 @@ function getOrCreateHistogram(
   buckets: number[]
 ): Histogram {
   const existing = registry.getSingleMetric(name);
-  if (existing) return existing as Histogram;
-  return new Histogram({ name, help, labelNames, buckets, registers: [registry] });
+  if (existing) {
+    return existing as Histogram;
+  }
+  return new Histogram({
+    name,
+    help,
+    labelNames,
+    buckets,
+    registers: [registry],
+  });
 }
 
 function getOrCreateCounter(
@@ -61,7 +74,9 @@ function getOrCreateCounter(
   labelNames: string[]
 ): Counter {
   const existing = registry.getSingleMetric(name);
-  if (existing) return existing as Counter;
+  if (existing) {
+    return existing as Counter;
+  }
   return new Counter({ name, help, labelNames, registers: [registry] });
 }
 
@@ -71,7 +86,9 @@ function getOrCreateGauge(
   labelNames: string[]
 ): Gauge {
   const existing = registry.getSingleMetric(name);
-  if (existing) return existing as Gauge;
+  if (existing) {
+    return existing as Gauge;
+  }
   return new Gauge({ name, help, labelNames, registers: [registry] });
 }
 
@@ -80,7 +97,7 @@ const workflowDuration = getOrCreateHistogram(
   "keeperhub_workflow_execution_duration_ms",
   "Workflow execution duration in milliseconds",
   WORKFLOW_LABELS,
-  [100, 250, 500, 1000, 2000, 5000, 10000, 30000]
+  [100, 250, 500, 1000, 2000, 5000, 10_000, 30_000]
 );
 
 const stepDuration = getOrCreateHistogram(
@@ -115,7 +132,7 @@ const aiDuration = getOrCreateHistogram(
   "keeperhub_ai_generation_duration_ms",
   "AI workflow generation duration in milliseconds",
   ["status"],
-  [500, 1000, 2000, 5000, 10000, 20000]
+  [500, 1000, 2000, 5000, 10_000, 20_000]
 );
 
 const externalServiceLatency = getOrCreateHistogram(
@@ -229,7 +246,9 @@ function filterLabelsForMetric(
   labels: Record<string, string>
 ): Record<string, string> {
   const allowed = errorLabelAllowlist[metricName];
-  if (!allowed) return labels;
+  if (!allowed) {
+    return labels;
+  }
 
   const filtered: Record<string, string> = {};
   for (const key of allowed) {
@@ -279,7 +298,9 @@ const gaugeMap: Record<string, Gauge> = {
  * Prometheus labels must be strings and use snake_case
  */
 function sanitizeLabels(labels?: MetricLabels): Record<string, string> {
-  if (!labels) return {};
+  if (!labels) {
+    return {};
+  }
 
   const sanitized: Record<string, string> = {};
   for (const [key, value] of Object.entries(labels)) {
@@ -355,7 +376,7 @@ export function getPrometheusRegistry(): Registry {
  * Get metrics in Prometheus format
  */
 export async function getPrometheusMetrics(): Promise<string> {
-  return registry.metrics();
+  return await registry.metrics();
 }
 
 /**

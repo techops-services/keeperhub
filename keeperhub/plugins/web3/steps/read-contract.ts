@@ -2,12 +2,12 @@ import "server-only";
 
 import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
+import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 import { db } from "@/lib/db";
 import { workflowExecutions } from "@/lib/db/schema";
 import { getChainIdFromNetwork, resolveRpcConfig } from "@/lib/rpc";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
-import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 
 /**
  * Get userId from executionId by querying the workflowExecutions table
@@ -274,7 +274,11 @@ export async function readContractStep(
   "use step";
 
   return withPluginMetrics(
-    { pluginName: "web3", actionName: "read-contract", executionId: input._context?.executionId },
+    {
+      pluginName: "web3",
+      actionName: "read-contract",
+      executionId: input._context?.executionId,
+    },
     () => withStepLogging(input, () => stepHandler(input))
   );
 }

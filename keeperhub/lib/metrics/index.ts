@@ -29,27 +29,29 @@
  * ```
  */
 
+// Re-export collectors (only non-Node.js specific ones)
+// biome-ignore lint/performance/noBarrelFile: Intentional barrel file for metrics API
+export {
+  consoleMetricsCollector,
+  createPrefixedConsoleCollector,
+} from "./collectors/console";
+export { noopMetricsCollector } from "./collectors/noop";
 // Re-export types
 export type {
-  MetricsCollector,
-  MetricLabels,
-  MetricEvent,
-  MetricType,
   ErrorContext,
-  TriggerType,
   ExecutionStatus,
+  MetricEvent,
+  MetricLabels,
+  MetricsCollector,
+  MetricType,
+  TriggerType,
 } from "./types";
-
 // Re-export constants
-export { MetricNames, LabelKeys } from "./types";
+export { LabelKeys, MetricNames } from "./types";
 
-// Re-export collectors (only non-Node.js specific ones)
-export { consoleMetricsCollector, createPrefixedConsoleCollector } from "./collectors/console";
-export { noopMetricsCollector } from "./collectors/noop";
-
-import type { MetricsCollector } from "./types";
 import { consoleMetricsCollector } from "./collectors/console";
 import { noopMetricsCollector } from "./collectors/noop";
+import type { MetricsCollector } from "./types";
 
 /**
  * Detect if running in a server environment
@@ -80,8 +82,12 @@ function isMetricsEnabled(): boolean {
  */
 function getMetricsCollectorType(): "console" | "prometheus" | "noop" {
   const envValue = process.env.METRICS_COLLECTOR;
-  if (envValue === "prometheus") return "prometheus";
-  if (envValue === "noop") return "noop";
+  if (envValue === "prometheus") {
+    return "prometheus";
+  }
+  if (envValue === "noop") {
+    return "noop";
+  }
   return "console";
 }
 
@@ -111,7 +117,7 @@ export function getMetricsCollector(): MetricsCollector {
     return metricsCollectorInstance;
   }
 
-  if (!isServerEnvironment() || !isMetricsEnabled()) {
+  if (!(isServerEnvironment() && isMetricsEnabled())) {
     metricsCollectorInstance = noopMetricsCollector;
     return metricsCollectorInstance;
   }
@@ -127,7 +133,6 @@ export function getMetricsCollector(): MetricsCollector {
     case "noop":
       metricsCollectorInstance = noopMetricsCollector;
       break;
-    case "console":
     default:
       metricsCollectorInstance = consoleMetricsCollector;
       break;
@@ -190,10 +195,16 @@ export async function withLatencyTracking<T>(
 
   try {
     const result = await fn();
-    metrics.recordLatency(metricName, timer(), { ...labels, status: "success" });
+    metrics.recordLatency(metricName, timer(), {
+      ...labels,
+      status: "success",
+    });
     return result;
   } catch (error) {
-    metrics.recordLatency(metricName, timer(), { ...labels, status: "failure" });
+    metrics.recordLatency(metricName, timer(), {
+      ...labels,
+      status: "failure",
+    });
     throw error;
   }
 }
@@ -236,13 +247,19 @@ export async function withMetrics<T>(
     const result = await fn();
 
     if (latencyMetric) {
-      metrics.recordLatency(latencyMetric, timer(), { ...labels, status: "success" });
+      metrics.recordLatency(latencyMetric, timer(), {
+        ...labels,
+        status: "success",
+      });
     }
 
     return result;
   } catch (error) {
     if (latencyMetric) {
-      metrics.recordLatency(latencyMetric, timer(), { ...labels, status: "failure" });
+      metrics.recordLatency(latencyMetric, timer(), {
+        ...labels,
+        status: "failure",
+      });
     }
 
     if (errorMetric && error instanceof Error) {

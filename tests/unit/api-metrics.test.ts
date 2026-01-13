@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  startApiMetrics,
-  recordWebhookMetrics,
-  recordStatusPollMetrics,
-} from "@/keeperhub/lib/metrics/instrumentation/api";
-import {
-  setMetricsCollector,
-  resetMetricsCollector,
   MetricNames,
   type MetricsCollector,
+  resetMetricsCollector,
+  setMetricsCollector,
 } from "@/keeperhub/lib/metrics";
+import {
+  recordStatusPollMetrics,
+  recordWebhookMetrics,
+  startApiMetrics,
+} from "@/keeperhub/lib/metrics/instrumentation/api";
 
 describe("API Metrics Instrumentation", () => {
   let mockCollector: MetricsCollector;
@@ -104,7 +104,9 @@ describe("API Metrics Instrumentation", () => {
     });
 
     it("should use webhook latency metric for webhook endpoints", () => {
-      const { complete } = startApiMetrics({ endpoint: "/api/workflows/123/webhook" });
+      const { complete } = startApiMetrics({
+        endpoint: "/api/workflows/123/webhook",
+      });
 
       complete(200);
 
@@ -116,7 +118,9 @@ describe("API Metrics Instrumentation", () => {
     });
 
     it("should use status latency metric for status endpoints", () => {
-      const { complete } = startApiMetrics({ endpoint: "/api/executions/123/status" });
+      const { complete } = startApiMetrics({
+        endpoint: "/api/executions/123/status",
+      });
 
       complete(200);
 
