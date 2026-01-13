@@ -16,11 +16,21 @@ import {
 } from "prom-client";
 import type { MetricsCollector, MetricLabels, ErrorContext } from "../types";
 
-// Create a dedicated registry for application metrics
-const registry = new Registry();
+// Use global singleton to prevent duplicate registration during hot reload
+// This is safe because each pod has its own Node.js process
+const globalForProm = globalThis as unknown as {
+  prometheusRegistry: Registry | undefined;
+};
+
+// Create a dedicated registry for application metrics (singleton)
+const registry = globalForProm.prometheusRegistry ?? new Registry();
+globalForProm.prometheusRegistry = registry;
 
 // Collect default Node.js metrics (memory, CPU, event loop, etc.)
-collectDefaultMetrics({ register: registry, prefix: "keeperhub_" });
+// Only register if not already registered (handles hot reload)
+if (!registry.getSingleMetric("keeperhub_process_cpu_seconds_total")) {
+  collectDefaultMetrics({ register: registry, prefix: "keeperhub_" });
+}
 
 // Pre-defined label names for each metric
 const WORKFLOW_LABELS = ["workflow_id", "execution_id", "trigger_type", "status"];
@@ -31,163 +41,176 @@ const ERROR_LABELS = ["error_type", "plugin_name", "action_name", "service"];
 const DB_LABELS = ["query_type", "threshold"];
 const POOL_LABELS = ["active", "max"];
 
+/**
+ * Helper to get or create a metric (handles hot reload gracefully)
+ */
+function getOrCreateHistogram(
+  name: string,
+  help: string,
+  labelNames: string[],
+  buckets: number[]
+): Histogram {
+  const existing = registry.getSingleMetric(name);
+  if (existing) return existing as Histogram;
+  return new Histogram({ name, help, labelNames, buckets, registers: [registry] });
+}
+
+function getOrCreateCounter(
+  name: string,
+  help: string,
+  labelNames: string[]
+): Counter {
+  const existing = registry.getSingleMetric(name);
+  if (existing) return existing as Counter;
+  return new Counter({ name, help, labelNames, registers: [registry] });
+}
+
+function getOrCreateGauge(
+  name: string,
+  help: string,
+  labelNames: string[]
+): Gauge {
+  const existing = registry.getSingleMetric(name);
+  if (existing) return existing as Gauge;
+  return new Gauge({ name, help, labelNames, registers: [registry] });
+}
+
 // Latency histograms
-const workflowDuration = new Histogram({
-  name: "keeperhub_workflow_execution_duration_ms",
-  help: "Workflow execution duration in milliseconds",
-  labelNames: WORKFLOW_LABELS,
-  buckets: [100, 250, 500, 1000, 2000, 5000, 10000, 30000],
-  registers: [registry],
-});
+const workflowDuration = getOrCreateHistogram(
+  "keeperhub_workflow_execution_duration_ms",
+  "Workflow execution duration in milliseconds",
+  WORKFLOW_LABELS,
+  [100, 250, 500, 1000, 2000, 5000, 10000, 30000]
+);
 
-const stepDuration = new Histogram({
-  name: "keeperhub_workflow_step_duration_ms",
-  help: "Workflow step execution duration in milliseconds",
-  labelNames: STEP_LABELS,
-  buckets: [50, 100, 250, 500, 1000, 2000, 5000],
-  registers: [registry],
-});
+const stepDuration = getOrCreateHistogram(
+  "keeperhub_workflow_step_duration_ms",
+  "Workflow step execution duration in milliseconds",
+  STEP_LABELS,
+  [50, 100, 250, 500, 1000, 2000, 5000]
+);
 
-const webhookLatency = new Histogram({
-  name: "keeperhub_api_webhook_latency_ms",
-  help: "Webhook trigger response time in milliseconds",
-  labelNames: API_LABELS,
-  buckets: [10, 25, 50, 100, 250, 500],
-  registers: [registry],
-});
+const webhookLatency = getOrCreateHistogram(
+  "keeperhub_api_webhook_latency_ms",
+  "Webhook trigger response time in milliseconds",
+  API_LABELS,
+  [10, 25, 50, 100, 250, 500]
+);
 
-const statusLatency = new Histogram({
-  name: "keeperhub_api_status_latency_ms",
-  help: "Status polling response time in milliseconds",
-  labelNames: ["execution_id", "status"],
-  buckets: [5, 10, 25, 50, 100],
-  registers: [registry],
-});
+const statusLatency = getOrCreateHistogram(
+  "keeperhub_api_status_latency_ms",
+  "Status polling response time in milliseconds",
+  ["execution_id", "status"],
+  [5, 10, 25, 50, 100]
+);
 
-const pluginDuration = new Histogram({
-  name: "keeperhub_plugin_action_duration_ms",
-  help: "Plugin action execution duration in milliseconds",
-  labelNames: PLUGIN_LABELS,
-  buckets: [50, 100, 250, 500, 1000, 2000, 5000],
-  registers: [registry],
-});
+const pluginDuration = getOrCreateHistogram(
+  "keeperhub_plugin_action_duration_ms",
+  "Plugin action execution duration in milliseconds",
+  PLUGIN_LABELS,
+  [50, 100, 250, 500, 1000, 2000, 5000]
+);
 
-const aiDuration = new Histogram({
-  name: "keeperhub_ai_generation_duration_ms",
-  help: "AI workflow generation duration in milliseconds",
-  labelNames: ["status"],
-  buckets: [500, 1000, 2000, 5000, 10000, 20000],
-  registers: [registry],
-});
+const aiDuration = getOrCreateHistogram(
+  "keeperhub_ai_generation_duration_ms",
+  "AI workflow generation duration in milliseconds",
+  ["status"],
+  [500, 1000, 2000, 5000, 10000, 20000]
+);
 
-const externalServiceLatency = new Histogram({
-  name: "keeperhub_external_service_latency_ms",
-  help: "External service call latency in milliseconds",
-  labelNames: ["service", "status", "status_code"],
-  buckets: [50, 100, 250, 500, 1000, 2000, 5000],
-  registers: [registry],
-});
+const externalServiceLatency = getOrCreateHistogram(
+  "keeperhub_external_service_latency_ms",
+  "External service call latency in milliseconds",
+  ["service", "status", "status_code"],
+  [50, 100, 250, 500, 1000, 2000, 5000]
+);
 
 // Traffic counters
-const workflowExecutions = new Counter({
-  name: "keeperhub_workflow_executions_total",
-  help: "Total workflow executions",
-  labelNames: ["trigger_type", "workflow_id"],
-  registers: [registry],
-});
+const workflowExecutions = getOrCreateCounter(
+  "keeperhub_workflow_executions_total",
+  "Total workflow executions",
+  ["trigger_type", "workflow_id"]
+);
 
-const apiRequests = new Counter({
-  name: "keeperhub_api_requests_total",
-  help: "Total API requests",
-  labelNames: ["endpoint", "status_code"],
-  registers: [registry],
-});
+const apiRequests = getOrCreateCounter(
+  "keeperhub_api_requests_total",
+  "Total API requests",
+  ["endpoint", "status_code"]
+);
 
-const pluginInvocations = new Counter({
-  name: "keeperhub_plugin_invocations_total",
-  help: "Total plugin invocations",
-  labelNames: ["plugin_name", "action_name"],
-  registers: [registry],
-});
+const pluginInvocations = getOrCreateCounter(
+  "keeperhub_plugin_invocations_total",
+  "Total plugin invocations",
+  ["plugin_name", "action_name"]
+);
 
-const aiTokensConsumed = new Counter({
-  name: "keeperhub_ai_tokens_consumed_total",
-  help: "Total AI tokens consumed",
-  labelNames: [],
-  registers: [registry],
-});
+const aiTokensConsumed = getOrCreateCounter(
+  "keeperhub_ai_tokens_consumed_total",
+  "Total AI tokens consumed",
+  []
+);
 
 // Error counters
-const workflowErrors = new Counter({
-  name: "keeperhub_workflow_execution_errors_total",
-  help: "Failed workflow executions",
-  labelNames: ["workflow_id", "trigger_type", "error_type"],
-  registers: [registry],
-});
+const workflowErrors = getOrCreateCounter(
+  "keeperhub_workflow_execution_errors_total",
+  "Failed workflow executions",
+  ["workflow_id", "trigger_type", "error_type"]
+);
 
-const stepErrors = new Counter({
-  name: "keeperhub_workflow_step_errors_total",
-  help: "Failed step executions",
-  labelNames: ["step_type", "error_type"],
-  registers: [registry],
-});
+const stepErrors = getOrCreateCounter(
+  "keeperhub_workflow_step_errors_total",
+  "Failed step executions",
+  ["step_type", "error_type"]
+);
 
-const pluginErrors = new Counter({
-  name: "keeperhub_plugin_action_errors_total",
-  help: "Failed plugin actions",
-  labelNames: ["plugin_name", "action_name", "error_type"],
-  registers: [registry],
-});
+const pluginErrors = getOrCreateCounter(
+  "keeperhub_plugin_action_errors_total",
+  "Failed plugin actions",
+  ["plugin_name", "action_name", "error_type"]
+);
 
-const apiErrors = new Counter({
-  name: "keeperhub_api_errors_total",
-  help: "API errors by status code",
-  labelNames: ["endpoint", "status_code", "error_type"],
-  registers: [registry],
-});
+const apiErrors = getOrCreateCounter(
+  "keeperhub_api_errors_total",
+  "API errors by status code",
+  ["endpoint", "status_code", "error_type"]
+);
 
-const externalServiceErrors = new Counter({
-  name: "keeperhub_external_service_errors_total",
-  help: "External service failures",
-  labelNames: ["service", "plugin_name"],
-  registers: [registry],
-});
+const externalServiceErrors = getOrCreateCounter(
+  "keeperhub_external_service_errors_total",
+  "External service failures",
+  ["service", "plugin_name"]
+);
 
-const slowQueries = new Counter({
-  name: "keeperhub_db_query_slow_total",
-  help: "Slow database queries (>100ms)",
-  labelNames: DB_LABELS,
-  registers: [registry],
-});
+const slowQueries = getOrCreateCounter(
+  "keeperhub_db_query_slow_total",
+  "Slow database queries (>100ms)",
+  DB_LABELS
+);
 
 // Saturation gauges
-const dbPoolUtilization = new Gauge({
-  name: "keeperhub_db_pool_utilization_percent",
-  help: "Database connection pool utilization percentage",
-  labelNames: POOL_LABELS,
-  registers: [registry],
-});
+const dbPoolUtilization = getOrCreateGauge(
+  "keeperhub_db_pool_utilization_percent",
+  "Database connection pool utilization percentage",
+  POOL_LABELS
+);
 
-const workflowQueueDepth = new Gauge({
-  name: "keeperhub_workflow_queue_depth",
-  help: "Pending workflow jobs in queue",
-  labelNames: [],
-  registers: [registry],
-});
+const workflowQueueDepth = getOrCreateGauge(
+  "keeperhub_workflow_queue_depth",
+  "Pending workflow jobs in queue",
+  []
+);
 
-const workflowConcurrent = new Gauge({
-  name: "keeperhub_workflow_concurrent_count",
-  help: "Current concurrent workflow executions",
-  labelNames: [],
-  registers: [registry],
-});
+const workflowConcurrent = getOrCreateGauge(
+  "keeperhub_workflow_concurrent_count",
+  "Current concurrent workflow executions",
+  []
+);
 
-const activeUsers = new Gauge({
-  name: "keeperhub_user_active_daily",
-  help: "Daily active users",
-  labelNames: [],
-  registers: [registry],
-});
+const activeUsers = getOrCreateGauge(
+  "keeperhub_user_active_daily",
+  "Daily active users",
+  []
+);
 
 // Metric name to histogram/counter/gauge mapping
 const histogramMap: Record<string, Histogram> = {
