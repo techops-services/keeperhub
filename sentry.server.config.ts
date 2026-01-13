@@ -2,12 +2,12 @@
 // The config you add here will be used whenever the server handles a request.
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/
 
-import * as Sentry from "@sentry/nextjs";
+import { init } from "@sentry/nextjs";
 
 const { SENTRY_DSN, SENTRY_ENVIRONMENT } = process.env;
 
 if (SENTRY_DSN) {
-  Sentry.init({
+  init({
     dsn: SENTRY_DSN,
     environment: SENTRY_ENVIRONMENT,
 
