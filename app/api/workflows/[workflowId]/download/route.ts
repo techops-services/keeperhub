@@ -1,7 +1,10 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+// start custom keeperhub code //
+import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
+// end keeperhub code //
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { workflows } from "@/lib/db/schema";
@@ -217,11 +220,10 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // start custom keeperhub code //
+    // Verify workflow access (owner or org member)
     const workflow = await db.query.workflows.findFirst({
-      where: and(
-        eq(workflows.id, workflowId),
-        eq(workflows.userId, session.user.id)
-      ),
+      where: eq(workflows.id, workflowId),
     });
 
     if (!workflow) {
@@ -230,6 +232,21 @@ export async function GET(
         { status: 404 }
       );
     }
+
+    const isOwner = session.user.id === workflow.userId;
+    const orgContext = await getOrgContext();
+    const isSameOrg =
+      !workflow.isAnonymous &&
+      workflow.organizationId &&
+      orgContext.organization?.id === workflow.organizationId;
+
+    if (!isOwner && !isSameOrg) {
+      return NextResponse.json(
+        { error: "Workflow not found" },
+        { status: 404 }
+      );
+    }
+    // end keeperhub code //
 
     // Read boilerplate files
     const boilerplateFiles = await readDirectoryRecursive(BOILERPLATE_PATH);

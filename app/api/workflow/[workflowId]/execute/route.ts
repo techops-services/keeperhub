@@ -1,6 +1,9 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { start } from "workflow/api";
+// start custom keeperhub code //
+import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
+// end keeperhub code //
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { validateWorkflowIntegrations } from "@/lib/db/integrations";
@@ -113,18 +116,31 @@ export async function POST(
         );
       }
 
-      if (workflow.userId !== session.user.id) {
+      // start custom keeperhub code //
+      // Check access: owner or org member
+      const isOwner = workflow.userId === session.user.id;
+      const orgContext = await getOrgContext();
+      const isSameOrg =
+        !workflow.isAnonymous &&
+        workflow.organizationId &&
+        orgContext.organization?.id === workflow.organizationId;
+
+      if (!isOwner && !isSameOrg) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
+      // end keeperhub code //
 
       userId = session.user.id;
     }
 
-    // Validate that all integrationIds in workflow nodes belong to the workflow owner
+    // start custom keeperhub code //
+    // Validate that all integrationIds in workflow nodes belong to the user or org
     const validation = await validateWorkflowIntegrations(
       workflow.nodes as WorkflowNode[],
-      userId
+      userId,
+      workflow.organizationId
     );
+    // end keeperhub code //
     if (!validation.valid) {
       console.error(
         "[Workflow Execute] Invalid integration references:",

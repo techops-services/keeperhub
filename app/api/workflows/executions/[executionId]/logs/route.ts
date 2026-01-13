@@ -1,5 +1,8 @@
 import { desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+// start custom keeperhub code //
+import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
+// end keeperhub code //
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { workflowExecutionLogs, workflowExecutions } from "@/lib/db/schema";
@@ -34,10 +37,19 @@ export async function GET(
       );
     }
 
-    // Verify the workflow belongs to the user
-    if (execution.workflow.userId !== session.user.id) {
+    // start custom keeperhub code //
+    // Verify access: owner or org member
+    const isOwner = execution.workflow.userId === session.user.id;
+    const orgContext = await getOrgContext();
+    const isSameOrg =
+      !execution.workflow.isAnonymous &&
+      execution.workflow.organizationId &&
+      orgContext.organization?.id === execution.workflow.organizationId;
+
+    if (!isOwner && !isSameOrg) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+    // end keeperhub code //
 
     // Get logs
     const logs = await db.query.workflowExecutionLogs.findMany({

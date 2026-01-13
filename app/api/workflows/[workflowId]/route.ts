@@ -94,7 +94,11 @@ export async function GET(
           ),
       createdAt: workflow.createdAt.toISOString(),
       updatedAt: workflow.updatedAt.toISOString(),
-      isOwner,
+      // Note: `isOwner` controls edit permissions in the frontend.
+      // We use `hasFullAccess` here so that all org members can edit,
+      // not just the original creator. This is a bit of a misnomer but
+      // avoids refactoring the frontend atom naming (isWorkflowOwnerAtom).
+      isOwner: hasFullAccess,
     };
 
     return NextResponse.json(responseData);
