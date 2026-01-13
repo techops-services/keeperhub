@@ -17,6 +17,14 @@ import { triggerStep } from "./steps/trigger";
 import { getErrorMessageAsync } from "./utils";
 import type { WorkflowEdge, WorkflowNode } from "./workflow-store";
 
+// start custom keeperhub code //
+import {
+  recordWorkflowComplete,
+  detectTriggerType,
+} from "@/keeperhub/lib/metrics/instrumentation/workflow";
+import { getMetricsCollector, MetricNames, LabelKeys } from "@/keeperhub/lib/metrics";
+// end keeperhub code //
+
 // System actions that don't have plugins - maps to module import functions
 const SYSTEM_ACTIONS: Record<string, StepImporter> = {
   "Database Query": {
@@ -655,10 +663,30 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
     console.log("[Workflow Executor] Starting execution from trigger nodes");
     const workflowStartTime = Date.now();
 
+    // start custom keeperhub code //
+    const triggerType = detectTriggerType(nodes);
+    const metrics = getMetricsCollector();
+    metrics.incrementCounter(MetricNames.WORKFLOW_EXECUTIONS_TOTAL, {
+      [LabelKeys.TRIGGER_TYPE]: triggerType,
+      ...(workflowId && { [LabelKeys.WORKFLOW_ID]: workflowId }),
+    });
+    // end keeperhub code //
+
     await Promise.all(triggerNodes.map((trigger) => executeNode(trigger.id)));
 
     const finalSuccess = Object.values(results).every((r) => r.success);
     const duration = Date.now() - workflowStartTime;
+
+    // start custom keeperhub code //
+    recordWorkflowComplete({
+      workflowId,
+      executionId,
+      triggerType,
+      durationMs: duration,
+      success: finalSuccess,
+      error: Object.values(results).find((r) => !r.success)?.error,
+    });
+    // end keeperhub code //
 
     console.log("[Workflow Executor] Workflow execution completed:", {
       success: finalSuccess,
@@ -700,6 +728,17 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
     );
 
     const errorMessage = await getErrorMessageAsync(error);
+
+    // start custom keeperhub code //
+    recordWorkflowComplete({
+      workflowId,
+      executionId,
+      triggerType: detectTriggerType(nodes),
+      durationMs: 0, // Unknown duration on fatal error
+      success: false,
+      error: errorMessage,
+    });
+    // end keeperhub code //
 
     // Update execution record with error if we have an executionId
     if (executionId) {
