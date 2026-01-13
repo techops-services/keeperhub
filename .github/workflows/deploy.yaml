@@ -64,7 +64,7 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.REGION }}
-          role-to-assume: "arn:aws:iam::068992353948:role/TerraformCloud"
+          role-to-assume: "arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/TerraformCloud"
           role-session-name: keeperhub-prod-deploy
           role-skip-session-tagging: true
 
@@ -176,10 +176,12 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
           SERVICE_ACCOUNT_ROLE_ARN: ${{ env.SERVICE_ACCOUNT_ROLE_ARN }}
+          AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
         run: |
           sed -i 's|${ECR_REGISTRY}|'"$ECR_REGISTRY"'|g' $HELM_FILE
           sed -i 's|${IMAGE_TAG}|'"$IMAGE_TAG"'|g' $HELM_FILE
           sed -i 's|${SERVICE_ACCOUNT_ROLE_ARN}|'"$SERVICE_ACCOUNT_ROLE_ARN"'|g' $HELM_FILE
+          sed -i 's|${AWS_ACCOUNT_ID}|'"$AWS_ACCOUNT_ID"'|g' $HELM_FILE
 
       - name: Replace variables in the Job Spawner values file
         id: replace-vars-job-spawner
@@ -188,9 +190,11 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
           JOB_SPAWNER_HELM_FILE: deploy/job-spawner/${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}/values.yaml
+          AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
         run: |
           sed -i 's|${ECR_REGISTRY}|'"$ECR_REGISTRY"'|g' $JOB_SPAWNER_HELM_FILE
           sed -i 's|${IMAGE_TAG}|'"$IMAGE_TAG"'|g' $JOB_SPAWNER_HELM_FILE
+          sed -i 's|${AWS_ACCOUNT_ID}|'"$AWS_ACCOUNT_ID"'|g' $JOB_SPAWNER_HELM_FILE
 
       - name: Configure kubectl
         if: ${{ !contains(github.event.head_commit.message , '[skip deploy]') }}
