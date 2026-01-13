@@ -2,6 +2,7 @@ import "server-only";
 
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
+import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 
 type SendWebhookResult =
   | { success: true; statusCode: number; response: unknown }
@@ -153,7 +154,10 @@ export async function sendWebhookStep(
 ): Promise<SendWebhookResult> {
   "use step";
 
-  return withStepLogging(input, () => stepHandler(input));
+  return withPluginMetrics(
+    { pluginName: "webhook", actionName: "send-webhook", executionId: input._context?.executionId },
+    () => withStepLogging(input, () => stepHandler(input))
+  );
 }
 sendWebhookStep.maxRetries = 0;
 

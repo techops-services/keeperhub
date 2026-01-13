@@ -9,6 +9,7 @@ import { workflowExecutions } from "@/lib/db/schema";
 import { getChainIdFromNetwork, resolveRpcConfig } from "@/lib/rpc";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
+import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 
 type WriteContractResult =
   | { success: true; transactionHash: string; result?: unknown }
@@ -239,7 +240,10 @@ export async function writeContractStep(
 ): Promise<WriteContractResult> {
   "use step";
 
-  return withStepLogging(input, () => stepHandler(input));
+  return withPluginMetrics(
+    { pluginName: "web3", actionName: "write-contract", executionId: input._context?.executionId },
+    () => withStepLogging(input, () => stepHandler(input))
+  );
 }
 
 export const _integrationType = "web3";

@@ -7,6 +7,7 @@ import { workflowExecutions } from "@/lib/db/schema";
 import { getChainIdFromNetwork, resolveRpcConfig } from "@/lib/rpc";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
+import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 
 /**
  * Get userId from executionId by querying the workflowExecutions table
@@ -144,7 +145,10 @@ export async function checkBalanceStep(
 ): Promise<CheckBalanceResult> {
   "use step";
 
-  return withStepLogging(input, () => stepHandler(input));
+  return withPluginMetrics(
+    { pluginName: "web3", actionName: "check-balance", executionId: input._context?.executionId },
+    () => withStepLogging(input, () => stepHandler(input))
+  );
 }
 
 export const _integrationType = "web3";
