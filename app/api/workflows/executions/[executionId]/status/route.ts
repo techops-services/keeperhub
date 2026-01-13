@@ -7,6 +7,11 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { workflowExecutionLogs, workflowExecutions } from "@/lib/db/schema";
 
+// start custom keeperhub code //
+import { recordStatusPollMetrics } from "@/keeperhub/lib/metrics/instrumentation/api";
+import { createTimer } from "@/keeperhub/lib/metrics";
+// end keeperhub code //
+
 type NodeStatus = {
   nodeId: string;
   status: "pending" | "running" | "success" | "error";
@@ -16,6 +21,10 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ executionId: string }> }
 ) {
+  // start custom keeperhub code //
+  const timer = createTimer();
+  // end keeperhub code //
+
   try {
     const { executionId } = await context.params;
     const session = await auth.api.getSession({
@@ -96,6 +105,15 @@ export async function GET(
           }
         : null;
 
+    // start custom keeperhub code //
+    recordStatusPollMetrics({
+      executionId,
+      durationMs: timer(),
+      statusCode: 200,
+      executionStatus: execution.status,
+    });
+    // end keeperhub code //
+
     return NextResponse.json({
       status: execution.status,
       nodeStatuses,
@@ -104,6 +122,16 @@ export async function GET(
     });
   } catch (error) {
     console.error("Failed to get execution status:", error);
+
+    // start custom keeperhub code //
+    const { executionId } = await context.params;
+    recordStatusPollMetrics({
+      executionId,
+      durationMs: timer(),
+      statusCode: 500,
+    });
+    // end keeperhub code //
+
     return NextResponse.json(
       {
         error:
