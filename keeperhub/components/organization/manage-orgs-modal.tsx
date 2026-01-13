@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  Copy,
+  ArrowLeft,
   LogOut,
   Mail,
   Plus,
@@ -235,10 +235,23 @@ export function ManageOrgsModal({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
 
+  // Track which org is being managed (null = list view, string = detail view)
+  const [managedOrgId, setManagedOrgId] = useState<string | null>(null);
+
   const { organization, switchOrganization } = useOrganization();
   const { organizations } = useOrganizations();
-  const { isOwner, isAdmin } = useActiveMember();
+  const { isOwner: isActiveOrgOwner, isAdmin: isActiveOrgAdmin } =
+    useActiveMember();
   const router = useRouter();
+  const { data: session } = authClient.useSession();
+
+  // Get the managed organization object (for detail view)
+  const managedOrg = managedOrgId
+    ? organizations.find((org) => org.id === managedOrgId)
+    : null;
+
+  // Determine if the managed org is the active session org
+  const isManagedOrgActive = managedOrgId === organization?.id;
 
   // Create organization state
   const [orgName, setOrgName] = useState("");
@@ -292,6 +305,20 @@ export function ManageOrgsModal({
   const [members, setMembers] = useState<Member[]>([]);
   const [, setLoadingMembers] = useState(false);
 
+  // Compute user's role in the managed org from fetched members
+  const currentUserMember = members.find((m) => m.userId === session?.user?.id);
+  const managedOrgRole = currentUserMember?.role as
+    | "owner"
+    | "admin"
+    | "member"
+    | undefined;
+  const isOwner = isManagedOrgActive
+    ? isActiveOrgOwner
+    : managedOrgRole === "owner";
+  const isAdmin = isManagedOrgActive
+    ? isActiveOrgAdmin
+    : managedOrgRole === "admin" || managedOrgRole === "owner";
+
   const fetchInvitations = useCallback(async () => {
     setLoadingInvitations(true);
     try {
@@ -330,8 +357,8 @@ export function ManageOrgsModal({
     }
   }, []);
 
-  // Fetch sent invitations for the current organization (for admins)
-  const organizationId = organization?.id;
+  // Fetch sent invitations for the managed organization (for admins)
+  const organizationId = managedOrgId;
   const fetchSentInvitations = useCallback(async () => {
     if (!organizationId) {
       return;
@@ -383,10 +410,25 @@ export function ManageOrgsModal({
   useEffect(() => {
     if (open) {
       fetchInvitations();
+    }
+  }, [open, fetchInvitations]);
+
+  // Fetch org-specific data when managed org changes
+  useEffect(() => {
+    if (open && managedOrgId) {
       fetchSentInvitations();
       fetchMembers();
     }
-  }, [open, fetchInvitations, fetchSentInvitations, fetchMembers]);
+  }, [open, managedOrgId, fetchSentInvitations, fetchMembers]);
+
+  // Reset managed org when modal closes
+  useEffect(() => {
+    if (!open) {
+      setManagedOrgId(null);
+      setShowInviteForm(false);
+      setInviteId(null);
+    }
+  }, [open]);
 
   const handleOrgNameChange = (value: string) => {
     setOrgName(value);
@@ -429,7 +471,7 @@ export function ManageOrgsModal({
   };
 
   const handleInviteMember = async () => {
-    if (!inviteEmail) {
+    if (!inviteEmail || !managedOrgId) {
       return;
     }
 
@@ -438,6 +480,7 @@ export function ManageOrgsModal({
       const { data, error } = await authClient.organization.inviteMember({
         email: inviteEmail,
         role: inviteRole,
+        organizationId: managedOrgId,
       });
 
       if (error) {
@@ -462,23 +505,6 @@ export function ManageOrgsModal({
     } finally {
       setInviteLoading(false);
     }
-  };
-
-  const copyInviteLink = () => {
-    if (!inviteId) {
-      return;
-    }
-    const link = `${window.location.origin}/accept-invite/${inviteId}`;
-    navigator.clipboard.writeText(link);
-    toast.success("Invite link copied");
-  };
-
-  const copyInviteCode = () => {
-    if (!inviteId) {
-      return;
-    }
-    navigator.clipboard.writeText(inviteId);
-    toast.success("Invite code copied");
   };
 
   const handleCancelInvitation = async (invitationId: string) => {
@@ -553,13 +579,13 @@ export function ManageOrgsModal({
   };
 
   const handleLeaveOrg = async () => {
-    if (!organization) {
+    if (!managedOrg) {
       return;
     }
 
     try {
       const { error } = await authClient.organization.leave({
-        organizationId: organization.id,
+        organizationId: managedOrg.id,
       });
 
       if (error) {
@@ -567,14 +593,16 @@ export function ManageOrgsModal({
         return;
       }
 
-      toast.success(`Left ${organization.name}`);
+      toast.success(`Left ${managedOrg.name}`);
       setShowLeaveDialog(false);
-      setOpen(false);
+      setManagedOrgId(null);
 
-      // Switch to another org if available
-      const otherOrg = organizations.find((org) => org.id !== organization.id);
-      if (otherOrg) {
-        await switchOrganization(otherOrg.id);
+      // If we left the active org, switch to another org if available
+      if (isManagedOrgActive) {
+        const otherOrg = organizations.find((org) => org.id !== managedOrg.id);
+        if (otherOrg) {
+          await switchOrganization(otherOrg.id);
+        }
       }
 
       router.refresh();
@@ -584,13 +612,13 @@ export function ManageOrgsModal({
   };
 
   const handleDeleteOrg = async () => {
-    if (!organization) {
+    if (!managedOrg) {
       return;
     }
 
     try {
       const { error } = await authClient.organization.delete({
-        organizationId: organization.id,
+        organizationId: managedOrg.id,
       });
 
       if (error) {
@@ -598,14 +626,16 @@ export function ManageOrgsModal({
         return;
       }
 
-      toast.success(`Deleted ${organization.name}`);
+      toast.success(`Deleted ${managedOrg.name}`);
       setShowDeleteDialog(false);
-      setOpen(false);
+      setManagedOrgId(null);
 
-      // Switch to another org if available
-      const otherOrg = organizations.find((org) => org.id !== organization.id);
-      if (otherOrg) {
-        await switchOrganization(otherOrg.id);
+      // If we deleted the active org, switch to another org if available
+      if (isManagedOrgActive) {
+        const otherOrg = organizations.find((org) => org.id !== managedOrg.id);
+        if (otherOrg) {
+          await switchOrganization(otherOrg.id);
+        }
       }
 
       router.refresh();
@@ -653,244 +683,303 @@ export function ManageOrgsModal({
             </TabsList>
 
             <TabsContent className="space-y-4" value="organizations">
-              {/* Create Organization Section */}
-              <div className="space-y-3 rounded-lg border p-4">
-                {showCreateForm ? (
-                  <div className="space-y-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="org-name">Organization Name</Label>
-                      <Input
-                        disabled={createLoading}
-                        id="org-name"
-                        onChange={(e) => handleOrgNameChange(e.target.value)}
-                        placeholder="Acme Inc."
-                        value={orgName}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="org-slug">Slug (URL identifier)</Label>
-                      <Input
-                        disabled={createLoading}
-                        id="org-slug"
-                        onChange={(e) => setOrgSlug(e.target.value)}
-                        placeholder="acme-inc"
-                        value={orgSlug}
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        className="flex-1"
-                        disabled={createLoading}
-                        onClick={() => {
-                          setShowCreateForm(false);
-                          setOrgName("");
-                          setOrgSlug("");
-                        }}
-                        variant="outline"
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        className="flex-1"
-                        disabled={createLoading || !orgName || !orgSlug}
-                        onClick={handleCreateOrg}
-                      >
-                        {createLoading ? "Creating..." : "Create"}
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <Button
-                    className="w-full"
-                    onClick={() => setShowCreateForm(true)}
-                    variant="outline"
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create New Organization
-                  </Button>
-                )}
-              </div>
-
-              {/* Current Organization Section */}
-              {organization && (
-                <div className="space-y-4 rounded-lg border p-4">
-                  <div>
-                    <h3 className="font-semibold text-lg">
-                      {organization.name}
-                    </h3>
-                    <p className="text-muted-foreground text-sm">
-                      {isOwner ? "Owner" : "Member"}
-                    </p>
-                  </div>
-
-                  {/* Pending Invitations Section */}
-                  {sentInvitations.filter((inv) => inv.status === "pending")
-                    .length > 0 && (
-                    <div className="space-y-3">
-                      <h4 className="font-medium text-muted-foreground text-sm">
-                        Pending Invitations
-                      </h4>
-                      <div className="space-y-2">
-                        {sentInvitations
-                          .filter((inv) => inv.status === "pending")
-                          .map((invitation) => (
-                            <SentInvitationItem
-                              cancellingInvite={cancellingInvite}
-                              canManageInvitations={isAdmin}
-                              invitation={invitation}
-                              key={invitation.id}
-                              onCancel={handleCancelInvitation}
-                            />
-                          ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Members Section */}
-                  {members.length > 0 && (
-                    <div className="space-y-3">
-                      <h4 className="font-medium text-muted-foreground text-sm">
-                        Members
-                      </h4>
-                      <div className="space-y-2">
-                        {members.map((member, index) => (
-                          <div
-                            className="flex items-center justify-between rounded-lg border p-3"
-                            key={member.id || `member-${index}`}
-                          >
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate font-medium text-sm">
-                                {member.user?.email || "Unknown"}
-                              </p>
-                              <p className="text-muted-foreground text-xs">
-                                {member.role}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Invite Members Section */}
-                  <div className="space-y-3">
-                    {showInviteForm ? (
+              {/* LIST VIEW - Show when no org is being managed */}
+              {!managedOrgId && (
+                <>
+                  {/* Create Organization Section */}
+                  <div className="space-y-3 rounded-lg border p-4">
+                    {showCreateForm ? (
                       <div className="space-y-3">
                         <div className="space-y-2">
-                          <Label htmlFor="invite-email">Email Address</Label>
+                          <Label htmlFor="org-name">Organization Name</Label>
                           <Input
-                            disabled={inviteLoading}
-                            id="invite-email"
-                            onChange={(e) => setInviteEmail(e.target.value)}
-                            placeholder="colleague@example.com"
-                            type="email"
-                            value={inviteEmail}
+                            disabled={createLoading}
+                            id="org-name"
+                            onChange={(e) =>
+                              handleOrgNameChange(e.target.value)
+                            }
+                            placeholder="Acme Inc."
+                            value={orgName}
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="invite-role">Role</Label>
-                          <Select
-                            onValueChange={(v) =>
-                              setInviteRole(v as "member" | "admin")
-                            }
-                            value={inviteRole}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="member">
-                                Member - Can create workflows
-                              </SelectItem>
-                              <SelectItem value="admin">
-                                Admin - Can manage members and wallets
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <Label htmlFor="org-slug">
+                            Slug (URL identifier)
+                          </Label>
+                          <Input
+                            disabled={createLoading}
+                            id="org-slug"
+                            onChange={(e) => setOrgSlug(e.target.value)}
+                            placeholder="acme-inc"
+                            value={orgSlug}
+                          />
                         </div>
-                        {inviteId && (
-                          <div className="space-y-2 rounded-lg border bg-muted p-3">
-                            <p className="font-medium text-sm">
-                              Invitation Created
-                            </p>
-                            <div className="flex gap-2">
-                              <Button
-                                className="flex-1"
-                                onClick={copyInviteLink}
-                                size="sm"
-                                variant="outline"
-                              >
-                                <Copy className="mr-2 h-3 w-3" />
-                                Copy Link
-                              </Button>
-                              <Button
-                                className="flex-1"
-                                onClick={copyInviteCode}
-                                size="sm"
-                                variant="outline"
-                              >
-                                <Copy className="mr-2 h-3 w-3" />
-                                Copy Code
-                              </Button>
-                            </div>
-                          </div>
-                        )}
                         <div className="flex gap-2">
                           <Button
                             className="flex-1"
-                            disabled={inviteLoading}
+                            disabled={createLoading}
                             onClick={() => {
-                              setShowInviteForm(false);
-                              setInviteEmail("");
-                              setInviteId(null);
+                              setShowCreateForm(false);
+                              setOrgName("");
+                              setOrgSlug("");
                             }}
                             variant="outline"
                           >
-                            Close
+                            Cancel
                           </Button>
                           <Button
                             className="flex-1"
-                            disabled={inviteLoading || !inviteEmail}
-                            onClick={handleInviteMember}
+                            disabled={createLoading || !orgName || !orgSlug}
+                            onClick={handleCreateOrg}
                           >
-                            <Mail className="mr-2 h-4 w-4" />
-                            {inviteLoading ? "Sending..." : "Send Invitation"}
+                            {createLoading ? "Creating..." : "Create"}
                           </Button>
                         </div>
                       </div>
                     ) : (
                       <Button
                         className="w-full"
-                        onClick={() => setShowInviteForm(true)}
+                        onClick={() => setShowCreateForm(true)}
                         variant="outline"
                       >
-                        <UserPlus className="mr-2 h-4 w-4" />
-                        Invite Members
+                        <Plus className="mr-2 h-4 w-4" />
+                        Create New Organization
                       </Button>
                     )}
                   </div>
 
-                  {/* Leave/Delete Organization */}
-                  <div className="space-y-2 border-t pt-3">
-                    {isOwner ? (
-                      <Button
-                        className="w-full text-destructive hover:text-destructive"
-                        onClick={() => setShowDeleteDialog(true)}
-                        variant="outline"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete Organization
-                      </Button>
-                    ) : (
-                      <Button
-                        className="w-full text-orange-600 hover:text-orange-700"
-                        onClick={() => setShowLeaveDialog(true)}
-                        variant="outline"
-                      >
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Leave Organization
-                      </Button>
+                  {/* Organizations List */}
+                  {organizations.length > 0 ? (
+                    <div className="space-y-2">
+                      {organizations.map((org) => {
+                        const isActive = org.id === organization?.id;
+                        return (
+                          <div
+                            className="flex items-center justify-between rounded-lg border p-3"
+                            key={org.id}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="truncate font-medium text-sm">
+                                  {org.name}
+                                </p>
+                                {isActive && (
+                                  <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-700 text-xs">
+                                    Active
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-muted-foreground text-xs capitalize">
+                                {(org as { role?: string }).role || "Member"}
+                              </p>
+                            </div>
+                            <Button
+                              onClick={() => setManagedOrgId(org.id)}
+                              size="sm"
+                              variant="outline"
+                            >
+                              <Settings className="mr-2 h-3 w-3" />
+                              Manage
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="py-4 text-center text-muted-foreground text-sm">
+                      No organizations yet. Create one to get started.
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* DETAIL VIEW - Show when managing a specific org */}
+              {managedOrgId && managedOrg && (
+                <div className="space-y-4">
+                  {/* Back Button */}
+                  <Button
+                    className="gap-2"
+                    onClick={() => {
+                      setManagedOrgId(null);
+                      setShowInviteForm(false);
+                      setInviteId(null);
+                    }}
+                    size="sm"
+                    variant="ghost"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Back to organizations
+                  </Button>
+
+                  <div className="space-y-4 rounded-lg border p-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-lg">
+                          {managedOrg.name}
+                        </h3>
+                        {isManagedOrgActive && (
+                          <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-700 text-xs">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-muted-foreground text-sm">
+                        {managedOrgRole || "Member"}
+                      </p>
+                    </div>
+
+                    {/* Pending Invitations Section */}
+                    {sentInvitations.filter((inv) => inv.status === "pending")
+                      .length > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="font-medium text-muted-foreground text-sm">
+                          Pending Invitations
+                        </h4>
+                        <div className="space-y-2">
+                          {sentInvitations
+                            .filter((inv) => inv.status === "pending")
+                            .map((invitation) => (
+                              <SentInvitationItem
+                                cancellingInvite={cancellingInvite}
+                                canManageInvitations={isAdmin}
+                                invitation={invitation}
+                                key={invitation.id}
+                                onCancel={handleCancelInvitation}
+                              />
+                            ))}
+                        </div>
+                      </div>
                     )}
+
+                    {/* Members Section */}
+                    {members.length > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="font-medium text-muted-foreground text-sm">
+                          Members
+                        </h4>
+                        <div className="space-y-2">
+                          {members.map((member, index) => (
+                            <div
+                              className="flex items-center justify-between rounded-lg border p-3"
+                              key={member.id || `member-${index}`}
+                            >
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate font-medium text-sm">
+                                  {member.user?.email || "Unknown"}
+                                </p>
+                                <p className="text-muted-foreground text-xs">
+                                  {member.role}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Invite Members Section */}
+                    <div className="space-y-3">
+                      {showInviteForm ? (
+                        <div className="space-y-3">
+                          <div className="space-y-2">
+                            <Label htmlFor="invite-email">Email Address</Label>
+                            <Input
+                              disabled={inviteLoading}
+                              id="invite-email"
+                              onChange={(e) => {
+                                setInviteEmail(e.target.value);
+                                if (inviteId) {
+                                  setInviteId(null);
+                                }
+                              }}
+                              placeholder="colleague@example.com"
+                              type="email"
+                              value={inviteEmail}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="invite-role">Role</Label>
+                            <Select
+                              onValueChange={(v) =>
+                                setInviteRole(v as "member" | "admin")
+                              }
+                              value={inviteRole}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="member">
+                                  Member - Can create workflows
+                                </SelectItem>
+                                <SelectItem value="admin">
+                                  Admin - Can manage members and wallets
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              className="flex-1"
+                              disabled={inviteLoading}
+                              onClick={() => {
+                                setShowInviteForm(false);
+                                setInviteEmail("");
+                                setInviteId(null);
+                              }}
+                              variant="outline"
+                            >
+                              Close
+                            </Button>
+                            <Button
+                              className="flex-1"
+                              disabled={inviteLoading || !inviteEmail}
+                              onClick={handleInviteMember}
+                            >
+                              <Mail className="mr-2 h-4 w-4" />
+                              {inviteLoading ? "Sending..." : "Send Invitation"}
+                            </Button>
+                          </div>
+                          {inviteId && (
+                            <div className="rounded-md bg-green-50 px-3 py-2 text-center text-green-700 text-sm">
+                              Invitation sent
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <Button
+                          className="w-full"
+                          onClick={() => setShowInviteForm(true)}
+                          variant="outline"
+                        >
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          Invite Members
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* Leave/Delete Organization */}
+                    <div className="space-y-2 border-t pt-3">
+                      {isOwner ? (
+                        <Button
+                          className="w-full text-destructive hover:text-destructive"
+                          onClick={() => setShowDeleteDialog(true)}
+                          variant="outline"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete Organization
+                        </Button>
+                      ) : (
+                        <Button
+                          className="w-full text-orange-600 hover:text-orange-700"
+                          onClick={() => setShowLeaveDialog(true)}
+                          variant="outline"
+                        >
+                          <LogOut className="mr-2 h-4 w-4" />
+                          Leave Organization
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -925,8 +1014,8 @@ export function ManageOrgsModal({
           <AlertDialogHeader>
             <AlertDialogTitle>Leave Organization</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to leave {organization?.name}? You will need
-              a new invitation to rejoin.
+              Are you sure you want to leave {managedOrg?.name}? You will need a
+              new invitation to rejoin.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -947,7 +1036,7 @@ export function ManageOrgsModal({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Organization</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete {organization?.name}? This action
+              Are you sure you want to delete {managedOrg?.name}? This action
               cannot be undone. All workflows, credentials, and data will be
               permanently deleted.
             </AlertDialogDescription>
