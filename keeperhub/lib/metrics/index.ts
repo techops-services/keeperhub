@@ -48,6 +48,42 @@ import { consoleMetricsCollector } from "./collectors/console";
 import { noopMetricsCollector } from "./collectors/noop";
 
 /**
+ * Prometheus collector type (lazy loaded to avoid server-only issues)
+ */
+type PrometheusModule = typeof import("./collectors/prometheus");
+let prometheusModule: PrometheusModule | null = null;
+
+/**
+ * Get Prometheus collector (lazy loaded)
+ */
+async function getPrometheusCollector(): Promise<MetricsCollector> {
+  if (!prometheusModule) {
+    prometheusModule = await import("./collectors/prometheus");
+  }
+  return prometheusModule.prometheusMetricsCollector;
+}
+
+/**
+ * Get Prometheus metrics for /metrics endpoint
+ */
+export async function getPrometheusMetrics(): Promise<string> {
+  if (!prometheusModule) {
+    prometheusModule = await import("./collectors/prometheus");
+  }
+  return prometheusModule.getPrometheusMetrics();
+}
+
+/**
+ * Get Prometheus content type for /metrics endpoint
+ */
+export async function getPrometheusContentType(): Promise<string> {
+  if (!prometheusModule) {
+    prometheusModule = await import("./collectors/prometheus");
+  }
+  return prometheusModule.getPrometheusContentType();
+}
+
+/**
  * Detect if running in a server environment
  */
 function isServerEnvironment(): boolean {
@@ -67,6 +103,17 @@ function isMetricsEnabled(): boolean {
 }
 
 /**
+ * Get metrics collector type from environment
+ * METRICS_COLLECTOR can be: "console" (default), "prometheus", or "noop"
+ */
+function getMetricsCollectorType(): "console" | "prometheus" | "noop" {
+  const envValue = process.env.METRICS_COLLECTOR;
+  if (envValue === "prometheus") return "prometheus";
+  if (envValue === "noop") return "noop";
+  return "console";
+}
+
+/**
  * Singleton metrics collector instance
  */
 let metricsCollectorInstance: MetricsCollector | null = null;
@@ -74,9 +121,12 @@ let metricsCollectorInstance: MetricsCollector | null = null;
 /**
  * Get the metrics collector instance
  *
- * Returns:
- * - ConsoleMetricsCollector in server environment (when enabled)
- * - NoopMetricsCollector in browser or when disabled
+ * Returns based on METRICS_COLLECTOR env var:
+ * - "prometheus": PrometheusMetricsCollector (requires server environment)
+ * - "console" (default): ConsoleMetricsCollector (JSON structured logging)
+ * - "noop": NoopMetricsCollector (silent)
+ *
+ * Falls back to NoopMetricsCollector in browser or when disabled.
  *
  * @returns MetricsCollector instance
  */
@@ -85,13 +135,48 @@ export function getMetricsCollector(): MetricsCollector {
     return metricsCollectorInstance;
   }
 
-  if (isServerEnvironment() && isMetricsEnabled()) {
-    metricsCollectorInstance = consoleMetricsCollector;
-  } else {
+  if (!isServerEnvironment() || !isMetricsEnabled()) {
     metricsCollectorInstance = noopMetricsCollector;
+    return metricsCollectorInstance;
+  }
+
+  const collectorType = getMetricsCollectorType();
+
+  switch (collectorType) {
+    case "prometheus":
+      // Prometheus collector is loaded synchronously when needed
+      // This requires the module to be pre-imported on server start
+      if (prometheusModule) {
+        metricsCollectorInstance = prometheusModule.prometheusMetricsCollector;
+      } else {
+        // Fall back to console if prometheus module not loaded yet
+        // Will be upgraded once initializePrometheusCollector is called
+        console.warn("[Metrics] Prometheus collector requested but module not loaded, falling back to console");
+        metricsCollectorInstance = consoleMetricsCollector;
+      }
+      break;
+    case "noop":
+      metricsCollectorInstance = noopMetricsCollector;
+      break;
+    case "console":
+    default:
+      metricsCollectorInstance = consoleMetricsCollector;
+      break;
   }
 
   return metricsCollectorInstance;
+}
+
+/**
+ * Initialize Prometheus collector (call on server startup)
+ * This pre-loads the prometheus module so getMetricsCollector can use it synchronously.
+ */
+export async function initializePrometheusCollector(): Promise<void> {
+  if (isServerEnvironment() && getMetricsCollectorType() === "prometheus") {
+    prometheusModule = await import("./collectors/prometheus");
+    metricsCollectorInstance = prometheusModule.prometheusMetricsCollector;
+    console.log("[Metrics] Prometheus collector initialized");
+  }
 }
 
 /**
