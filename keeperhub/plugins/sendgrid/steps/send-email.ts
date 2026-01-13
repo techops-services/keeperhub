@@ -1,5 +1,6 @@
 import "server-only";
 
+import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 import { fetchCredentials } from "@/lib/credential-fetcher";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import type { SendGridCredentials } from "../credentials";
@@ -147,8 +148,16 @@ export async function sendEmailStep(
     ...input,
   };
 
-  return withStepLogging(input, () =>
-    stepHandler(coreInput, credentials, useKeeperHubApiKey)
+  return withPluginMetrics(
+    {
+      pluginName: "sendgrid",
+      actionName: "send-email",
+      executionId: input._context?.executionId,
+    },
+    () =>
+      withStepLogging(input, () =>
+        stepHandler(coreInput, credentials, useKeeperHubApiKey)
+      )
   );
 }
 sendEmailStep.maxRetries = 0;
