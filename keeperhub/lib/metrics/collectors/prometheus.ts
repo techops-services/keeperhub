@@ -212,6 +212,34 @@ const activeUsers = getOrCreateGauge(
   []
 );
 
+// Allowed labels per error metric (must match counter definitions)
+const errorLabelAllowlist: Record<string, string[]> = {
+  "workflow.execution.errors": ["workflow_id", "trigger_type", "error_type"],
+  "workflow.step.errors": ["step_type", "error_type"],
+  "plugin.action.errors": ["plugin_name", "action_name", "error_type"],
+  "api.errors.total": ["endpoint", "status_code", "error_type"],
+  "external.service.errors": ["service", "plugin_name"],
+};
+
+/**
+ * Filter labels to only include allowed ones for a specific metric
+ */
+function filterLabelsForMetric(
+  metricName: string,
+  labels: Record<string, string>
+): Record<string, string> {
+  const allowed = errorLabelAllowlist[metricName];
+  if (!allowed) return labels;
+
+  const filtered: Record<string, string> = {};
+  for (const key of allowed) {
+    if (key in labels) {
+      filtered[key] = labels[key];
+    }
+  }
+  return filtered;
+}
+
 // Metric name to histogram/counter/gauge mapping
 const histogramMap: Record<string, Histogram> = {
   "workflow.execution.duration_ms": workflowDuration,
@@ -291,13 +319,15 @@ export const prometheusMetricsCollector: MetricsCollector = {
   ): void {
     const counter = errorCounterMap[name];
     if (counter) {
-      const errorLabels = sanitizeLabels(labels);
+      const sanitized = sanitizeLabels(labels);
       // Add error type from error object if available
       if ("code" in error && error.code) {
-        errorLabels.error_type = error.code;
+        sanitized.error_type = error.code;
       } else if (error instanceof Error) {
-        errorLabels.error_type = error.name || "Error";
+        sanitized.error_type = error.name || "Error";
       }
+      // Filter to only include labels defined for this counter
+      const errorLabels = filterLabelsForMetric(name, sanitized);
       counter.inc(errorLabels);
     } else {
       console.warn(`[Prometheus] Unknown error metric: ${name}`);
