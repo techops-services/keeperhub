@@ -38,6 +38,10 @@ env:
   NODE_ENV:
     type: kv
     value: "development"
+  # Enable Prometheus metrics
+  METRICS_COLLECTOR:
+    type: kv
+    value: "prometheus"
   # Debug logging for observability
   DEBUG:
     type: kv
