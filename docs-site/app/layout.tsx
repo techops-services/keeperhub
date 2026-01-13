@@ -19,10 +19,14 @@ export const metadata = {
 };
 
 // Filter out hidden sections from page map
-function filterPageMap(items: Awaited<ReturnType<typeof getPageMap>>): typeof items {
+function filterPageMap(
+  items: Awaited<ReturnType<typeof getPageMap>>
+): typeof items {
   return items.filter((item) => {
     // Hide the API section (not yet public)
-    if ("name" in item && item.name === "api") return false;
+    if ("name" in item && item.name === "api") {
+      return false;
+    }
     return true;
   });
 }
