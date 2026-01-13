@@ -4,6 +4,10 @@
  * Application-level metrics for KeeperHub workflow execution,
  * user activity, and plugin operations.
  *
+ * NOTE: This module is intentionally kept free of Node.js-only dependencies
+ * (like prom-client) so it can be safely bundled in workflow code.
+ * Prometheus-specific functionality is in ./prometheus-api.ts
+ *
  * @example
  * ```typescript
  * import { getMetricsCollector, MetricNames, LabelKeys } from "@/keeperhub/lib/metrics";
@@ -39,49 +43,13 @@ export type {
 // Re-export constants
 export { MetricNames, LabelKeys } from "./types";
 
-// Re-export collectors
+// Re-export collectors (only non-Node.js specific ones)
 export { consoleMetricsCollector, createPrefixedConsoleCollector } from "./collectors/console";
 export { noopMetricsCollector } from "./collectors/noop";
 
 import type { MetricsCollector } from "./types";
 import { consoleMetricsCollector } from "./collectors/console";
 import { noopMetricsCollector } from "./collectors/noop";
-
-/**
- * Prometheus collector type (lazy loaded to avoid server-only issues)
- */
-type PrometheusModule = typeof import("./collectors/prometheus");
-let prometheusModule: PrometheusModule | null = null;
-
-/**
- * Get Prometheus collector (lazy loaded)
- */
-async function getPrometheusCollector(): Promise<MetricsCollector> {
-  if (!prometheusModule) {
-    prometheusModule = await import("./collectors/prometheus");
-  }
-  return prometheusModule.prometheusMetricsCollector;
-}
-
-/**
- * Get Prometheus metrics for /metrics endpoint
- */
-export async function getPrometheusMetrics(): Promise<string> {
-  if (!prometheusModule) {
-    prometheusModule = await import("./collectors/prometheus");
-  }
-  return prometheusModule.getPrometheusMetrics();
-}
-
-/**
- * Get Prometheus content type for /metrics endpoint
- */
-export async function getPrometheusContentType(): Promise<string> {
-  if (!prometheusModule) {
-    prometheusModule = await import("./collectors/prometheus");
-  }
-  return prometheusModule.getPrometheusContentType();
-}
 
 /**
  * Detect if running in a server environment
@@ -105,6 +73,10 @@ function isMetricsEnabled(): boolean {
 /**
  * Get metrics collector type from environment
  * METRICS_COLLECTOR can be: "console" (default), "prometheus", or "noop"
+ *
+ * Note: When "prometheus" is selected, this module still returns the console
+ * collector for workflow code. The actual Prometheus metrics are collected
+ * via the /api/metrics endpoint which imports the prometheus collector directly.
  */
 function getMetricsCollectorType(): "console" | "prometheus" | "noop" {
   const envValue = process.env.METRICS_COLLECTOR;
@@ -122,11 +94,15 @@ let metricsCollectorInstance: MetricsCollector | null = null;
  * Get the metrics collector instance
  *
  * Returns based on METRICS_COLLECTOR env var:
- * - "prometheus": PrometheusMetricsCollector (requires server environment)
+ * - "prometheus": ConsoleMetricsCollector (JSON logs are scraped separately)
  * - "console" (default): ConsoleMetricsCollector (JSON structured logging)
  * - "noop": NoopMetricsCollector (silent)
  *
  * Falls back to NoopMetricsCollector in browser or when disabled.
+ *
+ * Note: For Prometheus, this returns console collector because the actual
+ * Prometheus metrics are exposed via /api/metrics which uses the prometheus
+ * collector directly. This architecture avoids bundling prom-client in workflow code.
  *
  * @returns MetricsCollector instance
  */
@@ -144,16 +120,9 @@ export function getMetricsCollector(): MetricsCollector {
 
   switch (collectorType) {
     case "prometheus":
-      // Prometheus collector is loaded synchronously when needed
-      // This requires the module to be pre-imported on server start
-      if (prometheusModule) {
-        metricsCollectorInstance = prometheusModule.prometheusMetricsCollector;
-      } else {
-        // Fall back to console if prometheus module not loaded yet
-        // Will be upgraded once initializePrometheusCollector is called
-        console.warn("[Metrics] Prometheus collector requested but module not loaded, falling back to console");
-        metricsCollectorInstance = consoleMetricsCollector;
-      }
+      // For prometheus mode, use console collector in workflow code
+      // The /api/metrics endpoint imports prometheus collector directly
+      metricsCollectorInstance = consoleMetricsCollector;
       break;
     case "noop":
       metricsCollectorInstance = noopMetricsCollector;
@@ -165,18 +134,6 @@ export function getMetricsCollector(): MetricsCollector {
   }
 
   return metricsCollectorInstance;
-}
-
-/**
- * Initialize Prometheus collector (call on server startup)
- * This pre-loads the prometheus module so getMetricsCollector can use it synchronously.
- */
-export async function initializePrometheusCollector(): Promise<void> {
-  if (isServerEnvironment() && getMetricsCollectorType() === "prometheus") {
-    prometheusModule = await import("./collectors/prometheus");
-    metricsCollectorInstance = prometheusModule.prometheusMetricsCollector;
-    console.log("[Metrics] Prometheus collector initialized");
-  }
 }
 
 /**

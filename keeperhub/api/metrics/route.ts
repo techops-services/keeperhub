@@ -9,7 +9,7 @@ import { NextResponse } from "next/server";
 import {
   getPrometheusMetrics,
   getPrometheusContentType,
-} from "@/keeperhub/lib/metrics";
+} from "@/keeperhub/lib/metrics/prometheus-api";
 
 /**
  * GET /api/metrics
