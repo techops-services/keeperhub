@@ -239,7 +239,7 @@ export function ManageOrgsModal({
   const [managedOrgId, setManagedOrgId] = useState<string | null>(null);
 
   const { organization, switchOrganization } = useOrganization();
-  const { organizations } = useOrganizations();
+  const { organizations, refetch: refetchOrganizations } = useOrganizations();
   const { isOwner: isActiveOrgOwner, isAdmin: isActiveOrgAdmin } =
     useActiveMember();
   const router = useRouter();
@@ -549,6 +549,8 @@ export function ManageOrgsModal({
       setUserInvitations((prev) =>
         prev.filter((inv) => inv.id !== invitationId)
       );
+      // Refresh the organizations list so the new org appears in the dropdown
+      refetchOrganizations();
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "An error occurred");
