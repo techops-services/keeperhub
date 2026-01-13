@@ -9,6 +9,9 @@
   "wallet-management": "Wallet Management",
   "users-teams-orgs": "Users and Organizations",
   "practices": "Best Practices",
-  "api": "API Reference",
+  "api": {
+    "title": "API Reference",
+    "display": "hidden"
+  },
   "FAQ": "FAQ"
 }
