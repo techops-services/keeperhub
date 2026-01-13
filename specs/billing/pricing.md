@@ -12,8 +12,8 @@ No credit card facility. All payments via smart contract (ETH, USDC, USDT, USDS)
 
 | Feature | Developer | Team | Company | Enterprise |
 |---------|-----------|------|---------|------------|
-| **Annual** | Free | $199 | $449 | Custom |
-| **Lifetime** | $99 | $599 | $1,349 | Custom |
+| **Annual** | Free | $225 | $675 | Custom |
+| **Lifetime** | $99 | $675 | $2,025 | Custom |
 | **Users** | 1 | 5 | 25 | Unlimited |
 | **Orgs** | 1 | 2 | 5 | 10 |
 | **Workflows** | 5 | 50 | Unlimited | Unlimited |
@@ -79,12 +79,18 @@ When limits are hit, the UI notifies users and prompts upgrade:
 
 ## Competitive Positioning
 
-| Platform | Free Tier | Paid Model | Our Advantage |
-|----------|-----------|------------|---------------|
-| Zapier | 100 tasks/mo | $19.99/mo for 750 tasks | More generous free tier |
-| n8n | Self-hosted only | €20/mo for 2,500 executions | 2,500 free credits |
-| Pabbly | 100 tasks/mo | $249-699 lifetime | Web3-native, NFT ownership |
-| Chainlink | None | Gas + 70% premium | Simpler pricing model |
+| Platform | Free Tier | Entry Paid | Mid Tier | Model |
+|----------|-----------|------------|----------|-------|
+| **KeeperHub** | 2,500 credits | $225/yr | $675/yr | NFT + Credits |
+| **Zapier** | 100 tasks/mo | $240/yr | $876/yr | Per-task subscription |
+| **n8n** | Self-hosted | €240/yr | €600/yr | Per-execution subscription |
+| **Pabbly** | 100 tasks/mo | $249 LTD | $699 LTD | Lifetime only |
+
+**KeeperHub advantages:**
+- 25x more generous free tier (2,500 credits vs 100 tasks)
+- Credits never expire
+- Lifetime purchase option (Zapier/n8n don't offer this)
+- Web3-native payments, no credit cards
 
 ## Revenue Model
 
