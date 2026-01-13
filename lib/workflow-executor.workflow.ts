@@ -22,6 +22,10 @@ import {
   recordWorkflowComplete,
   detectTriggerType,
 } from "@/keeperhub/lib/metrics/instrumentation/workflow";
+import {
+  incrementConcurrentExecutions,
+  decrementConcurrentExecutions,
+} from "@/keeperhub/lib/metrics/instrumentation/saturation";
 import { getMetricsCollector, MetricNames, LabelKeys } from "@/keeperhub/lib/metrics";
 // end keeperhub code //
 
@@ -670,6 +674,7 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
       [LabelKeys.TRIGGER_TYPE]: triggerType,
       ...(workflowId && { [LabelKeys.WORKFLOW_ID]: workflowId }),
     });
+    incrementConcurrentExecutions();
     // end keeperhub code //
 
     await Promise.all(triggerNodes.map((trigger) => executeNode(trigger.id)));
@@ -686,6 +691,7 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
       success: finalSuccess,
       error: Object.values(results).find((r) => !r.success)?.error,
     });
+    decrementConcurrentExecutions();
     // end keeperhub code //
 
     console.log("[Workflow Executor] Workflow execution completed:", {
@@ -738,6 +744,7 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
       success: false,
       error: errorMessage,
     });
+    decrementConcurrentExecutions();
     // end keeperhub code //
 
     // Update execution record with error if we have an executionId
