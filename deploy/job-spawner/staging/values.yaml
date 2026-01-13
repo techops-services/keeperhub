@@ -57,7 +57,7 @@ env:
     value: "us-east-2"
   SQS_QUEUE_URL:
     type: kv
-    value: "https://sqs.us-east-2.amazonaws.com/068992353948/keeperhub-workflow-queue-staging"
+    value: "https://sqs.us-east-2.amazonaws.com/${AWS_ACCOUNT_ID}/keeperhub-workflow-queue-staging"
   # K8s Job configuration
   RUNNER_IMAGE:
     type: kv
