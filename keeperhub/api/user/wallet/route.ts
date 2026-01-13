@@ -15,6 +15,7 @@ import { integrations, paraWallets } from "@/lib/db/schema";
 
 const PARA_API_KEY = process.env.PARA_API_KEY || "";
 const PARA_ENV = process.env.PARA_ENVIRONMENT || "beta";
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Helper: Validate user authentication, organization membership, and admin permissions
 async function validateUserAndOrganization(request: Request) {
@@ -291,8 +292,7 @@ export async function POST(request: Request) {
     }
 
     // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(walletEmail)) {
+    if (!EMAIL_REGEX.test(walletEmail)) {
       return NextResponse.json(
         { error: "Invalid email format" },
         { status: 400 }

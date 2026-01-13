@@ -125,7 +125,7 @@ export async function POST(
         workflow.organizationId &&
         orgContext.organization?.id === workflow.organizationId;
 
-      if (!isOwner && !isSameOrg) {
+      if (!(isOwner || isSameOrg)) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
       // end keeperhub code //

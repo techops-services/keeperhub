@@ -11,7 +11,7 @@ type RouteParams = {
  * GET /api/invitations/[inviteId]
  * Fetch invitation details by ID (public endpoint for accept-invite page)
  */
-export async function GET(request: Request, { params }: RouteParams) {
+export async function GET(_request: Request, { params }: RouteParams) {
   try {
     const { inviteId } = await params;
 

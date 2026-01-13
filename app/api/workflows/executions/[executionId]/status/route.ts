@@ -50,7 +50,7 @@ export async function GET(
       execution.workflow.organizationId &&
       orgContext.organization?.id === execution.workflow.organizationId;
 
-    if (!isOwner && !isSameOrg) {
+    if (!(isOwner || isSameOrg)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     // end keeperhub code //

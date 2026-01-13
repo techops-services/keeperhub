@@ -240,7 +240,7 @@ export async function GET(
       workflow.organizationId &&
       orgContext.organization?.id === workflow.organizationId;
 
-    if (!isOwner && !isSameOrg) {
+    if (!(isOwner || isSameOrg)) {
       return NextResponse.json(
         { error: "Workflow not found" },
         { status: 404 }

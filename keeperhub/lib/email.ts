@@ -85,7 +85,8 @@ type InvitationEmailData = {
 export async function sendInvitationEmail(
   data: InvitationEmailData
 ): Promise<boolean> {
-  const { inviteeEmail, inviterName, organizationName, role, inviteLink } = data;
+  const { inviteeEmail, inviterName, organizationName, role, inviteLink } =
+    data;
 
   const subject = `You've been invited to join ${organizationName} on KeeperHub`;
 
