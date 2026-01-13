@@ -346,6 +346,9 @@ export const prometheusMetricsCollector: MetricsCollector = {
         sanitized.error_type = error.code;
       } else if (error instanceof Error) {
         sanitized.error_type = error.name || "Error";
+      } else {
+        // Default error type for plain objects without code
+        sanitized.error_type = "UnknownError";
       }
       // Filter to only include labels defined for this counter
       const errorLabels = filterLabelsForMetric(name, sanitized);

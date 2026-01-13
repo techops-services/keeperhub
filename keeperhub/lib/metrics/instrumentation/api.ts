@@ -36,26 +36,39 @@ export function startApiMetrics(context: ApiMetricsContext): {
     baseLabels.method = context.method;
   }
 
-  // Increment request counter
-  metrics.incrementCounter(MetricNames.API_REQUESTS_TOTAL, baseLabels);
-
   return {
     complete: (statusCode: number) => {
       const latencyMetric = getLatencyMetricForEndpoint(context.endpoint);
-      metrics.recordLatency(latencyMetric, timer(), {
+      const labelsWithStatus = {
         ...baseLabels,
         [LabelKeys.STATUS_CODE]: String(statusCode),
         [LabelKeys.STATUS]: statusCode >= 400 ? "failure" : "success",
+      };
+
+      // Increment request counter with status_code (required by Prometheus counter)
+      metrics.incrementCounter(MetricNames.API_REQUESTS_TOTAL, {
+        [LabelKeys.ENDPOINT]: context.endpoint,
+        [LabelKeys.STATUS_CODE]: String(statusCode),
       });
+
+      metrics.recordLatency(latencyMetric, timer(), labelsWithStatus);
     },
 
     recordError: (error: Error | string, statusCode = 500) => {
       const latencyMetric = getLatencyMetricForEndpoint(context.endpoint);
-      metrics.recordLatency(latencyMetric, timer(), {
+      const labelsWithStatus = {
         ...baseLabels,
         [LabelKeys.STATUS_CODE]: String(statusCode),
         [LabelKeys.STATUS]: "failure",
+      };
+
+      // Increment request counter with status_code (required by Prometheus counter)
+      metrics.incrementCounter(MetricNames.API_REQUESTS_TOTAL, {
+        [LabelKeys.ENDPOINT]: context.endpoint,
+        [LabelKeys.STATUS_CODE]: String(statusCode),
       });
+
+      metrics.recordLatency(latencyMetric, timer(), labelsWithStatus);
 
       const errorObj = typeof error === "string" ? { message: error } : error;
       metrics.recordError(MetricNames.API_ERRORS_TOTAL, errorObj, {

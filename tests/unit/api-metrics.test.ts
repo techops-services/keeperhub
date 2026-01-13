@@ -33,15 +33,24 @@ describe("API Metrics Instrumentation", () => {
   });
 
   describe("startApiMetrics", () => {
-    it("should increment request counter on start", () => {
-      startApiMetrics({ endpoint: "/api/test", method: "GET" });
+    it("should increment request counter on complete with status_code", () => {
+      const { complete } = startApiMetrics({
+        endpoint: "/api/test",
+        method: "GET",
+      });
 
+      // Counter is NOT called on start (requires status_code)
+      expect(mockCollector.incrementCounter).not.toHaveBeenCalled();
+
+      complete(200);
+
+      // Counter is called on complete with endpoint and status_code
       expect(mockCollector.incrementCounter).toHaveBeenCalledWith(
         MetricNames.API_REQUESTS_TOTAL,
-        expect.objectContaining({
+        {
           endpoint: "/api/test",
-          method: "GET",
-        })
+          status_code: "200",
+        }
       );
     });
 

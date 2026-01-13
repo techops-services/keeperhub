@@ -93,16 +93,25 @@ export async function withPluginMetrics<T>(
   const metrics = getMetricsCollector();
   const timer = createTimer();
 
-  const labels: Record<string, string> = {
+  // Base labels for invocation counter (only plugin_name, action_name)
+  const invocationLabels: Record<string, string> = {
     [LabelKeys.PLUGIN_NAME]: context.pluginName,
     [LabelKeys.ACTION_NAME]: context.actionName,
+  };
+
+  // Extended labels for latency/error metrics (includes execution_id)
+  const labels: Record<string, string> = {
+    ...invocationLabels,
   };
   if (context.executionId) {
     labels[LabelKeys.EXECUTION_ID] = context.executionId;
   }
 
-  // Increment invocation counter
-  metrics.incrementCounter(MetricNames.PLUGIN_INVOCATIONS_TOTAL, labels);
+  // Increment invocation counter (only uses plugin_name, action_name)
+  metrics.incrementCounter(
+    MetricNames.PLUGIN_INVOCATIONS_TOTAL,
+    invocationLabels
+  );
 
   try {
     const result = await fn();
