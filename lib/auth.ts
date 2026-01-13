@@ -5,6 +5,7 @@ import { anonymous, genericOAuth, organization } from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
+import { sendInvitationEmail } from "@/keeperhub/lib/email";
 import { isAiGatewayManagedKeysEnabled } from "./ai-gateway/config";
 import { db } from "./db";
 import {
@@ -189,12 +190,10 @@ const plugins = [
       member: memberRole,
     },
 
-    // Email invitation handler (integrate with SendGrid plugin)
+    // Email invitation handler using SendGrid
     async sendInvitationEmail(data) {
-      const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL}/accept-invite/${data.id}`;
+      const inviteLink = `${getBaseURL()}/accept-invite/${data.id}`;
 
-      // TODO: Use SendGrid plugin to send email
-      // For now, log the invite (email integration in Phase 7)
       console.log(`[Invitation] Sending to ${data.email}`, {
         inviter: data.inviter.user.name,
         organization: data.organization.name,
@@ -202,18 +201,14 @@ const plugins = [
         link: inviteLink,
       });
 
-      // When implementing email, uncomment:
-      // await sendEmail({
-      //   to: data.email,
-      //   template: "organization-invitation",
-      //   data: {
-      //     inviterName: data.inviter.user.name,
-      //     organizationName: data.organization.name,
-      //     role: data.role,
-      //     inviteLink,
-      //   },
-      // });
-      await Promise.resolve();
+      // Send the invitation email
+      await sendInvitationEmail({
+        inviteeEmail: data.email,
+        inviterName: data.inviter.user.name || "A team member",
+        organizationName: data.organization.name,
+        role: data.role || "member",
+        inviteLink,
+      });
     },
 
     // Invitation settings
