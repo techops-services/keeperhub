@@ -73,9 +73,15 @@ serviceAccount:
 
 podAnnotations:
   reloader.stakater.com/auto: "true"
-  prometheus.io/scrape: "true"
-  prometheus.io/port: "3000"
-  prometheus.io/path: "/api/metrics"
+
+serviceMonitors:
+  enabled: true
+  monitors:
+    - name: metrics
+      port: http
+      path: /api/metrics
+      interval: 30s
+      scrapeTimeout: 10s
 
 resources:
   limits:

@@ -106,13 +106,19 @@ Metrics can be exported via different collectors based on `METRICS_COLLECTOR` en
 
 When using Prometheus collector, metrics are exposed at `/api/metrics` in Prometheus text format.
 
-### Kubernetes Pod Annotations
+### ServiceMonitor (Prometheus Operator)
+
+Prometheus scraping is configured via the Helm chart's built-in ServiceMonitor support in values.yaml:
 
 ```yaml
-podAnnotations:
-  prometheus.io/scrape: "true"
-  prometheus.io/port: "3000"
-  prometheus.io/path: "/api/metrics"
+serviceMonitors:
+  enabled: true
+  monitors:
+    - name: metrics
+      port: http
+      path: /api/metrics
+      interval: 30s
+      scrapeTimeout: 10s
 ```
 
 ### Prometheus Metric Names
