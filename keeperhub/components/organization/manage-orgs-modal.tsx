@@ -8,6 +8,7 @@ import {
   Settings,
   Trash2,
   UserPlus,
+  X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -48,6 +49,168 @@ import {
 } from "@/keeperhub/lib/hooks/use-organization";
 import { authClient } from "@/lib/auth-client";
 
+// Helper function to get status color based on invitation status
+function getStatusColor(status: string): string {
+  switch (status) {
+    case "accepted":
+      return "text-green-600";
+    case "rejected":
+    case "cancelled":
+      return "text-red-600";
+    case "expired":
+      return "text-orange-600";
+    default:
+      return "text-muted-foreground";
+  }
+}
+
+// Helper function to get status badge classes
+function getStatusBadgeClasses(status: string): string {
+  switch (status) {
+    case "accepted":
+      return "bg-green-100 text-green-700";
+    case "rejected":
+    case "cancelled":
+      return "bg-red-100 text-red-700";
+    case "expired":
+      return "bg-orange-100 text-orange-700";
+    default:
+      return "bg-muted text-muted-foreground";
+  }
+}
+
+// Component to render a received invitation item
+type ReceivedInvitationItemProps = {
+  invitation: {
+    id: string;
+    organizationId?: string;
+    organizationName?: string;
+    organization?: { name?: string };
+    role?: string;
+    status?: string;
+    expiresAt?: Date | string;
+    inviterId?: string;
+    inviter?: { user?: { name?: string } };
+  };
+  processingInvite: string | null;
+  onAccept: (invitationId: string) => void;
+  onReject: (invitationId: string) => void;
+};
+
+function ReceivedInvitationItem({
+  invitation,
+  processingInvite,
+  onAccept,
+  onReject,
+}: ReceivedInvitationItemProps) {
+  const isExpired = invitation.expiresAt
+    ? new Date(invitation.expiresAt) < new Date()
+    : false;
+  const isPending =
+    (!invitation.status || invitation.status === "pending") && !isExpired;
+  const displayStatus = isExpired ? "expired" : invitation.status || "pending";
+
+  // Use organization name from enriched data or fallback
+  const organizationName =
+    invitation.organizationName ||
+    invitation.organization?.name ||
+    "Organization";
+
+  return (
+    <div className="space-y-3 rounded-lg border p-4">
+      <div>
+        <h3 className="font-semibold">{organizationName}</h3>
+        <p className="text-muted-foreground text-sm">Role: {invitation.role}</p>
+        {invitation.inviter?.user?.name && (
+          <p className="text-muted-foreground text-sm">
+            Invited by: {invitation.inviter.user.name}
+          </p>
+        )}
+      </div>
+      {isPending ? (
+        <div className="flex gap-2">
+          <Button
+            className="flex-1"
+            disabled={processingInvite === invitation.id}
+            onClick={() => onAccept(invitation.id)}
+          >
+            {processingInvite === invitation.id ? "Accepting..." : "Accept"}
+          </Button>
+          <Button
+            className="flex-1"
+            disabled={processingInvite === invitation.id}
+            onClick={() => onReject(invitation.id)}
+            variant="outline"
+          >
+            {processingInvite === invitation.id ? "Rejecting..." : "Reject"}
+          </Button>
+        </div>
+      ) : (
+        <div
+          className={`rounded-md px-3 py-2 text-center font-medium text-sm ${getStatusBadgeClasses(displayStatus)}`}
+        >
+          {displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Separate component to render sent invitation items
+type SentInvitationItemProps = {
+  invitation: {
+    id: string;
+    email: string;
+    role?: string;
+    status: string;
+    expiresAt?: Date | string;
+  };
+  cancellingInvite: string | null;
+  onCancel: (invitationId: string) => void;
+  canManageInvitations: boolean;
+};
+
+function SentInvitationItem({
+  invitation,
+  cancellingInvite,
+  onCancel,
+  canManageInvitations,
+}: SentInvitationItemProps) {
+  const isExpired = invitation.expiresAt
+    ? new Date(invitation.expiresAt) < new Date()
+    : false;
+  const statusDisplay =
+    invitation.status === "pending" && isExpired
+      ? "expired"
+      : invitation.status;
+  const statusColor = getStatusColor(statusDisplay);
+  const canCancel =
+    canManageInvitations && invitation.status === "pending" && !isExpired;
+
+  return (
+    <div className="flex items-center justify-between rounded-lg border p-3">
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-medium text-sm">{invitation.email}</p>
+        <p className="text-muted-foreground text-xs">
+          Role: {invitation.role || "member"} •{" "}
+          <span className={statusColor}>{statusDisplay}</span>
+        </p>
+      </div>
+      {canCancel && (
+        <Button
+          disabled={cancellingInvite === invitation.id}
+          onClick={() => onCancel(invitation.id)}
+          size="sm"
+          variant="ghost"
+        >
+          <X className="h-4 w-4" />
+          <span className="sr-only">Cancel invitation</span>
+        </Button>
+      )}
+    </div>
+  );
+}
+
 type ManageOrgsModalProps = {
   triggerText?: string;
   defaultShowCreateForm?: boolean;
@@ -74,7 +237,7 @@ export function ManageOrgsModal({
 
   const { organization, switchOrganization } = useOrganization();
   const { organizations } = useOrganizations();
-  const { isOwner } = useActiveMember();
+  const { isOwner, isAdmin } = useActiveMember();
   const router = useRouter();
 
   // Create organization state
@@ -88,24 +251,77 @@ export function ManageOrgsModal({
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteId, setInviteId] = useState<string | null>(null);
 
-  // Invitations state
+  // Invitations state (received by current user)
   type Invitation = {
     id: string;
+    organizationId?: string;
+    organizationName?: string;
     organization?: { name?: string };
     role?: string;
+    status?: string;
     expiresAt?: Date | string;
+    inviterId?: string;
     inviter?: { user?: { name?: string } };
   };
   const [userInvitations, setUserInvitations] = useState<Invitation[]>([]);
   const [, setLoadingInvitations] = useState(false);
   const [processingInvite, setProcessingInvite] = useState<string | null>(null);
 
+  // Sent invitations state (invitations sent by org admins)
+  type SentInvitation = {
+    id: string;
+    email: string;
+    role?: string;
+    status: string;
+    expiresAt?: Date | string;
+  };
+  const [sentInvitations, setSentInvitations] = useState<SentInvitation[]>([]);
+  const [, setLoadingSentInvitations] = useState(false);
+  const [cancellingInvite, setCancellingInvite] = useState<string | null>(null);
+
+  // Organization members state
+  type Member = {
+    id: string;
+    userId: string;
+    role: string;
+    user: {
+      name?: string;
+      email?: string;
+    };
+  };
+  const [members, setMembers] = useState<Member[]>([]);
+  const [, setLoadingMembers] = useState(false);
+
   const fetchInvitations = useCallback(async () => {
     setLoadingInvitations(true);
     try {
       const result = await authClient.organization.listUserInvitations();
       if (result.data) {
-        setUserInvitations(Array.isArray(result.data) ? result.data : []);
+        const invitations = Array.isArray(result.data) ? result.data : [];
+
+        // Fetch organization names for each invitation using our custom API
+        const enrichedInvitations = await Promise.all(
+          invitations.map(async (inv: Invitation) => {
+            try {
+              const response = await fetch(`/api/invitations/${inv.id}`);
+              const data = await response.json();
+              // Extract organization name from response (works for both OK and 410 responses)
+              const extractedOrgName =
+                data.invitation?.organizationName || data.organizationName;
+              if (extractedOrgName) {
+                return {
+                  ...inv,
+                  organizationName: extractedOrgName,
+                };
+              }
+            } catch {
+              // Ignore errors, just use the original invitation
+            }
+            return inv;
+          })
+        );
+
+        setUserInvitations(enrichedInvitations);
       }
     } catch (error) {
       console.error("Failed to fetch invitations:", error);
@@ -114,12 +330,63 @@ export function ManageOrgsModal({
     }
   }, []);
 
+  // Fetch sent invitations for the current organization (for admins)
+  const organizationId = organization?.id;
+  const fetchSentInvitations = useCallback(async () => {
+    if (!organizationId) {
+      return;
+    }
+    setLoadingSentInvitations(true);
+    try {
+      const result = await authClient.organization.listInvitations({
+        query: { organizationId },
+      });
+      if (result.data) {
+        const invitations = Array.isArray(result.data)
+          ? result.data
+          : [result.data];
+        setSentInvitations(invitations.filter(Boolean) as SentInvitation[]);
+      }
+    } catch (error) {
+      console.error("Failed to fetch sent invitations:", error);
+      setSentInvitations([]);
+    } finally {
+      setLoadingSentInvitations(false);
+    }
+  }, [organizationId]);
+
+  // Fetch organization members
+  const fetchMembers = useCallback(async () => {
+    if (!organizationId) {
+      return;
+    }
+    setLoadingMembers(true);
+    try {
+      const result = await authClient.organization.listMembers({
+        query: { organizationId },
+      });
+      if (result.data) {
+        // API returns { members: [...], total: number }
+        const data = result.data as { members?: Member[] } | Member[];
+        const membersList = Array.isArray(data) ? data : data.members || [];
+        setMembers(membersList.filter(Boolean) as Member[]);
+      }
+    } catch (error) {
+      console.error("Failed to fetch members:", error);
+      setMembers([]);
+    } finally {
+      setLoadingMembers(false);
+    }
+  }, [organizationId]);
+
   // Fetch invitations when modal opens
   useEffect(() => {
     if (open) {
       fetchInvitations();
+      fetchSentInvitations();
+      fetchMembers();
     }
-  }, [open, fetchInvitations]);
+  }, [open, fetchInvitations, fetchSentInvitations, fetchMembers]);
 
   const handleOrgNameChange = (value: string) => {
     setOrgName(value);
@@ -187,6 +454,8 @@ export function ManageOrgsModal({
         setInviteId(invitationId);
         toast.success(`Invitation sent to ${inviteEmail}`);
         setInviteEmail("");
+        // Refresh sent invitations list
+        fetchSentInvitations();
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "An error occurred");
@@ -212,20 +481,48 @@ export function ManageOrgsModal({
     toast.success("Invite code copied");
   };
 
-  const handleAcceptInvitation = async (invitationId: string) => {
-    setProcessingInvite(invitationId);
+  const handleCancelInvitation = async (invitationId: string) => {
+    setCancellingInvite(invitationId);
     try {
-      const { error } = await authClient.organization.acceptInvitation({
+      const { error } = await authClient.organization.cancelInvitation({
         invitationId,
       });
 
       if (error) {
-        toast.error(error.message || "Failed to accept invitation");
+        toast.error(error.message || "Failed to cancel invitation");
         return;
       }
 
-      toast.success("Invitation accepted");
-      fetchInvitations();
+      toast.success("Invitation cancelled");
+      fetchSentInvitations();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setCancellingInvite(null);
+    }
+  };
+
+  const handleAcceptInvitation = async (invitationId: string) => {
+    setProcessingInvite(invitationId);
+    try {
+      const result = await authClient.organization.acceptInvitation({
+        invitationId,
+      });
+
+      if (result.error) {
+        toast.error(
+          result.error.message ||
+            result.error.code ||
+            "Failed to accept invitation"
+        );
+        return;
+      }
+
+      toast.success("Invitation accepted! You are now a member.");
+      // Remove accepted invitation from list immediately
+      setUserInvitations((prev) =>
+        prev.filter((inv) => inv.id !== invitationId)
+      );
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "An error occurred");
@@ -426,6 +723,55 @@ export function ManageOrgsModal({
                     </p>
                   </div>
 
+                  {/* Pending Invitations Section */}
+                  {sentInvitations.filter((inv) => inv.status === "pending")
+                    .length > 0 && (
+                    <div className="space-y-3">
+                      <h4 className="font-medium text-muted-foreground text-sm">
+                        Pending Invitations
+                      </h4>
+                      <div className="space-y-2">
+                        {sentInvitations
+                          .filter((inv) => inv.status === "pending")
+                          .map((invitation) => (
+                            <SentInvitationItem
+                              cancellingInvite={cancellingInvite}
+                              canManageInvitations={isAdmin}
+                              invitation={invitation}
+                              key={invitation.id}
+                              onCancel={handleCancelInvitation}
+                            />
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Members Section */}
+                  {members.length > 0 && (
+                    <div className="space-y-3">
+                      <h4 className="font-medium text-muted-foreground text-sm">
+                        Members
+                      </h4>
+                      <div className="space-y-2">
+                        {members.map((member, index) => (
+                          <div
+                            className="flex items-center justify-between rounded-lg border p-3"
+                            key={member.id || `member-${index}`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate font-medium text-sm">
+                                {member.user?.email || "Unknown"}
+                              </p>
+                              <p className="text-muted-foreground text-xs">
+                                {member.role}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Invite Members Section */}
                   <div className="space-y-3">
                     {showInviteForm ? (
@@ -500,7 +846,7 @@ export function ManageOrgsModal({
                             }}
                             variant="outline"
                           >
-                            Cancel
+                            Close
                           </Button>
                           <Button
                             className="flex-1"
@@ -553,50 +899,18 @@ export function ManageOrgsModal({
             <TabsContent className="space-y-4" value="invitations">
               {!userInvitations || userInvitations.length === 0 ? (
                 <div className="py-8 text-center text-muted-foreground">
-                  No pending invitations
+                  No invitations
                 </div>
               ) : (
                 <div className="space-y-3">
                   {userInvitations.map((invitation) => (
-                    <div
-                      className="space-y-3 rounded-lg border p-4"
+                    <ReceivedInvitationItem
+                      invitation={invitation}
                       key={invitation.id}
-                    >
-                      <div>
-                        <h3 className="font-semibold">
-                          {invitation.organization?.name || "Organization"}
-                        </h3>
-                        <p className="text-muted-foreground text-sm">
-                          Role: {invitation.role}
-                        </p>
-                        {invitation.inviter?.user?.name && (
-                          <p className="text-muted-foreground text-sm">
-                            Invited by: {invitation.inviter.user.name}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          className="flex-1"
-                          disabled={processingInvite === invitation.id}
-                          onClick={() => handleAcceptInvitation(invitation.id)}
-                        >
-                          {processingInvite === invitation.id
-                            ? "Accepting..."
-                            : "Accept"}
-                        </Button>
-                        <Button
-                          className="flex-1"
-                          disabled={processingInvite === invitation.id}
-                          onClick={() => handleRejectInvitation(invitation.id)}
-                          variant="outline"
-                        >
-                          {processingInvite === invitation.id
-                            ? "Rejecting..."
-                            : "Reject"}
-                        </Button>
-                      </div>
-                    </div>
+                      onAccept={handleAcceptInvitation}
+                      onReject={handleRejectInvitation}
+                      processingInvite={processingInvite}
+                    />
                   ))}
                 </div>
               )}
