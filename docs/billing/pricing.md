@@ -24,8 +24,8 @@ KeeperHub uses a simple two-part pricing model: **Tier NFTs** for feature access
 
 | Feature | Developer | Team | Company | Enterprise |
 |---------|-----------|------|---------|------------|
-| **Annual** | Free | $199 | $449 | Custom |
-| **Lifetime** | $99 | $599 | $1,349 | Custom |
+| **Annual** | Free | $225 | $675 | Custom |
+| **Lifetime** | $99 | $675 | $2,025 | Custom |
 | **Users** | 1 | 5 | 25 | Unlimited |
 | **Orgs** | 1 | 2 | 5 | 10 |
 | **Workflows** | 5 | 50 | Unlimited | Unlimited |
@@ -90,6 +90,21 @@ When you hit a limit, the UI will notify you and prompt an upgrade:
 - **Workflow limit**: Blocked from creating new workflows until upgrade
 - **Rate limit**: Runs are queued until limit resets or you upgrade
 - **Low credits**: Warning when balance is low, workflows pause at zero
+
+## How We Compare
+
+| Platform | Free Tier | Entry Paid | Mid Tier | Model |
+|----------|-----------|------------|----------|-------|
+| **KeeperHub** | 2,500 credits | $225/yr | $675/yr | NFT + Credits |
+| **Zapier** | 100 tasks/mo | $240/yr | $876/yr | Per-task subscription |
+| **n8n** | Self-hosted | €240/yr | €600/yr | Per-execution subscription |
+| **Pabbly** | 100 tasks/mo | $249 LTD | $699 LTD | Lifetime only |
+
+**Why KeeperHub wins:**
+- **25x more generous free tier** - 2,500 credits vs 100 tasks
+- **Credits never expire** - Use them whenever you need
+- **Lifetime option** - One-time purchase available (Zapier/n8n don't offer this)
+- **Web3-native** - Smart contract payments, no credit cards needed
 
 ## FAQ
 

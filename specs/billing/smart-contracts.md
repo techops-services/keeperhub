@@ -83,13 +83,13 @@ tierPricing[Tier.Developer] = TierPricing({
 });
 
 tierPricing[Tier.Team] = TierPricing({
-    annualPrice: 199_000000,  // $199/year
-    lifetimePrice: 599_000000 // $599
+    annualPrice: 225_000000,  // $225/year
+    lifetimePrice: 675_000000 // $675
 });
 
 tierPricing[Tier.Company] = TierPricing({
-    annualPrice: 449_000000,  // $449/year
-    lifetimePrice: 1349_000000 // $1,349
+    annualPrice: 675_000000,  // $675/year
+    lifetimePrice: 2025_000000 // $2,025
 });
 
 // Enterprise is custom, handled off-chain
