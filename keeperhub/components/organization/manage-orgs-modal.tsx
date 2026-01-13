@@ -471,7 +471,7 @@ export function ManageOrgsModal({
   };
 
   const handleInviteMember = async () => {
-    if (!inviteEmail || !managedOrgId) {
+    if (!(inviteEmail && managedOrgId)) {
       return;
     }
 
