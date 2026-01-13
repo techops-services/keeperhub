@@ -205,7 +205,6 @@ jobs:
         if: ${{ !contains(github.event.head_commit.message , '[skip deploy]') }}
         run: |
           kubectl apply -f deploy/${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}/rbac.yaml
-          sed -i 's|${SERVICE_ACCOUNT_ROLE_ARN}|'"$SERVICE_ACCOUNT_ROLE_ARN"'|g' $JOB_SPAWNER_HELM_FILE
 
       - name: Deploying Service to Kubernetes with Helm
         id: deploy
