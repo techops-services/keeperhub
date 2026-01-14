@@ -27,7 +27,6 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { validateWorkflowIntegrations } from "../lib/db/integrations";
-import { SHUTDOWN_TIMEOUT_MS } from "../lib/workflow-runner/constants";
 import {
   workflowExecutions,
   workflowSchedules,
@@ -35,6 +34,7 @@ import {
 } from "../lib/db/schema";
 import { executeWorkflow } from "../lib/workflow-executor.workflow";
 import { calculateTotalSteps } from "../lib/workflow-progress";
+import { SHUTDOWN_TIMEOUT_MS } from "../lib/workflow-runner/constants";
 import type { WorkflowEdge, WorkflowNode } from "../lib/workflow-store";
 
 // Validate required environment variables
