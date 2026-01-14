@@ -5,6 +5,15 @@ import { api } from "./api-client";
 
 export type WorkflowNodeType = "trigger" | "action" | "add";
 
+export enum WorkflowTriggerEnum {
+  MANUAL = "Manual",
+  SCHEDULE = "Schedule",
+  WEBHOOK = "Webhook",
+  EVENT = "Event",
+}
+
+export type WorkflowTriggerType = `${WorkflowTriggerEnum}`;
+
 export type WorkflowNodeData = {
   label: string;
   description?: string;
