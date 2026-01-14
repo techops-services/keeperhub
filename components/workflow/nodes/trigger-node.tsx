@@ -2,7 +2,7 @@
 
 import type { NodeProps } from "@xyflow/react";
 import { Boxes, Check, Clock, Play, Webhook, XCircle } from "lucide-react";
-import { memo, ElementType } from "react";
+import { type ElementType, memo } from "react";
 import {
   Node,
   NodeDescription,
