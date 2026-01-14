@@ -27,6 +27,7 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { validateWorkflowIntegrations } from "../lib/db/integrations";
+import { SHUTDOWN_TIMEOUT_MS } from "../lib/workflow-runner/constants";
 import {
   workflowExecutions,
   workflowSchedules,
@@ -117,7 +118,7 @@ async function handleGracefulShutdown(signal: string): Promise<void> {
   const shutdownTimeout = setTimeout(() => {
     console.error("[Runner] Graceful shutdown timeout, forcing exit");
     process.exit(1);
-  }, 25_000); // 25s timeout (K8s default terminationGracePeriodSeconds is 30s)
+  }, SHUTDOWN_TIMEOUT_MS);
 
   try {
     // Update execution status if we have an active execution

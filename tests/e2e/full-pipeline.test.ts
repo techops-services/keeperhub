@@ -133,11 +133,20 @@ describe.skipIf(SKIP_INFRA_TESTS)("Full Pipeline E2E", () => {
         name: "Sepolia Testnet",
         symbol: "ETH",
         chainType: "evm",
-        defaultPrimaryRpc: "https://rpc.sepolia.org",
+        defaultPrimaryRpc: "https://ethereum-sepolia-rpc.publicnode.com",
         defaultFallbackRpc: "https://ethereum-sepolia.publicnode.com",
         isTestnet: true,
         isEnabled: true,
       });
+    } else {
+      // Update existing chain with reliable RPC URLs
+      await db
+        .update(chains)
+        .set({
+          defaultPrimaryRpc: "https://ethereum-sepolia-rpc.publicnode.com",
+          defaultFallbackRpc: "https://ethereum-sepolia.publicnode.com",
+        })
+        .where(eq(chains.chainId, 11_155_111));
     }
 
     // Create test user
@@ -409,7 +418,7 @@ describe.skipIf(SKIP_INFRA_TESTS)("Full Pipeline E2E", () => {
           userId: TEST_USER_ID,
           chainId: 11_155_111,
           primaryRpcUrl: CUSTOM_PRIMARY_RPC,
-          fallbackRpcUrl: "https://rpc.sepolia.org",
+          fallbackRpcUrl: "https://ethereum-sepolia-rpc.publicnode.com",
         });
 
         // Step 2: Create workflow
@@ -666,13 +675,15 @@ describe.skipIf(SKIP_INFRA_TESTS)("Full Pipeline E2E", () => {
         startedAt: new Date(),
       });
 
-      // Run workflow-runner (should fail)
+      // Run workflow-runner (should fail but record to DB)
       const result = await runWorkflowRunner(workflowId, executionId, {
         scheduleId,
         timeout: 30_000,
       });
 
-      expect(result.exitCode).toBe(1);
+      // Per KEEP-1228: Exit 0 when workflow fails but result is recorded to DB
+      // Exit 1 is only for system errors (DB unreachable, signal termination)
+      expect(result.exitCode).toBe(0);
 
       // Poll for schedule status update (may take a moment for DB write to be visible)
       let updatedSchedule: (typeof workflowSchedules.$inferSelect)[] = [];

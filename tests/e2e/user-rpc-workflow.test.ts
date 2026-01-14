@@ -44,7 +44,7 @@ const TEST_EXECUTION_PREFIX = `${TEST_PREFIX}exec_`;
 
 // Test RPC URLs - use TechOps Sepolia for primary (reliable)
 const CUSTOM_PRIMARY_RPC = "https://chain.techops.services/eth-sepolia";
-const CUSTOM_FALLBACK_RPC = "https://rpc.sepolia.org";
+const CUSTOM_FALLBACK_RPC = "https://ethereum-sepolia-rpc.publicnode.com";
 
 // A well-known address for balance checking (Sepolia)
 const TEST_ADDRESS = "0xaa00000000000000000000000000000000000000";
@@ -82,7 +82,7 @@ describe.skipIf(SKIP_INFRA_TESTS)(
           name: "Sepolia Testnet",
           symbol: "ETH",
           chainType: "evm",
-          defaultPrimaryRpc: "https://rpc.sepolia.org",
+          defaultPrimaryRpc: "https://ethereum-sepolia-rpc.publicnode.com",
           defaultFallbackRpc: "https://ethereum-sepolia.publicnode.com",
           isTestnet: true,
           isEnabled: true,
@@ -630,8 +630,9 @@ describe.skipIf(SKIP_INFRA_TESTS)(
             timeout: 30_000,
           });
 
-          // Should fail because network can't be resolved
-          expect(result.exitCode).toBe(1);
+          // Per KEEP-1228: Exit 0 when workflow fails but result is recorded to DB
+          // Exit 1 is only for system errors (DB unreachable, signal termination)
+          expect(result.exitCode).toBe(0);
 
           const execution = await getExecutionResult(executionId);
           expect(execution?.status).toBe("error");

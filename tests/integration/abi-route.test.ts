@@ -159,8 +159,8 @@ describe("/api/chains/[chainId]/abi route", () => {
     selectCallIndex = 0;
     mockChainResult = [];
     mockExplorerResult = [];
-    // Clear environment variable
-    process.env.ETHERSCAN_API_KEY = undefined;
+    // Clear environment variable (empty string is falsy, unlike "undefined" string)
+    process.env.ETHERSCAN_API_KEY = "";
   });
 
   describe("Input validation", () => {

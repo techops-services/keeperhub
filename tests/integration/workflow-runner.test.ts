@@ -24,11 +24,6 @@ const TEST_HARNESS_PATH = path.join(
   "tests/fixtures/workflow-runner-harness.ts"
 );
 
-// Test database connection (uses test setup defaults)
-const _TEST_DATABASE_URL =
-  process.env.DATABASE_URL ||
-  "postgresql://postgres:postgres@localhost:5432/workflow_builder_test";
-
 // Timeout for process operations
 const PROCESS_TIMEOUT = 10_000;
 const SIGNAL_DELAY = 1000; // Delay before sending signal (increased for reliability)
@@ -439,28 +434,5 @@ describe("workflow-runner output validation", () => {
   });
 });
 
-describe("workflow-runner with real database", () => {
-  // These tests require a real database connection
-  // They are skipped by default and can be enabled for full integration testing
-
-  const hasTestDatabase =
-    process.env.TEST_DATABASE_URL || process.env.RUN_DB_TESTS;
-
-  describe.skipIf(!hasTestDatabase)("database integration", () => {
-    it("should update execution status on SIGTERM", () => {
-      // This test would:
-      // 1. Create a test workflow and execution in the database
-      // 2. Spawn workflow-runner with real DB connection
-      // 3. Send SIGTERM
-      // 4. Verify execution status is "error" in database
-      // 5. Verify error message contains "SIGTERM"
-
-      expect(true).toBe(true); // Placeholder
-    });
-
-    it("should update schedule status on SIGTERM", () => {
-      // Similar to above but for scheduled executions
-      expect(true).toBe(true); // Placeholder
-    });
-  });
-});
+// Real database integration tests moved to tests/e2e/graceful-shutdown.test.ts
+// Those tests require infrastructure (PostgreSQL) and belong in the e2e folder

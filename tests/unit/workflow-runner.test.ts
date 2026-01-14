@@ -260,16 +260,23 @@ describe("workflow-runner", () => {
   });
 
   describe("shutdown timeout", () => {
-    it("should use 25s timeout (within K8s 30s grace period)", () => {
-      const SHUTDOWN_TIMEOUT_MS = 25_000;
-      const K8S_GRACE_PERIOD_MS = 30_000;
+    it("should use 25s timeout (within K8s 30s grace period)", async () => {
+      // Import the actual constants used by workflow-runner.ts
+      const { SHUTDOWN_TIMEOUT_MS, K8S_GRACE_PERIOD_MS, SHUTDOWN_BUFFER_MS } =
+        await import("@/lib/workflow-runner/constants");
+
+      // Verify the actual values
+      expect(SHUTDOWN_TIMEOUT_MS).toBe(25_000);
+      expect(K8S_GRACE_PERIOD_MS).toBe(30_000);
 
       // Verify our timeout is less than K8s grace period
       expect(SHUTDOWN_TIMEOUT_MS).toBeLessThan(K8S_GRACE_PERIOD_MS);
 
-      // Leave buffer for cleanup
-      const buffer = K8S_GRACE_PERIOD_MS - SHUTDOWN_TIMEOUT_MS;
-      expect(buffer).toBe(5000); // 5s buffer
+      // Verify buffer calculation
+      expect(SHUTDOWN_BUFFER_MS).toBe(5000);
+      expect(K8S_GRACE_PERIOD_MS - SHUTDOWN_TIMEOUT_MS).toBe(
+        SHUTDOWN_BUFFER_MS
+      );
     });
   });
 

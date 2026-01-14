@@ -298,17 +298,4 @@ describeApiTests("Schedule API E2E", () => {
   });
 });
 
-/**
- * Full pipeline tests - require all components running
- * These are typically run in CI with docker-compose
- */
-describe.skipIf(SKIP_INFRA_TESTS || !process.env.FULL_E2E)(
-  "Full Pipeline E2E",
-  () => {
-    it.todo("creates schedule when workflow saved with Schedule trigger");
-    it.todo("dispatcher sends message to SQS at scheduled time");
-    it.todo("executor processes message and triggers workflow");
-    it.todo("execution record is created with correct status");
-    it.todo("schedule nextRunAt is updated after execution");
-  }
-);
+// Full pipeline tests are in tests/e2e/full-pipeline.test.ts
