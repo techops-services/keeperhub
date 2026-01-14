@@ -1,7 +1,7 @@
 "use client";
 
 import { ethers } from "ethers";
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -34,6 +34,8 @@ export function AbiWithAutoFetchField({
   const [useManualAbi, setUseManualAbi] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const lastFetchedRef = useRef<string>("");
+  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const contractAddress = (config[contractAddressField] as string) || "";
   const network = (config[networkField] as string) || "";
@@ -50,12 +52,7 @@ export function AbiWithAutoFetchField({
     }
   }, [contractAddress]);
 
-  const handleFetchAbi = async () => {
-    if (!(isValidAddress && network)) {
-      setError("Please enter a valid contract address and select a network");
-      return;
-    }
-
+  const performAbiFetch = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
@@ -84,6 +81,8 @@ export function AbiWithAutoFetchField({
 
       onChange(data.abi);
       setError(null);
+      const fetchKey = `${contractAddress.toLowerCase()}-${network}`;
+      lastFetchedRef.current = fetchKey;
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Failed to fetch ABI";
@@ -91,7 +90,83 @@ export function AbiWithAutoFetchField({
     } finally {
       setIsLoading(false);
     }
+  }, [contractAddress, network, onChange]);
+
+  const handleFetchAbi = useCallback(
+    async (skipValidation = false) => {
+      if (!(skipValidation || (isValidAddress && network))) {
+        setError("Please enter a valid contract address and select a network");
+        return;
+      }
+
+      // Create a unique key for this fetch request
+      const fetchKey = `${contractAddress.toLowerCase()}-${network}`;
+
+      if (lastFetchedRef.current === fetchKey) {
+        return;
+      }
+
+      await performAbiFetch();
+    },
+    [contractAddress, network, isValidAddress, performAbiFetch]
+  );
+
+  const handleButtonClick = () => {
+    handleFetchAbi(false);
   };
+
+  // Auto-fetch ABI when contract address and network are valid
+  useEffect(() => {
+    // Clear any pending timeout
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+
+    // Don't auto-fetch if:
+    // - Manual mode is enabled
+    // - Already loading
+    // - Invalid address or missing network
+    // - Already fetched for this combination
+    if (
+      useManualAbi ||
+      isLoading ||
+      !isValidAddress ||
+      !network ||
+      lastFetchedRef.current === `${contractAddress.toLowerCase()}-${network}`
+    ) {
+      return;
+    }
+
+    // Debounce the fetch to avoid too many requests while typing
+    fetchTimeoutRef.current = setTimeout(() => {
+      handleFetchAbi(true);
+    }, 500);
+
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+    };
+  }, [
+    contractAddress,
+    network,
+    isValidAddress,
+    useManualAbi,
+    isLoading,
+    handleFetchAbi,
+  ]);
+
+  // Reset last fetched ref when contract address or network changes significantly
+  useEffect(() => {
+    const currentKey = `${contractAddress.toLowerCase()}-${network}`;
+    if (
+      lastFetchedRef.current &&
+      lastFetchedRef.current !== currentKey &&
+      value
+    ) {
+      lastFetchedRef.current = "";
+    }
+  }, [contractAddress, network, value]);
 
   const handleManualToggle = (checked: boolean) => {
     setUseManualAbi(checked);
@@ -105,7 +180,7 @@ export function AbiWithAutoFetchField({
           disabled={
             disabled || isLoading || !isValidAddress || !network || useManualAbi
           }
-          onClick={handleFetchAbi}
+          onClick={handleButtonClick}
           size="sm"
           type="button"
           variant="outline"
@@ -159,9 +234,15 @@ export function AbiWithAutoFetchField({
 
       {!(useManualAbi || error) && (
         <p className="text-muted-foreground text-xs">
-          {isValidAddress && network
-            ? "Click the button above to fetch the ABI from Etherscan"
-            : "Enter a contract address and select a network to fetch the ABI"}
+          {(() => {
+            if (!(isValidAddress && network)) {
+              return "Enter a contract address and select a network to fetch the ABI";
+            }
+            if (isLoading) {
+              return "Fetching ABI from Etherscan...";
+            }
+            return "ABI will be fetched automatically, or click the button above to fetch manually";
+          })()}
         </p>
       )}
     </div>

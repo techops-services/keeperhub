@@ -11,6 +11,7 @@
 import { Label } from "@/components/ui/label";
 import { KeeperHubLogo } from "@/keeperhub/components/icons/keeperhub-logo";
 import { Web3WalletSection } from "@/keeperhub/components/settings/web3-wallet-section";
+import { AbiEventSelectField } from "@/keeperhub/components/workflow/config/abi-event-select-field";
 import { AbiWithAutoFetchField } from "@/keeperhub/components/workflow/config/abi-with-auto-fetch-field";
 import { ChainSelectField } from "@/keeperhub/components/workflow/config/chain-select-field";
 import { TokenSelectField } from "@/keeperhub/components/workflow/config/token-select-field";
@@ -108,6 +109,36 @@ registerFieldRenderer(
           field={field}
           networkField={networkField}
           onUpdateConfig={onUpdateConfig}
+        />
+      </div>
+    );
+  }
+);
+
+/**
+ * ABI Event Select Field
+ * Dynamic dropdown that parses ABI and shows available events (type === "event")
+ */
+registerFieldRenderer(
+  "abi-event-select",
+  ({ field, config, onUpdateConfig, disabled }) => {
+    const abiField = field.abiField || "abi";
+    const abiValue = (config[abiField] as string | undefined) || "";
+    const value =
+      (config[field.key] as string | undefined) || field.defaultValue || "";
+
+    return (
+      <div className="space-y-2" key={field.key}>
+        <Label className="ml-1" htmlFor={field.key}>
+          {field.label}
+          {field.required && <span className="text-red-500">*</span>}
+        </Label>
+        <AbiEventSelectField
+          abiValue={abiValue}
+          disabled={disabled}
+          field={field}
+          onChange={(val: unknown) => onUpdateConfig(field.key, val)}
+          value={value}
         />
       </div>
     );
