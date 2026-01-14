@@ -3,12 +3,10 @@
 import { useReactFlow } from "@xyflow/react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import {
-  AlertTriangle,
   Check,
   ChevronDown,
   Copy,
   Download,
-  FlaskConical,
   Globe,
   Loader2,
   Lock,
@@ -24,27 +22,8 @@ import { nanoid } from "nanoid";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -52,15 +31,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { api } from "@/lib/api-client";
 import { authClient, useSession } from "@/lib/auth-client";
-import {
-  integrationsAtom,
-  integrationsVersionAtom,
-} from "@/lib/integrations-store";
+import { integrationsAtom } from "@/lib/integrations-store";
 import type { IntegrationType } from "@/lib/types/integration";
 import {
   addNodeAtom,
@@ -84,8 +57,6 @@ import {
   selectedEdgeAtom,
   selectedExecutionIdAtom,
   selectedNodeAtom,
-  showClearDialogAtom,
-  showDeleteDialogAtom,
   triggerExecuteAtom,
   undoAtom,
   updateNodeDataAtom,
@@ -100,11 +71,14 @@ import {
 } from "@/plugins";
 import { Panel } from "../ai-elements/panel";
 import { KeeperHubLogo } from "../icons/keeperhub-logo";
-import { IntegrationFormDialog } from "../settings/integration-form-dialog";
-import { IntegrationIcon } from "../ui/integration-icon";
+import { ConfigurationOverlay } from "../overlays/configuration-overlay";
+import { ConfirmOverlay } from "../overlays/confirm-overlay";
+import { ExportWorkflowOverlay } from "../overlays/export-workflow-overlay";
+import { MakePublicOverlay } from "../overlays/make-public-overlay";
+import { useOverlay } from "../overlays/overlay-provider";
+import { WorkflowIssuesOverlay } from "../overlays/workflow-issues-overlay";
 import { WorkflowIcon } from "../ui/workflow-icon";
 import { UserMenu } from "../workflows/user-menu";
-import { PanelInner } from "./node-config-panel";
 
 type WorkflowToolbarProps = {
   workflowId?: string;
@@ -537,18 +511,7 @@ function useWorkflowHandlers({
   setSelectedExecutionId,
   userIntegrations,
 }: WorkflowHandlerParams) {
-  const [showUnsavedRunDialog, setShowUnsavedRunDialog] = useState(false);
-  const [showWorkflowIssuesDialog, setShowWorkflowIssuesDialog] =
-    useState(false);
-  const [workflowIssues, setWorkflowIssues] = useState<{
-    brokenReferences: BrokenTemplateReferenceInfo[];
-    missingRequiredFields: MissingRequiredFieldInfo[];
-    missingIntegrations: MissingIntegrationInfo[];
-  }>({
-    brokenReferences: [],
-    missingRequiredFields: [],
-    missingIntegrations: [],
-  });
+  const { open: openOverlay } = useOverlay();
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Cleanup polling interval on unmount
@@ -604,6 +567,22 @@ function useWorkflowHandlers({
     // Don't set executing to false here - let polling handle it
   };
 
+  const handleGoToStep = (nodeId: string, fieldKey?: string) => {
+    setSelectedNodeId(nodeId);
+    setActiveTab("properties");
+
+    // Focus on the specific field after a short delay to allow the panel to render
+    if (fieldKey) {
+      setTimeout(() => {
+        const element = document.getElementById(fieldKey);
+        if (element) {
+          element.focus();
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 100);
+    }
+  };
+
   const handleExecute = async () => {
     // Guard against concurrent executions
     if (isExecuting) {
@@ -615,43 +594,30 @@ function useWorkflowHandlers({
     const missingFields = getMissingRequiredFields(nodes);
     const missingIntegrations = getMissingIntegrations(nodes, userIntegrations);
 
-    // If there are any issues, show the combined dialog
+    // If there are any issues, show the workflow issues overlay
     if (
       brokenRefs.length > 0 ||
       missingFields.length > 0 ||
       missingIntegrations.length > 0
     ) {
-      setWorkflowIssues({
-        brokenReferences: brokenRefs,
-        missingRequiredFields: missingFields,
-        missingIntegrations,
+      openOverlay(WorkflowIssuesOverlay, {
+        issues: {
+          brokenReferences: brokenRefs,
+          missingRequiredFields: missingFields,
+          missingIntegrations,
+        },
+        onGoToStep: handleGoToStep,
+        onRunAnyway: executeWorkflow,
       });
-      setShowWorkflowIssuesDialog(true);
       return;
     }
 
-    await executeWorkflow();
-  };
-
-  const handleExecuteAnyway = async () => {
-    // Guard against concurrent executions
-    if (isExecuting) {
-      return;
-    }
-
-    setShowWorkflowIssuesDialog(false);
     await executeWorkflow();
   };
 
   return {
-    showUnsavedRunDialog,
-    setShowUnsavedRunDialog,
-    showWorkflowIssuesDialog,
-    setShowWorkflowIssuesDialog,
-    workflowIssues,
     handleSave,
     handleExecute,
-    handleExecuteAnyway,
   };
 }
 
@@ -672,8 +638,6 @@ function useWorkflowState() {
   );
   const isOwner = useAtomValue(isWorkflowOwnerAtom);
   const router = useRouter();
-  const [showClearDialog, setShowClearDialog] = useAtom(showClearDialogAtom);
-  const [showDeleteDialog, setShowDeleteDialog] = useAtom(showDeleteDialogAtom);
   const [isSaving, setIsSaving] = useAtom(isSavingAtom);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useAtom(
     hasUnsavedChangesAtom
@@ -692,10 +656,6 @@ function useWorkflowState() {
 
   const [isDownloading, setIsDownloading] = useState(false);
   const [isDuplicating, setIsDuplicating] = useState(false);
-  const [showCodeDialog, setShowCodeDialog] = useState(false);
-  const [showExportDialog, setShowExportDialog] = useState(false);
-  const [showMakePublicDialog, setShowMakePublicDialog] = useState(false);
-  const [generatedCode, _setGeneratedCode] = useState<string>("");
   const [allWorkflows, setAllWorkflows] = useState<
     Array<{
       id: string;
@@ -703,13 +663,6 @@ function useWorkflowState() {
       updatedAt: string;
     }>
   >([]);
-  const [showRenameDialog, setShowRenameDialog] = useState(false);
-  const [newWorkflowName, setNewWorkflowName] = useState(workflowName);
-
-  // Sync newWorkflowName when workflowName changes
-  useEffect(() => {
-    setNewWorkflowName(workflowName);
-  }, [workflowName]);
 
   // Load all workflows on mount
   useEffect(() => {
@@ -739,10 +692,6 @@ function useWorkflowState() {
     setWorkflowVisibility,
     isOwner,
     router,
-    showClearDialog,
-    setShowClearDialog,
-    showDeleteDialog,
-    setShowDeleteDialog,
     isSaving,
     setIsSaving,
     hasUnsavedChanges,
@@ -757,19 +706,8 @@ function useWorkflowState() {
     setIsDownloading,
     isDuplicating,
     setIsDuplicating,
-    showCodeDialog,
-    setShowCodeDialog,
-    showExportDialog,
-    setShowExportDialog,
-    showMakePublicDialog,
-    setShowMakePublicDialog,
-    generatedCode,
     allWorkflows,
     setAllWorkflows,
-    showRenameDialog,
-    setShowRenameDialog,
-    newWorkflowName,
-    setNewWorkflowName,
     setActiveTab,
     setNodes,
     setEdges,
@@ -783,6 +721,7 @@ function useWorkflowState() {
 
 // Hook for workflow actions
 function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
+  const { open: openOverlay } = useOverlay();
   const {
     currentWorkflowId,
     workflowName,
@@ -793,18 +732,11 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     setIsExecuting,
     setIsSaving,
     setHasUnsavedChanges,
-    setShowClearDialog,
     clearWorkflow,
-    setShowDeleteDialog,
-    setCurrentWorkflowName,
     setWorkflowVisibility,
     setAllWorkflows,
-    newWorkflowName,
-    setShowRenameDialog,
     setIsDownloading,
     setIsDuplicating,
-    setShowMakePublicDialog,
-    generatedCode,
     setActiveTab,
     setNodes,
     setEdges,
@@ -817,16 +749,7 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     session,
   } = state;
 
-  const {
-    showUnsavedRunDialog,
-    setShowUnsavedRunDialog,
-    showWorkflowIssuesDialog,
-    setShowWorkflowIssuesDialog,
-    workflowIssues,
-    handleSave,
-    handleExecute,
-    handleExecuteAnyway,
-  } = useWorkflowHandlers({
+  const { handleSave, handleExecute } = useWorkflowHandlers({
     currentWorkflowId,
     nodes,
     edges,
@@ -851,56 +774,39 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     }
   }, [triggerExecute, setTriggerExecute, handleExecute]);
 
-  const handleSaveAndRun = async () => {
-    await handleSave();
-    setShowUnsavedRunDialog(false);
-    await handleExecute();
-  };
-
-  const handleRunWithoutSaving = async () => {
-    setShowUnsavedRunDialog(false);
-    await handleExecute();
-  };
-
   const handleClearWorkflow = () => {
-    clearWorkflow();
-    setShowClearDialog(false);
+    openOverlay(ConfirmOverlay, {
+      title: "Clear Workflow",
+      message:
+        "Are you sure you want to clear all nodes and connections? This action cannot be undone.",
+      confirmLabel: "Clear Workflow",
+      confirmVariant: "destructive" as const,
+      destructive: true,
+      onConfirm: () => {
+        clearWorkflow();
+      },
+    });
   };
 
-  const handleDeleteWorkflow = async () => {
-    if (!currentWorkflowId) {
-      return;
-    }
-
-    try {
-      await api.workflow.delete(currentWorkflowId);
-      setShowDeleteDialog(false);
-      toast.success("Workflow deleted successfully");
-      window.location.href = "/";
-    } catch (error) {
-      console.error("Failed to delete workflow:", error);
-      toast.error("Failed to delete workflow. Please try again.");
-    }
-  };
-
-  const handleRenameWorkflow = async () => {
-    if (!(currentWorkflowId && newWorkflowName.trim())) {
-      return;
-    }
-
-    try {
-      await api.workflow.update(currentWorkflowId, {
-        name: newWorkflowName,
-      });
-      setShowRenameDialog(false);
-      setCurrentWorkflowName(newWorkflowName);
-      toast.success("Workflow renamed successfully");
-      const workflows = await api.workflow.getAll();
-      setAllWorkflows(workflows);
-    } catch (error) {
-      console.error("Failed to rename workflow:", error);
-      toast.error("Failed to rename workflow. Please try again.");
-    }
+  const handleDeleteWorkflow = () => {
+    openOverlay(ConfirmOverlay, {
+      title: "Delete Workflow",
+      message: `Are you sure you want to delete "${workflowName}"? This will permanently delete the workflow. This cannot be undone.`,
+      confirmLabel: "Delete Workflow",
+      confirmVariant: "destructive" as const,
+      destructive: true,
+      onConfirm: async () => {
+        if (!currentWorkflowId) return;
+        try {
+          await api.workflow.delete(currentWorkflowId);
+          toast.success("Workflow deleted successfully");
+          window.location.href = "/";
+        } catch (error) {
+          console.error("Failed to delete workflow:", error);
+          toast.error("Failed to delete workflow. Please try again.");
+        }
+      },
+    });
   };
 
   const handleDownload = async () => {
@@ -964,19 +870,27 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     }
   };
 
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(generatedCode);
-    toast.success("Code copied to clipboard");
-  };
-
   const handleToggleVisibility = async (newVisibility: WorkflowVisibility) => {
     if (!currentWorkflowId) {
       return;
     }
 
-    // Show confirmation dialog when making public
+    // Show confirmation overlay when making public
     if (newVisibility === "public") {
-      setShowMakePublicDialog(true);
+      openOverlay(MakePublicOverlay, {
+        onConfirm: async () => {
+          try {
+            await api.workflow.update(currentWorkflowId, {
+              visibility: "public",
+            });
+            setWorkflowVisibility("public");
+            toast.success("Workflow is now public");
+          } catch (error) {
+            console.error("Failed to update visibility:", error);
+            toast.error("Failed to update visibility. Please try again.");
+          }
+        },
+      });
       return;
     }
 
@@ -987,24 +901,6 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
       });
       setWorkflowVisibility(newVisibility);
       toast.success("Workflow is now private");
-    } catch (error) {
-      console.error("Failed to update visibility:", error);
-      toast.error("Failed to update visibility. Please try again.");
-    }
-  };
-
-  const handleConfirmMakePublic = async () => {
-    if (!currentWorkflowId) {
-      return;
-    }
-
-    try {
-      await api.workflow.update(currentWorkflowId, {
-        visibility: "public",
-      });
-      setWorkflowVisibility("public");
-      setShowMakePublicDialog(false);
-      toast.success("Workflow is now public");
     } catch (error) {
       console.error("Failed to update visibility:", error);
       toast.error("Failed to update visibility. Please try again.");
@@ -1037,24 +933,13 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
   };
 
   return {
-    showUnsavedRunDialog,
-    setShowUnsavedRunDialog,
-    showWorkflowIssuesDialog,
-    setShowWorkflowIssuesDialog,
-    workflowIssues,
     handleSave,
     handleExecute,
-    handleExecuteAnyway,
-    handleSaveAndRun,
-    handleRunWithoutSaving,
     handleClearWorkflow,
     handleDeleteWorkflow,
-    handleRenameWorkflow,
     handleDownload,
     loadWorkflows,
-    handleCopyCode,
     handleToggleVisibility,
-    handleConfirmMakePublic,
     handleDuplicate,
   };
 }
@@ -1069,8 +954,7 @@ function ToolbarActions({
   state: ReturnType<typeof useWorkflowState>;
   actions: ReturnType<typeof useWorkflowActions>;
 }) {
-  const [showPropertiesSheet, setShowPropertiesSheet] = useState(false);
-  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+  const { open: openOverlay, push } = useOverlay();
   const [selectedNodeId] = useAtom(selectedNodeAtom);
   const [selectedEdgeId] = useAtom(selectedEdgeAtom);
   const [nodes] = useAtom(nodesAtom);
@@ -1093,13 +977,23 @@ function ToolbarActions({
     return null;
   }
 
-  const handleDelete = () => {
-    if (selectedNodeId) {
-      deleteNode(selectedNodeId);
-    } else if (selectedEdgeId) {
-      deleteEdge(selectedEdgeId);
-    }
-    setShowDeleteAlert(false);
+  const handleDeleteConfirm = () => {
+    const isNode = Boolean(selectedNodeId);
+    const itemType = isNode ? "Node" : "Connection";
+
+    push(ConfirmOverlay, {
+      title: `Delete ${itemType}`,
+      message: `Are you sure you want to delete this ${itemType.toLowerCase()}? This action cannot be undone.`,
+      confirmLabel: "Delete",
+      confirmVariant: "destructive" as const,
+      onConfirm: () => {
+        if (selectedNodeId) {
+          deleteNode(selectedNodeId);
+        } else if (selectedEdgeId) {
+          deleteEdge(selectedEdgeId);
+        }
+      },
+    });
   };
 
   const handleAddStep = () => {
@@ -1187,9 +1081,9 @@ function ToolbarActions({
       <ButtonGroup className="flex lg:hidden" orientation="vertical">
         <Button
           className="border hover:bg-black/5 dark:hover:bg-white/5"
-          onClick={() => setShowPropertiesSheet(true)}
+          onClick={() => openOverlay(ConfigurationOverlay, {})}
           size="icon"
-          title="Properties"
+          title="Configuration"
           variant="secondary"
         >
           <Settings2 className="size-4" />
@@ -1198,7 +1092,7 @@ function ToolbarActions({
         {hasSelection && (
           <Button
             className="border hover:bg-black/5 dark:hover:bg-white/5"
-            onClick={() => setShowDeleteAlert(true)}
+            onClick={handleDeleteConfirm}
             size="icon"
             title="Delete"
             variant="secondary"
@@ -1207,35 +1101,6 @@ function ToolbarActions({
           </Button>
         )}
       </ButtonGroup>
-
-      {/* Properties Sheet - Mobile Only */}
-      <Sheet onOpenChange={setShowPropertiesSheet} open={showPropertiesSheet}>
-        <SheetContent className="w-full p-0 sm:max-w-full" side="bottom">
-          <div className="h-[80vh]">
-            <PanelInner />
-          </div>
-        </SheetContent>
-      </Sheet>
-
-      {/* Delete Alert - Mobile Only */}
-      <AlertDialog onOpenChange={setShowDeleteAlert} open={showDeleteAlert}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              Delete {selectedNode ? "Node" : "Connection"}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this{" "}
-              {selectedNode ? "node" : "connection"}? This action cannot be
-              undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Add Step - Desktop Horizontal */}
       <ButtonGroup className="hidden lg:flex" orientation="horizontal">
@@ -1302,13 +1167,13 @@ function ToolbarActions({
       {/* Save/Download - Mobile Vertical */}
       <ButtonGroup className="flex lg:hidden" orientation="vertical">
         <SaveButton handleSave={actions.handleSave} state={state} />
-        <DownloadButton state={state} />
+        <DownloadButton actions={actions} state={state} />
       </ButtonGroup>
 
       {/* Save/Download - Desktop Horizontal */}
       <ButtonGroup className="hidden lg:flex" orientation="horizontal">
         <SaveButton handleSave={actions.handleSave} state={state} />
-        <DownloadButton state={state} />
+        <DownloadButton actions={actions} state={state} />
       </ButtonGroup>
 
       {/* Visibility Toggle */}
@@ -1353,9 +1218,20 @@ function SaveButton({
 // Download Button Component
 function DownloadButton({
   state,
+  actions,
 }: {
   state: ReturnType<typeof useWorkflowState>;
+  actions: ReturnType<typeof useWorkflowActions>;
 }) {
+  const { open: openOverlay } = useOverlay();
+
+  const handleClick = () => {
+    openOverlay(ExportWorkflowOverlay, {
+      onExport: actions.handleDownload,
+      isDownloading: state.isDownloading,
+    });
+  };
+
   return (
     <Button
       className="border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
@@ -1365,7 +1241,7 @@ function DownloadButton({
         state.isGenerating ||
         !state.currentWorkflowId
       }
-      onClick={() => state.setShowExportDialog(true)}
+      onClick={handleClick}
       size="icon"
       title={
         state.isDownloading
@@ -1586,492 +1462,6 @@ function WorkflowMenuComponent({
   );
 }
 
-// Combined Workflow Issues Dialog Component
-function WorkflowIssuesDialog({
-  state,
-  actions,
-}: {
-  state: ReturnType<typeof useWorkflowState>;
-  actions: ReturnType<typeof useWorkflowActions>;
-}) {
-  const [addingIntegrationType, setAddingIntegrationType] =
-    useState<IntegrationType | null>(null);
-  const setIntegrationsVersion = useSetAtom(integrationsVersionAtom);
-  const { brokenReferences, missingRequiredFields, missingIntegrations } =
-    actions.workflowIssues;
-
-  const handleGoToStep = (nodeId: string) => {
-    actions.setShowWorkflowIssuesDialog(false);
-    state.setSelectedNodeId(nodeId);
-    state.setActiveTab("properties");
-  };
-
-  const handleAddIntegration = (integrationType: IntegrationType) => {
-    actions.setShowWorkflowIssuesDialog(false);
-    setAddingIntegrationType(integrationType);
-  };
-
-  const totalIssues =
-    brokenReferences.length +
-    missingRequiredFields.length +
-    missingIntegrations.length;
-
-  return (
-    <>
-      <AlertDialog
-        onOpenChange={actions.setShowWorkflowIssuesDialog}
-        open={actions.showWorkflowIssuesDialog}
-      >
-        <AlertDialogContent className="flex max-h-[80vh] max-w-lg flex-col overflow-hidden">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="size-5 text-orange-500" />
-              Workflow Issues ({totalIssues})
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="text-muted-foreground text-sm">
-                This workflow has issues that may cause it to fail.
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          <div className="flex-1 space-y-4 overflow-y-auto py-2">
-            {/* Broken References Section */}
-            {brokenReferences.length > 0 && (
-              <div className="space-y-2">
-                <h4 className="flex items-center gap-1.5 font-medium text-red-600 text-sm dark:text-red-400">
-                  <AlertTriangle className="size-4" />
-                  Broken References ({brokenReferences.length})
-                </h4>
-                <div className="space-y-2">
-                  {brokenReferences.map((broken) => (
-                    <div
-                      className="flex items-center gap-3 rounded-lg border border-red-500/20 bg-red-500/5 p-3"
-                      key={broken.nodeId}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-foreground text-sm">
-                          {broken.nodeLabel}
-                        </p>
-                        <div className="mt-1 space-y-1">
-                          {broken.brokenReferences.map((ref, idx) => (
-                            <p
-                              className="text-muted-foreground text-xs"
-                              key={`${ref.fieldKey}-${idx}`}
-                            >
-                              <span className="font-mono text-red-600 dark:text-red-400">
-                                {ref.displayText}
-                              </span>{" "}
-                              in {ref.fieldLabel}
-                            </p>
-                          ))}
-                        </div>
-                      </div>
-                      <Button
-                        className="shrink-0"
-                        onClick={() => handleGoToStep(broken.nodeId)}
-                        size="sm"
-                        variant="outline"
-                      >
-                        Fix
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Missing Required Fields Section */}
-            {missingRequiredFields.length > 0 && (
-              <div className="space-y-2">
-                <h4 className="flex items-center gap-1.5 font-medium text-orange-600 text-sm dark:text-orange-400">
-                  <AlertTriangle className="size-4" />
-                  Missing Required Fields ({missingRequiredFields.length})
-                </h4>
-                <div className="space-y-2">
-                  {missingRequiredFields.map((node) => (
-                    <div
-                      className="flex items-center gap-3 rounded-lg border border-orange-500/20 bg-orange-500/5 p-3"
-                      key={node.nodeId}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-foreground text-sm">
-                          {node.nodeLabel}
-                        </p>
-                        <div className="mt-1 space-y-1">
-                          {node.missingFields.map((field) => (
-                            <p
-                              className="text-muted-foreground text-xs"
-                              key={field.fieldKey}
-                            >
-                              Missing:{" "}
-                              <span className="font-medium text-orange-600 dark:text-orange-400">
-                                {field.fieldLabel}
-                              </span>
-                            </p>
-                          ))}
-                        </div>
-                      </div>
-                      <Button
-                        className="shrink-0"
-                        onClick={() => handleGoToStep(node.nodeId)}
-                        size="sm"
-                        variant="outline"
-                      >
-                        Fix
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Missing Integrations Section */}
-            {missingIntegrations.length > 0 && (
-              <div className="space-y-2">
-                <h4 className="flex items-center gap-1.5 font-medium text-orange-600 text-sm dark:text-orange-400">
-                  <AlertTriangle className="size-4" />
-                  Missing Integrations ({missingIntegrations.length})
-                </h4>
-                <div className="space-y-2">
-                  {missingIntegrations.map((missing) => (
-                    <div
-                      className="flex items-center gap-3 rounded-lg border border-orange-500/20 bg-orange-500/5 p-3"
-                      key={missing.integrationType}
-                    >
-                      <IntegrationIcon
-                        className="size-5 shrink-0"
-                        integration={missing.integrationType}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-foreground text-sm">
-                          {missing.integrationLabel}
-                        </p>
-                        <p className="text-muted-foreground text-xs">
-                          Used by:{" "}
-                          {missing.nodeNames.length > 3
-                            ? `${missing.nodeNames.slice(0, 3).join(", ")} and ${missing.nodeNames.length - 3} more`
-                            : missing.nodeNames.join(", ")}
-                        </p>
-                      </div>
-                      <Button
-                        className="shrink-0"
-                        onClick={() =>
-                          handleAddIntegration(missing.integrationType)
-                        }
-                        size="sm"
-                        variant="outline"
-                      >
-                        Add
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <Button onClick={actions.handleExecuteAnyway} variant="outline">
-              Run Anyway
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <IntegrationFormDialog
-        mode="create"
-        onClose={() => setAddingIntegrationType(null)}
-        onSuccess={() => {
-          setAddingIntegrationType(null);
-          // Increment version to trigger auto-fix for nodes
-          setIntegrationsVersion((v) => v + 1);
-        }}
-        open={addingIntegrationType !== null}
-        preselectedType={addingIntegrationType ?? undefined}
-      />
-    </>
-  );
-}
-
-// Workflow Dialogs Component
-function WorkflowDialogsComponent({
-  state,
-  actions,
-}: {
-  state: ReturnType<typeof useWorkflowState>;
-  actions: ReturnType<typeof useWorkflowActions>;
-}) {
-  return (
-    <>
-      <Dialog
-        onOpenChange={state.setShowClearDialog}
-        open={state.showClearDialog}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Clear Workflow</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to clear all nodes and connections? This
-              action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              onClick={() => state.setShowClearDialog(false)}
-              variant="outline"
-            >
-              Cancel
-            </Button>
-            <Button onClick={actions.handleClearWorkflow} variant="destructive">
-              Clear Workflow
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        onOpenChange={state.setShowRenameDialog}
-        open={state.showRenameDialog}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Rename Workflow</DialogTitle>
-            <DialogDescription>
-              Enter a new name for your workflow.
-            </DialogDescription>
-          </DialogHeader>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              actions.handleRenameWorkflow();
-            }}
-          >
-            <div className="space-y-2 py-4">
-              <Label className="ml-1" htmlFor="workflow-name">
-                Workflow Name
-              </Label>
-              <Input
-                id="workflow-name"
-                onChange={(e) => state.setNewWorkflowName(e.target.value)}
-                placeholder="Enter workflow name"
-                value={state.newWorkflowName}
-              />
-            </div>
-            <DialogFooter>
-              <Button
-                onClick={() => state.setShowRenameDialog(false)}
-                type="button"
-                variant="outline"
-              >
-                Cancel
-              </Button>
-              <Button disabled={!state.newWorkflowName.trim()} type="submit">
-                Rename
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        onOpenChange={state.setShowDeleteDialog}
-        open={state.showDeleteDialog}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Workflow</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete &ldquo;{state.workflowName}
-              &rdquo;? This will permanently delete the workflow. This cannot be
-              undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              onClick={() => state.setShowDeleteDialog(false)}
-              variant="outline"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={actions.handleDeleteWorkflow}
-              variant="destructive"
-            >
-              Delete Workflow
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        onOpenChange={state.setShowCodeDialog}
-        open={state.showCodeDialog}
-      >
-        <DialogContent className="flex max-h-[80vh] max-w-4xl flex-col overflow-hidden">
-          <DialogHeader>
-            <DialogTitle>Generated Workflow Code</DialogTitle>
-            <DialogDescription>
-              This is the generated code for your workflow using the Vercel
-              Workflow SDK. Copy this code or download the ZIP to run it in your
-              own Next.js project.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex-1 overflow-auto">
-            <pre className="overflow-auto rounded-lg bg-muted p-4 text-sm">
-              <code>{state.generatedCode}</code>
-            </pre>
-          </div>
-          <DialogFooter>
-            <Button
-              onClick={() => state.setShowCodeDialog(false)}
-              variant="outline"
-            >
-              Close
-            </Button>
-            <Button onClick={actions.handleCopyCode}>Copy to Clipboard</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog
-        onOpenChange={actions.setShowUnsavedRunDialog}
-        open={actions.showUnsavedRunDialog}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
-            <AlertDialogDescription>
-              You have unsaved changes. Would you like to save before running
-              the workflow?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <Button onClick={actions.handleRunWithoutSaving} variant="outline">
-              Run Without Saving
-            </Button>
-            <Button onClick={actions.handleSaveAndRun}>Save and Run</Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <Dialog
-        onOpenChange={state.setShowExportDialog}
-        open={state.showExportDialog}
-      >
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Download className="size-5" />
-              Export Workflow as Code
-            </DialogTitle>
-            <DialogDescription>
-              Export your workflow as a standalone Next.js project that you can
-              run independently.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <p className="text-muted-foreground text-sm">
-              This will generate a complete Next.js project containing your
-              workflow code. Once exported, you can run your workflow outside of
-              the Workflow Builder, deploy it to Vercel, or integrate it into
-              your existing applications.
-            </p>
-            <Alert>
-              <FlaskConical className="size-4" />
-              <AlertTitle>Experimental Feature</AlertTitle>
-              <AlertDescription className="block">
-                This feature is experimental and may have limitations. If you
-                encounter any issues, please{" "}
-                <a
-                  className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
-                  href="https://github.com/vercel-labs/workflow-builder-template/issues"
-                  rel="noopener noreferrer"
-                  target="_blank"
-                >
-                  report them on GitHub
-                </a>
-                .
-              </AlertDescription>
-            </Alert>
-          </div>
-          <DialogFooter>
-            <Button
-              onClick={() => state.setShowExportDialog(false)}
-              variant="outline"
-            >
-              Cancel
-            </Button>
-            <Button
-              disabled={state.isDownloading}
-              onClick={() => {
-                state.setShowExportDialog(false);
-                actions.handleDownload();
-              }}
-            >
-              {state.isDownloading ? (
-                <>
-                  <Loader2 className="mr-2 size-4 animate-spin" />
-                  Exporting...
-                </>
-              ) : (
-                <>
-                  <Download className="mr-2 size-4" />
-                  Export Project
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <WorkflowIssuesDialog actions={actions} state={state} />
-
-      {/* Make Public Confirmation Dialog */}
-      <AlertDialog
-        onOpenChange={state.setShowMakePublicDialog}
-        open={state.showMakePublicDialog}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <Globe className="size-5" />
-              Make Workflow Public?
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3">
-                <p>
-                  Making this workflow public means anyone with the link can:
-                </p>
-                <ul className="list-inside list-disc space-y-1 text-muted-foreground">
-                  <li>View the workflow structure and steps</li>
-                  <li>See action types and configurations</li>
-                  <li>Duplicate the workflow to their own account</li>
-                </ul>
-                <p className="font-medium text-foreground">
-                  The following will remain private:
-                </p>
-                <ul className="list-inside list-disc space-y-1 text-muted-foreground">
-                  <li>Your integration credentials (API keys, tokens)</li>
-                  <li>Execution logs and run history</li>
-                </ul>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={actions.handleConfirmMakePublic}>
-              Make Public
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
-  );
-}
-
 export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
   const state = useWorkflowState();
   const actions = useWorkflowActions(state);
@@ -2115,8 +1505,6 @@ export const WorkflowToolbar = ({ workflowId }: WorkflowToolbarProps) => {
           </div>
         </div>
       </div>
-
-      <WorkflowDialogsComponent actions={actions} state={state} />
     </>
   );
 };

@@ -457,6 +457,7 @@ function renderField(
     <div className="space-y-2" key={field.key}>
       <Label className="ml-1" htmlFor={field.key}>
         {field.label}
+        {field.required && <span className="text-red-500">*</span>}
       </Label>
       <FieldRenderer
         disabled={disabled}

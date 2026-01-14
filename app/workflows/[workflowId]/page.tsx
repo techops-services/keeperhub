@@ -129,7 +129,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   const setCurrentWorkflowVisibility = useSetAtom(
     currentWorkflowVisibilityAtom
   );
-  const setIsWorkflowOwner = useSetAtom(isWorkflowOwnerAtom);
+  const [isOwner, setIsWorkflowOwner] = useAtom(isWorkflowOwnerAtom);
   const setGlobalIntegrations = useSetAtom(integrationsAtom);
   const setIntegrationsLoaded = useSetAtom(integrationsLoadedAtom);
   const integrationsVersion = useAtomValue(integrationsVersionAtom);
@@ -427,6 +427,11 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
       return;
     }
 
+    // Skip for non-owners (they can't modify the workflow and may not be authenticated)
+    if (!isOwner) {
+      return;
+    }
+
     // Skip if already checked for this workflow+version combination
     const lastFix = lastAutoFixRef.current;
     if (
@@ -480,6 +485,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
     nodes,
     currentWorkflowId,
     integrationsVersion,
+    isOwner,
     updateNodeData,
     setGlobalIntegrations,
     setIntegrationsLoaded,
@@ -677,7 +683,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
       {/* Expand button when panel is collapsed */}
       {!isMobile && panelCollapsed && (
         <button
-          className="-translate-y-1/2 pointer-events-auto absolute top-1/2 right-0 z-20 flex size-6 items-center justify-center rounded-l-full border border-r-0 bg-background shadow-sm transition-colors hover:bg-muted"
+          className="pointer-events-auto absolute top-1/2 right-0 z-20 flex size-6 -translate-y-1/2 items-center justify-center rounded-l-full border border-r-0 bg-background shadow-sm transition-colors hover:bg-muted"
           onClick={() => {
             setIsPanelAnimating(true);
             setPanelCollapsed(false);
@@ -716,7 +722,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
             {/* Collapse button - hidden while resizing */}
             {!(isDraggingResize || panelCollapsed) && (
               <button
-                className="-translate-x-1/2 -translate-y-1/2 absolute top-1/2 left-0 flex size-6 items-center justify-center rounded-full border bg-background opacity-0 shadow-sm transition-opacity hover:bg-muted group-hover:opacity-100"
+                className="absolute top-1/2 left-0 flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border bg-background opacity-0 shadow-sm transition-opacity hover:bg-muted group-hover:opacity-100"
                 onClick={(e) => {
                   e.stopPropagation();
                   setIsPanelAnimating(true);
@@ -733,6 +739,9 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
           <NodeConfigPanel />
         </div>
       )}
+
+      {/* Mobile: NodeConfigPanel renders the overlay trigger button */}
+      {isMobile && <NodeConfigPanel />}
     </div>
   );
 };

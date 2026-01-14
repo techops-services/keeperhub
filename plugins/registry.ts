@@ -381,6 +381,17 @@ export function getIntegrationLabels(): Record<IntegrationType, string> {
 }
 
 /**
+ * Get integration descriptions map
+ */
+export function getIntegrationDescriptions(): Record<IntegrationType, string> {
+  const descriptions: Record<string, string> = {};
+  for (const plugin of integrationRegistry.values()) {
+    descriptions[plugin.type] = plugin.description;
+  }
+  return descriptions as Record<IntegrationType, string>;
+}
+
+/**
  * Get sorted integration types for dropdowns
  */
 export function getSortedIntegrationTypes(): IntegrationType[] {
