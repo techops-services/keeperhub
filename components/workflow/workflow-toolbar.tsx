@@ -33,6 +33,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
 // start custom keeperhub code //
 import { OrgSwitcher } from "@/keeperhub/components/organization/org-switcher";
 import { api } from "@/lib/api-client";
@@ -55,6 +56,7 @@ import {
   isExecutingAtom,
   isGeneratingAtom,
   isSavingAtom,
+  isWorkflowEnabled,
   isWorkflowOwnerAtom,
   nodesAtom,
   propertiesPanelActiveTabAtom,
@@ -678,6 +680,7 @@ function useWorkflowState() {
       updatedAt: string;
     }>
   >([]);
+  const [isEnabled, setIsEnabled] = useAtom(isWorkflowEnabled);
 
   // Load all workflows on mount
   useEffect(() => {
@@ -731,6 +734,8 @@ function useWorkflowState() {
     userIntegrations,
     triggerExecute,
     setTriggerExecute,
+    isEnabled,
+    setIsEnabled,
   };
 }
 
@@ -923,6 +928,23 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     }
   };
 
+  const handleToggleEnabled = async (newEnabled: boolean) => {
+    if (!currentWorkflowId) {
+      return;
+    }
+
+    try {
+      await api.workflow.update(currentWorkflowId, {
+        enabled: newEnabled,
+      });
+      state.setIsEnabled(newEnabled);
+      toast.success(newEnabled ? "Workflow enabled" : "Workflow disabled");
+    } catch (error) {
+      console.error("Failed to update enabled state:", error);
+      toast.error("Failed to update workflow state. Please try again.");
+    }
+  };
+
   const handleDuplicate = async () => {
     if (!currentWorkflowId) {
       return;
@@ -956,6 +978,7 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     handleDownload,
     loadWorkflows,
     handleToggleVisibility,
+    handleToggleEnabled,
     handleDuplicate,
   };
 }
@@ -1117,6 +1140,21 @@ function ToolbarActions({
           </Button>
         )}
       </ButtonGroup>
+
+      {/* Enable Workflow Switch - Desktop Horizontal */}
+      <div className="hidden items-center gap-2 lg:flex">
+        <label
+          className="font-medium text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          htmlFor="enable-workflow-switch"
+        >
+          Enable workflow
+        </label>
+        <Switch
+          checked={state.isEnabled}
+          id="enable-workflow-switch"
+          onCheckedChange={actions.handleToggleEnabled}
+        />
+      </div>
 
       {/* Add Step - Desktop Horizontal */}
       <ButtonGroup className="hidden lg:flex" orientation="horizontal">
