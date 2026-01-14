@@ -37,8 +37,7 @@ async function getUserContext(request: Request) {
     // Use the userId from the API key (the user who created the key)
     if (!apiKeyAuth.userId) {
       return {
-        error:
-          "API key has no associated user. Please recreate the API key.",
+        error: "API key has no associated user. Please recreate the API key.",
       };
     }
 

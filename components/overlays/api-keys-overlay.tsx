@@ -299,7 +299,7 @@ function useApiKeys(
  */
 export function ApiKeysOverlay({ overlayId }: ApiKeysOverlayProps) {
   const { push, closeAll } = useOverlay();
-  const [activeTab, setActiveTab] = useState("webhook");
+  const [activeTab, setActiveTab] = useState("organisation");
 
   // Webhook (User) keys
   const webhookKeys = useApiKeys(
@@ -337,33 +337,13 @@ export function ApiKeysOverlay({ overlayId }: ApiKeysOverlayProps) {
     >
       <Tabs className="-mt-2" onValueChange={setActiveTab} value={activeTab}>
         <TabsList className="w-full">
-          <TabsTrigger className="flex-1" value="webhook">
-            User
-          </TabsTrigger>
           <TabsTrigger className="flex-1" value="organisation">
             Organisation
           </TabsTrigger>
+          <TabsTrigger className="flex-1" value="webhook">
+            User
+          </TabsTrigger>
         </TabsList>
-
-        <TabsContent className="mt-4" value="webhook">
-          <p className="mb-4 text-muted-foreground text-xs">
-            Personal API keys for authenticating webhook requests to your
-            workflows.
-          </p>
-          {webhookKeys.loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Spinner />
-            </div>
-          ) : (
-            <ApiKeysList
-              apiKeys={webhookKeys.apiKeys}
-              deleting={webhookKeys.deleting}
-              newlyCreatedKey={webhookKeys.newlyCreatedKey}
-              onDelete={webhookKeys.handleDelete}
-              onDismissNewKey={webhookKeys.dismissNewKey}
-            />
-          )}
-        </TabsContent>
 
         <TabsContent className="mt-4" value="organisation">
           <p className="mb-4 text-muted-foreground text-xs">
@@ -383,6 +363,26 @@ export function ApiKeysOverlay({ overlayId }: ApiKeysOverlayProps) {
               onDelete={orgKeys.handleDelete}
               onDismissNewKey={orgKeys.dismissNewKey}
               showCreator
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent className="mt-4" value="webhook">
+          <p className="mb-4 text-muted-foreground text-xs">
+            Personal API keys for authenticating webhook requests to your
+            workflows.
+          </p>
+          {webhookKeys.loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Spinner />
+            </div>
+          ) : (
+            <ApiKeysList
+              apiKeys={webhookKeys.apiKeys}
+              deleting={webhookKeys.deleting}
+              newlyCreatedKey={webhookKeys.newlyCreatedKey}
+              onDelete={webhookKeys.handleDelete}
+              onDismissNewKey={webhookKeys.dismissNewKey}
             />
           )}
         </TabsContent>
