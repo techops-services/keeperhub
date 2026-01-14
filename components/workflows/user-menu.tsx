@@ -177,12 +177,10 @@ export const UserMenu = () => {
             <Key className="size-4" />
             <span>API Keys</span>
           </DropdownMenuItem>
-          {/* start custom keeperhub code */}
           <DropdownMenuItem onClick={() => openOverlay(WalletOverlay)}>
             <Wallet className="size-4" />
             <span>Wallet</span>
           </DropdownMenuItem>
-          {/* end keeperhub code */}
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
               <Sun className="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
