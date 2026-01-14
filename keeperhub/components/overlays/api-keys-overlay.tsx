@@ -3,14 +3,14 @@
 import { Copy, Key, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ConfirmOverlay } from "@/components/overlays/confirm-overlay";
-import { Overlay } from "@/components/overlays/overlay";
-import { useOverlay } from "@/components/overlays/overlay-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ConfirmOverlay } from "./confirm-overlay";
+import { Overlay } from "./overlay";
+import { useOverlay } from "./overlay-provider";
 
 type ApiKey = {
   id: string;
