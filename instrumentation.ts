@@ -11,7 +11,6 @@ export async function register() {
 
   // Only register process handlers in Node.js runtime (not Edge)
   if (process.env.NEXT_RUNTIME === "nodejs") {
-
     // Dynamically import Sentry to ensure it's available
     const Sentry = await import("@sentry/nextjs");
 
