@@ -1,5 +1,10 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+// start custom keeperhub code //
+import { createTimer } from "@/keeperhub/lib/metrics";
+import { recordStatusPollMetrics } from "@/keeperhub/lib/metrics/instrumentation/api";
+import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
+// end keeperhub code //
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { workflowExecutionLogs, workflowExecutions } from "@/lib/db/schema";
@@ -13,6 +18,10 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ executionId: string }> }
 ) {
+  // start custom keeperhub code //
+  const timer = createTimer();
+  // end keeperhub code //
+
   try {
     const { executionId } = await context.params;
     const session = await auth.api.getSession({
@@ -38,10 +47,19 @@ export async function GET(
       );
     }
 
-    // Verify the workflow belongs to the user
-    if (execution.workflow.userId !== session.user.id) {
+    // start custom keeperhub code //
+    // Verify access: owner or org member
+    const isOwner = execution.workflow.userId === session.user.id;
+    const orgContext = await getOrgContext();
+    const isSameOrg =
+      !execution.workflow.isAnonymous &&
+      execution.workflow.organizationId &&
+      orgContext.organization?.id === execution.workflow.organizationId;
+
+    if (!(isOwner || isSameOrg)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+    // end keeperhub code //
 
     // Get logs for all nodes
     const logs = await db.query.workflowExecutionLogs.findMany({
@@ -84,6 +102,15 @@ export async function GET(
           }
         : null;
 
+    // start custom keeperhub code //
+    recordStatusPollMetrics({
+      executionId,
+      durationMs: timer(),
+      statusCode: 200,
+      executionStatus: execution.status,
+    });
+    // end keeperhub code //
+
     return NextResponse.json({
       status: execution.status,
       nodeStatuses,
@@ -92,6 +119,16 @@ export async function GET(
     });
   } catch (error) {
     console.error("Failed to get execution status:", error);
+
+    // start custom keeperhub code //
+    const { executionId } = await context.params;
+    recordStatusPollMetrics({
+      executionId,
+      durationMs: timer(),
+      statusCode: 500,
+    });
+    // end keeperhub code //
+
     return NextResponse.json(
       {
         error:

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 import { fetchCredentials } from "@/lib/credential-fetcher";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
@@ -112,7 +113,14 @@ export async function sendDiscordMessageStep(
 
   const credentials = await fetchCredentials(input.integrationId);
 
-  return withStepLogging(input, () => stepHandler(input, credentials));
+  return withPluginMetrics(
+    {
+      pluginName: "discord",
+      actionName: "send-message",
+      executionId: input._context?.executionId,
+    },
+    () => withStepLogging(input, () => stepHandler(input, credentials))
+  );
 }
 sendDiscordMessageStep.maxRetries = 0;
 

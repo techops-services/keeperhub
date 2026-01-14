@@ -193,13 +193,26 @@ export function WalletOverlay({ overlayId }: WalletOverlayProps) {
 
       {!walletLoading && walletData?.hasWallet && (
         <div className="space-y-4">
-          <div className="rounded-lg border bg-muted/50 p-4">
-            <div className="mb-2 text-muted-foreground text-sm">
-              Wallet Address
+          <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
+            <div>
+              <div className="mb-1 text-muted-foreground text-sm">
+                Wallet Address
+              </div>
+              <code className="break-all font-mono text-sm">
+                {walletData.walletAddress}
+              </code>
             </div>
-            <code className="break-all font-mono text-sm">
-              {walletData.walletAddress}
-            </code>
+
+            {walletData.email && (
+              <div>
+                <div className="mb-1 text-muted-foreground text-sm">
+                  Associated Email
+                </div>
+                <code className="break-all font-mono text-sm">
+                  {walletData.email}
+                </code>
+              </div>
+            )}
           </div>
 
           <div className="space-y-3">

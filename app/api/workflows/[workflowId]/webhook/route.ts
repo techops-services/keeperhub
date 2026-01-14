@@ -2,11 +2,16 @@ import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { start } from "workflow/api";
+import { createTimer } from "@/keeperhub/lib/metrics";
+// start custom keeperhub code //
+import { recordWebhookMetrics } from "@/keeperhub/lib/metrics/instrumentation/api";
 import { db } from "@/lib/db";
 import { validateWorkflowIntegrations } from "@/lib/db/integrations";
 import { apiKeys, workflowExecutions, workflows } from "@/lib/db/schema";
 import { executeWorkflow } from "@/lib/workflow-executor.workflow";
 import type { WorkflowEdge, WorkflowNode } from "@/lib/workflow-store";
+
+// end keeperhub code //
 
 // Validate API key and return the user ID if valid
 async function validateApiKey(
@@ -123,6 +128,10 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ workflowId: string }> }
 ) {
+  // start custom keeperhub code //
+  const timer = createTimer();
+  // end keeperhub code //
+
   try {
     const { workflowId } = await context.params;
 
@@ -202,6 +211,15 @@ export async function POST(
       body
     );
 
+    // start custom keeperhub code //
+    recordWebhookMetrics({
+      workflowId,
+      executionId: execution.id,
+      durationMs: timer(),
+      statusCode: 200,
+    });
+    // end keeperhub code //
+
     // Return immediately with the execution ID
     return NextResponse.json(
       {
@@ -212,6 +230,18 @@ export async function POST(
     );
   } catch (error) {
     console.error("[Webhook] Failed to start workflow execution:", error);
+
+    // start custom keeperhub code //
+    const { workflowId } = await context.params;
+    recordWebhookMetrics({
+      workflowId,
+      durationMs: timer(),
+      statusCode: 500,
+      error:
+        error instanceof Error ? error.message : "Failed to execute workflow",
+    });
+    // end keeperhub code //
+
     return NextResponse.json(
       {
         error:

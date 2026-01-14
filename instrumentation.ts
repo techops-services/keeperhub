@@ -11,8 +11,27 @@ export async function register() {
 
   // Only register process handlers in Node.js runtime (not Edge)
   if (process.env.NEXT_RUNTIME === "nodejs") {
+
     // Dynamically import Sentry to ensure it's available
     const Sentry = await import("@sentry/nextjs");
+
+    // Initialize Prometheus metrics collector if enabled
+    if (process.env.METRICS_COLLECTOR === "prometheus") {
+      const { prometheusMetricsCollector } = await import(
+        "@/keeperhub/lib/metrics/collectors/prometheus"
+      );
+      const { createDualWriteCollector } = await import(
+        "@/keeperhub/lib/metrics/collectors/dual"
+      );
+      const { setMetricsCollector } = await import("@/keeperhub/lib/metrics");
+
+      // Use dual-write to send metrics to both console and Prometheus
+      const dualCollector = createDualWriteCollector(
+        prometheusMetricsCollector
+      );
+      setMetricsCollector(dualCollector);
+      console.log("[Metrics] Prometheus dual-write collector initialized");
+    }
 
     // Catch unhandled promise rejections (would otherwise be silent)
     process.on("unhandledRejection", (reason) => {

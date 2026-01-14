@@ -76,6 +76,15 @@ serviceAccount:
 podAnnotations:
   reloader.stakater.com/auto: "true"
 
+serviceMonitors:
+  enabled: true
+  monitors:
+    - name: metrics
+      port: http
+      path: /api/metrics
+      interval: 30s
+      scrapeTimeout: 10s
+
 resources:
   limits:
     memory: 2Gi
@@ -88,6 +97,9 @@ env:
   LOG_LEVEL:
     type: kv
     value: "info"
+  METRICS_COLLECTOR:
+    type: kv
+    value: "prometheus"
   NODE_OPTIONS:
     type: kv
     value: "--enable-source-maps --trace-warnings --trace-uncaught --trace-exit"
