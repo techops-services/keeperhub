@@ -28,6 +28,7 @@ function createDefaultTriggerNode() {
   };
 }
 
+// start custom keeperhub code //
 // Helper to authenticate and get user context
 async function getUserContext(request: Request) {
   // Try API key authentication first
@@ -91,6 +92,7 @@ async function generateWorkflowName(
   const count = userWorkflows.length + 1;
   return `Untitled ${count}`;
 }
+// end keeperhub code //
 
 export async function POST(request: Request) {
   try {

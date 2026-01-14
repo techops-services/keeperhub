@@ -37,13 +37,17 @@ type ApiKeysOverlayProps = {
 function CreateApiKeyOverlay({
   overlayId,
   onCreated,
+  // start custom keeperhub code //
   endpoint,
   keyType,
+  // end keeperhub code //
 }: {
   overlayId: string;
   onCreated: (key: ApiKey) => void;
+  // start custom keeperhub code //
   endpoint: string;
   keyType: "webhook" | "organisation";
+  // end keeperhub code //
 }) {
   const { pop } = useOverlay();
   const [keyName, setKeyName] = useState("");
@@ -77,10 +81,12 @@ function CreateApiKeyOverlay({
     }
   };
 
+  // start custom keeperhub code //
   const description =
     keyType === "webhook"
       ? "Create a new API key for webhook authentication"
       : "Create a new API key for MCP server and external integrations";
+  // end keeperhub code //
 
   return (
     <Overlay
