@@ -21,6 +21,7 @@ import { ApiKeysOverlay } from "@/components/overlays/api-keys-overlay";
 import { IntegrationsOverlay } from "@/components/overlays/integrations-overlay";
 import { useOverlay } from "@/components/overlays/overlay-provider";
 import { SettingsOverlay } from "@/components/overlays/settings-overlay";
+import { WalletOverlay } from "@/components/overlays/wallet-overlay";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,7 +40,6 @@ import {
 import { ManageOrgsModal } from "@/keeperhub/components/organization/manage-orgs-modal";
 // start custom keeperhub code //
 import { FeedbackOverlay } from "@/keeperhub/components/overlays/feedback-overlay";
-import { WalletOverlay } from "@/keeperhub/components/overlays/wallet-overlay";
 // end keeperhub code //
 import { api } from "@/lib/api-client";
 import { signOut, useSession } from "@/lib/auth-client";
@@ -177,12 +177,10 @@ export const UserMenu = () => {
             <Key className="size-4" />
             <span>API Keys</span>
           </DropdownMenuItem>
-          {/* start custom keeperhub code */}
           <DropdownMenuItem onClick={() => openOverlay(WalletOverlay)}>
             <Wallet className="size-4" />
             <span>Wallet</span>
           </DropdownMenuItem>
-          {/* end keeperhub code */}
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
               <Sun className="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
