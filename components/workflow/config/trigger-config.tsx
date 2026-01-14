@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, Copy, Play, Webhook } from "lucide-react";
+import { Boxes, Clock, Copy, Play, Webhook } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { CodeEditor } from "@/components/ui/code-editor";
@@ -14,6 +14,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TimezoneSelect } from "@/components/ui/timezone-select";
+import type { ActionConfigField } from "@/plugins";
+import { ActionConfigRenderer } from "./action-config-renderer";
 import { SchemaBuilder, type SchemaField } from "./schema-builder";
 
 type TriggerConfigProps = {
@@ -71,6 +73,12 @@ export function TriggerConfig({
               <div className="flex items-center gap-2">
                 <Webhook className="h-4 w-4" />
                 Webhook
+              </div>
+            </SelectItem>
+            <SelectItem value="Event">
+              <div className="flex items-center gap-2">
+                <Boxes className="h-4 w-4" />
+                Event
               </div>
             </SelectItem>
           </SelectContent>
@@ -174,6 +182,68 @@ export function TriggerConfig({
           </div>
         </>
       )}
+
+      {/* Event fields */}
+      {config?.triggerType === "Event" &&
+        (() => {
+          const eventFields: ActionConfigField[] = [
+            {
+              key: "network",
+              label: "Network",
+              type: "chain-select",
+              chainTypeFilter: "evm",
+              placeholder: "Select network",
+              required: true,
+            },
+            {
+              key: "contractAddress",
+              label: "Contract Address",
+              type: "template-input",
+              placeholder: "0x... or {{NodeName.contractAddress}}",
+              example: "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+              required: true,
+            },
+            {
+              key: "contractABI",
+              label: "Contract ABI",
+              type: "abi-with-auto-fetch",
+              contractAddressField: "contractAddress",
+              networkField: "network",
+              rows: 6,
+              required: true,
+            },
+            {
+              key: "eventName",
+              label: "Event Type",
+              type: "abi-event-select",
+              abiField: "contractABI",
+              placeholder: "Select an event",
+              required: true,
+            },
+          ];
+
+          return (
+            <ActionConfigRenderer
+              config={config}
+              disabled={disabled}
+              fields={eventFields}
+              onUpdateConfig={(key: string, value: unknown) => {
+                // Convert value to string for storage
+                // For JSON values (like ABI), they're already strings
+                // For other types, convert appropriately
+                let stringValue: string;
+                if (typeof value === "string") {
+                  stringValue = value;
+                } else if (typeof value === "object" && value !== null) {
+                  stringValue = JSON.stringify(value);
+                } else {
+                  stringValue = String(value);
+                }
+                onUpdateConfig(key, stringValue);
+              }}
+            />
+          );
+        })()}
     </>
   );
 }
