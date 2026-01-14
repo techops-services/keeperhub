@@ -69,6 +69,7 @@ import {
   updateNodeDataAtom,
   type WorkflowEdge,
   type WorkflowNode,
+  WorkflowTriggerEnum,
   type WorkflowVisibility,
 } from "@/lib/workflow-store";
 import {
@@ -1141,20 +1142,25 @@ function ToolbarActions({
         )}
       </ButtonGroup>
 
-      {/* Enable Workflow Switch - Desktop Horizontal */}
-      <div className="hidden items-center gap-2 lg:flex">
-        <label
-          className="font-medium text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-          htmlFor="enable-workflow-switch"
-        >
-          Enable workflow
-        </label>
-        <Switch
-          checked={state.isEnabled}
-          id="enable-workflow-switch"
-          onCheckedChange={actions.handleToggleEnabled}
-        />
-      </div>
+      {state.nodes?.find((node) => node?.data?.type === "trigger")?.data?.config
+        ?.triggerType === WorkflowTriggerEnum.EVENT && (
+        <>
+          {/* Enable Workflow Switch - Desktop Horizontal */}
+          <div className="hidden items-center gap-2 lg:flex">
+            <label
+              className="font-medium text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              htmlFor="enable-workflow-switch"
+            >
+              {state.isEnabled ? "Deactivate" : "Activate"} workflow
+            </label>
+            <Switch
+              checked={state.isEnabled}
+              id="enable-workflow-switch"
+              onCheckedChange={actions.handleToggleEnabled}
+            />
+          </div>
+        </>
+      )}
 
       {/* Add Step - Desktop Horizontal */}
       <ButtonGroup className="hidden lg:flex" orientation="horizontal">
