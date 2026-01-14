@@ -34,23 +34,17 @@ async function getUserContext(request: Request) {
   const apiKeyAuth = await authenticateApiKey(request);
 
   if (apiKeyAuth.authenticated) {
-    const organizationId = apiKeyAuth.organizationId || null;
-
-    // Get the first user from this organization
-    const orgWorkflow = await db.query.workflows.findFirst({
-      where: eq(workflows.organizationId, organizationId ?? ""),
-    });
-
-    if (!orgWorkflow) {
+    // Use the userId from the API key (the user who created the key)
+    if (!apiKeyAuth.userId) {
       return {
         error:
-          "No user context available for this organization. Please create workflows via the UI first.",
+          "API key has no associated user. Please recreate the API key.",
       };
     }
 
     return {
-      userId: orgWorkflow.userId,
-      organizationId,
+      userId: apiKeyAuth.userId,
+      organizationId: apiKeyAuth.organizationId || null,
     };
   }
 

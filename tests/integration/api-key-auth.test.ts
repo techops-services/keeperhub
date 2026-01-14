@@ -97,7 +97,7 @@ describe("API Key Authentication", () => {
       expect(response.status).toBe(200);
       const workflows = await response.json();
       expect(Array.isArray(workflows)).toBe(true);
-      expect(workflows.some((w) => w.id === testWorkflowId)).toBe(true);
+      expect(workflows.some((w: { id: string }) => w.id === testWorkflowId)).toBe(true);
     });
 
     it("should reject invalid API key", async () => {

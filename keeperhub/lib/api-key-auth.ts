@@ -26,6 +26,7 @@ export type ApiKeyAuthResult = {
   authenticated: boolean;
   organizationId?: string;
   apiKeyId?: string;
+  userId?: string; // User who created the API key (for ownership tracking)
   error?: string;
   statusCode?: number;
 };
@@ -85,6 +86,7 @@ export async function authenticateApiKey(
       columns: {
         id: true,
         organizationId: true,
+        createdBy: true,
         expiresAt: true,
       },
     });
@@ -120,6 +122,7 @@ export async function authenticateApiKey(
       authenticated: true,
       organizationId: apiKey.organizationId,
       apiKeyId: apiKey.id,
+      userId: apiKey.createdBy ?? undefined,
     };
   } catch (error) {
     console.error("[API Key Auth] Authentication error:", error);
