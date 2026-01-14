@@ -7,9 +7,10 @@
  * Tables defined here:
  * - paraWallets: Stores Para wallet information for Web3 operations
  * - organizationApiKeys: Stores organization-scoped API keys for MCP server authentication
+ * - organizationTokens: Tracks ERC20 tokens per organization/chain for balance display
  */
 
-import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 // Note: Using relative paths instead of @/ aliases for drizzle-kit compatibility
 import { organization, users } from "../../lib/db/schema";
 import { generateId } from "../../lib/utils/id";
@@ -83,3 +84,35 @@ export const organizationApiKeys = pgTable("organization_api_keys", {
 // Type exports for the Organization API Keys table
 export type OrganizationApiKey = typeof organizationApiKeys.$inferSelect;
 export type NewOrganizationApiKey = typeof organizationApiKeys.$inferInsert;
+
+/**
+ * Organization Tokens table
+ *
+ * Tracks ERC20 tokens that an organization wants to monitor for their wallet.
+ * Each row represents a token on a specific chain that the org is tracking.
+ */
+export const organizationTokens = pgTable(
+  "organization_tokens",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => generateId()),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    chainId: integer("chain_id").notNull(),
+    tokenAddress: text("token_address").notNull(), // ERC20 contract address
+    symbol: text("symbol").notNull(), // Cached token symbol
+    name: text("name").notNull(), // Cached token name
+    decimals: integer("decimals").notNull(), // Cached decimals
+    logoUrl: text("logo_url"), // Optional token logo
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("idx_org_tokens_org_chain").on(table.organizationId, table.chainId),
+  ]
+);
+
+// Type exports for Organization Tokens table
+export type OrganizationToken = typeof organizationTokens.$inferSelect;
+export type NewOrganizationToken = typeof organizationTokens.$inferInsert;
