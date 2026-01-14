@@ -76,7 +76,6 @@ import {
   getIntegrationLabels,
 } from "@/plugins";
 import { Panel } from "../ai-elements/panel";
-import { KeeperHubLogo } from "../icons/keeperhub-logo";
 import { ConfigurationOverlay } from "../overlays/configuration-overlay";
 import { ConfirmOverlay } from "../overlays/confirm-overlay";
 import { ExportWorkflowOverlay } from "../overlays/export-workflow-overlay";

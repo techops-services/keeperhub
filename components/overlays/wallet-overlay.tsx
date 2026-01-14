@@ -192,7 +192,7 @@ export function WalletOverlay({ overlayId }: WalletOverlayProps) {
         </div>
       )}
 
-      {!walletLoading && !walletData?.hasWallet && (
+      {!(walletLoading || walletData?.hasWallet) && (
         <div className="rounded-lg border bg-muted/50 p-4">
           <p className="text-muted-foreground text-sm">
             No wallet found. Create a wallet in Settings to get started.
