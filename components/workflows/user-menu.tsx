@@ -17,6 +17,7 @@ import {
   AuthDialog,
   isSingleProviderSignInInitiated,
 } from "@/components/auth/dialog";
+import { ApiKeysOverlay } from "@/components/overlays/api-keys-overlay";
 import { IntegrationsOverlay } from "@/components/overlays/integrations-overlay";
 import { useOverlay } from "@/components/overlays/overlay-provider";
 import { SettingsOverlay } from "@/components/overlays/settings-overlay";
@@ -37,7 +38,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 // start custom keeperhub code //
 import { ManageOrgsModal } from "@/keeperhub/components/organization/manage-orgs-modal";
-import { ApiKeysOverlay } from "@/keeperhub/components/overlays/api-keys-overlay";
 import { FeedbackOverlay } from "@/keeperhub/components/overlays/feedback-overlay";
 import { WalletOverlay } from "@/keeperhub/components/overlays/wallet-overlay";
 // end keeperhub code //
