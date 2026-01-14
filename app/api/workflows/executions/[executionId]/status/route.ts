@@ -29,6 +29,13 @@ export async function GET(
     });
 
     if (!session?.user) {
+      // start custom keeperhub code //
+      recordStatusPollMetrics({
+        executionId,
+        durationMs: timer(),
+        statusCode: 401,
+      });
+      // end keeperhub code //
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -41,6 +48,13 @@ export async function GET(
     });
 
     if (!execution) {
+      // start custom keeperhub code //
+      recordStatusPollMetrics({
+        executionId,
+        durationMs: timer(),
+        statusCode: 404,
+      });
+      // end keeperhub code //
       return NextResponse.json(
         { error: "Execution not found" },
         { status: 404 }
@@ -57,6 +71,11 @@ export async function GET(
       orgContext.organization?.id === execution.workflow.organizationId;
 
     if (!(isOwner || isSameOrg)) {
+      recordStatusPollMetrics({
+        executionId,
+        durationMs: timer(),
+        statusCode: 403,
+      });
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     // end keeperhub code //

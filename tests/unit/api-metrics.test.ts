@@ -191,7 +191,7 @@ describe("API Metrics Instrumentation", () => {
       );
     });
 
-    it("should handle missing executionId", () => {
+    it("should use 'unknown' for missing executionId", () => {
       recordWebhookMetrics({
         workflowId: "wf_123",
         durationMs: 30,
@@ -200,7 +200,7 @@ describe("API Metrics Instrumentation", () => {
 
       const labels = (mockCollector.recordLatency as ReturnType<typeof vi.fn>)
         .mock.calls[0][2];
-      expect(labels.execution_id).toBeUndefined();
+      expect(labels.execution_id).toBe("unknown");
     });
   });
 
@@ -243,7 +243,7 @@ describe("API Metrics Instrumentation", () => {
       );
     });
 
-    it("should handle missing executionStatus", () => {
+    it("should use 'unknown' for missing executionStatus", () => {
       recordStatusPollMetrics({
         executionId: "exec_123",
         durationMs: 20,
@@ -252,7 +252,7 @@ describe("API Metrics Instrumentation", () => {
 
       const labels = (mockCollector.recordLatency as ReturnType<typeof vi.fn>)
         .mock.calls[0][2];
-      expect(labels.execution_status).toBeUndefined();
+      expect(labels.execution_status).toBe("unknown");
     });
   });
 });

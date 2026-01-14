@@ -2,7 +2,12 @@ import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { start } from "workflow/api";
-import { createTimer } from "@/keeperhub/lib/metrics";
+import {
+  createTimer,
+  getMetricsCollector,
+  LabelKeys,
+  MetricNames,
+} from "@/keeperhub/lib/metrics";
 // start custom keeperhub code //
 import { recordWebhookMetrics } from "@/keeperhub/lib/metrics/instrumentation/api";
 import { db } from "@/lib/db";
@@ -141,6 +146,14 @@ export async function POST(
     });
 
     if (!workflow) {
+      // start custom keeperhub code //
+      recordWebhookMetrics({
+        workflowId,
+        durationMs: timer(),
+        statusCode: 404,
+        error: "Workflow not found",
+      });
+      // end keeperhub code //
       return NextResponse.json(
         { error: "Workflow not found" },
         { status: 404, headers: corsHeaders }
@@ -152,9 +165,18 @@ export async function POST(
     const apiKeyValidation = await validateApiKey(authHeader, workflow.userId);
 
     if (!apiKeyValidation.valid) {
+      const statusCode = apiKeyValidation.statusCode || 401;
+      // start custom keeperhub code //
+      recordWebhookMetrics({
+        workflowId,
+        durationMs: timer(),
+        statusCode,
+        error: apiKeyValidation.error,
+      });
+      // end keeperhub code //
       return NextResponse.json(
         { error: apiKeyValidation.error },
-        { status: apiKeyValidation.statusCode || 401, headers: corsHeaders }
+        { status: statusCode, headers: corsHeaders }
       );
     }
 
@@ -164,6 +186,14 @@ export async function POST(
     );
 
     if (!triggerNode || triggerNode.data.config?.triggerType !== "Webhook") {
+      // start custom keeperhub code //
+      recordWebhookMetrics({
+        workflowId,
+        durationMs: timer(),
+        statusCode: 400,
+        error: "This workflow is not configured for webhook triggers",
+      });
+      // end keeperhub code //
       return NextResponse.json(
         { error: "This workflow is not configured for webhook triggers" },
         { status: 400, headers: corsHeaders }
@@ -180,6 +210,14 @@ export async function POST(
         "[Webhook] Invalid integration references:",
         validation.invalidIds
       );
+      // start custom keeperhub code //
+      recordWebhookMetrics({
+        workflowId,
+        durationMs: timer(),
+        statusCode: 403,
+        error: "Workflow contains invalid integration references",
+      });
+      // end keeperhub code //
       return NextResponse.json(
         { error: "Workflow contains invalid integration references" },
         { status: 403, headers: corsHeaders }
@@ -201,6 +239,15 @@ export async function POST(
       .returning();
 
     console.log("[Webhook] Created execution:", execution.id);
+
+    // start custom keeperhub code //
+    // Record workflow execution metric in API process (workflow runs in separate context)
+    const metrics = getMetricsCollector();
+    metrics.incrementCounter(MetricNames.WORKFLOW_EXECUTIONS_TOTAL, {
+      [LabelKeys.TRIGGER_TYPE]: "webhook",
+      [LabelKeys.WORKFLOW_ID]: workflowId,
+    });
+    // end keeperhub code //
 
     // Execute the workflow in the background (don't await)
     executeWorkflowBackground(
