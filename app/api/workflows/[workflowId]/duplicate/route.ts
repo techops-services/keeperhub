@@ -1,6 +1,9 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { NextResponse } from "next/server";
+// start custom keeperhub code //
+import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
+// end keeperhub code //
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { workflows } from "@/lib/db/schema";
@@ -102,6 +105,13 @@ export async function POST(
       );
     }
 
+    // start custom keeperhub code //
+    // Get organization context for the new workflow
+    const orgContext = await getOrgContext();
+    const organizationId = orgContext.organization?.id || null;
+    const isAnonymous = orgContext.isAnonymous || !orgContext.organization;
+    // end keeperhub code //
+
     // Generate new IDs for nodes
     const oldNodes = sourceWorkflow.nodes as WorkflowNodeLike[];
     const newNodes = stripIntegrationIds(oldNodes);
@@ -111,15 +121,27 @@ export async function POST(
       newNodes
     );
 
-    // Count user's workflows to generate unique name
-    const userWorkflows = await db.query.workflows.findMany({
-      where: eq(workflows.userId, session.user.id),
-    });
+    // start custom keeperhub code //
+    // Count workflows in current context (org or anonymous) to generate unique name
+    const existingWorkflows = isAnonymous
+      ? await db.query.workflows.findMany({
+          where: and(
+            eq(workflows.userId, session.user.id),
+            eq(workflows.isAnonymous, true)
+          ),
+        })
+      : await db.query.workflows.findMany({
+          where: and(
+            eq(workflows.organizationId, organizationId ?? ""),
+            eq(workflows.isAnonymous, false)
+          ),
+        });
+    // end keeperhub code //
 
     // Generate a unique name
     const baseName = `${sourceWorkflow.name} (Copy)`;
     let workflowName = baseName;
-    const existingNames = new Set(userWorkflows.map((w) => w.name));
+    const existingNames = new Set(existingWorkflows.map((w) => w.name));
 
     if (existingNames.has(workflowName)) {
       let counter = 2;
@@ -140,6 +162,10 @@ export async function POST(
         nodes: newNodes,
         edges: newEdges,
         userId: session.user.id,
+        // start custom keeperhub code //
+        organizationId,
+        isAnonymous,
+        // end keeperhub code //
         visibility: "private", // Duplicated workflows are always private
       })
       .returning();

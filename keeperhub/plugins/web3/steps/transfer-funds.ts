@@ -2,6 +2,7 @@ import "server-only";
 
 import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
+import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 import { initializeParaSigner } from "@/keeperhub/lib/para/wallet-helpers";
 import { getOrganizationIdFromExecution } from "@/keeperhub/lib/workflow-helpers";
 import { db } from "@/lib/db";
@@ -195,7 +196,14 @@ export async function transferFundsStep(
 ): Promise<TransferFundsResult> {
   "use step";
 
-  return withStepLogging(input, () => stepHandler(input));
+  return withPluginMetrics(
+    {
+      pluginName: "web3",
+      actionName: "transfer-funds",
+      executionId: input._context?.executionId,
+    },
+    () => withStepLogging(input, () => stepHandler(input))
+  );
 }
 
 export const _integrationType = "web3";

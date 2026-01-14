@@ -1,5 +1,8 @@
-import { and, desc, eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+// start custom keeperhub code //
+import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
+// end keeperhub code //
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { workflowExecutions, workflows } from "@/lib/db/schema";
@@ -18,12 +21,10 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Verify workflow ownership
+    // start custom keeperhub code //
+    // Verify workflow access (owner or org member)
     const workflow = await db.query.workflows.findFirst({
-      where: and(
-        eq(workflows.id, workflowId),
-        eq(workflows.userId, session.user.id)
-      ),
+      where: eq(workflows.id, workflowId),
     });
 
     if (!workflow) {
@@ -32,6 +33,21 @@ export async function GET(
         { status: 404 }
       );
     }
+
+    const isOwner = session.user.id === workflow.userId;
+    const orgContext = await getOrgContext();
+    const isSameOrg =
+      !workflow.isAnonymous &&
+      workflow.organizationId &&
+      orgContext.organization?.id === workflow.organizationId;
+
+    if (!(isOwner || isSameOrg)) {
+      return NextResponse.json(
+        { error: "Workflow not found" },
+        { status: 404 }
+      );
+    }
+    // end keeperhub code //
 
     // Fetch executions
     const executions = await db.query.workflowExecutions.findMany({
@@ -67,12 +83,10 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Verify workflow ownership
+    // start custom keeperhub code //
+    // Verify workflow access (owner or org member)
     const workflow = await db.query.workflows.findFirst({
-      where: and(
-        eq(workflows.id, workflowId),
-        eq(workflows.userId, session.user.id)
-      ),
+      where: eq(workflows.id, workflowId),
     });
 
     if (!workflow) {
@@ -81,6 +95,21 @@ export async function DELETE(
         { status: 404 }
       );
     }
+
+    const isOwner = session.user.id === workflow.userId;
+    const orgContext = await getOrgContext();
+    const isSameOrg =
+      !workflow.isAnonymous &&
+      workflow.organizationId &&
+      orgContext.organization?.id === workflow.organizationId;
+
+    if (!(isOwner || isSameOrg)) {
+      return NextResponse.json(
+        { error: "Workflow not found" },
+        { status: 404 }
+      );
+    }
+    // end keeperhub code //
 
     // Get all execution IDs for this workflow
     const executions = await db.query.workflowExecutions.findMany({

@@ -18,12 +18,26 @@ export const metadata = {
   },
 };
 
+// Filter out hidden sections from page map
+function filterPageMap(
+  items: Awaited<ReturnType<typeof getPageMap>>
+): typeof items {
+  return items.filter((item) => {
+    // Hide the API section (not yet public)
+    if ("name" in item && item.name === "api") {
+      return false;
+    }
+    return true;
+  });
+}
+
 export default async function RootLayout({
   children,
 }: {
   children: ReactNode;
 }) {
-  const pageMap = await getPageMap("/");
+  const rawPageMap = await getPageMap("/");
+  const pageMap = filterPageMap(rawPageMap);
 
   return (
     <html dir="ltr" lang="en" suppressHydrationWarning>

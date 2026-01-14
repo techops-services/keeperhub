@@ -3,6 +3,9 @@ on:
     branches:
       - staging
       - prod
+    paths-ignore:
+      - 'docs/**'
+      - 'docs-site/**'
   workflow_dispatch:
 
 name: deploy-keeperhub

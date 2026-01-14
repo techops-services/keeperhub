@@ -5,6 +5,8 @@
  */
 import "server-only";
 
+// start custom keeperhub code //
+import { recordStepMetrics } from "@/keeperhub/lib/metrics/instrumentation/workflow";
 import { redactSensitiveData } from "../utils/redact";
 import {
   incrementCompletedSteps,
@@ -13,6 +15,7 @@ import {
   logWorkflowCompleteDb,
   updateCurrentStep,
 } from "../workflow-logging";
+// end keeperhub code //
 
 export type StepContext = {
   executionId?: string;
@@ -200,8 +203,31 @@ export async function withStepLogging<TInput extends StepInput, TOutput>(
         result,
         errorResult.error || "Step execution failed"
       );
+
+      // start custom keeperhub code //
+      recordStepMetrics({
+        executionId: context?.executionId,
+        nodeId: context?.nodeId || "",
+        nodeName: context?.nodeName || "",
+        stepType: context?.nodeType || "unknown",
+        durationMs: Date.now() - logInfo.startTime,
+        success: false,
+        error: errorResult.error,
+      });
+      // end keeperhub code //
     } else {
       await logStepComplete(logInfo, "success", result);
+
+      // start custom keeperhub code //
+      recordStepMetrics({
+        executionId: context?.executionId,
+        nodeId: context?.nodeId || "",
+        nodeName: context?.nodeName || "",
+        stepType: context?.nodeType || "unknown",
+        durationMs: Date.now() - logInfo.startTime,
+        success: true,
+      });
+      // end keeperhub code //
     }
 
     // Update progress: increment completed steps
@@ -234,6 +260,18 @@ export async function withStepLogging<TInput extends StepInput, TOutput>(
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
     await logStepComplete(logInfo, "error", undefined, errorMessage);
+
+    // start custom keeperhub code //
+    recordStepMetrics({
+      executionId: context?.executionId,
+      nodeId: context?.nodeId || "",
+      nodeName: context?.nodeName || "",
+      stepType: context?.nodeType || "unknown",
+      durationMs: Date.now() - logInfo.startTime,
+      success: false,
+      error: errorMessage,
+    });
+    // end keeperhub code //
 
     // Update progress on error too
     if (context?.executionId && context.nodeId) {
