@@ -4,6 +4,7 @@ import type { LanguageModelV2 } from "@ai-sdk/provider";
 import { streamText } from "ai";
 import { NextResponse } from "next/server";
 // start custom keeperhub code //
+import { authenticateApiKey } from "@/keeperhub/lib/api-key-auth";
 import {
   createTimer,
   getMetricsCollector,
@@ -324,18 +325,24 @@ export async function POST(request: Request) {
   // end keeperhub code //
 
   try {
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
+    // start custom keeperhub code //
+    // Try API key authentication first
+    const apiKeyAuth = await authenticateApiKey(request);
 
-    if (!session?.user) {
-      // start custom keeperhub code //
-      metrics.recordLatency(MetricNames.AI_GENERATION_DURATION, timer(), {
-        status: "failure",
+    if (!apiKeyAuth.authenticated) {
+      // Fall back to session authentication
+      const session = await auth.api.getSession({
+        headers: request.headers,
       });
-      // end keeperhub code //
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+      if (!session?.user) {
+        metrics.recordLatency(MetricNames.AI_GENERATION_DURATION, timer(), {
+          status: "failure",
+        });
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
     }
+    // end keeperhub code //
 
     const body = await request.json();
     const { prompt, existingWorkflow } = body;

@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { NextResponse } from "next/server";
 // start custom keeperhub code //
+import { authenticateApiKey } from "@/keeperhub/lib/api-key-auth";
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -27,15 +28,88 @@ function createDefaultTriggerNode() {
   };
 }
 
-export async function POST(request: Request) {
-  try {
-    const session = await auth.api.getSession({
-      headers: request.headers,
+// Helper to authenticate and get user context
+async function getUserContext(request: Request) {
+  // Try API key authentication first
+  const apiKeyAuth = await authenticateApiKey(request);
+
+  if (apiKeyAuth.authenticated) {
+    const organizationId = apiKeyAuth.organizationId || null;
+
+    // Get the first user from this organization
+    const orgWorkflow = await db.query.workflows.findFirst({
+      where: eq(workflows.organizationId, organizationId ?? ""),
     });
 
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!orgWorkflow) {
+      return {
+        error:
+          "No user context available for this organization. Please create workflows via the UI first.",
+      };
     }
+
+    return {
+      userId: orgWorkflow.userId,
+      organizationId,
+    };
+  }
+
+  // Fall back to session authentication
+  const session = await auth.api.getSession({
+    headers: request.headers,
+  });
+
+  if (!session?.user) {
+    return { error: "Unauthorized" };
+  }
+
+  const context = await getOrgContext();
+  return {
+    userId: session.user.id,
+    organizationId: context.organization?.id || null,
+  };
+}
+
+// Helper to generate workflow name
+async function generateWorkflowName(
+  name: string,
+  userId: string,
+  organizationId: string | null
+): Promise<string> {
+  if (name !== "Untitled Workflow") {
+    return name;
+  }
+
+  const isAnonymous = !organizationId;
+  const userWorkflows = isAnonymous
+    ? await db.query.workflows.findMany({
+        where: and(
+          eq(workflows.userId, userId),
+          eq(workflows.isAnonymous, true)
+        ),
+      })
+    : await db.query.workflows.findMany({
+        where: and(
+          eq(workflows.organizationId, organizationId ?? ""),
+          eq(workflows.isAnonymous, false)
+        ),
+      });
+
+  const count = userWorkflows.length + 1;
+  return `Untitled ${count}`;
+}
+
+export async function POST(request: Request) {
+  try {
+    // start custom keeperhub code //
+    const userContext = await getUserContext(request);
+    if ("error" in userContext) {
+      const status = userContext.error === "Unauthorized" ? 401 : 400;
+      return NextResponse.json({ error: userContext.error }, { status });
+    }
+
+    const { userId, organizationId } = userContext;
+    // end keeperhub code //
 
     const body = await request.json();
 
@@ -46,19 +120,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // start custom keeperhub code //
-    // Get organization context early for validation
-    const context = await getOrgContext();
-    const organizationId = context.organization?.id || null;
-    // end keeperhub code //
-
     // Validate that all integrationIds in nodes belong to the current user
     const validation = await validateWorkflowIntegrations(
       body.nodes,
-      session.user.id,
-      // start custom keeperhub code //
+      userId,
       organizationId
-      // end keeperhub code //
     );
     if (!validation.valid) {
       return NextResponse.json(
@@ -74,28 +140,12 @@ export async function POST(request: Request) {
     }
 
     // start custom keeperhub code //
-    const isAnonymous = context.isAnonymous || !context.organization;
-
-    // Generate "Untitled N" name if the provided name is "Untitled Workflow"
-    let workflowName = body.name;
-    if (body.name === "Untitled Workflow") {
-      // Count workflows scoped to current context (anonymous or org)
-      const userWorkflows = isAnonymous
-        ? await db.query.workflows.findMany({
-            where: and(
-              eq(workflows.userId, session.user.id),
-              eq(workflows.isAnonymous, true)
-            ),
-          })
-        : await db.query.workflows.findMany({
-            where: and(
-              eq(workflows.organizationId, organizationId ?? ""),
-              eq(workflows.isAnonymous, false)
-            ),
-          });
-      const count = userWorkflows.length + 1;
-      workflowName = `Untitled ${count}`;
-    }
+    const isAnonymous = !organizationId;
+    const workflowName = await generateWorkflowName(
+      body.name,
+      userId,
+      organizationId
+    );
     // end keeperhub code //
 
     // Generate workflow ID first
@@ -109,7 +159,7 @@ export async function POST(request: Request) {
         description: body.description,
         nodes,
         edges: body.edges,
-        userId: session.user.id,
+        userId,
         // start custom keeperhub code //
         organizationId,
         isAnonymous,

@@ -107,6 +107,7 @@ export async function authenticateApiKey(
     }
 
     // Update last_used_at timestamp (fire and forget, don't block the request)
+    // We intentionally don't await this to avoid blocking the request
     db.update(organizationApiKeys)
       .set({ lastUsedAt: new Date() })
       .where(eq(organizationApiKeys.id, apiKey.id))
