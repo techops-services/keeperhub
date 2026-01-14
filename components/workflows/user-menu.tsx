@@ -21,9 +21,6 @@ import { ApiKeysOverlay } from "@/components/overlays/api-keys-overlay";
 import { IntegrationsOverlay } from "@/components/overlays/integrations-overlay";
 import { useOverlay } from "@/components/overlays/overlay-provider";
 import { SettingsOverlay } from "@/components/overlays/settings-overlay";
-// start custom keeperhub code //
-import { WalletOverlay } from "@/keeperhub/components/overlays/wallet-overlay";
-// end keeperhub code //
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,6 +39,7 @@ import {
 import { ManageOrgsModal } from "@/keeperhub/components/organization/manage-orgs-modal";
 // start custom keeperhub code //
 import { FeedbackOverlay } from "@/keeperhub/components/overlays/feedback-overlay";
+import { WalletOverlay } from "@/keeperhub/components/overlays/wallet-overlay";
 // end keeperhub code //
 import { api } from "@/lib/api-client";
 import { signOut, useSession } from "@/lib/auth-client";
