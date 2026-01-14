@@ -109,9 +109,9 @@ export async function GET(request: Request) {
     // Return a dictionary of chains by chainId to make it easier to lookup
     const networkMap: Record<number, Chain> = {};
 
-    networks.forEach((network) => {
+    for (const network of networks) {
       networkMap[network.chainId] = network;
-    });
+    }
 
     const response = {
       workflows: eventWorkflows,
