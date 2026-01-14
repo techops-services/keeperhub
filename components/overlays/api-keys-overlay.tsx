@@ -332,7 +332,7 @@ export function ApiKeysOverlay({ overlayId }: ApiKeysOverlayProps) {
       <Tabs className="-mt-2" onValueChange={setActiveTab} value={activeTab}>
         <TabsList className="w-full">
           <TabsTrigger className="flex-1" value="webhook">
-            Webhook (User)
+            User
           </TabsTrigger>
           <TabsTrigger className="flex-1" value="organisation">
             Organisation
