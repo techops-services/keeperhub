@@ -1,11 +1,11 @@
 import { createHash, randomBytes } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { NextResponse } from "next/server";
 // start custom keeperhub code //
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { organizationApiKeys } from "@/lib/db/schema";
+import { organizationApiKeys, users } from "@/lib/db/schema";
 
 // end keeperhub code //
 
@@ -51,25 +51,29 @@ export async function GET(request: Request) {
         id: true,
         name: true,
         keyPrefix: true,
+        createdBy: true,
         createdAt: true,
         lastUsedAt: true,
         expiresAt: true,
       },
-      with: {
-        createdByUser: {
-          columns: {
-            name: true,
-          },
-        },
-      },
       orderBy: (table, { desc }) => [desc(table.createdAt)],
     });
 
-    // Flatten the response to include createdByName
+    // Get unique creator IDs and fetch their names
+    const creatorIds = [...new Set(keys.map((k) => k.createdBy).filter(Boolean))] as string[];
+    const creators = creatorIds.length > 0
+      ? await db.query.users.findMany({
+          where: inArray(users.id, creatorIds),
+          columns: { id: true, name: true },
+        })
+      : [];
+    const creatorMap = new Map(creators.map((u) => [u.id, u.name]));
+
+    // Add createdByName to response
     const response = keys.map((key) => ({
       ...key,
-      createdByName: key.createdByUser?.name || null,
-      createdByUser: undefined,
+      createdByName: key.createdBy ? creatorMap.get(key.createdBy) || null : null,
+      createdBy: undefined,
     }));
 
     return NextResponse.json(response);
