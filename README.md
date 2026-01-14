@@ -62,11 +62,15 @@ AI_MODEL=gpt-4o  # Options: gpt-4o, gpt-4o-mini, gpt-3.5-turbo
 # Option 3: Direct Anthropic API
 # ANTHROPIC_API_KEY=your-anthropic-api-key
 # AI_MODEL=claude-3-5-sonnet-20241022  # Or other Claude models
+
+# Internal API (for worker services)
+# INTERNAL_API_TOKEN=your-internal-api-token  # Required for internal endpoints like /api/workflows/events
 ```
 
 ### Environment Setup
 
 1. Copy the example environment file:
+
    ```bash
    cp .env.example .env
    ```
@@ -131,6 +135,7 @@ make dev-down
 ```
 
 **Services started:**
+
 - PostgreSQL (port 5433)
 - LocalStack SQS (port 4566)
 - KeeperHub App (port 3000)
@@ -161,6 +166,7 @@ make hybrid-down
 ```
 
 **Architecture:**
+
 - Docker Compose: PostgreSQL, LocalStack, KeeperHub App
 - Minikube: Schedule Dispatcher (CronJob), Job Spawner, Workflow Runner Jobs
 
@@ -468,6 +474,7 @@ The project includes MCP server configurations in `.mcp.json` for enhanced Claud
 - **memory** - Persistent memory across sessions
 
 Required environment variables (set in `.env`):
+
 ```bash
 TFE_TOKEN=       # Terraform Cloud API token
 OBSIDIAN_API_KEY= # Obsidian Local REST API key
