@@ -5,6 +5,10 @@ node_modules/
 .next/
 out/
 
+# Pagefind search index (generated at build time)
+_pagefind/
+public/_pagefind/
+
 # Production
 build/
 
