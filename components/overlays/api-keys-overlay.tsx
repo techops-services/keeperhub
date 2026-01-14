@@ -108,6 +108,7 @@ function CreateApiKeyOverlay({
   );
 }
 
+// start custom keeperhub code //
 /**
  * Shared component for displaying and managing API keys list
  */
@@ -117,18 +118,14 @@ function ApiKeysList({
   deleting,
   onDelete,
   onDismissNewKey,
-  // start custom keeperhub code //
   showCreator = false,
-  // end keeperhub code //
 }: {
   apiKeys: ApiKey[];
   newlyCreatedKey: string | null;
   deleting: string | null;
   onDelete: (keyId: string) => void;
   onDismissNewKey: () => void;
-  // start custom keeperhub code //
   showCreator?: boolean;
-  // end keeperhub code //
 }) {
   const { push } = useOverlay();
 
@@ -211,11 +208,9 @@ function ApiKeysList({
                 </div>
                 <p className="mt-1 text-muted-foreground text-xs">
                   Created {formatDate(apiKey.createdAt)}
-                  {/* start custom keeperhub code */}
                   {showCreator &&
                     apiKey.createdByName &&
                     ` by ${apiKey.createdByName}`}
-                  {/* end keeperhub code */}
                   {apiKey.lastUsedAt &&
                     ` · Last used ${formatDate(apiKey.lastUsedAt)}`}
                 </p>
@@ -239,6 +234,7 @@ function ApiKeysList({
     </div>
   );
 }
+// end keeperhub code //
 
 /**
  * Hook for managing API keys state and operations
@@ -310,14 +306,13 @@ function useApiKeys(
   };
 }
 
+// start custom keeperhub code //
 /**
  * Main API Keys management overlay with tabs for Webhook and Organisation keys.
  */
 export function ApiKeysOverlay({ overlayId }: ApiKeysOverlayProps) {
   const { push, closeAll } = useOverlay();
-  // start custom keeperhub code //
   const [activeTab, setActiveTab] = useState("organisation");
-  // end keeperhub code //
 
   // Webhook (User) keys
   const webhookKeys = useApiKeys(
@@ -325,19 +320,15 @@ export function ApiKeysOverlay({ overlayId }: ApiKeysOverlayProps) {
     (id) => `/api/api-keys/${id}`
   );
 
-  // start custom keeperhub code //
   // Organisation keys
   const orgKeys = useApiKeys(
     "/api/keeperhub/keys",
     (id) => `/api/keeperhub/keys/${id}`
   );
-  // end keeperhub code //
 
-  // start custom keeperhub code //
   const currentKeys = activeTab === "webhook" ? webhookKeys : orgKeys;
   const createEndpoint =
     activeTab === "webhook" ? "/api/api-keys" : "/api/keeperhub/keys";
-  // end keeperhub code //
 
   return (
     <Overlay
@@ -359,17 +350,14 @@ export function ApiKeysOverlay({ overlayId }: ApiKeysOverlayProps) {
     >
       <Tabs className="-mt-2" onValueChange={setActiveTab} value={activeTab}>
         <TabsList className="w-full">
-          {/* start custom keeperhub code */}
           <TabsTrigger className="flex-1" value="organisation">
             Organisation
           </TabsTrigger>
-          {/* end keeperhub code */}
           <TabsTrigger className="flex-1" value="webhook">
             User
           </TabsTrigger>
         </TabsList>
 
-        {/* start custom keeperhub code */}
         <TabsContent className="mt-4" value="organisation">
           <p className="mb-4 text-muted-foreground text-xs">
             Organisation-wide API keys for MCP servers and external
@@ -391,7 +379,6 @@ export function ApiKeysOverlay({ overlayId }: ApiKeysOverlayProps) {
             />
           )}
         </TabsContent>
-        {/* end keeperhub code */}
 
         <TabsContent className="mt-4" value="webhook">
           <p className="mb-4 text-muted-foreground text-xs">
@@ -416,3 +403,4 @@ export function ApiKeysOverlay({ overlayId }: ApiKeysOverlayProps) {
     </Overlay>
   );
 }
+// end keeperhub code //
