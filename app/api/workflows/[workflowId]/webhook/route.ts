@@ -2,7 +2,12 @@ import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { start } from "workflow/api";
-import { createTimer } from "@/keeperhub/lib/metrics";
+import {
+  createTimer,
+  getMetricsCollector,
+  LabelKeys,
+  MetricNames,
+} from "@/keeperhub/lib/metrics";
 // start custom keeperhub code //
 import { recordWebhookMetrics } from "@/keeperhub/lib/metrics/instrumentation/api";
 import { db } from "@/lib/db";
@@ -201,6 +206,15 @@ export async function POST(
       .returning();
 
     console.log("[Webhook] Created execution:", execution.id);
+
+    // start custom keeperhub code //
+    // Record workflow execution metric in API process (workflow runs in separate context)
+    const metrics = getMetricsCollector();
+    metrics.incrementCounter(MetricNames.WORKFLOW_EXECUTIONS_TOTAL, {
+      [LabelKeys.TRIGGER_TYPE]: "webhook",
+      [LabelKeys.WORKFLOW_ID]: workflowId,
+    });
+    // end keeperhub code //
 
     // Execute the workflow in the background (don't await)
     executeWorkflowBackground(

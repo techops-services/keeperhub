@@ -3,6 +3,13 @@ import { createOpenAI } from "@ai-sdk/openai";
 import type { LanguageModelV2 } from "@ai-sdk/provider";
 import { streamText } from "ai";
 import { NextResponse } from "next/server";
+// start custom keeperhub code //
+import {
+  createTimer,
+  getMetricsCollector,
+  MetricNames,
+} from "@/keeperhub/lib/metrics";
+// end keeperhub code //
 import { auth } from "@/lib/auth";
 import { generateAIActionPrompts } from "@/plugins";
 
@@ -311,6 +318,11 @@ function getAIModel(
 }
 
 export async function POST(request: Request) {
+  // start custom keeperhub code //
+  const timer = createTimer();
+  const metrics = getMetricsCollector();
+  // end keeperhub code //
+
   try {
     const session = await auth.api.getSession({
       headers: request.headers,
@@ -404,8 +416,18 @@ Example: If user says "connect node A to node B", output:
       async start(controller) {
         try {
           await processOperationStream(result.textStream, encoder, controller);
+          // start custom keeperhub code //
+          metrics.recordLatency(MetricNames.AI_GENERATION_DURATION, timer(), {
+            status: "success",
+          });
+          // end keeperhub code //
           controller.close();
         } catch (error) {
+          // start custom keeperhub code //
+          metrics.recordLatency(MetricNames.AI_GENERATION_DURATION, timer(), {
+            status: "failure",
+          });
+          // end keeperhub code //
           controller.enqueue(
             encodeMessage(encoder, {
               type: "error",
@@ -429,6 +451,11 @@ Example: If user says "connect node A to node B", output:
     });
   } catch (error) {
     console.error("Failed to generate workflow:", error);
+    // start custom keeperhub code //
+    metrics.recordLatency(MetricNames.AI_GENERATION_DURATION, timer(), {
+      status: "failure",
+    });
+    // end keeperhub code //
     return NextResponse.json(
       {
         error:

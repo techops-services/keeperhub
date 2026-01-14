@@ -2,6 +2,11 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { start } from "workflow/api";
 // start custom keeperhub code //
+import {
+  getMetricsCollector,
+  LabelKeys,
+  MetricNames,
+} from "@/keeperhub/lib/metrics";
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 // end keeperhub code //
 import { auth } from "@/lib/auth";
@@ -195,6 +200,16 @@ export async function POST(
       executionId = execution.id;
       console.log("[API] Created execution:", executionId);
     }
+
+    // start custom keeperhub code //
+    // Record workflow execution metric in API process (workflow runs in separate context)
+    const triggerType = isInternalExecution ? "scheduled" : "manual";
+    const metrics = getMetricsCollector();
+    metrics.incrementCounter(MetricNames.WORKFLOW_EXECUTIONS_TOTAL, {
+      [LabelKeys.TRIGGER_TYPE]: triggerType,
+      [LabelKeys.WORKFLOW_ID]: workflowId,
+    });
+    // end keeperhub code //
 
     // Execute the workflow in the background (don't await)
     executeWorkflowBackground(
