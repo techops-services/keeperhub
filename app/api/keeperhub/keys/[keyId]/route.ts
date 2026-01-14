@@ -1,11 +1,9 @@
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-// start custom keeperhub code //
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { organizationApiKeys } from "@/lib/db/schema";
-// end keeperhub code //
 
 // DELETE - Revoke an API key
 export async function DELETE(
@@ -22,10 +20,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // start custom keeperhub code //
     const orgContext = await getOrgContext();
     const activeOrgId = orgContext.organization?.id;
-    // end keeperhub code //
 
     if (!activeOrgId) {
       return NextResponse.json(

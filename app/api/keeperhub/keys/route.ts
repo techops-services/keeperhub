@@ -1,13 +1,10 @@
 import { createHash, randomBytes } from "node:crypto";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { NextResponse } from "next/server";
-// start custom keeperhub code //
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { organizationApiKeys, users } from "@/lib/db/schema";
-
-// end keeperhub code //
 
 // Generate a secure API key with KeeperHub prefix
 function generateApiKey(): { key: string; hash: string; prefix: string } {
