@@ -60,19 +60,24 @@ export async function GET(request: Request) {
     });
 
     // Get unique creator IDs and fetch their names
-    const creatorIds = [...new Set(keys.map((k) => k.createdBy).filter(Boolean))] as string[];
-    const creators = creatorIds.length > 0
-      ? await db.query.users.findMany({
-          where: inArray(users.id, creatorIds),
-          columns: { id: true, name: true },
-        })
-      : [];
+    const creatorIds = [
+      ...new Set(keys.map((k) => k.createdBy).filter(Boolean)),
+    ] as string[];
+    const creators =
+      creatorIds.length > 0
+        ? await db.query.users.findMany({
+            where: inArray(users.id, creatorIds),
+            columns: { id: true, name: true },
+          })
+        : [];
     const creatorMap = new Map(creators.map((u) => [u.id, u.name]));
 
     // Add createdByName to response
     const response = keys.map((key) => ({
       ...key,
-      createdByName: key.createdBy ? creatorMap.get(key.createdBy) || null : null,
+      createdByName: key.createdBy
+        ? creatorMap.get(key.createdBy) || null
+        : null,
       createdBy: undefined,
     }));
 
