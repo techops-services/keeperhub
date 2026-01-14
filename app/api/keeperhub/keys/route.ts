@@ -55,10 +55,24 @@ export async function GET(request: Request) {
         lastUsedAt: true,
         expiresAt: true,
       },
+      with: {
+        createdByUser: {
+          columns: {
+            name: true,
+          },
+        },
+      },
       orderBy: (table, { desc }) => [desc(table.createdAt)],
     });
 
-    return NextResponse.json(keys);
+    // Flatten the response to include createdByName
+    const response = keys.map((key) => ({
+      ...key,
+      createdByName: key.createdByUser?.name || null,
+      createdByUser: undefined,
+    }));
+
+    return NextResponse.json(response);
   } catch (error) {
     console.error("[API Keys] Failed to list API keys:", error);
     return NextResponse.json(

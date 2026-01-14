@@ -18,6 +18,7 @@ type ApiKey = {
   keyPrefix: string;
   createdAt: string;
   lastUsedAt: string | null;
+  createdByName?: string | null;
   key?: string;
 };
 
@@ -106,12 +107,14 @@ function ApiKeysList({
   deleting,
   onDelete,
   onDismissNewKey,
+  showCreator = false,
 }: {
   apiKeys: ApiKey[];
   newlyCreatedKey: string | null;
   deleting: string | null;
   onDelete: (keyId: string) => void;
   onDismissNewKey: () => void;
+  showCreator?: boolean;
 }) {
   const { push } = useOverlay();
 
@@ -194,6 +197,9 @@ function ApiKeysList({
                 </div>
                 <p className="mt-1 text-muted-foreground text-xs">
                   Created {formatDate(apiKey.createdAt)}
+                  {showCreator &&
+                    apiKey.createdByName &&
+                    ` by ${apiKey.createdByName}`}
                   {apiKey.lastUsedAt &&
                     ` · Last used ${formatDate(apiKey.lastUsedAt)}`}
                 </p>
@@ -376,6 +382,7 @@ export function ApiKeysOverlay({ overlayId }: ApiKeysOverlayProps) {
               newlyCreatedKey={orgKeys.newlyCreatedKey}
               onDelete={orgKeys.handleDelete}
               onDismissNewKey={orgKeys.dismissNewKey}
+              showCreator
             />
           )}
         </TabsContent>
