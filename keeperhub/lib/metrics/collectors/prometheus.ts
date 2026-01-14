@@ -418,12 +418,15 @@ const STEP_DURATION_BUCKETS = [50, 100, 250, 500, 1000, 2000, 5000];
 export async function updateDbMetrics(): Promise<void> {
   try {
     // Dynamic import to avoid circular dependencies
-    const { getWorkflowStatsFromDb, getStepStatsFromDb } = await import(
-      "../db-metrics"
-    );
-    const [workflowStats, stepStats] = await Promise.all([
+    const {
+      getWorkflowStatsFromDb,
+      getStepStatsFromDb,
+      getDailyActiveUsersFromDb,
+    } = await import("../db-metrics");
+    const [workflowStats, stepStats, dailyActiveUsers] = await Promise.all([
       getWorkflowStatsFromDb(),
       getStepStatsFromDb(),
+      getDailyActiveUsersFromDb(),
     ]);
 
     // Update workflow execution counts by status
@@ -484,6 +487,11 @@ export async function updateDbMetrics(): Promise<void> {
     // Update step duration sum and count
     stepDurationSum.set(stepStats.durationSum);
     stepDurationCount.set(stepStats.durationCount);
+
+    // Update saturation gauges from DB
+    workflowQueueDepth.set(workflowStats.totalPending);
+    workflowConcurrent.set(workflowStats.totalRunning);
+    activeUsers.set(dailyActiveUsers);
   } catch (error) {
     console.error("[Prometheus] Failed to update DB metrics:", error);
     // Don't throw - allow other metrics to still be returned

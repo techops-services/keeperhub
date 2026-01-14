@@ -9,9 +9,13 @@
 
 import "server-only";
 
-import { and, count, eq, gte, sql } from "drizzle-orm";
+import { and, count, countDistinct, eq, gte, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { workflowExecutionLogs, workflowExecutions } from "@/lib/db/schema";
+import {
+  sessions,
+  workflowExecutionLogs,
+  workflowExecutions,
+} from "@/lib/db/schema";
 
 // Histogram bucket boundaries in milliseconds (must match prometheus.ts)
 const WORKFLOW_DURATION_BUCKETS = [100, 250, 500, 1000, 2000, 5000, 10_000, 30_000];
@@ -226,5 +230,33 @@ export async function getStepStatsFromDb(): Promise<StepStats> {
       durationSum: 0,
       durationCount: 0,
     };
+  }
+}
+
+/**
+ * Query daily active users from the database
+ *
+ * Returns count of distinct users with active sessions in the last 24 hours.
+ */
+export async function getDailyActiveUsersFromDb(): Promise<number> {
+  try {
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const result = await db
+      .select({
+        count: countDistinct(sessions.userId),
+      })
+      .from(sessions)
+      .where(
+        and(
+          gte(sessions.updatedAt, oneDayAgo),
+          gte(sessions.expiresAt, new Date()) // Only count non-expired sessions
+        )
+      );
+
+    return Number(result[0]?.count) || 0;
+  } catch (error) {
+    console.error("[Metrics] Failed to query daily active users from DB:", error);
+    return 0;
   }
 }
