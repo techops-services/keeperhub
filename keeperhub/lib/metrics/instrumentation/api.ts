@@ -109,10 +109,9 @@ export function recordWebhookMetrics(options: {
     [LabelKeys.WORKFLOW_ID]: options.workflowId,
     [LabelKeys.STATUS_CODE]: String(options.statusCode),
     [LabelKeys.STATUS]: success ? "success" : "failure",
+    // Always include execution_id - Prometheus histogram requires this label
+    [LabelKeys.EXECUTION_ID]: options.executionId ?? "unknown",
   };
-  if (options.executionId) {
-    labels[LabelKeys.EXECUTION_ID] = options.executionId;
-  }
 
   metrics.recordLatency(
     MetricNames.API_WEBHOOK_LATENCY,
@@ -147,8 +146,7 @@ export function recordStatusPollMetrics(options: {
     [LabelKeys.EXECUTION_ID]: options.executionId,
     [LabelKeys.STATUS_CODE]: String(options.statusCode),
     [LabelKeys.STATUS]: options.statusCode < 400 ? "success" : "failure",
-    ...(options.executionStatus && {
-      execution_status: options.executionStatus,
-    }),
+    // Always include execution_status - Prometheus histogram requires this label
+    execution_status: options.executionStatus ?? "unknown",
   });
 }
