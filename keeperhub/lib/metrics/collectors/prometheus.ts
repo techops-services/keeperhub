@@ -93,20 +93,77 @@ function getOrCreateGauge(
   return new Gauge({ name, help, labelNames, registers: [registry] });
 }
 
-// Latency histograms
-const workflowDuration = getOrCreateHistogram(
-  "keeperhub_workflow_execution_duration_ms",
-  "Workflow execution duration in milliseconds",
-  WORKFLOW_LABELS,
-  [100, 250, 500, 1000, 2000, 5000, 10_000, 30_000]
+// start custom keeperhub code //
+// DB-sourced workflow metrics (populated from database on each scrape)
+// Using gauges instead of histograms/counters because workflow runner jobs
+// exit before Prometheus can scrape them - data must come from the database.
+
+// Workflow execution counts by status (replaces counter)
+const workflowExecutionsTotal = getOrCreateGauge(
+  "keeperhub_workflow_executions_total",
+  "Total workflow executions",
+  ["status"]
 );
 
-const stepDuration = getOrCreateHistogram(
-  "keeperhub_workflow_step_duration_ms",
-  "Workflow step execution duration in milliseconds",
-  STEP_LABELS,
-  [50, 100, 250, 500, 1000, 2000, 5000]
+// Workflow errors (derived from executions with status=error)
+const workflowErrorsTotal = getOrCreateGauge(
+  "keeperhub_workflow_execution_errors_total",
+  "Failed workflow executions",
+  []
 );
+
+// Workflow duration histogram as gauges (replaces histogram)
+const workflowDurationBucket = getOrCreateGauge(
+  "keeperhub_workflow_execution_duration_ms_bucket",
+  "Workflow execution duration histogram buckets",
+  ["le"]
+);
+
+const workflowDurationSum = getOrCreateGauge(
+  "keeperhub_workflow_execution_duration_ms_sum",
+  "Sum of workflow execution durations",
+  []
+);
+
+const workflowDurationCount = getOrCreateGauge(
+  "keeperhub_workflow_execution_duration_ms_count",
+  "Count of workflow executions with duration",
+  []
+);
+
+// Step execution counts by status (populated from DB)
+const stepExecutionsTotal = getOrCreateGauge(
+  "keeperhub_workflow_step_executions_total",
+  "Total workflow step executions",
+  ["step_type", "status"]
+);
+
+// Step errors (derived from step executions with status=error)
+const stepErrorsTotal = getOrCreateGauge(
+  "keeperhub_workflow_step_errors_total",
+  "Failed step executions",
+  ["step_type"]
+);
+
+// Step duration histogram as gauges
+const stepDurationBucket = getOrCreateGauge(
+  "keeperhub_workflow_step_duration_ms_bucket",
+  "Workflow step duration histogram buckets",
+  ["le"]
+);
+
+const stepDurationSum = getOrCreateGauge(
+  "keeperhub_workflow_step_duration_ms_sum",
+  "Sum of workflow step durations",
+  []
+);
+
+const stepDurationCount = getOrCreateGauge(
+  "keeperhub_workflow_step_duration_ms_count",
+  "Count of workflow steps with duration",
+  []
+);
+// end keeperhub code //
 
 const webhookLatency = getOrCreateHistogram(
   "keeperhub_api_webhook_latency_ms",
@@ -144,12 +201,6 @@ const externalServiceLatency = getOrCreateHistogram(
 );
 
 // Traffic counters
-const workflowExecutions = getOrCreateCounter(
-  "keeperhub_workflow_executions_total",
-  "Total workflow executions",
-  ["trigger_type", "workflow_id"]
-);
-
 const apiRequests = getOrCreateCounter(
   "keeperhub_api_requests_total",
   "Total API requests",
@@ -169,18 +220,6 @@ const aiTokensConsumed = getOrCreateCounter(
 );
 
 // Error counters
-const workflowErrors = getOrCreateCounter(
-  "keeperhub_workflow_execution_errors_total",
-  "Failed workflow executions",
-  ["workflow_id", "trigger_type", "error_type"]
-);
-
-const stepErrors = getOrCreateCounter(
-  "keeperhub_workflow_step_errors_total",
-  "Failed step executions",
-  ["step_type", "error_type"]
-);
-
 const pluginErrors = getOrCreateCounter(
   "keeperhub_plugin_action_errors_total",
   "Failed plugin actions",
@@ -261,9 +300,8 @@ function filterLabelsForMetric(
 }
 
 // Metric name to histogram/counter/gauge mapping
+// Note: Workflow execution/step metrics are now DB-sourced gauges, not histograms/counters
 const histogramMap: Record<string, Histogram> = {
-  "workflow.execution.duration_ms": workflowDuration,
-  "workflow.step.duration_ms": stepDuration,
   "api.webhook.latency_ms": webhookLatency,
   "api.status.latency_ms": statusLatency,
   "plugin.action.duration_ms": pluginDuration,
@@ -272,7 +310,6 @@ const histogramMap: Record<string, Histogram> = {
 };
 
 const counterMap: Record<string, Counter> = {
-  "workflow.executions.total": workflowExecutions,
   "api.requests.total": apiRequests,
   "plugin.invocations.total": pluginInvocations,
   "ai.tokens.consumed": aiTokensConsumed,
@@ -280,8 +317,6 @@ const counterMap: Record<string, Counter> = {
 };
 
 const errorCounterMap: Record<string, Counter> = {
-  "workflow.execution.errors": workflowErrors,
-  "workflow.step.errors": stepErrors,
   "plugin.action.errors": pluginErrors,
   "api.errors.total": apiErrors,
   "external.service.errors": externalServiceErrors,
@@ -368,6 +403,93 @@ export const prometheusMetricsCollector: MetricsCollector = {
     }
   },
 };
+
+// start custom keeperhub code //
+// Duration histogram bucket boundaries in milliseconds
+const WORKFLOW_DURATION_BUCKETS = [100, 250, 500, 1000, 2000, 5000, 10_000, 30_000];
+const STEP_DURATION_BUCKETS = [50, 100, 250, 500, 1000, 2000, 5000];
+
+/**
+ * Update DB-sourced metrics from database
+ *
+ * Called before each metrics scrape to ensure fresh data from the database.
+ * This is necessary because workflow runner jobs exit before Prometheus can scrape them.
+ */
+export async function updateDbMetrics(): Promise<void> {
+  try {
+    // Dynamic import to avoid circular dependencies
+    const { getWorkflowStatsFromDb, getStepStatsFromDb } = await import(
+      "../db-metrics"
+    );
+    const [workflowStats, stepStats] = await Promise.all([
+      getWorkflowStatsFromDb(),
+      getStepStatsFromDb(),
+    ]);
+
+    // Update workflow execution counts by status
+    workflowExecutionsTotal.set({ status: "success" }, workflowStats.totalSuccess);
+    workflowExecutionsTotal.set({ status: "error" }, workflowStats.totalError);
+    workflowExecutionsTotal.set({ status: "running" }, workflowStats.totalRunning);
+    workflowExecutionsTotal.set({ status: "pending" }, workflowStats.totalPending);
+
+    // Update workflow errors total
+    workflowErrorsTotal.set(workflowStats.totalError);
+
+    // Update workflow duration histogram buckets
+    for (let i = 0; i < WORKFLOW_DURATION_BUCKETS.length; i++) {
+      workflowDurationBucket.set(
+        { le: String(WORKFLOW_DURATION_BUCKETS[i]) },
+        workflowStats.durationBuckets[i] ?? 0
+      );
+    }
+    // +Inf bucket (all observations)
+    workflowDurationBucket.set(
+      { le: "+Inf" },
+      workflowStats.durationBuckets[WORKFLOW_DURATION_BUCKETS.length] ??
+        workflowStats.durationCount
+    );
+
+    // Update workflow duration sum and count
+    workflowDurationSum.set(workflowStats.durationSum);
+    workflowDurationCount.set(workflowStats.durationCount);
+
+    // Update step execution counts by status and type
+    for (const [stepType, counts] of Object.entries(stepStats.countsByType)) {
+      stepExecutionsTotal.set(
+        { step_type: stepType, status: "success" },
+        counts.success
+      );
+      stepExecutionsTotal.set(
+        { step_type: stepType, status: "error" },
+        counts.error
+      );
+      // Update step errors for this type
+      stepErrorsTotal.set({ step_type: stepType }, counts.error);
+    }
+
+    // Update step duration histogram buckets
+    for (let i = 0; i < STEP_DURATION_BUCKETS.length; i++) {
+      stepDurationBucket.set(
+        { le: String(STEP_DURATION_BUCKETS[i]) },
+        stepStats.durationBuckets[i] ?? 0
+      );
+    }
+    // +Inf bucket
+    stepDurationBucket.set(
+      { le: "+Inf" },
+      stepStats.durationBuckets[STEP_DURATION_BUCKETS.length] ??
+        stepStats.durationCount
+    );
+
+    // Update step duration sum and count
+    stepDurationSum.set(stepStats.durationSum);
+    stepDurationCount.set(stepStats.durationCount);
+  } catch (error) {
+    console.error("[Prometheus] Failed to update DB metrics:", error);
+    // Don't throw - allow other metrics to still be returned
+  }
+}
+// end keeperhub code //
 
 /**
  * Get Prometheus registry for metrics endpoint

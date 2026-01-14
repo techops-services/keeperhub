@@ -13,4 +13,7 @@ export {
   getPrometheusContentType,
   getPrometheusMetrics,
   prometheusMetricsCollector,
+  // start custom keeperhub code //
+  updateDbMetrics,
+  // end keeperhub code //
 } from "./collectors/prometheus";
