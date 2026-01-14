@@ -146,6 +146,14 @@ export async function POST(
     });
 
     if (!workflow) {
+      // start custom keeperhub code //
+      recordWebhookMetrics({
+        workflowId,
+        durationMs: timer(),
+        statusCode: 404,
+        error: "Workflow not found",
+      });
+      // end keeperhub code //
       return NextResponse.json(
         { error: "Workflow not found" },
         { status: 404, headers: corsHeaders }
@@ -157,9 +165,18 @@ export async function POST(
     const apiKeyValidation = await validateApiKey(authHeader, workflow.userId);
 
     if (!apiKeyValidation.valid) {
+      const statusCode = apiKeyValidation.statusCode || 401;
+      // start custom keeperhub code //
+      recordWebhookMetrics({
+        workflowId,
+        durationMs: timer(),
+        statusCode,
+        error: apiKeyValidation.error,
+      });
+      // end keeperhub code //
       return NextResponse.json(
         { error: apiKeyValidation.error },
-        { status: apiKeyValidation.statusCode || 401, headers: corsHeaders }
+        { status: statusCode, headers: corsHeaders }
       );
     }
 
@@ -169,6 +186,14 @@ export async function POST(
     );
 
     if (!triggerNode || triggerNode.data.config?.triggerType !== "Webhook") {
+      // start custom keeperhub code //
+      recordWebhookMetrics({
+        workflowId,
+        durationMs: timer(),
+        statusCode: 400,
+        error: "This workflow is not configured for webhook triggers",
+      });
+      // end keeperhub code //
       return NextResponse.json(
         { error: "This workflow is not configured for webhook triggers" },
         { status: 400, headers: corsHeaders }
@@ -185,6 +210,14 @@ export async function POST(
         "[Webhook] Invalid integration references:",
         validation.invalidIds
       );
+      // start custom keeperhub code //
+      recordWebhookMetrics({
+        workflowId,
+        durationMs: timer(),
+        statusCode: 403,
+        error: "Workflow contains invalid integration references",
+      });
+      // end keeperhub code //
       return NextResponse.json(
         { error: "Workflow contains invalid integration references" },
         { status: 403, headers: corsHeaders }

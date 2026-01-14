@@ -40,7 +40,7 @@ const WORKFLOW_LABELS = [
   "status",
 ];
 const STEP_LABELS = ["execution_id", "step_type", "status"];
-const API_LABELS = ["endpoint", "status_code", "status"];
+const _API_LABELS = ["endpoint", "status_code", "status"];
 const WEBHOOK_LABELS = ["workflow_id", "status_code", "status", "execution_id"];
 const PLUGIN_LABELS = ["plugin_name", "action_name", "execution_id", "status"];
 const _ERROR_LABELS = ["error_type", "plugin_name", "action_name", "service"];

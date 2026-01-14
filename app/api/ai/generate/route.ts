@@ -329,6 +329,11 @@ export async function POST(request: Request) {
     });
 
     if (!session?.user) {
+      // start custom keeperhub code //
+      metrics.recordLatency(MetricNames.AI_GENERATION_DURATION, timer(), {
+        status: "failure",
+      });
+      // end keeperhub code //
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -336,6 +341,11 @@ export async function POST(request: Request) {
     const { prompt, existingWorkflow } = body;
 
     if (!prompt) {
+      // start custom keeperhub code //
+      metrics.recordLatency(MetricNames.AI_GENERATION_DURATION, timer(), {
+        status: "failure",
+      });
+      // end keeperhub code //
       return NextResponse.json(
         { error: "Prompt is required" },
         { status: 400 }
@@ -352,6 +362,11 @@ export async function POST(request: Request) {
     );
 
     if (!modelResult.success) {
+      // start custom keeperhub code //
+      metrics.recordLatency(MetricNames.AI_GENERATION_DURATION, timer(), {
+        status: "failure",
+      });
+      // end keeperhub code //
       return NextResponse.json({ error: modelResult.error }, { status: 500 });
     }
 
