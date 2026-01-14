@@ -225,7 +225,6 @@ export {
   type NewParaWallet,
   type OrganizationApiKey,
   organizationApiKeys,
-  organizationApiKeysRelations,
   type ParaWallet,
   paraWallets,
 } from "../../keeperhub/db/schema-extensions";

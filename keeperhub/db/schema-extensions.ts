@@ -9,7 +9,6 @@
  * - organizationApiKeys: Stores organization-scoped API keys for MCP server authentication
  */
 
-import { relations } from "drizzle-orm";
 import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
 // Note: Using relative paths instead of @/ aliases for drizzle-kit compatibility
 import { organization, users } from "../../lib/db/schema";
@@ -80,21 +79,6 @@ export const organizationApiKeys = pgTable("organization_api_keys", {
   expiresAt: timestamp("expires_at"), // Optional expiration
   revokedAt: timestamp("revoked_at"), // Soft delete via revocation
 });
-
-// Relations for Organization API Keys
-export const organizationApiKeysRelations = relations(
-  organizationApiKeys,
-  ({ one }) => ({
-    createdByUser: one(users, {
-      fields: [organizationApiKeys.createdBy],
-      references: [users.id],
-    }),
-    organization: one(organization, {
-      fields: [organizationApiKeys.organizationId],
-      references: [organization.id],
-    }),
-  })
-);
 
 // Type exports for the Organization API Keys table
 export type OrganizationApiKey = typeof organizationApiKeys.$inferSelect;
