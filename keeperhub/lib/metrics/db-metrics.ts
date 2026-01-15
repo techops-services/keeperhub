@@ -12,9 +12,15 @@ import "server-only";
 import { and, count, countDistinct, eq, gte, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
+  integrations,
+  invitation,
+  member,
+  organization,
   sessions,
+  users,
   workflowExecutionLogs,
   workflowExecutions,
+  workflows,
 } from "@/lib/db/schema";
 
 // Histogram bucket boundaries in milliseconds (must match prometheus.ts)
@@ -260,3 +266,136 @@ export async function getDailyActiveUsersFromDb(): Promise<number> {
     return 0;
   }
 }
+
+// start custom keeperhub code //
+export type UserStats = {
+  total: number;
+  verified: number;
+  anonymous: number;
+  withWorkflows: number;
+  withIntegrations: number;
+};
+
+/**
+ * Query user statistics from the database
+ *
+ * Returns counts of users by various categories.
+ */
+export async function getUserStatsFromDb(): Promise<UserStats> {
+  try {
+    const [
+      totalResult,
+      verifiedResult,
+      anonymousResult,
+      withWorkflowsResult,
+      withIntegrationsResult,
+    ] = await Promise.all([
+      // Total users
+      db.select({ count: count() }).from(users),
+      // Verified users
+      db
+        .select({ count: count() })
+        .from(users)
+        .where(eq(users.emailVerified, true)),
+      // Anonymous users
+      db
+        .select({ count: count() })
+        .from(users)
+        .where(eq(users.isAnonymous, true)),
+      // Users with at least one workflow
+      db.select({ count: countDistinct(workflows.userId) }).from(workflows),
+      // Users with at least one integration
+      db
+        .select({ count: countDistinct(integrations.userId) })
+        .from(integrations),
+    ]);
+
+    return {
+      total: Number(totalResult[0]?.count) || 0,
+      verified: Number(verifiedResult[0]?.count) || 0,
+      anonymous: Number(anonymousResult[0]?.count) || 0,
+      withWorkflows: Number(withWorkflowsResult[0]?.count) || 0,
+      withIntegrations: Number(withIntegrationsResult[0]?.count) || 0,
+    };
+  } catch (error) {
+    console.error("[Metrics] Failed to query user stats from DB:", error);
+    return {
+      total: 0,
+      verified: 0,
+      anonymous: 0,
+      withWorkflows: 0,
+      withIntegrations: 0,
+    };
+  }
+}
+
+export type OrgStats = {
+  total: number;
+  membersTotal: number;
+  membersByRole: Record<string, number>;
+  invitationsPending: number;
+  withWorkflows: number;
+};
+
+/**
+ * Query organization statistics from the database
+ *
+ * Returns counts of organizations and their members.
+ */
+export async function getOrgStatsFromDb(): Promise<OrgStats> {
+  try {
+    const [
+      totalResult,
+      membersTotalResult,
+      membersByRoleResult,
+      invitationsPendingResult,
+      withWorkflowsResult,
+    ] = await Promise.all([
+      // Total organizations
+      db.select({ count: count() }).from(organization),
+      // Total members across all orgs
+      db.select({ count: count() }).from(member),
+      // Members grouped by role
+      db
+        .select({
+          role: member.role,
+          count: count(),
+        })
+        .from(member)
+        .groupBy(member.role),
+      // Pending invitations
+      db
+        .select({ count: count() })
+        .from(invitation)
+        .where(eq(invitation.status, "pending")),
+      // Organizations with at least one workflow
+      db
+        .select({ count: countDistinct(workflows.organizationId) })
+        .from(workflows)
+        .where(sql`${workflows.organizationId} IS NOT NULL`),
+    ]);
+
+    const membersByRole: Record<string, number> = {};
+    for (const row of membersByRoleResult) {
+      membersByRole[row.role] = row.count;
+    }
+
+    return {
+      total: Number(totalResult[0]?.count) || 0,
+      membersTotal: Number(membersTotalResult[0]?.count) || 0,
+      membersByRole,
+      invitationsPending: Number(invitationsPendingResult[0]?.count) || 0,
+      withWorkflows: Number(withWorkflowsResult[0]?.count) || 0,
+    };
+  } catch (error) {
+    console.error("[Metrics] Failed to query org stats from DB:", error);
+    return {
+      total: 0,
+      membersTotal: 0,
+      membersByRole: {},
+      invitationsPending: 0,
+      withWorkflows: 0,
+    };
+  }
+}
+// end keeperhub code //
