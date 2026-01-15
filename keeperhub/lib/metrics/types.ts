@@ -106,7 +106,6 @@ export const MetricNames = {
   WORKFLOW_STEP_ERRORS: "workflow.step.errors",
   PLUGIN_ACTION_ERRORS: "plugin.action.errors",
   API_ERRORS_TOTAL: "api.errors.total",
-  EXTERNAL_SERVICE_ERRORS: "external.service.errors",
 
   // Saturation metrics
   DB_POOL_UTILIZATION: "db.pool.utilization",

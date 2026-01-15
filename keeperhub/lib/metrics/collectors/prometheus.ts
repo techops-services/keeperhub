@@ -193,13 +193,6 @@ const aiDuration = getOrCreateHistogram(
   [500, 1000, 2000, 5000, 10_000, 20_000]
 );
 
-const externalServiceLatency = getOrCreateHistogram(
-  "keeperhub_external_service_latency_ms",
-  "External service call latency in milliseconds",
-  ["service", "status", "status_code"],
-  [50, 100, 250, 500, 1000, 2000, 5000]
-);
-
 // Traffic counters
 const pluginInvocations = getOrCreateCounter(
   "keeperhub_plugin_invocations_total",
@@ -218,12 +211,6 @@ const apiErrors = getOrCreateCounter(
   "keeperhub_api_errors_total",
   "API errors by status code",
   ["endpoint", "status_code", "error_type"]
-);
-
-const externalServiceErrors = getOrCreateCounter(
-  "keeperhub_external_service_errors_total",
-  "External service failures",
-  ["service", "plugin_name"]
 );
 
 const slowQueries = getOrCreateCounter(
@@ -413,7 +400,6 @@ const errorLabelAllowlist: Record<string, string[]> = {
   "workflow.step.errors": ["step_type", "error_type"],
   "plugin.action.errors": ["plugin_name", "action_name", "error_type"],
   "api.errors.total": ["endpoint", "status_code", "error_type"],
-  "external.service.errors": ["service", "plugin_name"],
 };
 
 /**
@@ -448,6 +434,8 @@ const dbSourcedMetrics = new Set([
   "workflow.executions.total",
   "workflow.execution.errors",
   "workflow.step.errors",
+  "workflow.queue.depth",
+  "workflow.concurrent.count",
 ]);
 
 const histogramMap: Record<string, Histogram> = {
@@ -455,7 +443,6 @@ const histogramMap: Record<string, Histogram> = {
   "api.status.latency_ms": statusLatency,
   "plugin.action.duration_ms": pluginDuration,
   "ai.generation.duration_ms": aiDuration,
-  "external.service.latency_ms": externalServiceLatency,
 };
 
 const counterMap: Record<string, Counter> = {
@@ -466,7 +453,6 @@ const counterMap: Record<string, Counter> = {
 const errorCounterMap: Record<string, Counter> = {
   "plugin.action.errors": pluginErrors,
   "api.errors.total": apiErrors,
-  "external.service.errors": externalServiceErrors,
 };
 
 const gaugeMap: Record<string, Gauge> = {

@@ -6,7 +6,6 @@ import {
   setMetricsCollector,
 } from "@/keeperhub/lib/metrics";
 import {
-  recordExternalServiceCall,
   recordPluginMetrics,
   withPluginMetrics,
 } from "@/keeperhub/lib/metrics/instrumentation/plugin";
@@ -83,30 +82,6 @@ describe("Plugin Metrics Instrumentation", () => {
       );
     });
 
-    it("should record external service error when service specified", () => {
-      recordPluginMetrics({
-        pluginName: "discord",
-        actionName: "send-message",
-        durationMs: 1000,
-        success: false,
-        error: "Discord API rate limited",
-        externalService: "discord-api",
-      });
-
-      expect(mockCollector.recordError).toHaveBeenCalledWith(
-        MetricNames.PLUGIN_ACTION_ERRORS,
-        { message: "Discord API rate limited" },
-        expect.any(Object)
-      );
-      expect(mockCollector.recordError).toHaveBeenCalledWith(
-        MetricNames.EXTERNAL_SERVICE_ERRORS,
-        { message: "Discord API rate limited" },
-        expect.objectContaining({
-          service: "discord-api",
-          plugin_name: "discord",
-        })
-      );
-    });
   });
 
   describe("withPluginMetrics", () => {
@@ -205,55 +180,6 @@ describe("Plugin Metrics Instrumentation", () => {
         expect.any(Number),
         expect.objectContaining({
           execution_id: "exec_456",
-        })
-      );
-    });
-  });
-
-  describe("recordExternalServiceCall", () => {
-    it("should record successful external service call", () => {
-      recordExternalServiceCall({
-        service: "discord-webhook",
-        durationMs: 120,
-        success: true,
-        statusCode: 200,
-      });
-
-      expect(mockCollector.recordLatency).toHaveBeenCalledWith(
-        "external.service.latency_ms",
-        120,
-        expect.objectContaining({
-          service: "discord-webhook",
-          status: "success",
-          status_code: "200",
-        })
-      );
-      expect(mockCollector.recordError).not.toHaveBeenCalled();
-    });
-
-    it("should record failed external service call with error", () => {
-      recordExternalServiceCall({
-        service: "sendgrid-api",
-        durationMs: 5000,
-        success: false,
-        statusCode: 503,
-        error: "Service unavailable",
-      });
-
-      expect(mockCollector.recordLatency).toHaveBeenCalledWith(
-        "external.service.latency_ms",
-        5000,
-        expect.objectContaining({
-          service: "sendgrid-api",
-          status: "failure",
-          status_code: "503",
-        })
-      );
-      expect(mockCollector.recordError).toHaveBeenCalledWith(
-        MetricNames.EXTERNAL_SERVICE_ERRORS,
-        { message: "Service unavailable" },
-        expect.objectContaining({
-          service: "sendgrid-api",
         })
       );
     });
