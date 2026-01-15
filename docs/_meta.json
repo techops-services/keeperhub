@@ -1,5 +1,5 @@
 {
-  "index": "Home",
+  "index": "Overview",
   "intro": "Introduction",
   "getting-started": "Getting Started",
   "keepers": "Nodes",
@@ -8,7 +8,33 @@
   "notifications": "Notifications",
   "wallet-management": "Wallet Management",
   "users-teams-orgs": "Users and Organizations",
-  "billing": "Billing & Pricing",
   "practices": "Best Practices",
-  "FAQ": "FAQ"
+  "FAQ": "FAQ",
+  "organization-guard-implementation": {
+    "display": "hidden"
+  },
+  "organization-implementation": {
+    "display": "hidden"
+  },
+  "organization-implementation-strategy": {
+    "display": "hidden"
+  },
+  "organization-wallet-execution": {
+    "display": "hidden"
+  },
+  "organizations_migration_handover": {
+    "display": "hidden"
+  },
+  "wallet-migration-todo": {
+    "display": "hidden"
+  },
+  "plans-features": {
+    "display": "hidden"
+  },
+  "api": {
+    "display": "hidden"
+  },
+  "billing": {
+    "display": "hidden"
+  }
 }
