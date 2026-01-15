@@ -98,17 +98,14 @@ export const MetricNames = {
 
   // Traffic metrics
   WORKFLOW_EXECUTIONS_TOTAL: "workflow.executions.total",
-  API_REQUESTS_TOTAL: "api.requests.total",
   PLUGIN_INVOCATIONS_TOTAL: "plugin.invocations.total",
   USER_ACTIVE_DAILY: "user.active.daily",
-  AI_TOKENS_CONSUMED: "ai.tokens.consumed",
 
   // Error metrics
   WORKFLOW_EXECUTION_ERRORS: "workflow.execution.errors",
   WORKFLOW_STEP_ERRORS: "workflow.step.errors",
   PLUGIN_ACTION_ERRORS: "plugin.action.errors",
   API_ERRORS_TOTAL: "api.errors.total",
-  EXTERNAL_SERVICE_ERRORS: "external.service.errors",
 
   // Saturation metrics
   DB_POOL_UTILIZATION: "db.pool.utilization",

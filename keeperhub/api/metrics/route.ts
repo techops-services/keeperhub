@@ -25,9 +25,12 @@ export async function GET(): Promise<NextResponse> {
 
   try {
     // Dynamic import to avoid loading prom-client when not needed
-    const { getPrometheusMetrics, getPrometheusContentType } = await import(
-      "@/keeperhub/lib/metrics/prometheus-api"
-    );
+    const { getPrometheusMetrics, getPrometheusContentType, updateDbMetrics } =
+      await import("@/keeperhub/lib/metrics/prometheus-api");
+
+    // Update DB-sourced metrics before collecting
+    // This ensures workflow execution metrics are fresh from the database
+    await updateDbMetrics();
 
     const metrics = await getPrometheusMetrics();
     const contentType = getPrometheusContentType();

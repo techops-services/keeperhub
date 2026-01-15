@@ -8,7 +8,6 @@ import {
 import {
   recordStatusPollMetrics,
   recordWebhookMetrics,
-  startApiMetrics,
 } from "@/keeperhub/lib/metrics/instrumentation/api";
 
 describe("API Metrics Instrumentation", () => {
@@ -30,115 +29,6 @@ describe("API Metrics Instrumentation", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     resetMetricsCollector();
-  });
-
-  describe("startApiMetrics", () => {
-    it("should increment request counter on complete with status_code", () => {
-      const { complete } = startApiMetrics({
-        endpoint: "/api/test",
-        method: "GET",
-      });
-
-      // Counter is NOT called on start (requires status_code)
-      expect(mockCollector.incrementCounter).not.toHaveBeenCalled();
-
-      complete(200);
-
-      // Counter is called on complete with endpoint and status_code
-      expect(mockCollector.incrementCounter).toHaveBeenCalledWith(
-        MetricNames.API_REQUESTS_TOTAL,
-        {
-          endpoint: "/api/test",
-          status_code: "200",
-        }
-      );
-    });
-
-    it("should record latency on complete", async () => {
-      const { complete } = startApiMetrics({ endpoint: "/api/test" });
-
-      // Simulate some processing time
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      complete(200);
-
-      expect(mockCollector.recordLatency).toHaveBeenCalledWith(
-        "api.request.latency_ms",
-        expect.any(Number),
-        expect.objectContaining({
-          endpoint: "/api/test",
-          status_code: "200",
-          status: "success",
-        })
-      );
-    });
-
-    it("should record latency with failure status for 4xx/5xx", () => {
-      const { complete } = startApiMetrics({ endpoint: "/api/test" });
-
-      complete(404);
-
-      expect(mockCollector.recordLatency).toHaveBeenCalledWith(
-        "api.request.latency_ms",
-        expect.any(Number),
-        expect.objectContaining({
-          status_code: "404",
-          status: "failure",
-        })
-      );
-    });
-
-    it("should record error on recordError call", () => {
-      const { recordError } = startApiMetrics({ endpoint: "/api/test" });
-
-      recordError("Something went wrong", 500);
-
-      expect(mockCollector.recordLatency).toHaveBeenCalledWith(
-        "api.request.latency_ms",
-        expect.any(Number),
-        expect.objectContaining({
-          status_code: "500",
-          status: "failure",
-        })
-      );
-
-      expect(mockCollector.recordError).toHaveBeenCalledWith(
-        MetricNames.API_ERRORS_TOTAL,
-        { message: "Something went wrong" },
-        expect.objectContaining({
-          endpoint: "/api/test",
-          status_code: "500",
-        })
-      );
-    });
-
-    it("should use webhook latency metric for webhook endpoints", () => {
-      const { complete } = startApiMetrics({
-        endpoint: "/api/workflows/123/webhook",
-      });
-
-      complete(200);
-
-      expect(mockCollector.recordLatency).toHaveBeenCalledWith(
-        MetricNames.API_WEBHOOK_LATENCY,
-        expect.any(Number),
-        expect.any(Object)
-      );
-    });
-
-    it("should use status latency metric for status endpoints", () => {
-      const { complete } = startApiMetrics({
-        endpoint: "/api/executions/123/status",
-      });
-
-      complete(200);
-
-      expect(mockCollector.recordLatency).toHaveBeenCalledWith(
-        MetricNames.API_STATUS_LATENCY,
-        expect.any(Number),
-        expect.any(Object)
-      );
-    });
   });
 
   describe("recordWebhookMetrics", () => {
