@@ -5,6 +5,7 @@ const {
 } = require("./core/process-handlers/process.js");
 const { fetchActiveWorkflows } = require("./core/utils/fetch-utils.js");
 const { logger } = require("./core/utils/logger.js");
+const { syncModule } = require("./core/synchronization/redis.js");
 
 /**
  * @type {Object.<string, { process: import('child_process').ChildProcess, event: KeeperEvent}>}
@@ -27,9 +28,20 @@ async function synchronizeData() {
       );
     }
 
-    removeExcessProcesses(workflows, childProcesses);
+    await removeExcessProcesses({
+      workflows,
+      childProcesses,
+      syncService: syncModule,
+      logger,
+    });
 
-    await handleActiveWorkflows(workflows, childProcesses, networks);
+    await handleActiveWorkflows({
+      workflows,
+      childProcesses,
+      networks,
+      syncService: syncModule,
+      logger,
+    });
   } catch (error) {
     logger.error(`Error during synchronization: ${error.message}`);
   }
