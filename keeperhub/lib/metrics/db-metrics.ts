@@ -92,6 +92,9 @@ export async function getWorkflowStatsFromDb(): Promise<WorkflowStats> {
         case "cancelled":
           stats.totalCancelled = row.count;
           break;
+        default:
+          // Ignore unknown status values
+          break;
       }
     }
 
@@ -163,6 +166,35 @@ export type StepStats = {
   durationCount: number;
 };
 
+// Helper to parse step duration buckets from query result
+function parseStepDurationBuckets(row: {
+  totalCount: number;
+  totalSum: number;
+  bucket0: number;
+  bucket1: number;
+  bucket2: number;
+  bucket3: number;
+  bucket4: number;
+  bucket5: number;
+  bucket6: number;
+}): { buckets: number[]; sum: number; count: number } {
+  const totalCount = Number(row.totalCount) || 0;
+  return {
+    count: totalCount,
+    sum: Number(row.totalSum) || 0,
+    buckets: [
+      Number(row.bucket0) || 0,
+      Number(row.bucket1) || 0,
+      Number(row.bucket2) || 0,
+      Number(row.bucket3) || 0,
+      Number(row.bucket4) || 0,
+      Number(row.bucket5) || 0,
+      Number(row.bucket6) || 0,
+      totalCount, // +Inf bucket = total count
+    ],
+  };
+}
+
 /**
  * Query step execution statistics from the database
  *
@@ -223,19 +255,10 @@ export async function getStepStatsFromDb(): Promise<StepStats> {
       );
 
     if (durationQuery[0]) {
-      const row = durationQuery[0];
-      stats.durationCount = Number(row.totalCount) || 0;
-      stats.durationSum = Number(row.totalSum) || 0;
-      stats.durationBuckets = [
-        Number(row.bucket0) || 0,
-        Number(row.bucket1) || 0,
-        Number(row.bucket2) || 0,
-        Number(row.bucket3) || 0,
-        Number(row.bucket4) || 0,
-        Number(row.bucket5) || 0,
-        Number(row.bucket6) || 0,
-        stats.durationCount, // +Inf bucket = total count
-      ];
+      const parsed = parseStepDurationBuckets(durationQuery[0]);
+      stats.durationCount = parsed.count;
+      stats.durationSum = parsed.sum;
+      stats.durationBuckets = parsed.buckets;
     }
 
     return stats;

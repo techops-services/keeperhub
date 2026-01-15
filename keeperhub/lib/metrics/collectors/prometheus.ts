@@ -33,13 +33,13 @@ if (!registry.getSingleMetric("keeperhub_process_cpu_seconds_total")) {
 }
 
 // Pre-defined label names for each metric
-const WORKFLOW_LABELS = [
+const _WORKFLOW_LABELS = [
   "workflow_id",
   "execution_id",
   "trigger_type",
   "status",
 ];
-const STEP_LABELS = ["execution_id", "step_type", "status"];
+const _STEP_LABELS = ["execution_id", "step_type", "status"];
 const _API_LABELS = ["endpoint", "status_code", "status"];
 const WEBHOOK_LABELS = ["workflow_id", "status_code", "status", "execution_id"];
 const PLUGIN_LABELS = ["plugin_name", "action_name", "execution_id", "status"];

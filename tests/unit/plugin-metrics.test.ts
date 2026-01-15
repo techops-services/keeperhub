@@ -81,7 +81,6 @@ describe("Plugin Metrics Instrumentation", () => {
         })
       );
     });
-
   });
 
   describe("withPluginMetrics", () => {
