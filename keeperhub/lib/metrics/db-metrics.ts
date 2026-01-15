@@ -12,15 +12,19 @@ import "server-only";
 import { and, count, countDistinct, eq, gte, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
+  apiKeys,
+  chains,
   integrations,
   invitation,
   member,
   organization,
+  paraWallets,
   sessions,
   users,
   workflowExecutionLogs,
   workflowExecutions,
   workflows,
+  workflowSchedules,
 } from "@/lib/db/schema";
 
 // Histogram bucket boundaries in milliseconds (must match prometheus.ts)
@@ -395,6 +399,194 @@ export async function getOrgStatsFromDb(): Promise<OrgStats> {
       membersByRole: {},
       invitationsPending: 0,
       withWorkflows: 0,
+    };
+  }
+}
+
+export type WorkflowDefinitionStats = {
+  total: number;
+  public: number;
+  private: number;
+  anonymous: number;
+};
+
+/**
+ * Query workflow definition statistics from the database
+ *
+ * Returns counts of workflows by visibility and anonymity.
+ */
+export async function getWorkflowDefinitionStatsFromDb(): Promise<WorkflowDefinitionStats> {
+  try {
+    const [totalResult, publicResult, anonymousResult] = await Promise.all([
+      db.select({ count: count() }).from(workflows),
+      db
+        .select({ count: count() })
+        .from(workflows)
+        .where(eq(workflows.visibility, "public")),
+      db
+        .select({ count: count() })
+        .from(workflows)
+        .where(eq(workflows.isAnonymous, true)),
+    ]);
+
+    const total = Number(totalResult[0]?.count) || 0;
+    const publicCount = Number(publicResult[0]?.count) || 0;
+
+    return {
+      total,
+      public: publicCount,
+      private: total - publicCount,
+      anonymous: Number(anonymousResult[0]?.count) || 0,
+    };
+  } catch (error) {
+    console.error("[Metrics] Failed to query workflow definition stats from DB:", error);
+    return { total: 0, public: 0, private: 0, anonymous: 0 };
+  }
+}
+
+export type ScheduleStats = {
+  total: number;
+  enabled: number;
+  disabled: number;
+  byLastStatus: Record<string, number>;
+};
+
+/**
+ * Query schedule statistics from the database
+ *
+ * Returns counts of schedules by enabled state and last run status.
+ */
+export async function getScheduleStatsFromDb(): Promise<ScheduleStats> {
+  try {
+    const [totalResult, enabledResult, statusResult] = await Promise.all([
+      db.select({ count: count() }).from(workflowSchedules),
+      db
+        .select({ count: count() })
+        .from(workflowSchedules)
+        .where(eq(workflowSchedules.enabled, true)),
+      db
+        .select({
+          status: workflowSchedules.lastStatus,
+          count: count(),
+        })
+        .from(workflowSchedules)
+        .where(sql`${workflowSchedules.lastStatus} IS NOT NULL`)
+        .groupBy(workflowSchedules.lastStatus),
+    ]);
+
+    const total = Number(totalResult[0]?.count) || 0;
+    const enabled = Number(enabledResult[0]?.count) || 0;
+
+    const byLastStatus: Record<string, number> = {};
+    for (const row of statusResult) {
+      if (row.status) {
+        byLastStatus[row.status] = row.count;
+      }
+    }
+
+    return {
+      total,
+      enabled,
+      disabled: total - enabled,
+      byLastStatus,
+    };
+  } catch (error) {
+    console.error("[Metrics] Failed to query schedule stats from DB:", error);
+    return { total: 0, enabled: 0, disabled: 0, byLastStatus: {} };
+  }
+}
+
+export type IntegrationStats = {
+  total: number;
+  managed: number;
+  byType: Record<string, number>;
+};
+
+/**
+ * Query integration statistics from the database
+ *
+ * Returns counts of integrations by type and managed status.
+ */
+export async function getIntegrationStatsFromDb(): Promise<IntegrationStats> {
+  try {
+    const [totalResult, managedResult, typeResult] = await Promise.all([
+      db.select({ count: count() }).from(integrations),
+      db
+        .select({ count: count() })
+        .from(integrations)
+        .where(eq(integrations.isManaged, true)),
+      db
+        .select({
+          type: integrations.type,
+          count: count(),
+        })
+        .from(integrations)
+        .groupBy(integrations.type),
+    ]);
+
+    const byType: Record<string, number> = {};
+    for (const row of typeResult) {
+      byType[row.type] = row.count;
+    }
+
+    return {
+      total: Number(totalResult[0]?.count) || 0,
+      managed: Number(managedResult[0]?.count) || 0,
+      byType,
+    };
+  } catch (error) {
+    console.error("[Metrics] Failed to query integration stats from DB:", error);
+    return { total: 0, managed: 0, byType: {} };
+  }
+}
+
+export type InfraStats = {
+  apiKeysTotal: number;
+  chainsTotal: number;
+  chainsEnabled: number;
+  paraWalletsTotal: number;
+  sessionsActive: number;
+};
+
+/**
+ * Query infrastructure statistics from the database
+ *
+ * Returns counts of API keys, chains, wallets, and active sessions.
+ */
+export async function getInfraStatsFromDb(): Promise<InfraStats> {
+  try {
+    const now = new Date();
+
+    const [apiKeysResult, chainsResult, chainsEnabledResult, walletsResult, sessionsResult] =
+      await Promise.all([
+        db.select({ count: count() }).from(apiKeys),
+        db.select({ count: count() }).from(chains),
+        db
+          .select({ count: count() })
+          .from(chains)
+          .where(eq(chains.isEnabled, true)),
+        db.select({ count: count() }).from(paraWallets),
+        db
+          .select({ count: count() })
+          .from(sessions)
+          .where(gte(sessions.expiresAt, now)),
+      ]);
+
+    return {
+      apiKeysTotal: Number(apiKeysResult[0]?.count) || 0,
+      chainsTotal: Number(chainsResult[0]?.count) || 0,
+      chainsEnabled: Number(chainsEnabledResult[0]?.count) || 0,
+      paraWalletsTotal: Number(walletsResult[0]?.count) || 0,
+      sessionsActive: Number(sessionsResult[0]?.count) || 0,
+    };
+  } catch (error) {
+    console.error("[Metrics] Failed to query infra stats from DB:", error);
+    return {
+      apiKeysTotal: 0,
+      chainsTotal: 0,
+      chainsEnabled: 0,
+      paraWalletsTotal: 0,
+      sessionsActive: 0,
     };
   }
 }
