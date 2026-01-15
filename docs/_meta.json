@@ -15,8 +15,5 @@
   },
   "api": {
     "display": "hidden"
-  },
-  "billing": {
-    "display": "hidden"
   }
 }
