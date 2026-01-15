@@ -14,7 +14,9 @@ ENV INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN}
 
 WORKDIR /worker
 
-COPY ./worker* .
+COPY package*.json ./
+COPY worker.js ./
+COPY ./src ./src
 
 RUN npm ci
 
