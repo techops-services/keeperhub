@@ -227,11 +227,11 @@ export {
   type NewSupportedToken,
   type OrganizationApiKey,
   type OrganizationToken,
-  type SupportedToken,
   organizationApiKeys,
   organizationTokens,
   type ParaWallet,
   paraWallets,
+  type SupportedToken,
   supportedTokens,
 } from "../../keeperhub/db/schema-extensions";
 

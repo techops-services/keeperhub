@@ -71,6 +71,13 @@
       "when": 1768361189370,
       "tag": "0009_petite_morlun",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1768449199165,
+      "tag": "0010_fat_nehzno",
+      "breakpoints": true
     }
   ]
 }

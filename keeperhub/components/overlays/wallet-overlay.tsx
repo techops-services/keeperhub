@@ -467,29 +467,6 @@ function CreateWalletForm({
 // Section Components
 // ============================================================================
 
-function WalletInfoSection({ walletData }: { walletData: WalletData }) {
-  return (
-    <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
-      <div>
-        <div className="mb-1 text-muted-foreground text-sm">Wallet Address</div>
-        <code className="break-all font-mono text-sm">
-          {walletData.walletAddress}
-        </code>
-      </div>
-      {walletData.email && (
-        <div>
-          <div className="mb-1 text-muted-foreground text-sm">
-            Associated Email
-          </div>
-          <code className="break-all font-mono text-sm">
-            {walletData.email}
-          </code>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function BalanceListSection({
   balances,
   chains,

@@ -281,10 +281,8 @@ export function TokenSelectField({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="supported">
-              Supported Tokens (Stablecoins)
-            </SelectItem>
-            <SelectItem value="custom">Custom Token Address</SelectItem>
+            <SelectItem value="supported">Stablecoins</SelectItem>
+            <SelectItem value="custom">Import Token Address</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -362,12 +360,12 @@ export function TokenSelectField({
                   onClick={() => handleTokenSelect(tokenId)}
                   type="button"
                 >
-                  <span className="font-medium">Supported:</span> {token.symbol}
+                  {token.symbol}
                   <X className="h-3 w-3 text-muted-foreground" />
                 </button>
               );
             })}
-            {/* Custom token badges */}
+            {/* Imported (custom) token badges */}
             {currentValue.customTokens.map((customToken) => (
               <button
                 className="flex items-center gap-1 rounded-full bg-orange-500/10 px-2 py-0.5 text-orange-700 text-xs hover:bg-orange-500/20 dark:text-orange-400"
@@ -376,8 +374,8 @@ export function TokenSelectField({
                 onClick={() => handleRemoveCustomToken(customToken.address)}
                 type="button"
               >
-                <span className="font-medium">Custom:</span>{" "}
-                {customToken.symbol}
+                {customToken.symbol}{" "}
+                <span className="text-orange-500/70">(imported)</span>
                 <X className="h-3 w-3 text-muted-foreground" />
               </button>
             ))}

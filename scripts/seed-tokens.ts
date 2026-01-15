@@ -20,7 +20,7 @@ import { ERC20_ABI } from "../lib/contracts";
 const LOGOS = {
   USDC: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
   USDT: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png",
-  DAI: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x6B175474E89094C44Da98b954EedeAC495271d0F/logo.png",
+  USDS: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdC035D45d973E3EC169d2276DDab16f1e407384F/logo.png",
 };
 
 // RPC URLs for each chain (using public endpoints for seeding)
@@ -62,8 +62,8 @@ const TOKEN_CONFIGS: TokenConfig[] = [
   },
   {
     chainId: 1,
-    tokenAddress: "0x6b175474e89094c44da98b954eedeac495271d0f", // DAI
-    logoUrl: LOGOS.DAI,
+    tokenAddress: "0xdc035d45d973e3ec169d2276ddab16f1e407384f", // USDS (Sky/MakerDAO)
+    logoUrl: LOGOS.USDS,
     isStablecoin: true,
     sortOrder: 3,
   },
@@ -85,13 +85,7 @@ const TOKEN_CONFIGS: TokenConfig[] = [
     isStablecoin: true,
     sortOrder: 2,
   },
-  {
-    chainId: 11_155_111,
-    tokenAddress: "0xff34b3d4aee8ddcd6f9afffb6fe49bd371b8a357", // DAI (Aave's Sepolia)
-    logoUrl: LOGOS.DAI,
-    isStablecoin: true,
-    sortOrder: 3,
-  },
+  // Note: USDS not yet deployed on Sepolia
 
   // ==========================================================================
   // Base Mainnet (chainId: 8453)
@@ -110,13 +104,7 @@ const TOKEN_CONFIGS: TokenConfig[] = [
     isStablecoin: true,
     sortOrder: 2,
   },
-  {
-    chainId: 8453,
-    tokenAddress: "0x50c5725949a6f0c72e6c4a641f24049a917db0cb", // DAI
-    logoUrl: LOGOS.DAI,
-    isStablecoin: true,
-    sortOrder: 3,
-  },
+  // Note: USDS not yet deployed on Base
 
   // ==========================================================================
   // Base Sepolia (chainId: 84532)
