@@ -155,6 +155,27 @@ env:
   FROM_ADDRESS:
     type: kv
     value: "noreply@keeperhub.com"
+  # Sentry
+  SENTRY_DSN:
+    type: parameterStore
+    name: sentry-dsn
+    parameter_name: /eks/maker-staging/keeperhub/sentry-dsn
+  NEXT_PUBLIC_SENTRY_DSN:
+    type: parameterStore
+    name: next-public-sentry-dsn
+    parameter_name: /eks/maker-staging/keeperhub/next-public-sentry-dsn
+  SENTRY_ORG:
+    type: parameterStore
+    name: sentry-org
+    parameter_name: /eks/maker-staging/keeperhub/sentry-org
+  SENTRY_PROJECT:
+    type: parameterStore
+    name: sentry-project
+    parameter_name: /eks/maker-staging/keeperhub/sentry-project
+  SENTRY_AUTH_TOKEN:
+    type: parameterStore
+    name: sentry-auth-token
+    parameter_name: /eks/maker-staging/keeperhub/sentry-auth-token
   # Feedback service (internal cluster communication)
   FEEDBACK_SERVICE_URL:
     type: kv
