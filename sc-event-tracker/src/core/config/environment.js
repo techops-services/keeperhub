@@ -4,7 +4,7 @@ const dotenv = require("dotenv");
 dotenv.config();
 
 const {
-  API_URL,
+  KEEPERHUB_API_URL,
   WORKER_URL,
   REDIS_HOST,
   REDIS_PORT,
@@ -14,7 +14,7 @@ const {
 } = process.env;
 
 module.exports = {
-  API_URL,
+  KEEPERHUB_API_URL,
   WORKER_URL,
   REDIS_HOST,
   REDIS_PORT,

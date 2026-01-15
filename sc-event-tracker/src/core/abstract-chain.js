@@ -3,7 +3,7 @@ const axios = require("axios");
 
 const { logger } = require("./utils/logger");
 const {
-  API_URL,
+  KEEPERHUB_API_URL,
   JWT_TOKEN_USERNAME,
   JWT_TOKEN_PASSWORD,
   WORKER_URL,
@@ -84,7 +84,7 @@ class AbstractChain {
     payload.append("username", JWT_TOKEN_USERNAME);
     payload.append("password", JWT_TOKEN_PASSWORD);
 
-    const { data } = await axios.post(`${API_URL}/auth/token`, payload, {
+    const { data } = await axios.post(`${KEEPERHUB_API_URL}/auth/token`, payload, {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
       },

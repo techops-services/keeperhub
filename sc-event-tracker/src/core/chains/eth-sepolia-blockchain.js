@@ -2,9 +2,8 @@
 const { ethers } = require("ethers");
 const { AbstractChain } = require("../abstract-chain.js");
 const { logger } = require("../utils/logger.js");
-const { ETHERSCAN_API_KEY } = require("../config/environment.js");
+const { ETHERSCAN_API_KEY, WORKER_URL } = require("../config/environment.js");
 const Redis = require("ioredis");
-const { WORKER_URL } = require("../config/environment.js");
 const axios = require("axios");
 
 class EthereumSepoliaBlockchain extends AbstractChain {
