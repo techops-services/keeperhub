@@ -606,6 +606,7 @@ export async function updateDbMetrics(): Promise<void> {
     workflowExecutionsTotal.set({ status: "error" }, workflowStats.totalError);
     workflowExecutionsTotal.set({ status: "running" }, workflowStats.totalRunning);
     workflowExecutionsTotal.set({ status: "pending" }, workflowStats.totalPending);
+    workflowExecutionsTotal.set({ status: "cancelled" }, workflowStats.totalCancelled);
 
     // Update workflow errors total
     workflowErrorsTotal.set(workflowStats.totalError);

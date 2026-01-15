@@ -10,8 +10,10 @@ Metrics are collected from two sources:
 
 | Source | Description | Metrics |
 |--------|-------------|---------|
-| **Database** | Queried from PostgreSQL on each Prometheus scrape. Required because workflow runner jobs exit before Prometheus can scrape them. | Workflow executions, steps, queue depth, concurrent count, daily active users, user stats, organization stats |
-| **API Process** | Recorded in-memory during request handling. Works normally as the API process is long-running. | API latency, webhook latency, AI generation, plugin actions |
+| **Database** | Queried from PostgreSQL on each Prometheus scrape. Required because workflow runner jobs exit before Prometheus can scrape them. | Workflow executions, steps, queue depth, concurrent count, daily active users, user stats, organization stats, workflow definitions, schedules, integrations, infrastructure |
+| **API Process** | Recorded in-memory during request handling. Works normally as the API process is long-running. | Webhook latency, status polling latency, AI generation duration, plugin action duration/errors |
+
+> **Note:** DB-sourced duration metrics (workflow/step) are exposed as Prometheus gauges with `_bucket/_sum/_count` suffixes to simulate histogram semantics. Standard `histogram_quantile()` queries work, but `# TYPE` will show `gauge` instead of `histogram`.
 
 ---
 
@@ -56,10 +58,8 @@ Counter/Gauge metrics tracking request/event counts.
 | Metric Name | Description | Labels | Unit | Source |
 |-------------|-------------|--------|------|--------|
 | `workflow.executions.total` | Total workflow executions | `status` | gauge | DB |
-| `api.requests.total` | Total API requests | `endpoint`, `status_code` | count | API |
 | `plugin.invocations.total` | Plugin action invocations | `plugin_name`, `action_name` | count | API |
 | `user.active.daily` | Daily active users (24h) | - | gauge | DB |
-| `ai.tokens.consumed` | AI token consumption | - | count | API |
 
 ---
 
@@ -72,8 +72,6 @@ Error metrics tracking failures and exceptions.
 | `workflow.execution.errors` | Failed workflow executions | - | < 5% | DB |
 | `workflow.step.errors` | Failed step executions | `step_type` | < 10% | DB |
 | `plugin.action.errors` | Failed plugin actions | `plugin_name`, `action_name`, `error_type` | < 20% | API |
-| `api.errors.total` | API errors by status code | `endpoint`, `status_code`, `error_type` | count | API |
-| `external.service.errors` | External service failures | `service`, `plugin_name` | count | API |
 
 ---
 
@@ -83,8 +81,6 @@ Gauge metrics tracking resource usage and capacity.
 
 | Metric Name | Description | Labels | Threshold | Source |
 |-------------|-------------|--------|-----------|--------|
-| `db.pool.utilization` | Database connection pool usage (%) | `active`, `max` | < 80% | API |
-| `db.query.slow_count` | Slow queries (>100ms) | `threshold`, `query_type` | < 10/min | API |
 | `workflow.queue.depth` | Pending workflow jobs | - | < 50 | DB |
 | `workflow.concurrent.count` | Concurrent workflow executions | - | gauge | DB |
 
@@ -161,7 +157,7 @@ Gauge metrics tracking user and organization statistics.
 | `plugin_name` | Plugin name | `discord`, `sendgrid`, `web3` |
 | `action_name` | Action name within plugin | `send-message`, `send-email` |
 | `trigger_type` | How workflow was triggered | `manual`, `webhook`, `scheduled` |
-| `status` | Execution status | `success`, `error`, `pending`, `running` |
+| `status` | Execution status | `success`, `error`, `pending`, `running`, `cancelled` |
 | `status_code` | HTTP status code | `200`, `400`, `500` |
 | `error_type` | Classification of error | `validation`, `timeout`, `external` |
 | `endpoint` | API endpoint path | `/api/workflows/webhook` |
@@ -179,10 +175,8 @@ Gauge metrics tracking user and organization statistics.
 |----------|------|-----------|
 | Core | `keeperhub/lib/metrics/index.ts` | `getMetricsCollector()`, `createTimer()`, `withMetrics()` |
 | DB Metrics | `keeperhub/lib/metrics/db-metrics.ts` | `getWorkflowStatsFromDb()`, `getStepStatsFromDb()`, `getDailyActiveUsersFromDb()`, `getUserStatsFromDb()`, `getOrgStatsFromDb()`, `getWorkflowDefinitionStatsFromDb()`, `getScheduleStatsFromDb()`, `getIntegrationStatsFromDb()`, `getInfraStatsFromDb()` |
-| Workflow | `keeperhub/lib/metrics/instrumentation/workflow.ts` | `recordWorkflowComplete()`, `recordStepMetrics()` |
 | API | `keeperhub/lib/metrics/instrumentation/api.ts` | `recordWebhookMetrics()`, `recordStatusPollMetrics()` |
-| Plugin | `keeperhub/lib/metrics/instrumentation/plugin.ts` | `withPluginMetrics()`, `recordExternalServiceCall()` |
-| Saturation | `keeperhub/lib/metrics/instrumentation/saturation.ts` | `withConcurrentTracking()`, `recordDbPoolUtilization()` |
+| Plugin | `keeperhub/lib/metrics/instrumentation/plugin.ts` | `withPluginMetrics()` |
 
 ---
 
@@ -283,15 +277,8 @@ Prometheus metrics are prefixed with `keeperhub_` and use snake_case:
 | `api.status.latency_ms` | `keeperhub_api_status_latency_ms` | histogram |
 | `plugin.action.duration_ms` | `keeperhub_plugin_action_duration_ms` | histogram |
 | `ai.generation.duration_ms` | `keeperhub_ai_generation_duration_ms` | histogram |
-| `external.service.latency_ms` | `keeperhub_external_service_latency_ms` | histogram |
-| `api.requests.total` | `keeperhub_api_requests_total` | counter |
 | `plugin.invocations.total` | `keeperhub_plugin_invocations_total` | counter |
-| `ai.tokens.consumed` | `keeperhub_ai_tokens_consumed_total` | counter |
 | `plugin.action.errors` | `keeperhub_plugin_action_errors_total` | counter |
-| `api.errors.total` | `keeperhub_api_errors_total` | counter |
-| `external.service.errors` | `keeperhub_external_service_errors_total` | counter |
-| `db.query.slow_count` | `keeperhub_db_query_slow_total` | counter |
-| `db.pool.utilization` | `keeperhub_db_pool_utilization_percent` | gauge |
 
 ### Default Node.js Metrics
 

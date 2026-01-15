@@ -37,6 +37,7 @@ export type WorkflowStats = {
   totalError: number;
   totalRunning: number;
   totalPending: number;
+  totalCancelled: number;
 
   // Duration histogram data (count of executions in each bucket)
   durationBuckets: number[];
@@ -66,6 +67,7 @@ export async function getWorkflowStatsFromDb(): Promise<WorkflowStats> {
       totalError: 0,
       totalRunning: 0,
       totalPending: 0,
+      totalCancelled: 0,
       durationBuckets: new Array(WORKFLOW_DURATION_BUCKETS.length + 1).fill(0),
       durationSum: 0,
       durationCount: 0,
@@ -84,6 +86,9 @@ export async function getWorkflowStatsFromDb(): Promise<WorkflowStats> {
           break;
         case "pending":
           stats.totalPending = row.count;
+          break;
+        case "cancelled":
+          stats.totalCancelled = row.count;
           break;
       }
     }
@@ -138,6 +143,7 @@ export async function getWorkflowStatsFromDb(): Promise<WorkflowStats> {
       totalError: 0,
       totalRunning: 0,
       totalPending: 0,
+      totalCancelled: 0,
       durationBuckets: new Array(WORKFLOW_DURATION_BUCKETS.length + 1).fill(0),
       durationSum: 0,
       durationCount: 0,
