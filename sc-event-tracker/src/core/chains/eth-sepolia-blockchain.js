@@ -96,13 +96,123 @@ class EthereumSepoliaBlockchain extends AbstractChain {
   }
 
   /**
+   * Extracts event arguments from a parsed log into an object.
+   *
+   * @param {*} parsedLog - The parsed log from ethers
+   * @param {Array} rawEventsAbi - The raw events ABI array
+   * @returns {Object} An object containing the event arguments
+   */
+  extractEventArgs(parsedLog, rawEventsAbi) {
+    const args = {};
+    if (!parsedLog.args || parsedLog.args.length === 0) {
+      return args;
+    }
+
+    const eventAbi = rawEventsAbi.find(
+      (event) => event.name === parsedLog.name
+    );
+    if (eventAbi?.inputs) {
+      eventAbi.inputs.forEach((input, index) => {
+        args[input.name || `arg${index}`] = parsedLog.args[index];
+      });
+    } else {
+      parsedLog.args.forEach((arg, index) => {
+        args[`arg${index}`] = arg;
+      });
+    }
+    return args;
+  }
+
+  /**
+   * Builds a payload object from a log and parsed log.
+   *
+   * @param {*} log - The raw log from the blockchain
+   * @param {*} parsedLog - The parsed log from ethers
+   * @param {Object} args - The extracted event arguments
+   * @returns {Object} The payload object
+   */
+  buildEventPayload(log, parsedLog, args) {
+    return {
+      eventName: parsedLog.name,
+      args,
+      blockNumber: log.blockNumber,
+      transactionHash: log.transactionHash,
+      blockHash: log.blockHash,
+      address: log.address,
+      logIndex: log.index,
+      transactionIndex: log.transactionIndex,
+    };
+  }
+
+  /**
+   * Handles a matched event by processing it and executing the workflow.
+   *
+   * @param {*} log - The raw log from the blockchain
+   * @param {*} parsedLog - The parsed log from ethers
+   * @param {Array} rawEventsAbi - The raw events ABI array
+   * @returns {Promise<void>}
+   */
+  async handleMatchedEvent(log, parsedLog, rawEventsAbi) {
+    const transactionHash = log.transactionHash;
+
+    if (await this.isTransactionProcessed(transactionHash)) {
+      console.log("Transaction already processed: ", transactionHash);
+      return;
+    }
+    await this.markTransactionProcessed(transactionHash);
+
+    const args = this.extractEventArgs(parsedLog, rawEventsAbi);
+    const payload = this.buildEventPayload(log, parsedLog, args);
+    const serializablePayload = this.convertBigIntToString(payload);
+
+    logger.log(
+      `Event matched ~ [ KeeperID: ${this.options.id} - ${this.options.name} ]`
+    );
+    logger.log(
+      `Executing workflow with payload: ${JSON.stringify(serializablePayload, null, 2)}`
+    );
+    await this.executeWorkflow(this.options.id, serializablePayload);
+  }
+
+  /**
+   * Processes a single event log.
+   *
+   * @param {*} log - The raw log from the blockchain
+   * @param {*} abiInterface - The ethers Interface instance
+   * @param {Array} rawEventsAbi - The raw events ABI array
+   * @returns {Promise<void>}
+   */
+  async processEventLog(log, abiInterface, rawEventsAbi) {
+    const timeoutInMs = Math.random() * 10 * 1000;
+    await new Promise((resolve) => setTimeout(resolve, timeoutInMs));
+
+    try {
+      const parsedLog = abiInterface.parseLog(log);
+      const { eventName } = this.options.workflow.node.data.config;
+
+      if (parsedLog.args && parsedLog.name === eventName) {
+        logger.log(`Event name ~ [ ${eventName} ]`);
+        console.log("Parsed log name", parsedLog.name);
+        await this.handleMatchedEvent(log, parsedLog, rawEventsAbi);
+      } else {
+        console.log("Event name mismatch / No args present");
+        console.log("parsedLog.name", parsedLog.name);
+        console.log("Expected eventName", eventName);
+      }
+    } catch (error) {
+      console.log(error);
+      logger.error(error);
+    }
+  }
+
+  /**
    * Listens for events emitted by the target Ethereum contract.
    *
    * Sets up an event filter for the target contract address and listens for logs
    * that match the specified event types from the ABI. When a log is received,
    * it parses the log using the ABI interface and triggers workflow execution.
    */
-  async listenEvent() {
+  listenEvent() {
     const formatDate = (date) =>
       date.toLocaleString("en-GB", {
         day: "2-digit",
@@ -153,74 +263,7 @@ class EthereumSepoliaBlockchain extends AbstractChain {
         // topics: log.topics.slice(1), // Additional indexed parameters
       });
 
-      const transactionHash = log.transactionHash;
-
-      const timeoutInMs = Math.random() * 10 * 1000;
-      await new Promise((resolve) => setTimeout(resolve, timeoutInMs));
-
-      try {
-        const parsedLog = abiInterface.parseLog(log);
-        const { eventName } = this.options.workflow.node.data.config;
-
-        if (parsedLog.args && parsedLog.name === eventName) {
-          logger.log(`Event name ~ [ ${eventName} ]`);
-          console.log("Parsed log name", parsedLog.name);
-
-          if (await this.isTransactionProcessed(transactionHash)) {
-            console.log("Transaction already processed: ", transactionHash);
-            return;
-          }
-          await this.markTransactionProcessed(transactionHash);
-
-          // Build payload with all event data
-          const args = {};
-          if (parsedLog.args && parsedLog.args.length > 0) {
-            // Dynamically extract all args from parsedLog.args
-            // parsedLog.args is an array, but we need to convert it to an object
-            // The args array contains the values in order
-            const eventAbi = rawEventsAbi.find(
-              (event) => event.name === parsedLog.name
-            );
-            if (eventAbi && eventAbi.inputs) {
-              eventAbi.inputs.forEach((input, index) => {
-                args[input.name || `arg${index}`] = parsedLog.args[index];
-              });
-            } else {
-              // Fallback: use index-based keys if ABI not found
-              parsedLog.args.forEach((arg, index) => {
-                args[`arg${index}`] = arg;
-              });
-            }
-          }
-
-          const payload = {
-            eventName: parsedLog.name,
-            args,
-            blockNumber: log.blockNumber,
-            transactionHash: log.transactionHash,
-            blockHash: log.blockHash,
-            address: log.address,
-            logIndex: log.index,
-            transactionIndex: log.transactionIndex,
-          };
-
-          // Convert BigInt values to strings for JSON serialization
-          const serializablePayload = this.convertBigIntToString(payload);
-
-          logger.log(
-            `Event matched ~ [ KeeperID: ${this.options.id} - ${this.options.name} ]`
-          );
-          logger.log(`Executing workflow with payload: ${JSON.stringify(serializablePayload, null, 2)}`);
-          await this.executeWorkflow(this.options.id, serializablePayload);
-        } else {
-          console.log("Event name mismatch / No args present");
-          console.log("parsedLog.name", parsedLog.name);
-          console.log("Expected eventName", eventName);
-        }
-      } catch (error) {
-        console.log(error);
-        logger.error(error);
-      }
+      await this.processEventLog(log, abiInterface, rawEventsAbi);
     });
   }
 
