@@ -11,7 +11,6 @@ RUN corepack enable pnpm && pnpm install
 
 # Rebuild the source code only when needed
 FROM base AS builder
-RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 
