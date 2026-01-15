@@ -1,3 +1,4 @@
+// start custom keeperhub code //
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
@@ -132,3 +133,5 @@ export async function GET(request: Request) {
     );
   }
 }
+
+// end custom keeperhub code //

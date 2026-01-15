@@ -1,13 +1,19 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import * as SwitchPrimitive from "@radix-ui/react-switch"
+// biome-ignore lint/performance/noNamespaceImport: Component is installed by default
+import * as SwitchPrimitive from "@radix-ui/react-switch";
+import {
+  type ComponentPropsWithoutRef,
+  type ElementRef,
+  forwardRef,
+} from "react";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
-const Switch = React.forwardRef<
-  React.ElementRef<typeof SwitchPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof SwitchPrimitive.Root>
+// biome-ignore lint/nursery/noReactForwardRef: Component is installed by default
+const Switch = forwardRef<
+  ElementRef<typeof SwitchPrimitive.Root>,
+  ComponentPropsWithoutRef<typeof SwitchPrimitive.Root>
 >(({ className, ...props }, ref) => (
   <SwitchPrimitive.Root
     className={cn(
@@ -23,7 +29,7 @@ const Switch = React.forwardRef<
       )}
     />
   </SwitchPrimitive.Root>
-))
-Switch.displayName = SwitchPrimitive.Root.displayName
+));
+Switch.displayName = SwitchPrimitive.Root.displayName;
 
-export { Switch }
+export { Switch };

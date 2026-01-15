@@ -181,7 +181,7 @@ function buildUpdateData(
     "nodes",
     "edges",
     "visibility",
-    "enabled",
+    "enabled", // keeperhub custom field //
   ];
   for (const field of fields) {
     if (body[field] !== undefined) {

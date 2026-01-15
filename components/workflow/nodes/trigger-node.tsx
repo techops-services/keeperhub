@@ -34,7 +34,7 @@ export const TriggerNode = memo(({ data, selected }: TriggerNodeProps) => {
     [WorkflowTriggerEnum.MANUAL]: Play,
     [WorkflowTriggerEnum.SCHEDULE]: Clock,
     [WorkflowTriggerEnum.WEBHOOK]: Webhook,
-    [WorkflowTriggerEnum.EVENT]: Boxes,
+    [WorkflowTriggerEnum.EVENT]: Boxes, // keeperhub custom field //
   };
 
   const TriggerIcon = triggerIcons[triggerType as WorkflowTriggerType] || Play;

@@ -33,9 +33,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Switch } from "@/components/ui/switch";
-// start custom keeperhub code //
 import { OrgSwitcher } from "@/keeperhub/components/organization/org-switcher";
+// start custom keeperhub code //
+import { Switch } from "@/keeperhub/components/ui/switch";
 import { api } from "@/lib/api-client";
 import { authClient, useSession } from "@/lib/auth-client";
 import { getCustomLogo } from "@/lib/extension-registry";
@@ -929,6 +929,7 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     }
   };
 
+  // start custom keeperhub code //
   const handleToggleEnabled = async (newEnabled: boolean) => {
     if (!currentWorkflowId) {
       return;
@@ -945,6 +946,7 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
       toast.error("Failed to update workflow state. Please try again.");
     }
   };
+  // end custom keeperhub code //
 
   const handleDuplicate = async () => {
     if (!currentWorkflowId) {
@@ -1142,6 +1144,7 @@ function ToolbarActions({
         )}
       </ButtonGroup>
 
+      {/* start custom keeperhub code // */}
       {state.nodes?.find((node) => node?.data?.type === "trigger")?.data?.config
         ?.triggerType === WorkflowTriggerEnum.EVENT && (
         <>
@@ -1161,6 +1164,7 @@ function ToolbarActions({
           </div>
         </>
       )}
+      {/* end custom keeperhub code // */}
 
       {/* Add Step - Desktop Horizontal */}
       <ButtonGroup className="hidden lg:flex" orientation="horizontal">

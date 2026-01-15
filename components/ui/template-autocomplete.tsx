@@ -169,6 +169,7 @@ const getCommonFields = (node: WorkflowNode) => {
     const triggerType = node.data.config?.triggerType as string | undefined;
     const webhookSchema = node.data.config?.webhookSchema as string | undefined;
 
+    // start custom keeperhub code //
     // Use keeperhub trigger output fields function for Event triggers
     if (triggerType === WorkflowTriggerEnum.EVENT) {
       const outputFields = getTriggerOutputFields(
@@ -179,6 +180,7 @@ const getCommonFields = (node: WorkflowNode) => {
         return outputFields;
       }
     }
+    // end custom keeperhub code //
 
     if (triggerType === "Webhook" && webhookSchema) {
       try {
@@ -191,6 +193,7 @@ const getCommonFields = (node: WorkflowNode) => {
       }
     }
 
+    // start custom keeperhub code //
     // Use keeperhub trigger output fields function for other trigger types
     if (triggerType) {
       const outputFields = getTriggerOutputFields(
@@ -201,6 +204,7 @@ const getCommonFields = (node: WorkflowNode) => {
         return outputFields;
       }
     }
+    // end custom keeperhub code //
 
     return [
       { field: "triggered", description: "Trigger status" },

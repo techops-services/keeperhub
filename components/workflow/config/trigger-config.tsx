@@ -75,12 +75,14 @@ export function TriggerConfig({
                 Webhook
               </div>
             </SelectItem>
+            {/* start custom keeperhub code // */}
             <SelectItem value="Event">
               <div className="flex items-center gap-2">
                 <Boxes className="h-4 w-4" />
                 Event
               </div>
             </SelectItem>
+            {/* end custom keeperhub code // */}
           </SelectContent>
         </Select>
       </div>
@@ -183,6 +185,7 @@ export function TriggerConfig({
         </>
       )}
 
+      {/* start custom keeperhub code // */}
       {/* Event fields */}
       {config?.triggerType === "Event" &&
         (() => {
@@ -244,6 +247,7 @@ export function TriggerConfig({
             />
           );
         })()}
+      {/* end custom keeperhub code // */}
     </>
   );
 }

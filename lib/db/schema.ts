@@ -133,7 +133,7 @@ export const workflows = pgTable("workflows", {
     .notNull()
     .default("private")
     .$type<WorkflowVisibility>(),
-  enabled: boolean("enabled").default(false).notNull(),
+  enabled: boolean("enabled").default(false).notNull(), // keeperhub custom field //
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
