@@ -555,7 +555,9 @@ export const prometheusMetricsCollector: MetricsCollector = {
 
 // start custom keeperhub code //
 // Duration histogram bucket boundaries in milliseconds
-const WORKFLOW_DURATION_BUCKETS = [100, 250, 500, 1000, 2000, 5000, 10_000, 30_000];
+const WORKFLOW_DURATION_BUCKETS = [
+  100, 250, 500, 1000, 2000, 5000, 10_000, 30_000,
+];
 const STEP_DURATION_BUCKETS = [50, 100, 250, 500, 1000, 2000, 5000];
 
 /**
@@ -601,11 +603,23 @@ export async function updateDbMetrics(): Promise<void> {
     ]);
 
     // Update workflow execution counts by status
-    workflowExecutionsTotal.set({ status: "success" }, workflowStats.totalSuccess);
+    workflowExecutionsTotal.set(
+      { status: "success" },
+      workflowStats.totalSuccess
+    );
     workflowExecutionsTotal.set({ status: "error" }, workflowStats.totalError);
-    workflowExecutionsTotal.set({ status: "running" }, workflowStats.totalRunning);
-    workflowExecutionsTotal.set({ status: "pending" }, workflowStats.totalPending);
-    workflowExecutionsTotal.set({ status: "cancelled" }, workflowStats.totalCancelled);
+    workflowExecutionsTotal.set(
+      { status: "running" },
+      workflowStats.totalRunning
+    );
+    workflowExecutionsTotal.set(
+      { status: "pending" },
+      workflowStats.totalPending
+    );
+    workflowExecutionsTotal.set(
+      { status: "cancelled" },
+      workflowStats.totalCancelled
+    );
 
     // Update workflow errors total
     workflowErrorsTotal.set(workflowStats.totalError);
@@ -689,7 +703,10 @@ export async function updateDbMetrics(): Promise<void> {
     // Update workflow definition metrics from DB
     workflowTotal.set(workflowDefStats.total);
     workflowByVisibility.set({ visibility: "public" }, workflowDefStats.public);
-    workflowByVisibility.set({ visibility: "private" }, workflowDefStats.private);
+    workflowByVisibility.set(
+      { visibility: "private" },
+      workflowDefStats.private
+    );
     workflowAnonymous.set(workflowDefStats.anonymous);
 
     // Update schedule metrics from DB

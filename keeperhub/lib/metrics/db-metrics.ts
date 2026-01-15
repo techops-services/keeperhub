@@ -23,12 +23,14 @@ import {
   users,
   workflowExecutionLogs,
   workflowExecutions,
-  workflows,
   workflowSchedules,
+  workflows,
 } from "@/lib/db/schema";
 
 // Histogram bucket boundaries in milliseconds (must match prometheus.ts)
-const WORKFLOW_DURATION_BUCKETS = [100, 250, 500, 1000, 2000, 5000, 10_000, 30_000];
+const WORKFLOW_DURATION_BUCKETS = [
+  100, 250, 500, 1000, 2000, 5000, 10_000, 30_000,
+];
 const STEP_DURATION_BUCKETS = [50, 100, 250, 500, 1000, 2000, 5000];
 
 export type WorkflowStats = {
@@ -272,7 +274,10 @@ export async function getDailyActiveUsersFromDb(): Promise<number> {
 
     return Number(result[0]?.count) || 0;
   } catch (error) {
-    console.error("[Metrics] Failed to query daily active users from DB:", error);
+    console.error(
+      "[Metrics] Failed to query daily active users from DB:",
+      error
+    );
     return 0;
   }
 }
@@ -301,7 +306,9 @@ export async function getUserStatsFromDb(): Promise<UserStats> {
       withIntegrationsResult,
     ] = await Promise.all([
       // Total users
-      db.select({ count: count() }).from(users),
+      db
+        .select({ count: count() })
+        .from(users),
       // Verified users
       db
         .select({ count: count() })
@@ -313,7 +320,9 @@ export async function getUserStatsFromDb(): Promise<UserStats> {
         .from(users)
         .where(eq(users.isAnonymous, true)),
       // Users with at least one workflow
-      db.select({ count: countDistinct(workflows.userId) }).from(workflows),
+      db
+        .select({ count: countDistinct(workflows.userId) })
+        .from(workflows),
       // Users with at least one integration
       db
         .select({ count: countDistinct(integrations.userId) })
@@ -362,9 +371,13 @@ export async function getOrgStatsFromDb(): Promise<OrgStats> {
       withWorkflowsResult,
     ] = await Promise.all([
       // Total organizations
-      db.select({ count: count() }).from(organization),
+      db
+        .select({ count: count() })
+        .from(organization),
       // Total members across all orgs
-      db.select({ count: count() }).from(member),
+      db
+        .select({ count: count() })
+        .from(member),
       // Members grouped by role
       db
         .select({
@@ -445,7 +458,10 @@ export async function getWorkflowDefinitionStatsFromDb(): Promise<WorkflowDefini
       anonymous: Number(anonymousResult[0]?.count) || 0,
     };
   } catch (error) {
-    console.error("[Metrics] Failed to query workflow definition stats from DB:", error);
+    console.error(
+      "[Metrics] Failed to query workflow definition stats from DB:",
+      error
+    );
     return { total: 0, public: 0, private: 0, anonymous: 0 };
   }
 }
@@ -541,7 +557,10 @@ export async function getIntegrationStatsFromDb(): Promise<IntegrationStats> {
       byType,
     };
   } catch (error) {
-    console.error("[Metrics] Failed to query integration stats from DB:", error);
+    console.error(
+      "[Metrics] Failed to query integration stats from DB:",
+      error
+    );
     return { total: 0, managed: 0, byType: {} };
   }
 }
@@ -563,20 +582,25 @@ export async function getInfraStatsFromDb(): Promise<InfraStats> {
   try {
     const now = new Date();
 
-    const [apiKeysResult, chainsResult, chainsEnabledResult, walletsResult, sessionsResult] =
-      await Promise.all([
-        db.select({ count: count() }).from(apiKeys),
-        db.select({ count: count() }).from(chains),
-        db
-          .select({ count: count() })
-          .from(chains)
-          .where(eq(chains.isEnabled, true)),
-        db.select({ count: count() }).from(paraWallets),
-        db
-          .select({ count: count() })
-          .from(sessions)
-          .where(gte(sessions.expiresAt, now)),
-      ]);
+    const [
+      apiKeysResult,
+      chainsResult,
+      chainsEnabledResult,
+      walletsResult,
+      sessionsResult,
+    ] = await Promise.all([
+      db.select({ count: count() }).from(apiKeys),
+      db.select({ count: count() }).from(chains),
+      db
+        .select({ count: count() })
+        .from(chains)
+        .where(eq(chains.isEnabled, true)),
+      db.select({ count: count() }).from(paraWallets),
+      db
+        .select({ count: count() })
+        .from(sessions)
+        .where(gte(sessions.expiresAt, now)),
+    ]);
 
     return {
       apiKeysTotal: Number(apiKeysResult[0]?.count) || 0,
