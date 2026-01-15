@@ -331,6 +331,94 @@ const orgWithWorkflows = getOrCreateGauge(
   []
 );
 
+// Workflow definition metrics (DB-sourced)
+const workflowTotal = getOrCreateGauge(
+  "keeperhub_workflow_total",
+  "Total workflow definitions",
+  []
+);
+
+const workflowByVisibility = getOrCreateGauge(
+  "keeperhub_workflow_by_visibility",
+  "Workflows by visibility",
+  ["visibility"]
+);
+
+const workflowAnonymous = getOrCreateGauge(
+  "keeperhub_workflow_anonymous_total",
+  "Anonymous workflows",
+  []
+);
+
+// Schedule metrics (DB-sourced)
+const scheduleTotal = getOrCreateGauge(
+  "keeperhub_schedule_total",
+  "Total workflow schedules",
+  []
+);
+
+const scheduleEnabled = getOrCreateGauge(
+  "keeperhub_schedule_enabled_total",
+  "Enabled workflow schedules",
+  []
+);
+
+const scheduleByLastStatus = getOrCreateGauge(
+  "keeperhub_schedule_by_last_status",
+  "Schedules by last run status",
+  ["status"]
+);
+
+// Integration metrics (DB-sourced)
+const integrationTotal = getOrCreateGauge(
+  "keeperhub_integration_total",
+  "Total integrations",
+  []
+);
+
+const integrationManaged = getOrCreateGauge(
+  "keeperhub_integration_managed_total",
+  "OAuth-managed integrations",
+  []
+);
+
+const integrationByType = getOrCreateGauge(
+  "keeperhub_integration_by_type",
+  "Integrations by type",
+  ["type"]
+);
+
+// Infrastructure metrics (DB-sourced)
+const apiKeyTotal = getOrCreateGauge(
+  "keeperhub_apikey_total",
+  "Total API keys",
+  []
+);
+
+const chainTotal = getOrCreateGauge(
+  "keeperhub_chain_total",
+  "Total blockchain networks configured",
+  []
+);
+
+const chainEnabled = getOrCreateGauge(
+  "keeperhub_chain_enabled_total",
+  "Enabled blockchain networks",
+  []
+);
+
+const paraWalletTotal = getOrCreateGauge(
+  "keeperhub_para_wallet_total",
+  "Total Para wallets",
+  []
+);
+
+const sessionActive = getOrCreateGauge(
+  "keeperhub_session_active_total",
+  "Active (non-expired) sessions",
+  []
+);
+
 // Allowed labels per error metric (must match counter definitions)
 const errorLabelAllowlist: Record<string, string[]> = {
   "workflow.execution.errors": ["workflow_id", "trigger_type", "error_type"],
@@ -486,13 +574,31 @@ export async function updateDbMetrics(): Promise<void> {
       getDailyActiveUsersFromDb,
       getUserStatsFromDb,
       getOrgStatsFromDb,
+      getWorkflowDefinitionStatsFromDb,
+      getScheduleStatsFromDb,
+      getIntegrationStatsFromDb,
+      getInfraStatsFromDb,
     } = await import("../db-metrics");
-    const [workflowStats, stepStats, dailyActiveUsers, userStats, orgStats] = await Promise.all([
+    const [
+      workflowStats,
+      stepStats,
+      dailyActiveUsers,
+      userStats,
+      orgStats,
+      workflowDefStats,
+      scheduleStats,
+      integrationStats,
+      infraStats,
+    ] = await Promise.all([
       getWorkflowStatsFromDb(),
       getStepStatsFromDb(),
       getDailyActiveUsersFromDb(),
       getUserStatsFromDb(),
       getOrgStatsFromDb(),
+      getWorkflowDefinitionStatsFromDb(),
+      getScheduleStatsFromDb(),
+      getIntegrationStatsFromDb(),
+      getInfraStatsFromDb(),
     ]);
 
     // Update workflow execution counts by status
@@ -574,6 +680,33 @@ export async function updateDbMetrics(): Promise<void> {
     }
     orgInvitationsPending.set(orgStats.invitationsPending);
     orgWithWorkflows.set(orgStats.withWorkflows);
+
+    // Update workflow definition metrics from DB
+    workflowTotal.set(workflowDefStats.total);
+    workflowByVisibility.set({ visibility: "public" }, workflowDefStats.public);
+    workflowByVisibility.set({ visibility: "private" }, workflowDefStats.private);
+    workflowAnonymous.set(workflowDefStats.anonymous);
+
+    // Update schedule metrics from DB
+    scheduleTotal.set(scheduleStats.total);
+    scheduleEnabled.set(scheduleStats.enabled);
+    for (const [status, count] of Object.entries(scheduleStats.byLastStatus)) {
+      scheduleByLastStatus.set({ status }, count);
+    }
+
+    // Update integration metrics from DB
+    integrationTotal.set(integrationStats.total);
+    integrationManaged.set(integrationStats.managed);
+    for (const [type, count] of Object.entries(integrationStats.byType)) {
+      integrationByType.set({ type }, count);
+    }
+
+    // Update infrastructure metrics from DB
+    apiKeyTotal.set(infraStats.apiKeysTotal);
+    chainTotal.set(infraStats.chainsTotal);
+    chainEnabled.set(infraStats.chainsEnabled);
+    paraWalletTotal.set(infraStats.paraWalletsTotal);
+    sessionActive.set(infraStats.sessionsActive);
   } catch (error) {
     console.error("[Prometheus] Failed to update DB metrics:", error);
     // Don't throw - allow other metrics to still be returned
