@@ -1,5 +1,7 @@
 "use client";
 
+import { Plus, RefreshCw, Trash2 } from "lucide-react";
+import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Overlay } from "@/components/overlays/overlay";
@@ -7,28 +9,626 @@ import { useOverlay } from "@/components/overlays/overlay-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { useActiveMember } from "@/keeperhub/lib/hooks/use-organization";
+import { fetchAllSupportedTokenBalances } from "@/keeperhub/lib/wallet/fetch-balances";
+import type {
+  ChainBalance,
+  ChainData,
+  SupportedToken,
+  SupportedTokenBalance,
+  TokenBalance,
+  TokenData,
+  WalletData,
+} from "@/keeperhub/lib/wallet/types";
+import { useWalletBalances } from "@/keeperhub/lib/wallet/use-wallet-balances";
 import { useSession } from "@/lib/auth-client";
 
 type WalletOverlayProps = {
   overlayId: string;
 };
 
-type WalletData = {
-  hasWallet: boolean;
-  walletAddress?: string;
-  walletId?: string;
-  email?: string;
-  createdAt?: string;
-};
+// ============================================================================
+// Balance Display Components
+// ============================================================================
 
-type ChainBalance = {
-  chain: string;
-  balance: string;
-  loading: boolean;
-  error?: string;
-};
+function TokenBalanceDisplay({ token }: { token: TokenBalance }) {
+  if (token.loading) {
+    return <div className="text-muted-foreground text-xs">Loading...</div>;
+  }
+  if (token.error) {
+    return <div className="text-destructive text-xs">{token.error}</div>;
+  }
+  return (
+    <div className="text-muted-foreground text-xs">
+      {token.balance} {token.symbol}
+    </div>
+  );
+}
+
+function ChainBalanceDisplay({ balance }: { balance: ChainBalance }) {
+  if (balance.loading) {
+    return <div className="mt-1 text-muted-foreground text-xs">Loading...</div>;
+  }
+  if (balance.error) {
+    return <div className="mt-1 text-destructive text-xs">{balance.error}</div>;
+  }
+  return (
+    <div className="mt-1 text-muted-foreground text-xs">
+      {balance.balance} {balance.symbol}
+    </div>
+  );
+}
+
+// Component for editing wallet email
+function WalletEmailEditor({
+  currentEmail,
+  isAdmin,
+  onEmailUpdated,
+}: {
+  currentEmail: string;
+  isAdmin: boolean;
+  onEmailUpdated: () => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [updating, setUpdating] = useState(false);
+
+  const handleUpdate = async () => {
+    if (!newEmail) {
+      toast.error("Email is required");
+      return;
+    }
+
+    setUpdating(true);
+    try {
+      const response = await fetch("/api/user/wallet", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: newEmail }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update email");
+      }
+
+      toast.success("Wallet email updated successfully!");
+      setIsEditing(false);
+      setNewEmail("");
+      onEmailUpdated();
+    } catch (error) {
+      console.error("Failed to update wallet email:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update email"
+      );
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const startEditing = () => {
+    setNewEmail(currentEmail);
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setNewEmail("");
+  };
+
+  return (
+    <div>
+      <div className="mb-1 text-muted-foreground text-sm">Associated Email</div>
+      {isEditing ? (
+        <div className="space-y-2">
+          <Input
+            className="font-mono text-sm"
+            disabled={updating}
+            onChange={(e) => setNewEmail(e.target.value)}
+            placeholder="newemail@example.com"
+            type="email"
+            value={newEmail}
+          />
+          <div className="flex gap-2">
+            <Button
+              disabled={updating}
+              onClick={cancelEditing}
+              size="sm"
+              variant="outline"
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={updating || !newEmail || newEmail === currentEmail}
+              onClick={handleUpdate}
+              size="sm"
+            >
+              {updating ? (
+                <>
+                  <Spinner className="mr-2 h-3 w-3" />
+                  Saving...
+                </>
+              ) : (
+                "Save"
+              )}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <code className="break-all font-mono text-sm">{currentEmail}</code>
+          {isAdmin && (
+            <Button
+              className="h-6 px-2 text-xs"
+              onClick={startEditing}
+              size="sm"
+              variant="ghost"
+            >
+              Edit
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SupportedTokenBalanceDisplay({
+  token,
+}: {
+  token: SupportedTokenBalance;
+}) {
+  const renderBalance = () => {
+    if (token.loading) {
+      return <Spinner className="h-3 w-3" />;
+    }
+    if (token.error) {
+      return <span className="text-destructive">{token.error}</span>;
+    }
+    return `${token.balance} ${token.symbol}`;
+  };
+
+  return (
+    <div className="flex items-center gap-2 py-1">
+      {token.logoUrl && (
+        <Image
+          alt={token.symbol}
+          className="h-4 w-4 rounded-full"
+          height={16}
+          src={token.logoUrl}
+          width={16}
+        />
+      )}
+      <span className="font-medium text-xs">{token.symbol}</span>
+      <span className="ml-auto text-muted-foreground text-xs">
+        {renderBalance()}
+      </span>
+    </div>
+  );
+}
+
+function ChainBalanceItem({
+  balance,
+  isAdmin,
+  onRemoveToken,
+  supportedTokenBalances,
+  tokenBalances,
+}: {
+  balance: ChainBalance;
+  isAdmin: boolean;
+  onRemoveToken: (tokenId: string, symbol: string) => void;
+  supportedTokenBalances: SupportedTokenBalance[];
+  tokenBalances: TokenBalance[];
+}) {
+  const chainTokens = tokenBalances.filter(
+    (t) => t.chainId === balance.chainId
+  );
+  const chainSupportedTokens = supportedTokenBalances.filter(
+    (t) => t.chainId === balance.chainId
+  );
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between rounded-lg border bg-muted/50 p-3">
+        <div className="flex-1">
+          <div className="font-medium text-sm">{balance.name}</div>
+          <ChainBalanceDisplay balance={balance} />
+        </div>
+      </div>
+      {/* Supported Token Balances (Stablecoins) */}
+      {chainSupportedTokens.length > 0 && (
+        <div className="ml-4">
+          <div className="mb-1 font-medium text-muted-foreground text-xs">
+            Stablecoins
+          </div>
+          <div className="rounded border bg-background/50 px-2 py-1">
+            {chainSupportedTokens.map((token) => (
+              <SupportedTokenBalanceDisplay
+                key={`${token.chainId}-${token.tokenAddress}`}
+                token={token}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+      {/* Custom Tracked Tokens */}
+      {chainTokens.length > 0 && (
+        <div className="ml-4 space-y-1">
+          <div className="font-medium text-muted-foreground text-xs">
+            Tracked Tokens
+          </div>
+          {chainTokens.map((token) => (
+            <div
+              className="flex items-center justify-between rounded border bg-background p-2"
+              key={token.tokenId}
+            >
+              <div className="flex-1">
+                <div className="font-medium text-xs">{token.symbol}</div>
+                <TokenBalanceDisplay token={token} />
+              </div>
+              {isAdmin && (
+                <Button
+                  className="h-6 w-6"
+                  onClick={() => onRemoveToken(token.tokenId, token.symbol)}
+                  size="icon"
+                  variant="ghost"
+                >
+                  <Trash2 className="h-3 w-3 text-muted-foreground" />
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// Form Components
+// ============================================================================
+
+function AddTokenForm({
+  chains,
+  onAdd,
+  onCancel,
+}: {
+  chains: ChainData[];
+  onAdd: (chainId: number, tokenAddress: string) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [chainId, setChainId] = useState<number | null>(null);
+  const [tokenAddress, setTokenAddress] = useState("");
+  const [adding, setAdding] = useState(false);
+
+  const handleAdd = async () => {
+    if (!(chainId && tokenAddress)) {
+      toast.error("Please select a chain and enter a token address");
+      return;
+    }
+    setAdding(true);
+    try {
+      await onAdd(chainId, tokenAddress);
+      setChainId(null);
+      setTokenAddress("");
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="space-y-2">
+        <Label>Chain</Label>
+        <Select
+          onValueChange={(value) => setChainId(Number.parseInt(value, 10))}
+          value={chainId?.toString() ?? ""}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select chain" />
+          </SelectTrigger>
+          <SelectContent>
+            {chains.map((chain) => (
+              <SelectItem key={chain.chainId} value={chain.chainId.toString()}>
+                {chain.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <Label>Token Address</Label>
+        <Input
+          disabled={adding}
+          onChange={(e) => setTokenAddress(e.target.value)}
+          placeholder="0x..."
+          value={tokenAddress}
+        />
+      </div>
+      <div className="flex gap-2">
+        <Button
+          className="flex-1"
+          disabled={adding}
+          onClick={onCancel}
+          variant="outline"
+        >
+          Cancel
+        </Button>
+        <Button
+          className="flex-1"
+          disabled={adding || !chainId || !tokenAddress}
+          onClick={handleAdd}
+        >
+          {adding ? (
+            <>
+              <Spinner className="mr-2 h-4 w-4" />
+              Adding...
+            </>
+          ) : (
+            "Add Token"
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function CreateWalletForm({
+  initialEmail,
+  onCancel,
+  onSubmit,
+}: {
+  initialEmail: string;
+  onCancel: () => void;
+  onSubmit: (email: string) => Promise<void>;
+}) {
+  const [email, setEmail] = useState(initialEmail);
+  const [creating, setCreating] = useState(false);
+
+  const handleCreate = async () => {
+    if (!email) {
+      toast.error("Email is required");
+      return;
+    }
+    setCreating(true);
+    try {
+      await onSubmit(email);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
+        <div>
+          <h3 className="mb-2 font-medium text-sm">
+            Create Organization Wallet
+          </h3>
+          <p className="mb-4 text-muted-foreground text-xs">
+            This wallet will be shared by all members of your organization. Only
+            admins and owners can manage it.
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="wallet-email">Email Address</Label>
+          <Input
+            disabled={creating}
+            id="wallet-email"
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            type="email"
+            value={email}
+          />
+          <p className="text-muted-foreground text-xs">
+            This email will be associated with the organization's wallet for
+            identification purposes.
+          </p>
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <Button
+          className="flex-1"
+          disabled={creating}
+          onClick={onCancel}
+          variant="outline"
+        >
+          Cancel
+        </Button>
+        <Button
+          className="flex-1"
+          disabled={creating || !email}
+          onClick={handleCreate}
+        >
+          {creating ? (
+            <>
+              <Spinner className="mr-2 h-4 w-4" />
+              Creating...
+            </>
+          ) : (
+            "Create Wallet"
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Section Components
+// ============================================================================
+
+function BalanceListSection({
+  balances,
+  chains,
+  isAdmin,
+  onAddToken,
+  onRefresh,
+  onRemoveToken,
+  refreshing,
+  showAddToken,
+  setShowAddToken,
+  supportedTokenBalances,
+  tokenBalances,
+}: {
+  balances: ChainBalance[];
+  chains: ChainData[];
+  isAdmin: boolean;
+  onAddToken: (chainId: number, tokenAddress: string) => Promise<void>;
+  onRefresh: () => void;
+  onRemoveToken: (tokenId: string, symbol: string) => void;
+  refreshing: boolean;
+  showAddToken: boolean;
+  setShowAddToken: (show: boolean) => void;
+  supportedTokenBalances: SupportedTokenBalance[];
+  tokenBalances: TokenBalance[];
+}) {
+  const [showTestnets, setShowTestnets] = useState(false);
+  const filteredBalances = balances.filter((b) =>
+    showTestnets ? b.isTestnet : !b.isTestnet
+  );
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="font-medium text-sm">Balances</h3>
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-md border">
+            <Button
+              className="h-7 rounded-r-none border-0 px-3 text-xs"
+              onClick={() => setShowTestnets(false)}
+              size="sm"
+              variant={showTestnets ? "ghost" : "default"}
+            >
+              Mainnets
+            </Button>
+            <Button
+              className="h-7 rounded-l-none border-0 px-3 text-xs"
+              onClick={() => setShowTestnets(true)}
+              size="sm"
+              variant={showTestnets ? "default" : "ghost"}
+            >
+              Testnets
+            </Button>
+          </div>
+          <Button
+            disabled={refreshing}
+            onClick={onRefresh}
+            size="sm"
+            variant="ghost"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+            />
+          </Button>
+        </div>
+      </div>
+
+      {balances.length === 0 ? (
+        <div className="text-muted-foreground text-sm">Loading chains...</div>
+      ) : (
+        <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+          {filteredBalances.map((balance) => (
+            <ChainBalanceItem
+              balance={balance}
+              isAdmin={isAdmin}
+              key={balance.chainId}
+              onRemoveToken={onRemoveToken}
+              supportedTokenBalances={supportedTokenBalances}
+              tokenBalances={tokenBalances}
+            />
+          ))}
+          {filteredBalances.length === 0 && (
+            <div className="py-4 text-center text-muted-foreground text-sm">
+              No {showTestnets ? "testnet" : "mainnet"} chains available
+            </div>
+          )}
+        </div>
+      )}
+
+      {isAdmin && (
+        <div className="mt-4 border-t pt-4">
+          {showAddToken ? (
+            <AddTokenForm
+              chains={chains}
+              onAdd={onAddToken}
+              onCancel={() => setShowAddToken(false)}
+            />
+          ) : (
+            <Button
+              className="w-full"
+              onClick={() => setShowAddToken(true)}
+              variant="outline"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Token
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NoWalletSection({
+  isAdmin,
+  initialEmail,
+  onCreateWallet,
+}: {
+  isAdmin: boolean;
+  initialEmail: string;
+  onCreateWallet: (email: string) => Promise<void>;
+}) {
+  const [showCreateForm, setShowCreateForm] = useState(false);
+
+  if (!isAdmin) {
+    return (
+      <div className="rounded-lg border bg-muted/50 p-4">
+        <p className="text-muted-foreground text-sm">
+          No wallet found for this organization. Only organization admins and
+          owners can create wallets.
+        </p>
+      </div>
+    );
+  }
+
+  if (showCreateForm) {
+    return (
+      <CreateWalletForm
+        initialEmail={initialEmail}
+        onCancel={() => setShowCreateForm(false)}
+        onSubmit={onCreateWallet}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border bg-muted/50 p-4">
+        <p className="text-muted-foreground text-sm">
+          No wallet found for this organization. Create a wallet to use Web3
+          features in your workflows.
+        </p>
+      </div>
+      <Button className="w-full" onClick={() => setShowCreateForm(true)}>
+        Create Organization Wallet
+      </Button>
+    </div>
+  );
+}
+
+// ============================================================================
+// Main Component
+// ============================================================================
 
 // Component for editing wallet email
 function WalletEmailEditor({
@@ -152,141 +752,215 @@ export function WalletOverlay({ overlayId }: WalletOverlayProps) {
 
   const [walletLoading, setWalletLoading] = useState(true);
   const [walletData, setWalletData] = useState<WalletData | null>(null);
-  const [balances, setBalances] = useState<ChainBalance[]>([
-    { chain: "mainnet", balance: "0", loading: true },
-    { chain: "sepolia", balance: "0", loading: true },
-  ]);
+  const [chains, setChains] = useState<ChainData[]>([]);
+  const [tokens, setTokens] = useState<TokenData[]>([]);
+  const [supportedTokens, setSupportedTokens] = useState<SupportedToken[]>([]);
+  const [supportedTokenBalances, setSupportedTokenBalances] = useState<
+    SupportedTokenBalance[]
+  >([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [showAddToken, setShowAddToken] = useState(false);
 
-  // Create wallet state
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [email, setEmail] = useState("");
-  const [creating, setCreating] = useState(false);
+  const { balances, tokenBalances, fetchBalances } = useWalletBalances();
 
-  const fetchBalances = useCallback(async (address: string) => {
-    const chains = [
-      { name: "mainnet", display: "Ethereum Mainnet" },
-      { name: "sepolia", display: "Sepolia Testnet" },
-    ];
-
-    const balancePromises = chains.map(async (chain) => {
-      try {
-        const rpcUrls: Record<string, string> = {
-          mainnet: "https://chain.techops.services/eth-mainnet",
-          sepolia: "https://chain.techops.services/eth-sepolia",
-        };
-
-        const rpcUrl = rpcUrls[chain.name];
-        if (!rpcUrl) {
-          throw new Error(`Unsupported network: ${chain.name}`);
-        }
-
-        const response = await fetch(rpcUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            method: "eth_getBalance",
-            params: [address, "latest"],
-            id: 1,
-          }),
-        });
-
-        const result = await response.json();
-        if (result.error) {
-          throw new Error(result.error.message);
-        }
-
-        const balanceWei = BigInt(result.result);
-        const balanceEth = Number(balanceWei) / 1e18;
-
-        return {
-          chain: chain.name,
-          balance: balanceEth.toFixed(6),
-          loading: false,
-        };
-      } catch (error) {
-        console.error(`Failed to fetch balance for ${chain.name}:`, error);
-        return {
-          chain: chain.name,
-          balance: "0",
-          loading: false,
-          error: error instanceof Error ? error.message : "Failed to fetch",
-        };
-      }
-    });
-
-    const results = await Promise.all(balancePromises);
-    setBalances(results);
+  const fetchChains = useCallback(async (): Promise<ChainData[]> => {
+    try {
+      const response = await fetch("/api/chains");
+      const data: ChainData[] = await response.json();
+      const evmChains = data.filter((chain) => chain.chainType === "evm");
+      setChains(evmChains);
+      return evmChains;
+    } catch (error) {
+      console.error("Failed to fetch chains:", error);
+      return [];
+    }
   }, []);
+
+  const fetchTokens = useCallback(async (): Promise<TokenData[]> => {
+    try {
+      const response = await fetch("/api/user/wallet/tokens");
+      const data = await response.json();
+      setTokens(data.tokens || []);
+      return data.tokens || [];
+    } catch (error) {
+      console.error("Failed to fetch tokens:", error);
+      return [];
+    }
+  }, []);
+
+  const fetchSupportedTokensData = useCallback(async (): Promise<
+    SupportedToken[]
+  > => {
+    try {
+      const response = await fetch("/api/supported-tokens");
+      const data = await response.json();
+      const tokenList = data.tokens || [];
+      setSupportedTokens(tokenList);
+      return tokenList;
+    } catch (error) {
+      console.error("Failed to fetch supported tokens:", error);
+      return [];
+    }
+  }, []);
+
+  const fetchSupportedBalances = useCallback(
+    async (
+      walletAddress: string,
+      chainList: ChainData[],
+      tokenList: SupportedToken[]
+    ) => {
+      if (tokenList.length === 0) {
+        setSupportedTokenBalances([]);
+        return;
+      }
+
+      // Set loading state
+      setSupportedTokenBalances(
+        tokenList.map((token) => ({
+          chainId: token.chainId,
+          tokenAddress: token.tokenAddress,
+          symbol: token.symbol,
+          name: token.name,
+          logoUrl: token.logoUrl,
+          balance: "0",
+          loading: true,
+        }))
+      );
+
+      // Fetch balances
+      const results = await fetchAllSupportedTokenBalances(
+        walletAddress,
+        tokenList,
+        chainList
+      );
+      setSupportedTokenBalances(results);
+    },
+    []
+  );
 
   const loadWallet = useCallback(async () => {
     setWalletLoading(true);
     try {
-      const response = await fetch("/api/user/wallet");
-      const data = await response.json();
+      const [chainList, tokenList, supportedList, walletResponse] =
+        await Promise.all([
+          fetchChains(),
+          fetchTokens(),
+          fetchSupportedTokensData(),
+          fetch("/api/user/wallet"),
+        ]);
+      const data = await walletResponse.json();
 
       if (data.hasWallet) {
         setWalletData(data);
-        setWalletLoading(false);
-        if (data.walletAddress) {
-          fetchBalances(data.walletAddress);
+        if (data.walletAddress && chainList.length > 0) {
+          await Promise.all([
+            fetchBalances(data.walletAddress, chainList, tokenList),
+            fetchSupportedBalances(
+              data.walletAddress,
+              chainList,
+              supportedList
+            ),
+          ]);
         }
       } else {
         setWalletData({ hasWallet: false });
-        setWalletLoading(false);
       }
     } catch (error) {
       console.error("Failed to load wallet:", error);
       setWalletData({ hasWallet: false });
+    } finally {
       setWalletLoading(false);
     }
-  }, [fetchBalances]);
+  }, [
+    fetchChains,
+    fetchTokens,
+    fetchSupportedTokensData,
+    fetchBalances,
+    fetchSupportedBalances,
+  ]);
+
+  const handleRefresh = useCallback(async () => {
+    if (!(walletData?.walletAddress && chains.length > 0)) {
+      return;
+    }
+    setRefreshing(true);
+    await Promise.all([
+      fetchBalances(walletData.walletAddress, chains, tokens),
+      fetchSupportedBalances(walletData.walletAddress, chains, supportedTokens),
+    ]);
+    setRefreshing(false);
+  }, [
+    walletData?.walletAddress,
+    chains,
+    tokens,
+    supportedTokens,
+    fetchBalances,
+    fetchSupportedBalances,
+  ]);
+
+  const handleAddToken = async (chainId: number, tokenAddress: string) => {
+    const response = await fetch("/api/user/wallet/tokens", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chainId, tokenAddress }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to add token");
+    }
+
+    toast.success(`Added ${data.token.symbol} to tracked tokens`);
+    setShowAddToken(false);
+    await loadWallet();
+  };
+
+  const handleRemoveToken = async (tokenId: string, symbol: string) => {
+    try {
+      const response = await fetch("/api/user/wallet/tokens", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tokenId }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to remove token");
+      }
+
+      toast.success(`Removed ${symbol} from tracked tokens`);
+      setTokens((prev) => prev.filter((t) => t.id !== tokenId));
+    } catch (error) {
+      console.error("Failed to remove token:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to remove token"
+      );
+    }
+  };
+
+  const handleCreateWallet = async (email: string) => {
+    const response = await fetch("/api/user/wallet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to create wallet");
+    }
+
+    toast.success("Wallet created successfully!");
+    await loadWallet();
+  };
 
   useEffect(() => {
     loadWallet();
-    // Prefill email with current user's email
-    if (session?.user?.email) {
-      setEmail(session.user.email);
-    }
-  }, [loadWallet, session?.user?.email]);
+  }, [loadWallet]);
 
-  const handleCreateWallet = async () => {
-    if (!email) {
-      toast.error("Email is required");
-      return;
-    }
-
-    setCreating(true);
-    try {
-      const response = await fetch("/api/user/wallet", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to create wallet");
-      }
-
-      toast.success("Wallet created successfully!");
-      setShowCreateForm(false);
-      // Reload wallet data
-      await loadWallet();
-    } catch (error) {
-      console.error("Failed to create wallet:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to create wallet"
-      );
-    } finally {
-      setCreating(false);
-    }
-  };
+  const description = walletData?.hasWallet
+    ? "View your organization's wallet address and balances across different chains"
+    : "Create a wallet for your organization to use in workflows";
 
   return (
     <Overlay
@@ -294,11 +968,7 @@ export function WalletOverlay({ overlayId }: WalletOverlayProps) {
       overlayId={overlayId}
       title="Organization Wallet"
     >
-      <p className="-mt-2 mb-4 text-muted-foreground text-sm">
-        {walletData?.hasWallet
-          ? "View your organization's wallet address and balances across different chains"
-          : "Create a wallet for your organization to use in workflows"}
-      </p>
+      <p className="-mt-2 mb-4 text-muted-foreground text-sm">{description}</p>
 
       {walletLoading && (
         <div className="flex items-center justify-center py-8">
@@ -327,131 +997,28 @@ export function WalletOverlay({ overlayId }: WalletOverlayProps) {
             )}
           </div>
 
-          <div className="space-y-3">
-            <h3 className="font-medium text-sm">Balances</h3>
-            {balances.map((balance) => {
-              let balanceContent: React.ReactNode;
-              if (balance.loading) {
-                balanceContent = (
-                  <div className="mt-1 text-muted-foreground text-xs">
-                    Loading...
-                  </div>
-                );
-              } else if (balance.error) {
-                balanceContent = (
-                  <div className="mt-1 text-destructive text-xs">
-                    {balance.error}
-                  </div>
-                );
-              } else {
-                balanceContent = (
-                  <div className="mt-1 text-muted-foreground text-xs">
-                    {balance.balance} ETH
-                  </div>
-                );
-              }
-
-              return (
-                <div
-                  className="flex items-center justify-between rounded-lg border bg-muted/50 p-3"
-                  key={balance.chain}
-                >
-                  <div className="flex-1">
-                    <div className="font-medium text-sm">
-                      {balance.chain === "mainnet"
-                        ? "Ethereum Mainnet"
-                        : "Sepolia Testnet"}
-                    </div>
-                    {balanceContent}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <BalanceListSection
+            balances={balances}
+            chains={chains}
+            isAdmin={isAdmin}
+            onAddToken={handleAddToken}
+            onRefresh={handleRefresh}
+            onRemoveToken={handleRemoveToken}
+            refreshing={refreshing}
+            setShowAddToken={setShowAddToken}
+            showAddToken={showAddToken}
+            supportedTokenBalances={supportedTokenBalances}
+            tokenBalances={tokenBalances}
+          />
         </div>
       )}
 
       {!(walletLoading || walletData?.hasWallet) && (
-        <div className="space-y-4">
-          {!isAdmin && (
-            <div className="rounded-lg border bg-muted/50 p-4">
-              <p className="text-muted-foreground text-sm">
-                No wallet found for this organization. Only organization admins
-                and owners can create wallets.
-              </p>
-            </div>
-          )}
-          {isAdmin && showCreateForm && (
-            <div className="space-y-4">
-              <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
-                <div>
-                  <h3 className="mb-2 font-medium text-sm">
-                    Create Organization Wallet
-                  </h3>
-                  <p className="mb-4 text-muted-foreground text-xs">
-                    This wallet will be shared by all members of your
-                    organization. Only admins and owners can manage it.
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="wallet-email">Email Address</Label>
-                  <Input
-                    disabled={creating}
-                    id="wallet-email"
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    type="email"
-                    value={email}
-                  />
-                  <p className="text-muted-foreground text-xs">
-                    This email will be associated with the organization's wallet
-                    for identification purposes.
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  className="flex-1"
-                  disabled={creating}
-                  onClick={() => setShowCreateForm(false)}
-                  variant="outline"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="flex-1"
-                  disabled={creating || !email}
-                  onClick={handleCreateWallet}
-                >
-                  {creating ? (
-                    <>
-                      <Spinner className="mr-2 h-4 w-4" />
-                      Creating...
-                    </>
-                  ) : (
-                    "Create Wallet"
-                  )}
-                </Button>
-              </div>
-            </div>
-          )}
-          {isAdmin && !showCreateForm && (
-            <div className="space-y-4">
-              <div className="rounded-lg border bg-muted/50 p-4">
-                <p className="text-muted-foreground text-sm">
-                  No wallet found for this organization. Create a wallet to use
-                  Web3 features in your workflows.
-                </p>
-              </div>
-              <Button
-                className="w-full"
-                onClick={() => setShowCreateForm(true)}
-              >
-                Create Organization Wallet
-              </Button>
-            </div>
-          )}
-        </div>
+        <NoWalletSection
+          initialEmail={session?.user?.email || ""}
+          isAdmin={isAdmin}
+          onCreateWallet={handleCreateWallet}
+        />
       )}
     </Overlay>
   );

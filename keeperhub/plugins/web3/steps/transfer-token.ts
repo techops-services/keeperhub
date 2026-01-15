@@ -1,0 +1,342 @@
+import "server-only";
+
+import { and, eq, inArray } from "drizzle-orm";
+import { ethers } from "ethers";
+import { initializeParaSigner } from "@/keeperhub/lib/para/wallet-helpers";
+import { getOrganizationIdFromExecution } from "@/keeperhub/lib/workflow-helpers";
+import { ERC20_ABI } from "@/lib/contracts";
+import { db } from "@/lib/db";
+import { supportedTokens, workflowExecutions } from "@/lib/db/schema";
+import { getChainIdFromNetwork, resolveRpcConfig } from "@/lib/rpc";
+import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
+import { getErrorMessage } from "@/lib/utils";
+
+type TransferTokenResult =
+  | {
+      success: true;
+      transactionHash: string;
+      amount: string;
+      symbol: string;
+      recipient: string;
+    }
+  | { success: false; error: string };
+
+export type TransferTokenCoreInput = {
+  network: string;
+  tokenConfig: string; // JSON string of TokenConfig
+  recipientAddress: string;
+  amount: string;
+  // Legacy support
+  tokenAddress?: string;
+};
+
+export type TransferTokenInput = StepInput & TransferTokenCoreInput;
+
+/**
+ * Parse token config from input and return a single token address
+ * For transfers, only the first token is used (checks supported first, then custom)
+ */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Handles multiple token config formats for backwards compatibility
+async function parseTokenAddress(
+  input: TransferTokenInput,
+  chainId: number
+): Promise<string | null> {
+  // Legacy support: if tokenAddress is provided directly, use it
+  if (input.tokenAddress && !input.tokenConfig) {
+    return input.tokenAddress;
+  }
+
+  if (!input.tokenConfig) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(input.tokenConfig);
+
+    // First, check for supported tokens
+    if (
+      Array.isArray(parsed.supportedTokenIds) &&
+      parsed.supportedTokenIds.length > 0
+    ) {
+      const tokens = await db
+        .select({ tokenAddress: supportedTokens.tokenAddress })
+        .from(supportedTokens)
+        .where(
+          and(
+            eq(supportedTokens.chainId, chainId),
+            inArray(supportedTokens.id, parsed.supportedTokenIds)
+          )
+        )
+        .limit(1);
+      if (tokens[0]?.tokenAddress) {
+        return tokens[0].tokenAddress;
+      }
+    }
+
+    // Then, check custom tokens (new format with symbol)
+    if (Array.isArray(parsed.customTokens) && parsed.customTokens.length > 0) {
+      return parsed.customTokens[0].address;
+    }
+
+    // Legacy: check old formats
+    if (
+      Array.isArray(parsed.customTokenAddresses) &&
+      parsed.customTokenAddresses.length > 0
+    ) {
+      const addr = parsed.customTokenAddresses.find(
+        (a: string) => a && a.trim() !== ""
+      );
+      if (addr) {
+        return addr;
+      }
+    } else if (parsed.customTokenAddress) {
+      return parsed.customTokenAddress;
+    }
+
+    return null;
+  } catch {
+    // If parsing fails and it looks like an address, use it directly
+    if (input.tokenConfig.startsWith("0x")) {
+      return input.tokenConfig;
+    }
+    return null;
+  }
+}
+
+/**
+ * Core transfer token logic
+ */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Step handler with comprehensive validation and error handling
+async function stepHandler(
+  input: TransferTokenInput
+): Promise<TransferTokenResult> {
+  console.log("[Transfer Token] Starting step with input:", {
+    network: input.network,
+    tokenConfig: input.tokenConfig,
+    recipientAddress: input.recipientAddress,
+    amount: input.amount,
+    hasContext: !!input._context,
+    executionId: input._context?.executionId,
+  });
+
+  const { network, recipientAddress, amount, _context } = input;
+
+  // Get chain ID first (needed for token config parsing)
+  let chainId: number;
+  try {
+    chainId = getChainIdFromNetwork(network);
+    console.log("[Transfer Token] Resolved chain ID:", chainId);
+  } catch (error) {
+    console.error("[Transfer Token] Failed to resolve network:", error);
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
+  }
+
+  // Parse token address from config
+  const tokenAddress = await parseTokenAddress(input, chainId);
+
+  // Validate token address
+  if (!(tokenAddress && ethers.isAddress(tokenAddress))) {
+    return {
+      success: false,
+      error: tokenAddress
+        ? `Invalid token address: ${tokenAddress}`
+        : "No token selected",
+    };
+  }
+
+  // Validate recipient address
+  if (!ethers.isAddress(recipientAddress)) {
+    return {
+      success: false,
+      error: `Invalid recipient address: ${recipientAddress}`,
+    };
+  }
+
+  // Validate amount
+  if (!amount || amount.trim() === "") {
+    return {
+      success: false,
+      error: "Amount is required",
+    };
+  }
+
+  // Get organizationId from executionId (passed via _context)
+  if (!_context?.executionId) {
+    return {
+      success: false,
+      error: "Execution ID is required to identify the organization",
+    };
+  }
+
+  let organizationId: string;
+  try {
+    organizationId = await getOrganizationIdFromExecution(_context.executionId);
+  } catch (error) {
+    console.error("[Transfer Token] Failed to get organization ID:", error);
+    return {
+      success: false,
+      error: `Failed to get organization ID: ${getErrorMessage(error)}`,
+    };
+  }
+
+  // Get userId from execution for RPC preferences
+  let userId: string;
+  try {
+    const execution = await db
+      .select({ userId: workflowExecutions.userId })
+      .from(workflowExecutions)
+      .where(eq(workflowExecutions.id, _context.executionId))
+      .then((rows) => rows[0]);
+    if (!execution) {
+      throw new Error("Execution not found");
+    }
+    userId = execution.userId;
+  } catch (error) {
+    console.error("[Transfer Token] Failed to get user ID:", error);
+    return {
+      success: false,
+      error: `Failed to get user ID: ${getErrorMessage(error)}`,
+    };
+  }
+
+  // Resolve RPC config (with user preferences)
+  let rpcUrl: string;
+  try {
+    const rpcConfig = await resolveRpcConfig(chainId, userId);
+    if (!rpcConfig) {
+      throw new Error(`Chain ${chainId} not found or not enabled`);
+    }
+
+    rpcUrl = rpcConfig.primaryRpcUrl;
+    console.log(
+      "[Transfer Token] Using RPC URL:",
+      rpcUrl,
+      "source:",
+      rpcConfig.source
+    );
+  } catch (error) {
+    console.error("[Transfer Token] Failed to resolve RPC config:", error);
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    };
+  }
+
+  // Initialize Para signer
+  let signer: Awaited<ReturnType<typeof initializeParaSigner>>;
+  let signerAddress: string;
+  try {
+    console.log(
+      "[Transfer Token] Initializing Para signer for organization:",
+      organizationId
+    );
+    signer = await initializeParaSigner(organizationId, rpcUrl);
+    signerAddress = await signer.getAddress();
+    console.log(
+      "[Transfer Token] Signer initialized successfully:",
+      signerAddress
+    );
+  } catch (error) {
+    console.error(
+      "[Transfer Token] Failed to initialize organization wallet:",
+      error
+    );
+    return {
+      success: false,
+      error: `Failed to initialize organization wallet: ${getErrorMessage(error)}`,
+    };
+  }
+
+  // Create contract instance with signer
+  const contract = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
+
+  try {
+    // Get token decimals and symbol
+    const [decimals, symbol] = await Promise.all([
+      contract.decimals() as Promise<bigint>,
+      contract.symbol() as Promise<string>,
+    ]);
+
+    const decimalsNum = Number(decimals);
+    console.log("[Transfer Token] Token info:", {
+      symbol,
+      decimals: decimalsNum,
+    });
+
+    // Convert amount to raw units
+    let amountRaw: bigint;
+    try {
+      amountRaw = ethers.parseUnits(amount, decimalsNum);
+    } catch (error) {
+      return {
+        success: false,
+        error: `Invalid amount format: ${getErrorMessage(error)}`,
+      };
+    }
+
+    // Check balance before transfer
+    const balance = (await contract.balanceOf(signerAddress)) as bigint;
+    if (balance < amountRaw) {
+      const balanceFormatted = ethers.formatUnits(balance, decimalsNum);
+      return {
+        success: false,
+        error: `Insufficient ${symbol} balance. Have: ${balanceFormatted}, Need: ${amount}`,
+      };
+    }
+
+    console.log("[Transfer Token] Executing transfer:", {
+      from: signerAddress,
+      to: recipientAddress,
+      amount,
+      amountRaw: amountRaw.toString(),
+      symbol,
+    });
+
+    // Execute transfer
+    const tx = await contract.transfer(recipientAddress, amountRaw);
+
+    // Wait for transaction to be mined
+    const receipt = await tx.wait();
+
+    if (!receipt) {
+      return {
+        success: false,
+        error: "Transaction sent but receipt not available",
+      };
+    }
+
+    console.log("[Transfer Token] Transaction confirmed:", receipt.hash);
+
+    return {
+      success: true,
+      transactionHash: receipt.hash,
+      amount,
+      symbol,
+      recipient: recipientAddress,
+    };
+  } catch (error) {
+    console.error("[Transfer Token] Transaction failed:", error);
+    return {
+      success: false,
+      error: `Token transfer failed: ${getErrorMessage(error)}`,
+    };
+  }
+}
+
+/**
+ * Transfer Token Step
+ * Transfers ERC20 tokens from the organization wallet to a recipient address
+ */
+// biome-ignore lint/suspicious/useAwait: "use step" directive requires async
+export async function transferTokenStep(
+  input: TransferTokenInput
+): Promise<TransferTokenResult> {
+  "use step";
+
+  return withStepLogging(input, () => stepHandler(input));
+}
+
+export const _integrationType = "web3";

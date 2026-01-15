@@ -32,7 +32,8 @@ export type ActionConfigFieldBase = {
     | "schema-builder" // Schema builder for structured output
     | "abi-function-select" // Dynamic dropdown that parses ABI and shows functions
     | "abi-function-args" // Dynamic inputs for function arguments based on selected ABI function
-    | "abi-with-auto-fetch"; // ABI textarea with automatic fetch from Etherscan
+    | "abi-with-auto-fetch" // ABI textarea with automatic fetch from Etherscan
+    | "token-select"; // Token selector with supported/custom toggle
 
   // For chain-select: filter by chain type (e.g., "evm" or "solana")
   chainTypeFilter?: string;
