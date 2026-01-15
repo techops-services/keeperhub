@@ -19,17 +19,7 @@ export const metadata = {
 };
 
 // Hidden sections that should not appear in sidebar
-const HIDDEN_SECTIONS = [
-  "api",
-  "billing",
-  "organization-guard-implementation",
-  "organization-implementation",
-  "organization-implementation-strategy",
-  "organization-wallet-execution",
-  "organizations_migration_handover",
-  "wallet-migration-todo",
-  "plans-features",
-];
+const HIDDEN_SECTIONS = ["api", "billing", "plans-features"];
 
 // Filter and reorder page map items
 function filterPageMap(

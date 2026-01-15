@@ -10,24 +10,6 @@
   "users-teams-orgs": "Users and Organizations",
   "practices": "Best Practices",
   "FAQ": "FAQ",
-  "organization-guard-implementation": {
-    "display": "hidden"
-  },
-  "organization-implementation": {
-    "display": "hidden"
-  },
-  "organization-implementation-strategy": {
-    "display": "hidden"
-  },
-  "organization-wallet-execution": {
-    "display": "hidden"
-  },
-  "organizations_migration_handover": {
-    "display": "hidden"
-  },
-  "wallet-migration-todo": {
-    "display": "hidden"
-  },
   "plans-features": {
     "display": "hidden"
   },
