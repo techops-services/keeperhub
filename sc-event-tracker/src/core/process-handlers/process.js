@@ -23,38 +23,77 @@ async function removeExcessProcesses({
   const activeKeys = Object.keys(childProcesses);
   const workflowIds = new Set(workflows.map((workflow) => workflow.id));
 
-  // Only remove processes if we have active workflows to compare against
-  if (workflows.length > 0) {
-    await Promise.all(
-      activeKeys
-        .filter((processId) => !workflowIds.has(processId))
-        .map(async (excessProcessId) => {
-          try {
-            logger.log(
-              `REMOVING EXCESS PROCESS: [ ${excessProcessId} ] - This workflow is no longer an active workflow`
-            );
-            const excessProcess = childProcesses[excessProcessId];
+  logger.log(
+    `Checking for excess processes: ${activeKeys.length} running processes, ${workflows.length} active workflows`
+  );
 
-            if (excessProcess?.process && !excessProcess.process.killed) {
-              logger.log(
-                `KILLING PROCESS: [ ${excessProcessId} ] - Process PID: ${excessProcess.process.pid}`
-              );
-              excessProcess.handler.killWorkflow({ shouldRestart: false });
-            }
+  // Find processes that are no longer in the active workflows list
+  // If workflows.length === 0, all processes should be removed
+  const excessProcessIds = activeKeys.filter(
+    (processId) => !workflowIds.has(processId)
+  );
 
-            await syncService.removeProcess(excessProcessId);
-            delete childProcesses[excessProcessId];
-            logger.log(
-              `PROCESS REMOVED: [ ${excessProcessId} ] - Successfully cleaned up`
-            );
-          } catch (error) {
-            logger.error(
-              `ERROR REMOVING PROCESS [${excessProcessId}]: ${error.message}`
-            );
-          }
-        })
-    );
+  if (excessProcessIds.length === 0) {
+    logger.log("No excess processes to remove");
+    return;
   }
+
+  logger.log(
+    `Found ${excessProcessIds.length} excess process(es) to remove: ${excessProcessIds.join(", ")}`
+  );
+
+  await Promise.all(
+    excessProcessIds.map(async (excessProcessId) => {
+      try {
+        logger.log(
+          `REMOVING EXCESS PROCESS: [ ${excessProcessId} ] - This workflow is no longer an active workflow`
+        );
+        const excessProcess = childProcesses[excessProcessId];
+
+        if (!excessProcess) {
+          logger.warn(
+            `Process [ ${excessProcessId} ] not found in childProcesses, removing from Redis only`
+          );
+          await syncService.removeProcess(excessProcessId);
+          return;
+        }
+
+        if (excessProcess?.process) {
+          if (excessProcess.process.killed) {
+            logger.log(
+              `Process [ ${excessProcessId} ] already killed, cleaning up Redis keys`
+            );
+          } else {
+            logger.log(
+              `KILLING PROCESS: [ ${excessProcessId} ] - Process PID: ${excessProcess.process.pid}`
+            );
+            await excessProcess.handler.killWorkflow({ shouldRestart: false });
+            logger.log(`Process [ ${excessProcessId} ] killed successfully`);
+          }
+        } else {
+          logger.warn(
+            `Process [ ${excessProcessId} ] has no process object, removing from Redis only`
+          );
+        }
+
+        // Remove from Redis (killWorkflow already does this, but ensure it's done)
+        await syncService.removeProcess(excessProcessId);
+
+        // Remove from local tracking
+        delete childProcesses[excessProcessId];
+
+        logger.log(
+          `PROCESS REMOVED: [ ${excessProcessId} ] - Successfully cleaned up from Redis and local tracking`
+        );
+      } catch (error) {
+        logger.error(
+          `ERROR REMOVING PROCESS [${excessProcessId}]: ${error.message}`
+        );
+        // Still try to remove from local tracking even if Redis removal failed
+        delete childProcesses[excessProcessId];
+      }
+    })
+  );
 }
 
 /**

@@ -10,7 +10,7 @@ const { logger } = require("./core/utils/logger.js");
  * @param {WorkflowEvent|Object} message.event - The event to handle.
  * @param {{networks: {[key: number]: Network}}} message.networks - The networks to use for the chain.
  */
-function handleEventMessage(message) {
+async function handleEventMessage(message) {
   let workflowEvent;
   try {
     // Handle both old format (just event) and new format (object with event and networks)
@@ -48,7 +48,7 @@ function handleEventMessage(message) {
       );
     }
 
-    blockchainEventHandler.listenEvent();
+    await blockchainEventHandler.listenEvent();
     process?.send({
       status: "listening",
       chain: workflowEvent.chain,

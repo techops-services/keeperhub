@@ -113,14 +113,40 @@ class WorkflowHandler {
   async killWorkflow({ shouldRestart = false }) {
     this.shouldRestart = shouldRestart;
 
-    // Clean up the chain handler before killing the process
-    if (this.chainHandler) {
-      this.chainHandler.cleanup();
-    }
-    // Kill the process
-    process.kill(this.currentProcess.process.pid);
+    this.logger.log(
+      `Killing workflow [ ${this.event.id} ] - shouldRestart: ${shouldRestart}`
+    );
 
+    // Kill the child process - this will automatically clean up all listeners
+    // and resources in that process
+    if (this.currentProcess?.process) {
+      if (this.currentProcess.process.killed) {
+        this.logger.log(
+          `Process [ ${this.currentProcess.process.pid} ] already killed`
+        );
+      } else {
+        this.logger.log(
+          `Killing child process [ ${this.currentProcess.process.pid} ] for workflow [ ${this.event.id} ]`
+        );
+        process.kill(this.currentProcess.process.pid);
+        this.logger.log(
+          `Kill signal sent to process [ ${this.currentProcess.process.pid} ]`
+        );
+      }
+    } else {
+      this.logger.warn(
+        `No process found for workflow [ ${this.event.id} ], cannot kill process`
+      );
+    }
+
+    // Remove Redis keys to prevent duplicate processing
+    this.logger.log(
+      `Removing workflow [ ${this.event.id} ] from Redis to prevent duplicate processing`
+    );
     await this.syncService.removeProcess(this.event.id);
+    this.logger.log(
+      `Workflow [ ${this.event.id} ] removed from Redis successfully`
+    );
   }
 
   /**

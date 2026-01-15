@@ -48,6 +48,14 @@ class AbstractChain {
     throw new Error("Method not implemented");
   }
 
+  /**
+   * Executes a workflow.
+   *
+   * @param {string} workflowId - The ID of the workflow to execute.
+   * @param {Object} payload - The payload to execute the workflow.
+   * @returns {Promise<Object>} The response from the workflow execution.
+   * @throws {Error} If the workflow execution fails.
+   */
   async executeWorkflow(workflowId, payload) {
     try {
       const url = `${WORKER_URL}/workflow/${workflowId}/execute`;
@@ -84,11 +92,15 @@ class AbstractChain {
     payload.append("username", JWT_TOKEN_USERNAME);
     payload.append("password", JWT_TOKEN_PASSWORD);
 
-    const { data } = await axios.post(`${KEEPERHUB_API_URL}/auth/token`, payload, {
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-    });
+    const { data } = await axios.post(
+      `${KEEPERHUB_API_URL}/auth/token`,
+      payload,
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      }
+    );
 
     return data.access_token;
   }

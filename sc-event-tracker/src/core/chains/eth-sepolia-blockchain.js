@@ -2,9 +2,7 @@
 const { ethers } = require("ethers");
 const { AbstractChain } = require("../abstract-chain.js");
 const { logger } = require("../utils/logger.js");
-const { ETHERSCAN_API_KEY, WORKER_URL } = require("../config/environment.js");
 const Redis = require("ioredis");
-const axios = require("axios");
 
 class EthereumSepoliaBlockchain extends AbstractChain {
   /**
@@ -34,6 +32,7 @@ class EthereumSepoliaBlockchain extends AbstractChain {
     this.provider = new ethers.WebSocketProvider(this.wssUrl);
 
     this.eventListener = null;
+    this.eventFilter = null;
     this.processedTransactions = new Set();
     this.redis = new Redis({
       host: process.env.REDIS_HOST,
@@ -48,10 +47,6 @@ class EthereumSepoliaBlockchain extends AbstractChain {
    */
   getProvider() {
     return this.provider;
-  }
-
-  getSepoliaEtherScan(contractAddress) {
-    return `https://api-sepolia.etherscan.io/v2/api?chainid=11155111&module=contract&action=getabi&address=${contractAddress}&apikey=${ETHERSCAN_API_KEY}`;
   }
 
   // Helper to create Redis key for a transaction
@@ -77,16 +72,27 @@ class EthereumSepoliaBlockchain extends AbstractChain {
     logger.log(`[Redis] Stored key ${key} with 24h TTL`);
   }
 
-  async fetchFreshConditions(keeperId) {
-    try {
-      const response = await axios.get(
-        `${WORKER_URL}/keeper/${keeperId}/conditions`
-      );
-      return response.data.conditions;
-    } catch (_error) {
-      console.error("Error fetching fresh conditions:", _error.message);
-      return null;
+  /**
+   * Converts BigInt values to strings recursively for JSON serialization.
+   *
+   * @param {*} value - The value to convert (can be any type)
+   * @returns {*} The value with BigInt converted to strings
+   */
+  convertBigIntToString(value) {
+    if (typeof value === "bigint") {
+      return value.toString();
     }
+    if (Array.isArray(value)) {
+      return value.map((item) => this.convertBigIntToString(item));
+    }
+    if (value && typeof value === "object") {
+      const converted = {};
+      for (const [key, val] of Object.entries(value)) {
+        converted[key] = this.convertBigIntToString(val);
+      }
+      return converted;
+    }
+    return value;
   }
 
   /**
@@ -94,9 +100,9 @@ class EthereumSepoliaBlockchain extends AbstractChain {
    *
    * Sets up an event filter for the target contract address and listens for logs
    * that match the specified event types from the ABI. When a log is received,
-   * it parses the log using the ABI interface and validates conditions.
+   * it parses the log using the ABI interface and triggers workflow execution.
    */
-  listenEvent() {
+  async listenEvent() {
     const formatDate = (date) =>
       date.toLocaleString("en-GB", {
         day: "2-digit",
@@ -108,10 +114,16 @@ class EthereumSepoliaBlockchain extends AbstractChain {
         hour12: false,
       });
 
-    // Clean up any existing listener first
-    if (this.eventListener) {
+    // Clean up any existing listener first if one exists
+    if (this.eventListener && this.eventFilter) {
       console.log(`[${formatDate(new Date())}] Cleaning up existing listener`);
-      this.cleanup();
+      try {
+        this.provider.off(this.eventFilter);
+        this.eventListener = null;
+        this.eventFilter = null;
+      } catch (error) {
+        logger.error(`Error removing existing listener: ${error.message}`);
+      }
     }
 
     console.log(
@@ -123,6 +135,7 @@ class EthereumSepoliaBlockchain extends AbstractChain {
     );
 
     const filter = { address: this.target };
+    this.eventFilter = filter;
     const rawEventsAbi = this.abi.filter(({ type }) => type === "event");
     const eventsAbi = rawEventsAbi.map(this.buildEventAbi.bind(this));
     const abiInterface = new ethers.Interface(eventsAbi);
@@ -159,40 +172,53 @@ class EthereumSepoliaBlockchain extends AbstractChain {
           }
           await this.markTransactionProcessed(transactionHash);
 
-          await this.decodeContractData(transactionHash, provider);
+          // Build payload with all event data
+          const args = {};
+          if (parsedLog.args && parsedLog.args.length > 0) {
+            // Dynamically extract all args from parsedLog.args
+            // parsedLog.args is an array, but we need to convert it to an object
+            // The args array contains the values in order
+            const eventAbi = rawEventsAbi.find(
+              (event) => event.name === parsedLog.name
+            );
+            if (eventAbi && eventAbi.inputs) {
+              eventAbi.inputs.forEach((input, index) => {
+                args[input.name || `arg${index}`] = parsedLog.args[index];
+              });
+            } else {
+              // Fallback: use index-based keys if ABI not found
+              parsedLog.args.forEach((arg, index) => {
+                args[`arg${index}`] = arg;
+              });
+            }
+          }
 
-          console.log(
-            "[THIS OPTIONS ID]",
-            JSON.stringify(this.options.id, null, 2)
-          );
-          // Fetch fresh conditions
-          const freshConditions = await this.fetchFreshConditions(
-            this.options.id
-          );
-          console.log(
-            "[FRESH CONDITIONS]",
-            JSON.stringify(freshConditions, null, 2)
-          );
+          const payload = {
+            eventName: parsedLog.name,
+            args,
+            blockNumber: log.blockNumber,
+            transactionHash: log.transactionHash,
+            blockHash: log.blockHash,
+            address: log.address,
+            logIndex: log.index,
+            transactionIndex: log.transactionIndex,
+          };
+
+          // Convert BigInt values to strings for JSON serialization
+          const serializablePayload = this.convertBigIntToString(payload);
 
           logger.log(
             `Event matched ~ [ KeeperID: ${this.options.id} - ${this.options.name} ]`
           );
-          this.logExecution(
-            `Event matched ~ [ KeeperID: ${this.options.id} - ${this.options.name} ], validating conditions...`
-          );
-          // Pass fresh conditions to validateConditions
-          await this.validateConditions(
-            parsedLog,
-            rawEventsAbi,
-            freshConditions
-          );
+          logger.log(`Executing workflow with payload: ${JSON.stringify(serializablePayload, null, 2)}`);
+          await this.executeWorkflow(this.options.id, serializablePayload);
         } else {
           console.log("Event name mismatch / No args present");
           console.log("parsedLog.name", parsedLog.name);
-          console.log("this.options.function.name", this.options.function.name);
-          // console.log("parsedLog.args", parsedLog.args);
+          console.log("Expected eventName", eventName);
         }
       } catch (error) {
+        console.log(error);
         logger.error(error);
       }
     });
@@ -216,154 +242,6 @@ class EthereumSepoliaBlockchain extends AbstractChain {
       .join(", ");
 
     return `event ${name}(${parsedInputs})`;
-  }
-
-  /**
-   * Validates if an event log matches all the conditions.
-   *
-   * @param {ethers.LogDescription} parsedLog - Parsed event log data.
-   * @param {{name: string; inputs: {name: string; type: string; indexed: boolean}[]}[]} rawEventsAbi - ABI for all events.
-   */
-  async validateConditions(parsedLog, rawEventsAbi, conditions) {
-    const validatioInitialTime = Date.now();
-    const { name, args } = parsedLog;
-    const eventAbi = rawEventsAbi.find((event) => event.name === name);
-
-    const inputsWithValues = eventAbi.inputs.map((input, index) => ({
-      ...input,
-      rawValue: args[index],
-    }));
-    const workflows = await this.getWorkflowByKeeper(this.options.id);
-    if (workflows.length > 0) {
-      for (const workflow of workflows) {
-        if (!conditions?.length) {
-          const noConditionsMessage = `NO CONDITIONS ~ [ KeeperID: ${this.options.id} - ${this.options.name} ]`;
-
-          this.logExecution(noConditionsMessage);
-          logger.log(noConditionsMessage);
-
-          const data = await this.notify(this.options.id, [], "success");
-          const notificationsSent = data.notify;
-          const transferSent = data.transfer;
-          const webhookSent = data.webhook;
-          logger.log(
-            `Notify ${data}, ${notificationsSent}, ${transferSent.transfer_amount}`
-          );
-
-          const notificationsExecutionTime = Date.now();
-          this.addNotificationsSentToLogs(
-            notificationsSent,
-            notificationsExecutionTime
-          );
-
-          const executionId = await this.saveLogs(
-            notificationsSent,
-            transferSent,
-            webhookSent
-          );
-          logger.log(`execution Id: ${executionId}`);
-          await this.executeWorkflow(
-            workflow.start_node_id,
-            workflow.workflow.id,
-            executionId,
-            "success"
-          );
-
-          return;
-        }
-
-        const validatedConditions = conditions.map((condition) =>
-          this.evaluateCondition(condition, inputsWithValues)
-        );
-
-        const resultBasedOnConditions =
-          this.evaluateConditionsWithRelationshipOperators(validatedConditions);
-
-        const triggerType = resultBasedOnConditions ? "success" : "failure";
-
-        const validationTime = Date.now() - validatioInitialTime;
-        this.logExecution(
-          `Event validated ~ [ KeeperID: ${this.options.id} - ${this.options.name} ] ~ Notifying`,
-          validationTime
-        );
-
-        const notificationsExecutionTime = Date.now();
-        logger.log(
-          `Notifying ~ [ KeeperID: ${this.options.id} - ${this.options.name} ]`
-        );
-        const data = await this.notify(
-          this.options.id,
-          validatedConditions,
-          triggerType
-        );
-        const notificationsSent = data.notify;
-        const transferSent = data.transfer;
-        const webhookSent = data.webhook;
-
-        this.addNotificationsSentToLogs(
-          notificationsSent,
-          notificationsExecutionTime
-        );
-
-        const executionId = await this.saveLogs(
-          notificationsSent,
-          transferSent,
-          webhookSent,
-          conditions,
-          triggerType
-        );
-        await this.executeWorkflow(
-          workflow.start_node_id,
-          workflow.workflow.id,
-          executionId,
-          triggerType
-        );
-        logger.log(`Execution Id : ${executionId}`);
-      }
-    }
-  }
-
-  /**
-   * Decodes the contract data from a transaction.
-   *
-   * @param {string} transactionHash - The transaction hash for which to decode the contract data.
-   * @param {ethers.providers.Provider} provider - The provider to use for transaction lookup.
-   *
-   * @returns {Promise<void>} Resolves when all contract data has been decoded.
-   */
-  async decodeContractData(transactionHash, provider) {
-    const transaction = await provider.getTransaction(transactionHash);
-
-    this.contractTransaction = transaction.toJSON();
-
-    const contract = new ethers.Contract(
-      transaction.to,
-      this.abi,
-      this.getProvider()
-    );
-
-    for (const item of this.abi) {
-      try {
-        const functionSignature = contract.interface.getFunction(item);
-
-        const decodedInput = contract.interface.decodeFunctionData(
-          functionSignature,
-          transaction.data
-        );
-
-        this.contractInformation = {
-          name: functionSignature.name,
-          inputs: functionSignature.inputs,
-          outputs: functionSignature.outputs,
-          decodedInput,
-          ...functionSignature,
-        };
-
-        break;
-      } catch (_error) {
-        console.error("Error decoding contract data:", _error.message);
-      }
-    }
   }
 }
 
