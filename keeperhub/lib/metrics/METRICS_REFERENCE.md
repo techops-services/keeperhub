@@ -6,14 +6,23 @@ Golden signal metrics for application-level observability.
 
 ## Data Sources
 
-Metrics are collected from two sources:
+Metrics are collected from two sources depending on the collector type:
 
 | Source | Description | Metrics |
 |--------|-------------|---------|
 | **Database** | Queried from PostgreSQL on each Prometheus scrape. Required because workflow runner jobs exit before Prometheus can scrape them. | Workflow executions, steps, queue depth, concurrent count, daily active users, user stats, organization stats, workflow definitions, schedules, integrations, infrastructure |
-| **API Process** | Recorded in-memory during request handling. Works normally as the API process is long-running. | Webhook latency, status polling latency, AI generation duration, plugin action duration/errors |
+| **API Process** | Recorded in-memory during request handling. Works normally as the API process is long-running. | Webhook latency, status polling latency, AI generation duration, plugin action duration/errors/invocations |
+
+### Collector Behavior
+
+| Collector | DB-sourced metrics | API-process metrics |
+|-----------|-------------------|---------------------|
+| **Prometheus** | Queried fresh on each `/api/metrics` scrape | Accumulated in-memory, scraped with other metrics |
+| **Console** | Not emitted (would require separate cron) | Logged as structured JSON on each event |
 
 > **Note:** DB-sourced duration metrics (workflow/step) are exposed as Prometheus gauges with `_bucket/_sum/_count` suffixes to simulate histogram semantics. Standard `histogram_quantile()` queries work, but `# TYPE` will show `gauge` instead of `histogram`.
+
+> **Note:** Runtime code (executor, routes) also increments workflow metrics for console logging, but Prometheus relies solely on DB snapshots. This dual approach ensures complete data even when workflow runners exit before scrape.
 
 ---
 

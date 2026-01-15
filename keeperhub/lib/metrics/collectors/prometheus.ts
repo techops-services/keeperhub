@@ -630,6 +630,9 @@ export async function updateDbMetrics(): Promise<void> {
     workflowDurationCount.set(workflowStats.durationCount);
 
     // Update step execution counts by status and type
+    // Reset label-based gauges to clear stale step types before repopulating
+    stepExecutionsTotal.reset();
+    stepErrorsTotal.reset();
     for (const [stepType, counts] of Object.entries(stepStats.countsByType)) {
       stepExecutionsTotal.set(
         { step_type: stepType, status: "success" },
@@ -676,6 +679,8 @@ export async function updateDbMetrics(): Promise<void> {
     // Update organization metrics from DB
     orgTotal.set(orgStats.total);
     orgMembersTotal.set(orgStats.membersTotal);
+    // Reset label-based gauge to clear stale roles before repopulating
+    orgMembersByRole.reset();
     for (const [role, count] of Object.entries(orgStats.membersByRole)) {
       orgMembersByRole.set({ role }, count);
     }
@@ -691,6 +696,8 @@ export async function updateDbMetrics(): Promise<void> {
     // Update schedule metrics from DB
     scheduleTotal.set(scheduleStats.total);
     scheduleEnabled.set(scheduleStats.enabled);
+    // Reset label-based gauge to clear stale statuses before repopulating
+    scheduleByLastStatus.reset();
     for (const [status, count] of Object.entries(scheduleStats.byLastStatus)) {
       scheduleByLastStatus.set({ status }, count);
     }
@@ -698,6 +705,8 @@ export async function updateDbMetrics(): Promise<void> {
     // Update integration metrics from DB
     integrationTotal.set(integrationStats.total);
     integrationManaged.set(integrationStats.managed);
+    // Reset label-based gauge to clear stale types before repopulating
+    integrationByType.reset();
     for (const [type, count] of Object.entries(integrationStats.byType)) {
       integrationByType.set({ type }, count);
     }
