@@ -211,8 +211,8 @@ class EthereumSepoliaBlockchain extends AbstractChain {
 
     const parsedInputs = inputs
       .map(
-        ({ name, type, indexed }) =>
-          `${type} ${indexed ? "indexed " : ""}${name}`
+        ({ name: inputName, type, indexed }) =>
+          `${type} ${indexed ? "indexed " : ""}${inputName}`
       )
       .join(", ");
 
