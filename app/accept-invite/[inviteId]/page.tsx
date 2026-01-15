@@ -1,14 +1,14 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { refetchOrganizations } from "@/keeperhub/lib/refetch-organizations";
-import { authClient, signIn, signUp } from "@/lib/auth-client";
+import { authClient, signIn, signOut, signUp, useSession } from "@/lib/auth-client";
 
 type InvitationData = {
   id: string;
@@ -30,6 +30,14 @@ type InvitationError = {
     organizationName: string;
   };
 };
+
+type PageState =
+  | "loading"
+  | "error"
+  | "not-found"
+  | "logged-in-match"
+  | "logged-in-mismatch"
+  | "logged-out";
 
 function getErrorTitle(inviteError: InvitationError): string {
   if (inviteError.expired) {
@@ -132,18 +140,17 @@ async function trySignUp(email: string, password: string) {
   };
 }
 
-async function trySignIn(email: string, password: string, isExisting: boolean) {
+async function trySignIn(email: string, password: string) {
   const response = await signIn.email({ email, password });
 
   if (!response.error) {
     return { success: true };
   }
 
-  const error = isExisting
-    ? "Incorrect password. Please try again."
-    : response.error.message || "Failed to sign in";
-
-  return { success: false, error };
+  return {
+    success: false,
+    error: response.error.message || "Failed to sign in",
+  };
 }
 
 async function acceptInvitation(invitationId: string) {
@@ -161,95 +168,181 @@ async function acceptInvitation(invitationId: string) {
   return { success: true };
 }
 
-type AuthFlowResult = {
-  success: boolean;
-  error?: string;
-  userExists?: boolean;
-};
+// Component for logged-in users with matching email
+function AcceptDirectState({
+  invitation,
+  onSuccess,
+}: {
+  invitation: InvitationData;
+  onSuccess: () => void;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
-async function performAuthFlow(
-  email: string,
-  password: string,
-  invitationId: string,
-  isExistingUser: boolean
-): Promise<AuthFlowResult> {
-  let shouldSignIn = isExistingUser;
+  const handleAccept = async () => {
+    setSubmitting(true);
+    setError("");
 
-  // Try signup for new users
-  if (!isExistingUser) {
-    const signUpResult = await trySignUp(email, password);
-    if (signUpResult.userExists) {
-      shouldSignIn = true;
-      return { success: false, userExists: true };
+    try {
+      const result = await acceptInvitation(invitation.id);
+      if (!result.success) {
+        setError(result.error || "Failed to accept invitation");
+        setSubmitting(false);
+        return;
+      }
+      onSuccess();
+    } catch (err) {
+      console.error("Failed to accept invitation:", err);
+      setError(err instanceof Error ? err.message : "Something went wrong");
+      setSubmitting(false);
     }
-    if (!signUpResult.success) {
-      return { success: false, error: signUpResult.error };
-    }
-  }
+  };
 
-  // Sign in
-  const signInResult = await trySignIn(email, password, shouldSignIn);
-  if (!signInResult.success) {
-    return { success: false, error: signInResult.error };
-  }
+  return (
+    <div className="pointer-events-auto flex min-h-screen items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-6 rounded-lg border bg-card p-8">
+        <div className="space-y-2 text-center">
+          <h1 className="font-semibold text-2xl">
+            Join {invitation.organizationName}
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            {invitation.inviterName} invited you to join as{" "}
+            <span className="font-medium text-foreground">
+              {invitation.role}
+            </span>
+          </p>
+        </div>
 
-  // Accept invitation
-  const acceptResult = await acceptInvitation(invitationId);
-  if (!acceptResult.success) {
-    return { success: false, error: acceptResult.error };
-  }
+        <div className="space-y-4">
+          <div className="rounded-md bg-muted/50 p-3 text-center text-sm">
+            You&apos;re signed in as{" "}
+            <span className="font-medium">{invitation.email}</span>
+          </div>
 
-  return { success: true };
+          {error && (
+            <div className="rounded-md bg-destructive/10 p-3 text-destructive text-sm">
+              {error}
+            </div>
+          )}
+
+          <Button
+            className="w-full"
+            disabled={submitting}
+            onClick={handleAccept}
+          >
+            {submitting && <Spinner className="mr-2 size-4" />}
+            {submitting ? "Joining..." : "Accept Invitation"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
-export default function AcceptInvitePage() {
-  const params = useParams();
+// Component for logged-in users with different email
+function EmailMismatchState({
+  invitation,
+  currentEmail,
+}: {
+  invitation: InvitationData;
+  currentEmail: string;
+}) {
   const router = useRouter();
-  const inviteId = params.inviteId as string;
+  const [signingOut, setSigningOut] = useState(false);
 
-  const [loading, setLoading] = useState(true);
-  const [invitation, setInvitation] = useState<InvitationData | null>(null);
-  const [inviteError, setInviteError] = useState<InvitationError | null>(null);
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    try {
+      await signOut();
+      // Page will re-render after sign out and show the auth form
+      window.location.reload();
+    } catch (err) {
+      console.error("Failed to sign out:", err);
+      setSigningOut(false);
+    }
+  };
 
+  const handleDecline = () => {
+    router.push("/workflows");
+  };
+
+  return (
+    <div className="pointer-events-auto flex min-h-screen items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-6 rounded-lg border bg-card p-8">
+        <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-amber-500/10">
+          <svg
+            aria-hidden="true"
+            className="size-6 text-amber-500"
+            fill="none"
+            role="img"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <title>Warning icon</title>
+            <path
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+            />
+          </svg>
+        </div>
+
+        <div className="space-y-2 text-center">
+          <h1 className="font-semibold text-xl">Wrong Account</h1>
+          <p className="text-muted-foreground text-sm">
+            This invitation is for{" "}
+            <span className="font-medium text-foreground">
+              {invitation.email}
+            </span>
+          </p>
+          <p className="text-muted-foreground text-sm">
+            You&apos;re currently signed in as{" "}
+            <span className="font-medium text-foreground">{currentEmail}</span>
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <Button
+            className="w-full"
+            disabled={signingOut}
+            onClick={handleSignOut}
+          >
+            {signingOut && <Spinner className="mr-2 size-4" />}
+            {signingOut ? "Signing out..." : "Sign Out & Continue"}
+          </Button>
+          <Button
+            className="w-full"
+            disabled={signingOut}
+            onClick={handleDecline}
+            variant="outline"
+          >
+            Go Back
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Component for logged-out users with sign-in/sign-up toggle
+function AuthFormState({
+  invitation,
+  onSuccess,
+}: {
+  invitation: InvitationData;
+  onSuccess: () => void;
+}) {
+  const [authMode, setAuthMode] = useState<"signin" | "signup">("signup");
   const [password, setPassword] = useState("");
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [isExistingUser, setIsExistingUser] = useState(false);
-
-  useEffect(() => {
-    async function fetchInvitation() {
-      try {
-        const response = await fetch(`/api/invitations/${inviteId}`);
-        const data = await response.json();
-
-        if (!response.ok) {
-          setInviteError(data);
-          return;
-        }
-
-        setInvitation(data.invitation);
-      } catch (error) {
-        console.error("Failed to fetch invitation:", error);
-        setInviteError({ error: "Failed to load invitation details" });
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    if (inviteId) {
-      fetchInvitation();
-    }
-  }, [inviteId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
 
-    if (!invitation) {
-      return;
-    }
-
-    if (!isExistingUser && password.length < 8) {
+    if (authMode === "signup" && password.length < 8) {
       setFormError("Password must be at least 8 characters");
       return;
     }
@@ -257,33 +350,50 @@ export default function AcceptInvitePage() {
     setSubmitting(true);
 
     try {
-      const result = await performAuthFlow(
-        invitation.email,
-        password,
-        invitation.id,
-        isExistingUser
-      );
+      if (authMode === "signup") {
+        // Try to sign up first
+        const signUpResult = await trySignUp(invitation.email, password);
 
-      if (result.userExists) {
-        setIsExistingUser(true);
-        setFormError("Please enter your password to sign in.");
+        if (signUpResult.userExists) {
+          // User already exists, switch to sign-in mode
+          setAuthMode("signin");
+          setFormError(
+            "An account with this email already exists. Please sign in."
+          );
+          setSubmitting(false);
+          return;
+        }
+
+        if (!signUpResult.success) {
+          setFormError(signUpResult.error || "Failed to create account");
+          setSubmitting(false);
+          return;
+        }
+      }
+
+      // Sign in (either after successful signup or in signin mode)
+      const signInResult = await trySignIn(invitation.email, password);
+      if (!signInResult.success) {
+        setFormError(
+          authMode === "signin"
+            ? "Incorrect password. Please try again."
+            : signInResult.error || "Failed to sign in"
+        );
         setSubmitting(false);
         return;
       }
 
-      if (!result.success) {
-        setFormError(result.error || "Something went wrong");
+      // Accept invitation
+      const acceptResult = await acceptInvitation(invitation.id);
+      if (!acceptResult.success) {
+        setFormError(acceptResult.error || "Failed to accept invitation");
         setSubmitting(false);
         return;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      await authClient.getSession();
-      refetchOrganizations();
-      toast.success(`Welcome to ${invitation.organizationName}!`);
-      router.push("/workflows");
+      onSuccess();
     } catch (error) {
-      console.error("Failed to accept invitation:", error);
+      console.error("Failed to complete auth flow:", error);
       setFormError(
         error instanceof Error ? error.message : "Something went wrong"
       );
@@ -291,17 +401,11 @@ export default function AcceptInvitePage() {
     }
   };
 
-  if (loading) {
-    return <LoadingState />;
-  }
-
-  if (inviteError) {
-    return <ErrorState inviteError={inviteError} />;
-  }
-
-  if (!invitation) {
-    return <NotFoundState />;
-  }
+  const toggleAuthMode = () => {
+    setAuthMode(authMode === "signin" ? "signup" : "signin");
+    setFormError("");
+    setPassword("");
+  };
 
   return (
     <div className="pointer-events-auto flex min-h-screen items-center justify-center p-4">
@@ -331,13 +435,15 @@ export default function AcceptInvitePage() {
               id="password"
               onChange={(e) => setPassword(e.target.value)}
               placeholder={
-                isExistingUser ? "Enter your password" : "Create a password"
+                authMode === "signin"
+                  ? "Enter your password"
+                  : "Create a password"
               }
               required
               type="password"
               value={password}
             />
-            {!isExistingUser && (
+            {authMode === "signup" && (
               <p className="text-muted-foreground text-xs">
                 Password must be at least 8 characters.
               </p>
@@ -352,20 +458,134 @@ export default function AcceptInvitePage() {
 
           <Button className="w-full" disabled={submitting} type="submit">
             {submitting && <Spinner className="mr-2 size-4" />}
-            {submitting && isExistingUser && "Signing in..."}
-            {submitting && !isExistingUser && "Creating account..."}
-            {!submitting && isExistingUser && "Sign In & Join"}
-            {!(submitting || isExistingUser) && "Create Account & Join"}
+            {submitting && authMode === "signin" && "Signing in..."}
+            {submitting && authMode === "signup" && "Creating account..."}
+            {!submitting && authMode === "signin" && "Sign In & Join"}
+            {!submitting && authMode === "signup" && "Create Account & Join"}
           </Button>
         </form>
 
-        {isExistingUser && (
-          <p className="text-center text-muted-foreground text-xs">
-            An account with this email already exists. Enter your password to
-            sign in and join.
-          </p>
-        )}
+        <p className="text-center text-muted-foreground text-sm">
+          {authMode === "signup" ? (
+            <>
+              Already have an account?{" "}
+              <button
+                className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
+                onClick={toggleAuthMode}
+                type="button"
+              >
+                Sign in
+              </button>
+            </>
+          ) : (
+            <>
+              Need an account?{" "}
+              <button
+                className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
+                onClick={toggleAuthMode}
+                type="button"
+              >
+                Create one
+              </button>
+            </>
+          )}
+        </p>
       </div>
     </div>
   );
+}
+
+export default function AcceptInvitePage() {
+  const params = useParams();
+  const router = useRouter();
+  const inviteId = params.inviteId as string;
+
+  // Session state
+  const { data: session, isPending: sessionPending } = useSession();
+
+  // Invitation state
+  const [inviteLoading, setInviteLoading] = useState(true);
+  const [invitation, setInvitation] = useState<InvitationData | null>(null);
+  const [inviteError, setInviteError] = useState<InvitationError | null>(null);
+
+  // Fetch invitation
+  useEffect(() => {
+    async function fetchInvitation() {
+      try {
+        const response = await fetch(`/api/invitations/${inviteId}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          setInviteError(data);
+          return;
+        }
+
+        setInvitation(data.invitation);
+      } catch (error) {
+        console.error("Failed to fetch invitation:", error);
+        setInviteError({ error: "Failed to load invitation details" });
+      } finally {
+        setInviteLoading(false);
+      }
+    }
+
+    if (inviteId) {
+      fetchInvitation();
+    }
+  }, [inviteId]);
+
+  // Determine page state
+  const pageState: PageState = useMemo(() => {
+    if (inviteLoading || sessionPending) return "loading";
+    if (inviteError) return "error";
+    if (!invitation) return "not-found";
+
+    // Check if user is logged in (and not anonymous)
+    const isLoggedIn =
+      session?.user &&
+      session.user.name !== "Anonymous" &&
+      !session.user.email?.startsWith("temp-");
+
+    if (isLoggedIn && session?.user?.email) {
+      const emailMatch =
+        session.user.email.toLowerCase() === invitation.email.toLowerCase();
+      return emailMatch ? "logged-in-match" : "logged-in-mismatch";
+    }
+
+    return "logged-out";
+  }, [inviteLoading, sessionPending, inviteError, invitation, session]);
+
+  // Success handler - called after accepting invitation
+  const handleSuccess = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await authClient.getSession();
+    refetchOrganizations();
+    toast.success(`Welcome to ${invitation?.organizationName}!`);
+    router.push("/workflows");
+  };
+
+  // Render based on page state
+  switch (pageState) {
+    case "loading":
+      return <LoadingState />;
+    case "error":
+      return <ErrorState inviteError={inviteError!} />;
+    case "not-found":
+      return <NotFoundState />;
+    case "logged-in-match":
+      return (
+        <AcceptDirectState invitation={invitation!} onSuccess={handleSuccess} />
+      );
+    case "logged-in-mismatch":
+      return (
+        <EmailMismatchState
+          currentEmail={session!.user!.email!}
+          invitation={invitation!}
+        />
+      );
+    case "logged-out":
+      return (
+        <AuthFormState invitation={invitation!} onSuccess={handleSuccess} />
+      );
+  }
 }
