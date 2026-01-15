@@ -2,7 +2,6 @@
 
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,7 +16,6 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 import { refetchOrganizations } from "@/keeperhub/lib/refetch-organizations";
-import { api } from "@/lib/api-client";
 import { authClient, signIn, signUp } from "@/lib/auth-client";
 import {
   getEnabledAuthProviders,
@@ -28,7 +26,7 @@ type AuthDialogProps = {
   children?: ReactNode;
 };
 
-type ModalView = "signin" | "signup" | "request-access" | "request-success";
+type ModalView = "signin" | "signup";
 
 const VercelIcon = ({ className = "mr-2 h-3 w-3" }: { className?: string }) => (
   <svg
@@ -233,108 +231,6 @@ const SignInForm = ({
   </div>
 );
 
-// Request Access Form
-type RequestAccessFormProps = {
-  email: string;
-  error: string;
-  loading: boolean;
-  onEmailChange: (v: string) => void;
-  onSubmit: (e: React.FormEvent) => void;
-  onSignIn: () => void;
-};
-
-const RequestAccessForm = ({
-  email,
-  error,
-  loading,
-  onEmailChange,
-  onSubmit,
-  onSignIn,
-}: RequestAccessFormProps) => (
-  <div className="space-y-4">
-    <form className="space-y-4" onSubmit={onSubmit}>
-      <div className="space-y-2">
-        <Label className="ml-1" htmlFor="request-email">
-          Email
-        </Label>
-        <Input
-          id="request-email"
-          onChange={(e) => onEmailChange(e.target.value)}
-          placeholder="you@example.com"
-          required
-          type="email"
-          value={email}
-        />
-      </div>
-      {error && <div className="text-destructive text-sm">{error}</div>}
-      <Button className="w-full" disabled={loading} type="submit">
-        {loading ? <Spinner className="mr-2 size-4" /> : null}
-        Request access
-      </Button>
-    </form>
-    <div className="flex items-center justify-center gap-1 text-sm">
-      <span className="text-muted-foreground">Already have an account?</span>
-      <button
-        className="font-medium text-foreground underline underline-offset-2 hover:text-foreground/80"
-        onClick={onSignIn}
-        type="button"
-      >
-        Sign in
-      </button>
-    </div>
-  </div>
-);
-
-// Request Success View
-type RequestSuccessProps = {
-  email: string;
-  onClose: () => void;
-  onSignIn: () => void;
-};
-
-const RequestSuccessView = ({
-  email,
-  onClose,
-  onSignIn,
-}: RequestSuccessProps) => (
-  <div className="space-y-6 py-4 text-center">
-    <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-      <svg
-        aria-label="Success"
-        className="size-6 text-green-600 dark:text-green-400"
-        fill="none"
-        role="img"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <title>Success</title>
-        <path
-          d="M5 13l4 4L19 7"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-        />
-      </svg>
-    </div>
-    <div className="space-y-2">
-      <h3 className="font-semibold text-lg">Request submitted</h3>
-      <p className="text-muted-foreground text-sm">
-        Thanks for your interest. We will email you at{" "}
-        <span className="font-medium text-foreground">{email}</span> when your
-        account is ready.
-      </p>
-    </div>
-    <div className="flex flex-col gap-2">
-      <Button className="w-full" onClick={onClose}>
-        Close
-      </Button>
-      <Button className="w-full" onClick={onSignIn} variant="ghost">
-        Back to sign in
-      </Button>
-    </div>
-  </div>
-);
-
 // Single provider button
 let singleProviderSignInInitiated = false;
 export const isSingleProviderSignInInitiated = () =>
@@ -385,21 +281,17 @@ const getViewTitle = (view: ModalView) => {
       return "Sign in";
     case "signup":
       return "Create account";
-    case "request-access":
-      return "Request access";
     default:
-      return "Request submitted";
+      return "Sign in";
   }
 };
 
 const getViewDescription = (view: ModalView) => {
   switch (view) {
     case "signin":
-      return "Sign in with an email that has been approved for the beta.";
+      return "Sign in to your account to continue.";
     case "signup":
       return "Create your account to get started.";
-    case "request-access":
-      return "We are in closed beta. Enter your email and we will notify you when you can sign up.";
     default:
       return null;
   }
@@ -410,7 +302,6 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
   const [view, setView] = useState<ModalView>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [requestEmail, setRequestEmail] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingProvider, setLoadingProvider] = useState<
@@ -427,7 +318,6 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
   const resetForm = () => {
     setEmail("");
     setPassword("");
-    setRequestEmail("");
     setError("");
   };
 
@@ -465,13 +355,8 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
         return;
       }
 
-      // Small delay to ensure session is fully established
       await new Promise((resolve) => setTimeout(resolve, 300));
-
-      // Fetch fresh session to get the active organization
       await authClient.getSession();
-
-      // Trigger all organization hooks to refetch their data
       refetchOrganizations();
 
       toast.success("Signed in successfully!");
@@ -483,21 +368,12 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
     }
   };
 
-  const handleCheckEmailAndSignUp = async (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
     try {
-      const { isAllowlisted } = await api.beta.checkEmail(email);
-      if (!isAllowlisted) {
-        setError(
-          "This app is currently in closed beta. This email has not been approved yet."
-        );
-        setLoading(false);
-        return;
-      }
-
       const signUpResponse = await signUp.email({
         email,
         password,
@@ -516,33 +392,14 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
         return;
       }
 
-      // Small delay to let the server-side session hook set activeOrganizationId
       await new Promise((resolve) => setTimeout(resolve, 300));
-
-      // Fetch fresh session to get the updated activeOrganizationId
       await authClient.getSession();
-
-      // Trigger all organization hooks to refetch their data
       refetchOrganizations();
 
       toast.success("Account created successfully!");
       setOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create account");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRequestAccess = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      await api.beta.requestAccess(requestEmail);
-      setView("request-success");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to submit request");
     } finally {
       setLoading(false);
     }
@@ -568,22 +425,12 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
         )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
-        {view !== "request-success" && (
-          <DialogHeader>
-            <div className="flex items-center gap-2">
-              <DialogTitle>{getViewTitle(view)}</DialogTitle>
-              <Badge
-                className="rounded-full bg-muted/50 px-2 py-0.5 font-normal text-xs"
-                variant="secondary"
-              >
-                Private beta
-              </Badge>
-            </div>
-            {getViewDescription(view) && (
-              <DialogDescription>{getViewDescription(view)}</DialogDescription>
-            )}
-          </DialogHeader>
-        )}
+        <DialogHeader>
+          <DialogTitle>{getViewTitle(view)}</DialogTitle>
+          {getViewDescription(view) && (
+            <DialogDescription>{getViewDescription(view)}</DialogDescription>
+          )}
+        </DialogHeader>
 
         <div className="space-y-4">
           {view === "signin" && (
@@ -634,20 +481,7 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
 
           {view === "signup" && (
             <div className="space-y-4">
-              <div className="flex items-center justify-center gap-1 rounded-lg border bg-muted/50 p-3 text-sm">
-                <span className="text-muted-foreground">Not approved yet?</span>
-                <button
-                  className="font-medium text-foreground underline underline-offset-2 hover:text-foreground/80"
-                  onClick={() => {
-                    setView("request-access");
-                    setError("");
-                  }}
-                  type="button"
-                >
-                  Request access
-                </button>
-              </div>
-              <form className="space-y-4" onSubmit={handleCheckEmailAndSignUp}>
+              <form className="space-y-4" onSubmit={handleSignUp}>
                 <div className="space-y-2">
                   <Label className="ml-1" htmlFor="signup-email">
                     Email
@@ -698,31 +532,6 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
                 </button>
               </div>
             </div>
-          )}
-
-          {view === "request-access" && (
-            <RequestAccessForm
-              email={requestEmail}
-              error={error}
-              loading={loading}
-              onEmailChange={setRequestEmail}
-              onSignIn={() => {
-                setView("signin");
-                setError("");
-              }}
-              onSubmit={handleRequestAccess}
-            />
-          )}
-
-          {view === "request-success" && (
-            <RequestSuccessView
-              email={requestEmail}
-              onClose={() => setOpen(false)}
-              onSignIn={() => {
-                setView("signin");
-                setRequestEmail("");
-              }}
-            />
           )}
         </div>
       </DialogContent>
