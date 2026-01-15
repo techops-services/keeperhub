@@ -5,6 +5,7 @@ import { api } from "./api-client";
 
 export type WorkflowNodeType = "trigger" | "action" | "add";
 
+// biome-ignore lint/style/noEnum: Prefer to use enums as make it easier to maintain and read.
 export enum WorkflowTriggerEnum {
   MANUAL = "Manual",
   SCHEDULE = "Schedule",

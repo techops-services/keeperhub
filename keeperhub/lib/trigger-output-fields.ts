@@ -50,7 +50,7 @@ export function getEventTriggerOutputFields(
         item.type === "event" && item.name === eventName
     );
 
-    if (!(event && event.inputs)) {
+    if (!event?.inputs) {
       return getEventTriggerOutputFields(undefined, undefined);
     }
 
@@ -63,16 +63,14 @@ export function getEventTriggerOutputFields(
     ];
 
     // Add each event parameter as an output field
-    event.inputs.forEach(
-      (input: { name: string; type: string; indexed?: boolean }) => {
-        const paramName = input.name || "unnamed";
-        const indexed = input.indexed ? " (indexed)" : "";
-        outputFields.push({
-          field: `args.${paramName}`,
-          description: `Event parameter: ${input.type}${indexed}`,
-        });
-      }
-    );
+    for (const input of event.inputs) {
+      const paramName = input.name || "unnamed";
+      const indexed = input.indexed ? " (indexed)" : "";
+      outputFields.push({
+        field: `args.${paramName}`,
+        description: `Event parameter: ${input.type}${indexed}`,
+      });
+    }
 
     // Add standard blockchain event fields
     outputFields.push(
