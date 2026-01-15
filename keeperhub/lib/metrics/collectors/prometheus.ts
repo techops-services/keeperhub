@@ -269,6 +269,68 @@ const activeUsers = getOrCreateGauge(
   []
 );
 
+// User metrics (DB-sourced)
+const userTotal = getOrCreateGauge(
+  "keeperhub_user_total",
+  "Total registered users",
+  []
+);
+
+const userVerified = getOrCreateGauge(
+  "keeperhub_user_verified_total",
+  "Users with verified email",
+  []
+);
+
+const userAnonymous = getOrCreateGauge(
+  "keeperhub_user_anonymous_total",
+  "Anonymous users",
+  []
+);
+
+const userWithWorkflows = getOrCreateGauge(
+  "keeperhub_user_with_workflows_total",
+  "Users who have created at least one workflow",
+  []
+);
+
+const userWithIntegrations = getOrCreateGauge(
+  "keeperhub_user_with_integrations_total",
+  "Users who have configured at least one integration",
+  []
+);
+
+// Organization metrics (DB-sourced)
+const orgTotal = getOrCreateGauge(
+  "keeperhub_org_total",
+  "Total organizations",
+  []
+);
+
+const orgMembersTotal = getOrCreateGauge(
+  "keeperhub_org_members_total",
+  "Total organization members across all orgs",
+  []
+);
+
+const orgMembersByRole = getOrCreateGauge(
+  "keeperhub_org_members_by_role",
+  "Organization members by role",
+  ["role"]
+);
+
+const orgInvitationsPending = getOrCreateGauge(
+  "keeperhub_org_invitations_pending",
+  "Pending organization invitations",
+  []
+);
+
+const orgWithWorkflows = getOrCreateGauge(
+  "keeperhub_org_with_workflows_total",
+  "Organizations with at least one workflow",
+  []
+);
+
 // Allowed labels per error metric (must match counter definitions)
 const errorLabelAllowlist: Record<string, string[]> = {
   "workflow.execution.errors": ["workflow_id", "trigger_type", "error_type"],
@@ -422,11 +484,15 @@ export async function updateDbMetrics(): Promise<void> {
       getWorkflowStatsFromDb,
       getStepStatsFromDb,
       getDailyActiveUsersFromDb,
+      getUserStatsFromDb,
+      getOrgStatsFromDb,
     } = await import("../db-metrics");
-    const [workflowStats, stepStats, dailyActiveUsers] = await Promise.all([
+    const [workflowStats, stepStats, dailyActiveUsers, userStats, orgStats] = await Promise.all([
       getWorkflowStatsFromDb(),
       getStepStatsFromDb(),
       getDailyActiveUsersFromDb(),
+      getUserStatsFromDb(),
+      getOrgStatsFromDb(),
     ]);
 
     // Update workflow execution counts by status
@@ -492,6 +558,22 @@ export async function updateDbMetrics(): Promise<void> {
     workflowQueueDepth.set(workflowStats.totalPending);
     workflowConcurrent.set(workflowStats.totalRunning);
     activeUsers.set(dailyActiveUsers);
+
+    // Update user metrics from DB
+    userTotal.set(userStats.total);
+    userVerified.set(userStats.verified);
+    userAnonymous.set(userStats.anonymous);
+    userWithWorkflows.set(userStats.withWorkflows);
+    userWithIntegrations.set(userStats.withIntegrations);
+
+    // Update organization metrics from DB
+    orgTotal.set(orgStats.total);
+    orgMembersTotal.set(orgStats.membersTotal);
+    for (const [role, count] of Object.entries(orgStats.membersByRole)) {
+      orgMembersByRole.set({ role }, count);
+    }
+    orgInvitationsPending.set(orgStats.invitationsPending);
+    orgWithWorkflows.set(orgStats.withWorkflows);
   } catch (error) {
     console.error("[Prometheus] Failed to update DB metrics:", error);
     // Don't throw - allow other metrics to still be returned
