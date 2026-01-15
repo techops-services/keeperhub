@@ -30,7 +30,6 @@ export function recordPluginMetrics(options: {
   durationMs: number;
   success: boolean;
   error?: string;
-  externalService?: string;
 }): void {
   const metrics = getMetricsCollector();
 
@@ -57,18 +56,6 @@ export function recordPluginMetrics(options: {
       { message: options.error },
       labels
     );
-
-    // Also record as external service error if service specified
-    if (options.externalService) {
-      metrics.recordError(
-        MetricNames.EXTERNAL_SERVICE_ERRORS,
-        { message: options.error },
-        {
-          [LabelKeys.SERVICE]: options.externalService,
-          [LabelKeys.PLUGIN_NAME]: options.pluginName,
-        }
-      );
-    }
   }
 }
 
@@ -157,41 +144,5 @@ export async function withPluginMetrics<T>(
     );
 
     throw error;
-  }
-}
-
-/**
- * Record external service call metrics (for tracking third-party API reliability)
- */
-export function recordExternalServiceCall(options: {
-  service: string;
-  durationMs: number;
-  success: boolean;
-  statusCode?: number;
-  error?: string;
-}): void {
-  const metrics = getMetricsCollector();
-
-  const labels: Record<string, string> = {
-    [LabelKeys.SERVICE]: options.service,
-    [LabelKeys.STATUS]: options.success ? "success" : "failure",
-  };
-  if (options.statusCode) {
-    labels[LabelKeys.STATUS_CODE] = String(options.statusCode);
-  }
-
-  // Record as generic API latency (could add a dedicated metric if needed)
-  metrics.recordLatency(
-    "external.service.latency_ms",
-    options.durationMs,
-    labels
-  );
-
-  if (!options.success && options.error) {
-    metrics.recordError(
-      MetricNames.EXTERNAL_SERVICE_ERRORS,
-      { message: options.error },
-      labels
-    );
   }
 }

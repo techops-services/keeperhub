@@ -18,17 +18,31 @@ export const metadata = {
   },
 };
 
-// Filter out hidden sections from page map
+// Hidden sections that should not appear in sidebar
+const HIDDEN_SECTIONS = ["api", "billing", "plans-features"];
+
+// Filter and reorder page map items
 function filterPageMap(
   items: Awaited<ReturnType<typeof getPageMap>>
 ): typeof items {
-  return items.filter((item) => {
-    // Hide the API section (not yet public)
-    if ("name" in item && item.name === "api") {
+  // Filter out hidden sections
+  const filtered = items.filter((item) => {
+    if ("name" in item && HIDDEN_SECTIONS.includes(item.name)) {
       return false;
     }
     return true;
   });
+
+  // Move FAQ to the end
+  const faqIndex = filtered.findIndex(
+    (item) => "name" in item && item.name === "FAQ"
+  );
+  if (faqIndex > -1) {
+    const [faq] = filtered.splice(faqIndex, 1);
+    filtered.push(faq);
+  }
+
+  return filtered;
 }
 
 export default async function RootLayout({
