@@ -80,32 +80,13 @@ const web3Plugin: IntegrationPlugin = {
           description: "Whether the balance check succeeded",
         },
         {
-          field: "balance",
-          description: "Token balance (human-readable with decimals applied)",
-        },
-        {
-          field: "balanceRaw",
-          description: "Raw token balance (smallest unit)",
-        },
-        {
-          field: "symbol",
-          description: "Token symbol (e.g., USDC)",
-        },
-        {
-          field: "decimals",
-          description: "Token decimals (e.g., 6 for USDC, 18 for DAI)",
-        },
-        {
-          field: "name",
-          description: "Token name (e.g., USD Coin)",
+          field: "balances",
+          description:
+            "Array of token balances (each with balance, symbol, decimals, etc.)",
         },
         {
           field: "address",
           description: "The wallet address that was checked",
-        },
-        {
-          field: "tokenAddress",
-          description: "The token contract address",
         },
         {
           field: "error",
@@ -123,18 +104,17 @@ const web3Plugin: IntegrationPlugin = {
         },
         {
           key: "address",
-          label: "Wallet Address",
+          label: "Address",
           type: "template-input",
           placeholder: "0x... or {{NodeName.address}}",
           example: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
           required: true,
         },
         {
-          key: "tokenAddress",
-          label: "Token Contract Address",
-          type: "template-input",
-          placeholder: "0x... (ERC20 token contract)",
-          example: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+          key: "tokenConfig",
+          label: "Token",
+          type: "token-select",
+          networkField: "network",
           required: true,
         },
       ],
@@ -231,11 +211,10 @@ const web3Plugin: IntegrationPlugin = {
           required: true,
         },
         {
-          key: "tokenAddress",
-          label: "Token Contract Address",
-          type: "template-input",
-          placeholder: "0x... (ERC20 token contract)",
-          example: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+          key: "tokenConfig",
+          label: "Token",
+          type: "token-select",
+          networkField: "network",
           required: true,
         },
         {

@@ -224,12 +224,15 @@ export {
   type NewOrganizationApiKey,
   type NewOrganizationToken,
   type NewParaWallet,
+  type NewSupportedToken,
   type OrganizationApiKey,
   type OrganizationToken,
+  type SupportedToken,
   organizationApiKeys,
   organizationTokens,
   type ParaWallet,
   paraWallets,
+  supportedTokens,
 } from "../../keeperhub/db/schema-extensions";
 
 // API Keys table for webhook authentication

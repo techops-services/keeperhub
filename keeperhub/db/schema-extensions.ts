@@ -8,9 +8,18 @@
  * - paraWallets: Stores Para wallet information for Web3 operations
  * - organizationApiKeys: Stores organization-scoped API keys for MCP server authentication
  * - organizationTokens: Tracks ERC20 tokens per organization/chain for balance display
+ * - supportedTokens: System-wide default tokens (stablecoins) available on each chain
  */
 
-import { index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+} from "drizzle-orm/pg-core";
 // Note: Using relative paths instead of @/ aliases for drizzle-kit compatibility
 import { organization, users } from "../../lib/db/schema";
 import { generateId } from "../../lib/utils/id";
@@ -116,3 +125,44 @@ export const organizationTokens = pgTable(
 // Type exports for Organization Tokens table
 export type OrganizationToken = typeof organizationTokens.$inferSelect;
 export type NewOrganizationToken = typeof organizationTokens.$inferInsert;
+
+/**
+ * Supported Tokens table
+ *
+ * System-wide default tokens available on each chain. These are pre-configured
+ * tokens (primarily stablecoins) that users can select from in workflow nodes
+ * like "Check Token Balance" and "Transfer Token".
+ *
+ * This is different from organizationTokens which are user-added custom tokens.
+ * supportedTokens are read-only system defaults managed via seed scripts.
+ */
+export const supportedTokens = pgTable(
+  "supported_tokens",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => generateId()),
+    chainId: integer("chain_id").notNull(),
+    tokenAddress: text("token_address").notNull(), // ERC20 contract address (lowercase)
+    symbol: text("symbol").notNull(), // e.g., "USDC", "USDT", "DAI"
+    name: text("name").notNull(), // e.g., "USD Coin", "Tether USD"
+    decimals: integer("decimals").notNull(),
+    logoUrl: text("logo_url"), // Optional token logo URL
+    isStablecoin: boolean("is_stablecoin").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0), // Display priority
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    // Ensure unique token per chain
+    unique("supported_tokens_chain_address").on(
+      table.chainId,
+      table.tokenAddress
+    ),
+    // Index for querying tokens by chain
+    index("idx_supported_tokens_chain").on(table.chainId),
+  ]
+);
+
+// Type exports for Supported Tokens table
+export type SupportedToken = typeof supportedTokens.$inferSelect;
+export type NewSupportedToken = typeof supportedTokens.$inferInsert;

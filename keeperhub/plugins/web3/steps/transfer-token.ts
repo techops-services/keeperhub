@@ -1,12 +1,12 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { ethers } from "ethers";
 import { initializeParaSigner } from "@/keeperhub/lib/para/wallet-helpers";
 import { getOrganizationIdFromExecution } from "@/keeperhub/lib/workflow-helpers";
 import { ERC20_ABI } from "@/lib/contracts";
 import { db } from "@/lib/db";
-import { workflowExecutions } from "@/lib/db/schema";
+import { supportedTokens, workflowExecutions } from "@/lib/db/schema";
 import { getChainIdFromNetwork, resolveRpcConfig } from "@/lib/rpc";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
@@ -23,35 +23,127 @@ type TransferTokenResult =
 
 export type TransferTokenCoreInput = {
   network: string;
-  tokenAddress: string;
+  tokenConfig: string; // JSON string of TokenConfig
   recipientAddress: string;
   amount: string;
+  // Legacy support
+  tokenAddress?: string;
 };
 
 export type TransferTokenInput = StepInput & TransferTokenCoreInput;
 
 /**
+ * Parse token config from input and return a single token address
+ * For transfers, only the first token is used (checks supported first, then custom)
+ */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Handles multiple token config formats for backwards compatibility
+async function parseTokenAddress(
+  input: TransferTokenInput,
+  chainId: number
+): Promise<string | null> {
+  // Legacy support: if tokenAddress is provided directly, use it
+  if (input.tokenAddress && !input.tokenConfig) {
+    return input.tokenAddress;
+  }
+
+  if (!input.tokenConfig) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(input.tokenConfig);
+
+    // First, check for supported tokens
+    if (
+      Array.isArray(parsed.supportedTokenIds) &&
+      parsed.supportedTokenIds.length > 0
+    ) {
+      const tokens = await db
+        .select({ tokenAddress: supportedTokens.tokenAddress })
+        .from(supportedTokens)
+        .where(
+          and(
+            eq(supportedTokens.chainId, chainId),
+            inArray(supportedTokens.id, parsed.supportedTokenIds)
+          )
+        )
+        .limit(1);
+      if (tokens[0]?.tokenAddress) {
+        return tokens[0].tokenAddress;
+      }
+    }
+
+    // Then, check custom tokens (new format with symbol)
+    if (Array.isArray(parsed.customTokens) && parsed.customTokens.length > 0) {
+      return parsed.customTokens[0].address;
+    }
+
+    // Legacy: check old formats
+    if (
+      Array.isArray(parsed.customTokenAddresses) &&
+      parsed.customTokenAddresses.length > 0
+    ) {
+      const addr = parsed.customTokenAddresses.find(
+        (a: string) => a && a.trim() !== ""
+      );
+      if (addr) {
+        return addr;
+      }
+    } else if (parsed.customTokenAddress) {
+      return parsed.customTokenAddress;
+    }
+
+    return null;
+  } catch {
+    // If parsing fails and it looks like an address, use it directly
+    if (input.tokenConfig.startsWith("0x")) {
+      return input.tokenConfig;
+    }
+    return null;
+  }
+}
+
+/**
  * Core transfer token logic
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Step handler with comprehensive validation and error handling
 async function stepHandler(
   input: TransferTokenInput
 ): Promise<TransferTokenResult> {
   console.log("[Transfer Token] Starting step with input:", {
     network: input.network,
-    tokenAddress: input.tokenAddress,
+    tokenConfig: input.tokenConfig,
     recipientAddress: input.recipientAddress,
     amount: input.amount,
     hasContext: !!input._context,
     executionId: input._context?.executionId,
   });
 
-  const { network, tokenAddress, recipientAddress, amount, _context } = input;
+  const { network, recipientAddress, amount, _context } = input;
 
-  // Validate token address
-  if (!ethers.isAddress(tokenAddress)) {
+  // Get chain ID first (needed for token config parsing)
+  let chainId: number;
+  try {
+    chainId = getChainIdFromNetwork(network);
+    console.log("[Transfer Token] Resolved chain ID:", chainId);
+  } catch (error) {
+    console.error("[Transfer Token] Failed to resolve network:", error);
     return {
       success: false,
-      error: `Invalid token address: ${tokenAddress}`,
+      error: getErrorMessage(error),
+    };
+  }
+
+  // Parse token address from config
+  const tokenAddress = await parseTokenAddress(input, chainId);
+
+  // Validate token address
+  if (!(tokenAddress && ethers.isAddress(tokenAddress))) {
+    return {
+      success: false,
+      error: tokenAddress
+        ? `Invalid token address: ${tokenAddress}`
+        : "No token selected",
     };
   }
 
@@ -110,13 +202,9 @@ async function stepHandler(
     };
   }
 
-  // Get chain ID and resolve RPC config (with user preferences)
-  let chainId: number;
+  // Resolve RPC config (with user preferences)
   let rpcUrl: string;
   try {
-    chainId = getChainIdFromNetwork(network);
-    console.log("[Transfer Token] Resolved chain ID:", chainId);
-
     const rpcConfig = await resolveRpcConfig(chainId, userId);
     if (!rpcConfig) {
       throw new Error(`Chain ${chainId} not found or not enabled`);

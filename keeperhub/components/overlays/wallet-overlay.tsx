@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus, RefreshCw, Trash2 } from "lucide-react";
+import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Overlay } from "@/components/overlays/overlay";
@@ -17,9 +18,12 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { useActiveMember } from "@/keeperhub/lib/hooks/use-organization";
+import { fetchAllSupportedTokenBalances } from "@/keeperhub/lib/wallet/fetch-balances";
 import type {
   ChainBalance,
   ChainData,
+  SupportedToken,
+  SupportedTokenBalance,
   TokenBalance,
   TokenData,
   WalletData,
@@ -178,18 +182,57 @@ function WalletEmailEditor({
   );
 }
 
+function SupportedTokenBalanceDisplay({
+  token,
+}: {
+  token: SupportedTokenBalance;
+}) {
+  const renderBalance = () => {
+    if (token.loading) {
+      return <Spinner className="h-3 w-3" />;
+    }
+    if (token.error) {
+      return <span className="text-destructive">{token.error}</span>;
+    }
+    return `${token.balance} ${token.symbol}`;
+  };
+
+  return (
+    <div className="flex items-center gap-2 py-1">
+      {token.logoUrl && (
+        <Image
+          alt={token.symbol}
+          className="h-4 w-4 rounded-full"
+          height={16}
+          src={token.logoUrl}
+          width={16}
+        />
+      )}
+      <span className="font-medium text-xs">{token.symbol}</span>
+      <span className="ml-auto text-muted-foreground text-xs">
+        {renderBalance()}
+      </span>
+    </div>
+  );
+}
+
 function ChainBalanceItem({
   balance,
   isAdmin,
   onRemoveToken,
+  supportedTokenBalances,
   tokenBalances,
 }: {
   balance: ChainBalance;
   isAdmin: boolean;
   onRemoveToken: (tokenId: string, symbol: string) => void;
+  supportedTokenBalances: SupportedTokenBalance[];
   tokenBalances: TokenBalance[];
 }) {
   const chainTokens = tokenBalances.filter(
+    (t) => t.chainId === balance.chainId
+  );
+  const chainSupportedTokens = supportedTokenBalances.filter(
     (t) => t.chainId === balance.chainId
   );
 
@@ -201,8 +244,28 @@ function ChainBalanceItem({
           <ChainBalanceDisplay balance={balance} />
         </div>
       </div>
+      {/* Supported Token Balances (Stablecoins) */}
+      {chainSupportedTokens.length > 0 && (
+        <div className="ml-4">
+          <div className="mb-1 font-medium text-muted-foreground text-xs">
+            Stablecoins
+          </div>
+          <div className="rounded border bg-background/50 px-2 py-1">
+            {chainSupportedTokens.map((token) => (
+              <SupportedTokenBalanceDisplay
+                key={`${token.chainId}-${token.tokenAddress}`}
+                token={token}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+      {/* Custom Tracked Tokens */}
       {chainTokens.length > 0 && (
         <div className="ml-4 space-y-1">
+          <div className="font-medium text-muted-foreground text-xs">
+            Tracked Tokens
+          </div>
           {chainTokens.map((token) => (
             <div
               className="flex items-center justify-between rounded border bg-background p-2"
@@ -437,6 +500,7 @@ function BalanceListSection({
   refreshing,
   showAddToken,
   setShowAddToken,
+  supportedTokenBalances,
   tokenBalances,
 }: {
   balances: ChainBalance[];
@@ -448,6 +512,7 @@ function BalanceListSection({
   refreshing: boolean;
   showAddToken: boolean;
   setShowAddToken: (show: boolean) => void;
+  supportedTokenBalances: SupportedTokenBalance[];
   tokenBalances: TokenBalance[];
 }) {
   const [showTestnets, setShowTestnets] = useState(false);
@@ -501,6 +566,7 @@ function BalanceListSection({
               isAdmin={isAdmin}
               key={balance.chainId}
               onRemoveToken={onRemoveToken}
+              supportedTokenBalances={supportedTokenBalances}
               tokenBalances={tokenBalances}
             />
           ))}
@@ -596,6 +662,10 @@ export function WalletOverlay({ overlayId }: WalletOverlayProps) {
   const [walletData, setWalletData] = useState<WalletData | null>(null);
   const [chains, setChains] = useState<ChainData[]>([]);
   const [tokens, setTokens] = useState<TokenData[]>([]);
+  const [supportedTokens, setSupportedTokens] = useState<SupportedToken[]>([]);
+  const [supportedTokenBalances, setSupportedTokenBalances] = useState<
+    SupportedTokenBalance[]
+  >([]);
   const [refreshing, setRefreshing] = useState(false);
   const [showAddToken, setShowAddToken] = useState(false);
 
@@ -626,20 +696,79 @@ export function WalletOverlay({ overlayId }: WalletOverlayProps) {
     }
   }, []);
 
+  const fetchSupportedTokensData = useCallback(async (): Promise<
+    SupportedToken[]
+  > => {
+    try {
+      const response = await fetch("/api/supported-tokens");
+      const data = await response.json();
+      const tokenList = data.tokens || [];
+      setSupportedTokens(tokenList);
+      return tokenList;
+    } catch (error) {
+      console.error("Failed to fetch supported tokens:", error);
+      return [];
+    }
+  }, []);
+
+  const fetchSupportedBalances = useCallback(
+    async (
+      walletAddress: string,
+      chainList: ChainData[],
+      tokenList: SupportedToken[]
+    ) => {
+      if (tokenList.length === 0) {
+        setSupportedTokenBalances([]);
+        return;
+      }
+
+      // Set loading state
+      setSupportedTokenBalances(
+        tokenList.map((token) => ({
+          chainId: token.chainId,
+          tokenAddress: token.tokenAddress,
+          symbol: token.symbol,
+          name: token.name,
+          logoUrl: token.logoUrl,
+          balance: "0",
+          loading: true,
+        }))
+      );
+
+      // Fetch balances
+      const results = await fetchAllSupportedTokenBalances(
+        walletAddress,
+        tokenList,
+        chainList
+      );
+      setSupportedTokenBalances(results);
+    },
+    []
+  );
+
   const loadWallet = useCallback(async () => {
     setWalletLoading(true);
     try {
-      const [chainList, tokenList, walletResponse] = await Promise.all([
-        fetchChains(),
-        fetchTokens(),
-        fetch("/api/user/wallet"),
-      ]);
+      const [chainList, tokenList, supportedList, walletResponse] =
+        await Promise.all([
+          fetchChains(),
+          fetchTokens(),
+          fetchSupportedTokensData(),
+          fetch("/api/user/wallet"),
+        ]);
       const data = await walletResponse.json();
 
       if (data.hasWallet) {
         setWalletData(data);
         if (data.walletAddress && chainList.length > 0) {
-          await fetchBalances(data.walletAddress, chainList, tokenList);
+          await Promise.all([
+            fetchBalances(data.walletAddress, chainList, tokenList),
+            fetchSupportedBalances(
+              data.walletAddress,
+              chainList,
+              supportedList
+            ),
+          ]);
         }
       } else {
         setWalletData({ hasWallet: false });
@@ -650,16 +779,32 @@ export function WalletOverlay({ overlayId }: WalletOverlayProps) {
     } finally {
       setWalletLoading(false);
     }
-  }, [fetchChains, fetchTokens, fetchBalances]);
+  }, [
+    fetchChains,
+    fetchTokens,
+    fetchSupportedTokensData,
+    fetchBalances,
+    fetchSupportedBalances,
+  ]);
 
   const handleRefresh = useCallback(async () => {
     if (!(walletData?.walletAddress && chains.length > 0)) {
       return;
     }
     setRefreshing(true);
-    await fetchBalances(walletData.walletAddress, chains, tokens);
+    await Promise.all([
+      fetchBalances(walletData.walletAddress, chains, tokens),
+      fetchSupportedBalances(walletData.walletAddress, chains, supportedTokens),
+    ]);
     setRefreshing(false);
-  }, [walletData?.walletAddress, chains, tokens, fetchBalances]);
+  }, [
+    walletData?.walletAddress,
+    chains,
+    tokens,
+    supportedTokens,
+    fetchBalances,
+    fetchSupportedBalances,
+  ]);
 
   const handleAddToken = async (chainId: number, tokenAddress: string) => {
     const response = await fetch("/api/user/wallet/tokens", {
@@ -770,6 +915,7 @@ export function WalletOverlay({ overlayId }: WalletOverlayProps) {
             refreshing={refreshing}
             setShowAddToken={setShowAddToken}
             showAddToken={showAddToken}
+            supportedTokenBalances={supportedTokenBalances}
             tokenBalances={tokenBalances}
           />
         </div>
