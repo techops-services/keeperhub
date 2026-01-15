@@ -37,6 +37,121 @@ type ChainBalance = {
   error?: string;
 };
 
+// Extracted component for editing wallet email to reduce cognitive complexity
+function WalletEmailEditor({
+  currentEmail,
+  isAdmin,
+  onEmailUpdated,
+}: {
+  currentEmail: string;
+  isAdmin: boolean;
+  onEmailUpdated: () => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [updating, setUpdating] = useState(false);
+
+  const handleUpdate = async () => {
+    if (!newEmail) {
+      toast.error("Email is required");
+      return;
+    }
+
+    setUpdating(true);
+    try {
+      const response = await fetch("/api/user/wallet", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: newEmail }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update email");
+      }
+
+      toast.success("Wallet email updated successfully!");
+      setIsEditing(false);
+      setNewEmail("");
+      onEmailUpdated();
+    } catch (error) {
+      console.error("Failed to update wallet email:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update email"
+      );
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const startEditing = () => {
+    setNewEmail(currentEmail);
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setNewEmail("");
+  };
+
+  return (
+    <div>
+      <div className="mb-1 text-muted-foreground text-sm">Associated Email</div>
+      {isEditing ? (
+        <div className="space-y-2">
+          <Input
+            className="font-mono text-sm"
+            disabled={updating}
+            onChange={(e) => setNewEmail(e.target.value)}
+            placeholder="newemail@example.com"
+            type="email"
+            value={newEmail}
+          />
+          <div className="flex gap-2">
+            <Button
+              disabled={updating}
+              onClick={cancelEditing}
+              size="sm"
+              variant="outline"
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={updating || !newEmail || newEmail === currentEmail}
+              onClick={handleUpdate}
+              size="sm"
+            >
+              {updating ? (
+                <>
+                  <Spinner className="mr-2 h-3 w-3" />
+                  Saving...
+                </>
+              ) : (
+                "Save"
+              )}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <code className="break-all font-mono text-sm">{currentEmail}</code>
+          {isAdmin && (
+            <Button
+              className="h-6 px-2 text-xs"
+              onClick={startEditing}
+              size="sm"
+              variant="ghost"
+            >
+              Edit
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function WalletDialog({ open, onOpenChange }: WalletDialogProps) {
   const { data: session } = useSession();
   const { isAdmin } = useActiveMember();
@@ -223,14 +338,11 @@ export function WalletDialog({ open, onOpenChange }: WalletDialogProps) {
                 </div>
 
                 {walletData.email && (
-                  <div>
-                    <div className="mb-1 text-muted-foreground text-sm">
-                      Associated Email
-                    </div>
-                    <code className="break-all font-mono text-sm">
-                      {walletData.email}
-                    </code>
-                  </div>
+                  <WalletEmailEditor
+                    currentEmail={walletData.email}
+                    isAdmin={isAdmin}
+                    onEmailUpdated={loadWallet}
+                  />
                 )}
               </div>
 
