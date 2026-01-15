@@ -1,5 +1,5 @@
 {
-  "index": "Home",
+  "index": "Overview",
   "intro": "Introduction",
   "getting-started": "Getting Started",
   "keepers": "Nodes",
@@ -9,5 +9,14 @@
   "wallet-management": "Wallet Management",
   "users-teams-orgs": "Users and Organizations",
   "practices": "Best Practices",
-  "FAQ": "FAQ"
+  "FAQ": "FAQ",
+  "plans-features": {
+    "display": "hidden"
+  },
+  "api": {
+    "display": "hidden"
+  },
+  "billing": {
+    "display": "hidden"
+  }
 }
