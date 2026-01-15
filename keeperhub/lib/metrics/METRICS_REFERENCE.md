@@ -10,7 +10,7 @@ Metrics are collected from two sources:
 
 | Source | Description | Metrics |
 |--------|-------------|---------|
-| **Database** | Queried from PostgreSQL on each Prometheus scrape. Required because workflow runner jobs exit before Prometheus can scrape them. | Workflow executions, steps, queue depth, concurrent count, daily active users |
+| **Database** | Queried from PostgreSQL on each Prometheus scrape. Required because workflow runner jobs exit before Prometheus can scrape them. | Workflow executions, steps, queue depth, concurrent count, daily active users, user stats, organization stats |
 | **API Process** | Recorded in-memory during request handling. Works normally as the API process is long-running. | API latency, webhook latency, AI generation, plugin actions |
 
 ---
@@ -71,6 +71,33 @@ Gauge metrics tracking resource usage and capacity.
 
 ---
 
+## 5. USER & ORGANIZATION
+
+Gauge metrics tracking user and organization statistics.
+
+### User Metrics
+
+| Metric Name | Description | Labels | Source |
+|-------------|-------------|--------|--------|
+| `user.total` | Total registered users | - | DB |
+| `user.verified` | Users with verified email | - | DB |
+| `user.anonymous` | Anonymous users | - | DB |
+| `user.with_workflows` | Users who have created at least one workflow | - | DB |
+| `user.with_integrations` | Users who have configured at least one integration | - | DB |
+| `user.active.daily` | Daily active users (24h) | - | DB |
+
+### Organization Metrics
+
+| Metric Name | Description | Labels | Source |
+|-------------|-------------|--------|--------|
+| `org.total` | Total organizations | - | DB |
+| `org.members.total` | Total organization members across all orgs | - | DB |
+| `org.members_by_role` | Organization members by role | `role` | DB |
+| `org.invitations.pending` | Pending organization invitations | - | DB |
+| `org.with_workflows` | Organizations with at least one workflow | - | DB |
+
+---
+
 ## Label Keys Reference
 
 | Label Key | Description | Example Values |
@@ -87,6 +114,7 @@ Gauge metrics tracking resource usage and capacity.
 | `endpoint` | API endpoint path | `/api/workflows/webhook` |
 | `service` | External service name | `discord-api`, `sendgrid-api` |
 | `le` | Histogram bucket boundary | `100`, `250`, `500`, `+Inf` |
+| `role` | Organization member role | `owner`, `admin`, `member` |
 
 ---
 
@@ -95,7 +123,7 @@ Gauge metrics tracking resource usage and capacity.
 | Category | File | Functions |
 |----------|------|-----------|
 | Core | `keeperhub/lib/metrics/index.ts` | `getMetricsCollector()`, `createTimer()`, `withMetrics()` |
-| DB Metrics | `keeperhub/lib/metrics/db-metrics.ts` | `getWorkflowStatsFromDb()`, `getStepStatsFromDb()`, `getDailyActiveUsersFromDb()` |
+| DB Metrics | `keeperhub/lib/metrics/db-metrics.ts` | `getWorkflowStatsFromDb()`, `getStepStatsFromDb()`, `getDailyActiveUsersFromDb()`, `getUserStatsFromDb()`, `getOrgStatsFromDb()` |
 | Workflow | `keeperhub/lib/metrics/instrumentation/workflow.ts` | `recordWorkflowComplete()`, `recordStepMetrics()` |
 | API | `keeperhub/lib/metrics/instrumentation/api.ts` | `recordWebhookMetrics()`, `recordStatusPollMetrics()` |
 | Plugin | `keeperhub/lib/metrics/instrumentation/plugin.ts` | `withPluginMetrics()`, `recordExternalServiceCall()` |
@@ -127,6 +155,12 @@ The following tables are queried:
 - `workflow_executions` - execution counts by status, duration histogram
 - `workflow_execution_logs` - step counts by type/status, step duration histogram
 - `sessions` - daily active users (distinct users with sessions updated in 24h)
+- `users` - total, verified, anonymous user counts
+- `workflows` - users/orgs with workflows
+- `integrations` - users with integrations
+- `organization` - total organization count
+- `member` - member counts by role
+- `invitation` - pending invitation counts
 
 ### ServiceMonitor (Prometheus Operator)
 
@@ -158,6 +192,16 @@ Prometheus metrics are prefixed with `keeperhub_` and use snake_case:
 | `workflow.queue.depth` | `keeperhub_workflow_queue_depth` | gauge |
 | `workflow.concurrent.count` | `keeperhub_workflow_concurrent_count` | gauge |
 | `user.active.daily` | `keeperhub_user_active_daily` | gauge |
+| `user.total` | `keeperhub_user_total` | gauge |
+| `user.verified` | `keeperhub_user_verified_total` | gauge |
+| `user.anonymous` | `keeperhub_user_anonymous_total` | gauge |
+| `user.with_workflows` | `keeperhub_user_with_workflows_total` | gauge |
+| `user.with_integrations` | `keeperhub_user_with_integrations_total` | gauge |
+| `org.total` | `keeperhub_org_total` | gauge |
+| `org.members.total` | `keeperhub_org_members_total` | gauge |
+| `org.members_by_role` | `keeperhub_org_members_by_role` | gauge |
+| `org.invitations.pending` | `keeperhub_org_invitations_pending` | gauge |
+| `org.with_workflows` | `keeperhub_org_with_workflows_total` | gauge |
 | `api.webhook.latency_ms` | `keeperhub_api_webhook_latency_ms` | histogram |
 | `api.requests.total` | `keeperhub_api_requests_total` | counter |
 | `plugin.action.errors` | `keeperhub_plugin_action_errors_total` | counter |
