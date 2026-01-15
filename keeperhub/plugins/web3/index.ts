@@ -68,6 +68,58 @@ const web3Plugin: IntegrationPlugin = {
       ],
     },
     {
+      slug: "check-token-balance",
+      label: "Check Token Balance",
+      description: "Check ERC20 token balance of any address",
+      category: "Web3",
+      stepFunction: "checkTokenBalanceStep",
+      stepImportPath: "check-token-balance",
+      outputFields: [
+        {
+          field: "success",
+          description: "Whether the balance check succeeded",
+        },
+        {
+          field: "balances",
+          description:
+            "Array of token balances (each with balance, symbol, decimals, etc.)",
+        },
+        {
+          field: "address",
+          description: "The wallet address that was checked",
+        },
+        {
+          field: "error",
+          description: "Error message if the check failed",
+        },
+      ],
+      configFields: [
+        {
+          key: "network",
+          label: "Network",
+          type: "chain-select",
+          chainTypeFilter: "evm",
+          placeholder: "Select network",
+          required: true,
+        },
+        {
+          key: "address",
+          label: "Address",
+          type: "template-input",
+          placeholder: "0x... or {{NodeName.address}}",
+          example: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+          required: true,
+        },
+        {
+          key: "tokenConfig",
+          label: "Token",
+          type: "token-select",
+          networkField: "network",
+          required: true,
+        },
+      ],
+    },
+    {
       slug: "transfer-funds",
       label: "Transfer Funds",
       description: "Transfer ETH from your wallet to a recipient address",
@@ -103,6 +155,74 @@ const web3Plugin: IntegrationPlugin = {
           type: "template-input",
           placeholder: "0.1 or {{NodeName.amount}}",
           example: "0.1",
+          required: true,
+        },
+        {
+          key: "recipientAddress",
+          label: "Recipient Address",
+          type: "template-input",
+          placeholder: "0x... or {{NodeName.address}}",
+          example: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+          required: true,
+        },
+      ],
+    },
+    {
+      slug: "transfer-token",
+      label: "Transfer Token",
+      description:
+        "Transfer ERC20 tokens from your wallet to a recipient address",
+      category: "Web3",
+      stepFunction: "transferTokenStep",
+      stepImportPath: "transfer-token",
+      outputFields: [
+        {
+          field: "success",
+          description: "Whether the transfer succeeded",
+        },
+        {
+          field: "transactionHash",
+          description: "The transaction hash of the successful transfer",
+        },
+        {
+          field: "amount",
+          description: "The amount transferred (human-readable)",
+        },
+        {
+          field: "symbol",
+          description: "The token symbol (e.g., USDC)",
+        },
+        {
+          field: "recipient",
+          description: "The recipient address",
+        },
+        {
+          field: "error",
+          description: "Error message if the transfer failed",
+        },
+      ],
+      configFields: [
+        {
+          key: "network",
+          label: "Network",
+          type: "chain-select",
+          chainTypeFilter: "evm",
+          placeholder: "Select network",
+          required: true,
+        },
+        {
+          key: "tokenConfig",
+          label: "Token",
+          type: "token-select",
+          networkField: "network",
+          required: true,
+        },
+        {
+          key: "amount",
+          label: "Amount",
+          type: "template-input",
+          placeholder: "100.50 or {{NodeName.amount}}",
+          example: "100.50",
           required: true,
         },
         {

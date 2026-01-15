@@ -217,16 +217,22 @@ export const workflowExecutionLogs = pgTable("workflow_execution_logs", {
   timestamp: timestamp("timestamp").notNull().defaultNow(),
 });
 
-// KeeperHub: Para Wallets table (imported from KeeperHub schema extensions)
+// KeeperHub: Para Wallets, Organization API Keys, and Organization Tokens (imported from KeeperHub schema extensions)
 // Note: Using relative path instead of @/ alias for drizzle-kit compatibility
 // biome-ignore lint/performance/noBarrelFile: Intentional re-export for schema extensions
 export {
   type NewOrganizationApiKey,
+  type NewOrganizationToken,
   type NewParaWallet,
+  type NewSupportedToken,
   type OrganizationApiKey,
+  type OrganizationToken,
   organizationApiKeys,
+  organizationTokens,
   type ParaWallet,
   paraWallets,
+  type SupportedToken,
+  supportedTokens,
 } from "../../keeperhub/db/schema-extensions";
 
 // API Keys table for webhook authentication
