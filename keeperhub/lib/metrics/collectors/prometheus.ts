@@ -451,6 +451,17 @@ function filterLabelsForMetric(
 
 // Metric name to histogram/counter/gauge mapping
 // Note: Workflow execution/step metrics are now DB-sourced gauges, not histograms/counters
+
+// Metrics that are DB-sourced and should be silently ignored when called via runtime instrumentation
+// These are populated from database queries in updateDbMetrics(), not from runtime calls
+const dbSourcedMetrics = new Set([
+  "workflow.execution.duration_ms",
+  "workflow.step.duration_ms",
+  "workflow.executions.total",
+  "workflow.execution.errors",
+  "workflow.step.errors",
+]);
+
 const histogramMap: Record<string, Histogram> = {
   "api.webhook.latency_ms": webhookLatency,
   "api.status.latency_ms": statusLatency,
@@ -502,6 +513,10 @@ function sanitizeLabels(labels?: MetricLabels): Record<string, string> {
  */
 export const prometheusMetricsCollector: MetricsCollector = {
   recordLatency(name: string, durationMs: number, labels?: MetricLabels): void {
+    // Silently skip DB-sourced metrics (populated via updateDbMetrics)
+    if (dbSourcedMetrics.has(name)) {
+      return;
+    }
     const histogram = histogramMap[name];
     if (histogram) {
       histogram.observe(sanitizeLabels(labels), durationMs);
@@ -511,6 +526,10 @@ export const prometheusMetricsCollector: MetricsCollector = {
   },
 
   incrementCounter(name: string, labels?: MetricLabels, value = 1): void {
+    // Silently skip DB-sourced metrics (populated via updateDbMetrics)
+    if (dbSourcedMetrics.has(name)) {
+      return;
+    }
     const counter = counterMap[name];
     if (counter) {
       counter.inc(sanitizeLabels(labels), value);
@@ -524,6 +543,10 @@ export const prometheusMetricsCollector: MetricsCollector = {
     error: Error | ErrorContext,
     labels?: MetricLabels
   ): void {
+    // Silently skip DB-sourced metrics (populated via updateDbMetrics)
+    if (dbSourcedMetrics.has(name)) {
+      return;
+    }
     const counter = errorCounterMap[name];
     if (counter) {
       const sanitized = sanitizeLabels(labels);
@@ -545,6 +568,10 @@ export const prometheusMetricsCollector: MetricsCollector = {
   },
 
   setGauge(name: string, value: number, labels?: MetricLabels): void {
+    // Silently skip DB-sourced metrics (populated via updateDbMetrics)
+    if (dbSourcedMetrics.has(name)) {
+      return;
+    }
     const gauge = gaugeMap[name];
     if (gauge) {
       gauge.set(sanitizeLabels(labels), value);

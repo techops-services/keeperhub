@@ -53,8 +53,8 @@ Histogram metrics tracking duration/response times.
 |-------------|-------------|--------|--------|--------|
 | `workflow.execution.duration_ms` | Total workflow execution time | `le` (bucket) | P95 < 2000ms | DB |
 | `workflow.step.duration_ms` | Individual step execution time | `le` (bucket) | P95 < 500ms | DB |
-| `api.webhook.latency_ms` | Webhook trigger response time | `workflow_id`, `status`, `status_code` | P95 < 50ms | API |
-| `api.status.latency_ms` | Status polling response time | `execution_id`, `status` | P95 < 30ms | API |
+| `api.webhook.latency_ms` | Webhook trigger response time | `workflow_id`, `execution_id`, `status`, `status_code` | P95 < 50ms | API |
+| `api.status.latency_ms` | Status polling response time | `execution_id`, `status`, `status_code`, `execution_status` | P95 < 30ms | API |
 | `plugin.action.duration_ms` | Plugin action execution time | `plugin_name`, `action_name`, `execution_id`, `status` | P95 < 1000ms | API |
 | `ai.generation.duration_ms` | AI workflow generation time | `status` | P95 < 5000ms | API |
 
@@ -81,6 +81,7 @@ Error metrics tracking failures and exceptions.
 | `workflow.execution.errors` | Failed workflow executions | - | < 5% | DB |
 | `workflow.step.errors` | Failed step executions | `step_type` | < 10% | DB |
 | `plugin.action.errors` | Failed plugin actions | `plugin_name`, `action_name`, `error_type` | < 20% | API |
+| `api.errors.total` | API errors (webhook failures) | `endpoint`, `status_code`, `error_type` | count | API |
 
 ---
 
@@ -288,6 +289,7 @@ Prometheus metrics are prefixed with `keeperhub_` and use snake_case:
 | `ai.generation.duration_ms` | `keeperhub_ai_generation_duration_ms` | histogram |
 | `plugin.invocations.total` | `keeperhub_plugin_invocations_total` | counter |
 | `plugin.action.errors` | `keeperhub_plugin_action_errors_total` | counter |
+| `api.errors.total` | `keeperhub_api_errors_total` | counter |
 
 ### Default Node.js Metrics
 
