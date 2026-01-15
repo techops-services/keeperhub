@@ -201,22 +201,10 @@ const externalServiceLatency = getOrCreateHistogram(
 );
 
 // Traffic counters
-const apiRequests = getOrCreateCounter(
-  "keeperhub_api_requests_total",
-  "Total API requests",
-  ["endpoint", "status_code"]
-);
-
 const pluginInvocations = getOrCreateCounter(
   "keeperhub_plugin_invocations_total",
   "Total plugin invocations",
   ["plugin_name", "action_name"]
-);
-
-const aiTokensConsumed = getOrCreateCounter(
-  "keeperhub_ai_tokens_consumed_total",
-  "Total AI tokens consumed",
-  []
 );
 
 // Error counters
@@ -471,9 +459,7 @@ const histogramMap: Record<string, Histogram> = {
 };
 
 const counterMap: Record<string, Counter> = {
-  "api.requests.total": apiRequests,
   "plugin.invocations.total": pluginInvocations,
-  "ai.tokens.consumed": aiTokensConsumed,
   "db.query.slow_count": slowQueries,
 };
 
