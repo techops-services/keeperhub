@@ -15,6 +15,25 @@ Metrics are collected from two sources:
 
 ---
 
+## Architecture Context
+
+Understanding the user/org/wallet model helps interpret metrics correctly:
+
+| Entity | Description | Expected Relationships |
+|--------|-------------|------------------------|
+| **User** | Registered or anonymous account | Each registered user auto-gets a personal org |
+| **Organization** | Multi-tenant container for workflows/credentials | Each org auto-gets a Para wallet |
+| **Para Wallet** | MPC wallet for blockchain signing | 1:1 with organizations |
+| **Anonymous User** | Trial user without org | Can run workflows, but no chain operations |
+
+**Key metric relationships:**
+- `org.total` ≈ `para_wallet.total` (1:1 org-to-wallet)
+- `user.total` ≥ `org.total` (users can share orgs via invites)
+- `user.anonymous` = users without orgs (trial mode)
+- Web3 steps (`transfer-funds`, `write-contract`) require org + wallet
+
+---
+
 ## 1. LATENCY (Response Time)
 
 Histogram metrics tracking duration/response times.
