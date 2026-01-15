@@ -59,9 +59,12 @@ app.post("/workflow/:id/execute", async (req, res) => {
   const { id } = req.params;
 
   try {
-    const response = await (await httpService.authorize()).post(
+    const response = await httpService.post(
       `${KEEPERHUB_API_URL}/api/workflow/${id}/execute`,
-      payload
+      payload,
+      {
+        "X-Internal-Execution": "true",
+      }
     );
 
     return res.status(200).json(response);

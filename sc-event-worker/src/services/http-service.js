@@ -15,9 +15,9 @@ class HttpService {
     return data;
   }
 
-  async post(url, data) {
+  async post(url, data, extraHeaders = {}) {
     const { data: response } = await axios.post(url, data, {
-      headers: this.getHeaders(),
+      headers: this.getHeaders(extraHeaders),
     });
 
     return response;
@@ -48,14 +48,16 @@ class HttpService {
 
   /**
    *
+   * @param {object} extraHeaders - Extra headers to add to the request.
    * @returns {object}
    *
    */
-  getHeaders() {
+  getHeaders(extraHeaders = {}) {
     return {
       Authorization: `Bearer ${this.accessToken}`,
       "Content-Type": "application/json",
       "X-Internal-Token": KEEPERHUB_API_KEY,
+      ...extraHeaders,
     };
   }
 }
