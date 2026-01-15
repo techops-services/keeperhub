@@ -34,6 +34,7 @@ import {
 } from "../lib/db/schema";
 import { executeWorkflow } from "../lib/workflow-executor.workflow";
 import { calculateTotalSteps } from "../lib/workflow-progress";
+import { SHUTDOWN_TIMEOUT_MS } from "../lib/workflow-runner/constants";
 import type { WorkflowEdge, WorkflowNode } from "../lib/workflow-store";
 
 // Validate required environment variables
@@ -79,15 +80,81 @@ function validateEnv(): {
   };
 }
 
-// Database connection
+// Database connection with timeout configuration
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
   throw new Error("DATABASE_URL environment variable is required");
 }
-const queryClient = postgres(connectionString);
+const queryClient = postgres(connectionString, {
+  connect_timeout: 10, // 10s connection timeout
+  idle_timeout: 30, // Close idle connections after 30s
+  max_lifetime: 60 * 5, // Max connection lifetime 5 minutes
+  connection: {
+    statement_timeout: 30_000, // 30s query timeout
+  },
+});
 const db = drizzle(queryClient, {
   schema: { workflows, workflowExecutions, workflowSchedules },
 });
+
+// Graceful shutdown state tracking
+let isShuttingDown = false;
+let currentExecutionId: string | null = null;
+let currentScheduleId: string | null = null;
+
+/**
+ * Handle graceful shutdown on SIGTERM/SIGINT
+ * Updates execution status and closes database connection before exit
+ */
+async function handleGracefulShutdown(signal: string): Promise<void> {
+  if (isShuttingDown) {
+    console.log(`[Runner] Already shutting down, ignoring ${signal}`);
+    return;
+  }
+
+  isShuttingDown = true;
+  console.log(`[Runner] Received ${signal}, initiating graceful shutdown...`);
+
+  const shutdownTimeout = setTimeout(() => {
+    console.error("[Runner] Graceful shutdown timeout, forcing exit");
+    process.exit(1);
+  }, SHUTDOWN_TIMEOUT_MS);
+
+  try {
+    // Update execution status if we have an active execution
+    if (currentExecutionId) {
+      console.log(
+        `[Runner] Updating execution ${currentExecutionId} status to error`
+      );
+      await updateExecutionStatus(currentExecutionId, "error", {
+        error: `Workflow terminated by ${signal} signal`,
+      });
+
+      // Update schedule status if this was a scheduled execution
+      if (currentScheduleId) {
+        await updateScheduleStatus(
+          currentScheduleId,
+          "error",
+          `Workflow terminated by ${signal} signal`
+        );
+      }
+    }
+
+    // Close database connection
+    await queryClient.end();
+    console.log("[Runner] Database connection closed");
+  } catch (error) {
+    console.error("[Runner] Error during graceful shutdown:", error);
+  } finally {
+    clearTimeout(shutdownTimeout);
+    console.log("[Runner] Graceful shutdown complete");
+    process.exit(1);
+  }
+}
+
+// Register signal handlers for graceful shutdown
+process.on("SIGTERM", () => handleGracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => handleGracefulShutdown("SIGINT"));
 
 /**
  * Update execution status in database
@@ -209,12 +276,22 @@ async function main(): Promise<void> {
   const startTime = Date.now();
   const { workflowId, executionId, input, scheduleId } = validateEnv();
 
+  // Track execution IDs for graceful shutdown handler
+  currentExecutionId = executionId;
+  currentScheduleId = scheduleId ?? null;
+
   console.log("[Runner] Starting workflow execution");
   console.log(`[Runner] Workflow ID: ${workflowId}`);
   console.log(`[Runner] Execution ID: ${executionId}`);
   console.log(`[Runner] Schedule ID: ${scheduleId || "none"}`);
 
   try {
+    // Check if we're already shutting down
+    if (isShuttingDown) {
+      console.log("[Runner] Shutdown in progress, aborting execution");
+      return;
+    }
+
     // Update execution status to running
     await updateExecutionStatus(executionId, "running");
 
@@ -248,6 +325,12 @@ async function main(): Promise<void> {
     console.log(`[Runner] Total steps: ${totalSteps}`);
     await initializeExecutionProgress(executionId, totalSteps);
 
+    // Check if shutdown was requested before starting long-running execution
+    if (isShuttingDown) {
+      console.log("[Runner] Shutdown requested, aborting before execution");
+      return;
+    }
+
     // Execute the workflow
     console.log("[Runner] Executing workflow...");
     const result = await executeWorkflow({
@@ -273,6 +356,8 @@ async function main(): Promise<void> {
         await updateScheduleStatus(scheduleId, "success");
       }
 
+      // Clear execution ID so signal handler doesn't update completed execution
+      currentExecutionId = null;
       console.log("[Runner] Execution completed successfully");
     } else {
       const errorMessage =
@@ -290,8 +375,11 @@ async function main(): Promise<void> {
         await updateScheduleStatus(scheduleId, "error", errorMessage);
       }
 
-      console.error("[Runner] Execution failed:", errorMessage);
-      process.exitCode = 1;
+      // Clear execution ID so signal handler doesn't update already-handled execution
+      currentExecutionId = null;
+      // Workflow failure is a business logic outcome, not a system error
+      // Exit 0 because we successfully executed and recorded the result
+      console.error("[Runner] Workflow execution failed:", errorMessage);
     }
   } catch (error) {
     const duration = Date.now() - startTime;
@@ -301,6 +389,8 @@ async function main(): Promise<void> {
     console.error(`[Runner] Fatal error after ${duration}ms:`, errorMessage);
 
     // Update execution status with error
+    // Only exit 1 if we fail to record the error (system failure)
+    let dbUpdateSucceeded = false;
     try {
       await updateExecutionStatus(executionId, "error", {
         error: errorMessage,
@@ -310,25 +400,39 @@ async function main(): Promise<void> {
       if (scheduleId) {
         await updateScheduleStatus(scheduleId, "error", errorMessage);
       }
+      dbUpdateSucceeded = true;
     } catch (updateError) {
       console.error("[Runner] Failed to update execution status:", updateError);
+      // System error: couldn't record the failure to database
+      process.exitCode = 1;
     }
 
-    process.exitCode = 1;
+    // Clear execution ID so signal handler doesn't update already-handled execution
+    currentExecutionId = null;
+
+    if (dbUpdateSucceeded) {
+      // We recorded the error successfully - this is a normal completion
+      console.log("[Runner] Error recorded to database, exiting normally");
+    }
   } finally {
-    // Clean up database connection
-    await queryClient.end();
-    console.log("[Runner] Database connection closed");
+    // Clean up database connection (skip if shutdown handler already closed it)
+    if (!isShuttingDown) {
+      await queryClient.end();
+      console.log("[Runner] Database connection closed");
+    }
   }
 }
 
 // Run main function
+// Exit codes:
+//   0 = Container completed successfully (workflow ran and result recorded, even if workflow failed)
+//   1 = System/runtime error (DB unreachable, signal termination, unhandled exception)
 main()
   .then(() => {
-    // Exit with the exitCode that was set (0 for success, 1 for errors)
     process.exit(process.exitCode ?? 0);
   })
   .catch((error) => {
+    // Unhandled exception is a system error
     console.error("[Runner] Unhandled error:", error);
     process.exit(1);
   });
