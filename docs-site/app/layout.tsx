@@ -23,8 +23,8 @@ function filterPageMap(
   items: Awaited<ReturnType<typeof getPageMap>>
 ): typeof items {
   return items.filter((item) => {
-    // Hide the API section (not yet public)
-    if ("name" in item && item.name === "api") {
+    // Hide sections that are not yet public
+    if ("name" in item && (item.name === "api" || item.name === "billing")) {
       return false;
     }
     return true;
