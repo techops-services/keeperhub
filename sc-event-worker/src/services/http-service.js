@@ -2,8 +2,8 @@ const { default: axios } = require("axios");
 const {
   JWT_TOKEN_USERNAME,
   JWT_TOKEN_PASSWORD,
-  API_URL,
-  INTERNAL_API_TOKEN,
+  KEEPERHUB_API_URL,
+  KEEPERHUB_API_KEY,
 } = require("../config/environment.js");
 
 class HttpService {
@@ -34,7 +34,7 @@ class HttpService {
     payload.append("username", JWT_TOKEN_USERNAME);
     payload.append("password", JWT_TOKEN_PASSWORD);
 
-    const url = `${API_URL}/auth/token`;
+    const url = `${KEEPERHUB_API_URL}/auth/token`;
     const { data } = await axios.post(url, payload, {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -55,7 +55,7 @@ class HttpService {
     return {
       Authorization: `Bearer ${this.accessToken}`,
       "Content-Type": "application/json",
-      "X-Internal-Token": INTERNAL_API_TOKEN,
+      "X-Internal-Token": KEEPERHUB_API_KEY,
     };
   }
 }

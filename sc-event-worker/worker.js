@@ -3,7 +3,7 @@ const bodyParser = require("body-parser");
 
 const { httpService } = require("./src/services/http-service.js");
 const {
-  API_URL,
+  KEEPERHUB_API_URL,
   PORT,
   TIMEOUT_BETWEEN_SYNC,
 } = require("./src/config/environment.js");
@@ -26,7 +26,7 @@ const synchronizedData = {
 async function fetchData() {
   try {
     const { workflows, networks } = await await httpService.get(
-      `${API_URL}/api/workflows/events?active=true`
+      `${KEEPERHUB_API_URL}/api/workflows/events?active=true`
     );
 
     synchronizedData.workflows = workflows;
@@ -60,7 +60,7 @@ app.post("/workflow/:id/execute", async (req, res) => {
 
   try {
     const response = await (await httpService.authorize()).post(
-      `${API_URL}/api/workflow/${id}/execute`,
+      `${KEEPERHUB_API_URL}/api/workflow/${id}/execute`,
       payload
     );
 
