@@ -245,9 +245,13 @@ Prometheus metrics are prefixed with `keeperhub_` and use snake_case:
 | `workflow.executions.total` | `keeperhub_workflow_executions_total` | gauge |
 | `workflow.execution.errors` | `keeperhub_workflow_execution_errors_total` | gauge |
 | `workflow.execution.duration_ms` | `keeperhub_workflow_execution_duration_ms_bucket` | gauge |
+| `workflow.execution.duration_ms` | `keeperhub_workflow_execution_duration_ms_sum` | gauge |
+| `workflow.execution.duration_ms` | `keeperhub_workflow_execution_duration_ms_count` | gauge |
 | `workflow.step.executions.total` | `keeperhub_workflow_step_executions_total` | gauge |
 | `workflow.step.errors` | `keeperhub_workflow_step_errors_total` | gauge |
 | `workflow.step.duration_ms` | `keeperhub_workflow_step_duration_ms_bucket` | gauge |
+| `workflow.step.duration_ms` | `keeperhub_workflow_step_duration_ms_sum` | gauge |
+| `workflow.step.duration_ms` | `keeperhub_workflow_step_duration_ms_count` | gauge |
 | `workflow.queue.depth` | `keeperhub_workflow_queue_depth` | gauge |
 | `workflow.concurrent.count` | `keeperhub_workflow_concurrent_count` | gauge |
 | `user.active.daily` | `keeperhub_user_active_daily` | gauge |
@@ -276,8 +280,18 @@ Prometheus metrics are prefixed with `keeperhub_` and use snake_case:
 | `para_wallet.total` | `keeperhub_para_wallet_total` | gauge |
 | `session.active` | `keeperhub_session_active_total` | gauge |
 | `api.webhook.latency_ms` | `keeperhub_api_webhook_latency_ms` | histogram |
+| `api.status.latency_ms` | `keeperhub_api_status_latency_ms` | histogram |
+| `plugin.action.duration_ms` | `keeperhub_plugin_action_duration_ms` | histogram |
+| `ai.generation.duration_ms` | `keeperhub_ai_generation_duration_ms` | histogram |
+| `external.service.latency_ms` | `keeperhub_external_service_latency_ms` | histogram |
 | `api.requests.total` | `keeperhub_api_requests_total` | counter |
+| `plugin.invocations.total` | `keeperhub_plugin_invocations_total` | counter |
+| `ai.tokens.consumed` | `keeperhub_ai_tokens_consumed_total` | counter |
 | `plugin.action.errors` | `keeperhub_plugin_action_errors_total` | counter |
+| `api.errors.total` | `keeperhub_api_errors_total` | counter |
+| `external.service.errors` | `keeperhub_external_service_errors_total` | counter |
+| `db.query.slow_count` | `keeperhub_db_query_slow_total` | counter |
+| `db.pool.utilization` | `keeperhub_db_pool_utilization_percent` | gauge |
 
 ### Default Node.js Metrics
 
