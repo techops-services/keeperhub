@@ -66,3 +66,6 @@ deploy/local/hybrid/schedule-trigger-hybrid.yaml
 
 # tailwindcss logs
 tailwindcss-*.log
+
+# Sentry Config File
+.env.sentry-build-plugin

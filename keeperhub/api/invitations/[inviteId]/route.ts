@@ -86,6 +86,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
         {
           error: "Invitation has been rejected",
           rejected: true,
+          invitation: {
+            email: inv.email,
+            organizationName: inv.organizationName,
+          },
         },
         { status: 410 }
       );

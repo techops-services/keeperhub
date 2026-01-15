@@ -40,7 +40,8 @@ const WORKFLOW_LABELS = [
   "status",
 ];
 const STEP_LABELS = ["execution_id", "step_type", "status"];
-const API_LABELS = ["endpoint", "status_code", "status"];
+const _API_LABELS = ["endpoint", "status_code", "status"];
+const WEBHOOK_LABELS = ["workflow_id", "status_code", "status", "execution_id"];
 const PLUGIN_LABELS = ["plugin_name", "action_name", "execution_id", "status"];
 const _ERROR_LABELS = ["error_type", "plugin_name", "action_name", "service"];
 const DB_LABELS = ["query_type", "threshold"];
@@ -110,14 +111,14 @@ const stepDuration = getOrCreateHistogram(
 const webhookLatency = getOrCreateHistogram(
   "keeperhub_api_webhook_latency_ms",
   "Webhook trigger response time in milliseconds",
-  API_LABELS,
+  WEBHOOK_LABELS,
   [10, 25, 50, 100, 250, 500]
 );
 
 const statusLatency = getOrCreateHistogram(
   "keeperhub_api_status_latency_ms",
   "Status polling response time in milliseconds",
-  ["execution_id", "status"],
+  ["execution_id", "status_code", "status", "execution_status"],
   [5, 10, 25, 50, 100]
 );
 

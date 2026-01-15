@@ -36,8 +36,8 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ManageOrgsModal } from "@/keeperhub/components/organization/manage-orgs-modal";
 // start custom keeperhub code //
+import { ManageOrgsModal } from "@/keeperhub/components/organization/manage-orgs-modal";
 import { FeedbackOverlay } from "@/keeperhub/components/overlays/feedback-overlay";
 import { WalletOverlay } from "@/keeperhub/components/overlays/wallet-overlay";
 // end keeperhub code //

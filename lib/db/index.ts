@@ -7,6 +7,9 @@ import {
   chains,
   chainsRelations,
   integrations,
+  // start custom keeperhub code //
+  organizationApiKeys,
+  // end keeperhub code //
   sessions,
   userRpcPreferences,
   userRpcPreferencesRelations,
@@ -33,6 +36,9 @@ const schema = {
   workflowSchedules,
   workflowSchedulesRelations,
   apiKeys,
+  // start custom keeperhub code //
+  organizationApiKeys,
+  // end keeperhub code //
   integrations,
   chains,
   chainsRelations,

@@ -221,7 +221,10 @@ export const workflowExecutionLogs = pgTable("workflow_execution_logs", {
 // Note: Using relative path instead of @/ alias for drizzle-kit compatibility
 // biome-ignore lint/performance/noBarrelFile: Intentional re-export for schema extensions
 export {
+  type NewOrganizationApiKey,
   type NewParaWallet,
+  type OrganizationApiKey,
+  organizationApiKeys,
   type ParaWallet,
   paraWallets,
 } from "../../keeperhub/db/schema-extensions";

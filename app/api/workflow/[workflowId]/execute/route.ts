@@ -2,6 +2,12 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { start } from "workflow/api";
 // start custom keeperhub code //
+import { authenticateApiKey } from "@/keeperhub/lib/api-key-auth";
+import {
+  getMetricsCollector,
+  LabelKeys,
+  MetricNames,
+} from "@/keeperhub/lib/metrics";
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 // end keeperhub code //
 import { auth } from "@/lib/auth";
@@ -95,42 +101,75 @@ export async function POST(
 
       userId = workflow.userId;
     } else {
-      // Normal user execution - validate session
-      const session = await auth.api.getSession({
-        headers: request.headers,
-      });
-
-      if (!session) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-
-      // Get workflow and verify ownership
-      workflow = await db.query.workflows.findFirst({
-        where: eq(workflows.id, workflowId),
-      });
-
-      if (!workflow) {
-        return NextResponse.json(
-          { error: "Workflow not found" },
-          { status: 404 }
-        );
-      }
-
       // start custom keeperhub code //
-      // Check access: owner or org member
-      const isOwner = workflow.userId === session.user.id;
-      const orgContext = await getOrgContext();
-      const isSameOrg =
-        !workflow.isAnonymous &&
-        workflow.organizationId &&
-        orgContext.organization?.id === workflow.organizationId;
+      // Try API key authentication first
+      const apiKeyAuth = await authenticateApiKey(request);
+      let organizationId: string | null = null;
 
-      if (!(isOwner || isSameOrg)) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      if (apiKeyAuth.authenticated) {
+        // API key authentication successful
+        organizationId = apiKeyAuth.organizationId || null;
+
+        // Get workflow and verify organization access
+        workflow = await db.query.workflows.findFirst({
+          where: eq(workflows.id, workflowId),
+        });
+
+        if (!workflow) {
+          return NextResponse.json(
+            { error: "Workflow not found" },
+            { status: 404 }
+          );
+        }
+
+        // Check that workflow belongs to the API key's organization
+        const isSameOrg =
+          !workflow.isAnonymous &&
+          workflow.organizationId &&
+          organizationId === workflow.organizationId;
+
+        if (!isSameOrg) {
+          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+
+        userId = workflow.userId;
+      } else {
+        // Fall back to session authentication
+        const session = await auth.api.getSession({
+          headers: request.headers,
+        });
+
+        if (!session) {
+          return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        // Get workflow and verify ownership
+        workflow = await db.query.workflows.findFirst({
+          where: eq(workflows.id, workflowId),
+        });
+
+        if (!workflow) {
+          return NextResponse.json(
+            { error: "Workflow not found" },
+            { status: 404 }
+          );
+        }
+
+        // Check access: owner or org member
+        const isOwner = workflow.userId === session.user.id;
+        const orgContext = await getOrgContext();
+        const isSameOrg =
+          !workflow.isAnonymous &&
+          workflow.organizationId &&
+          orgContext.organization?.id === workflow.organizationId;
+
+        if (!(isOwner || isSameOrg)) {
+          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+
+        userId = session.user.id;
       }
       // end keeperhub code //
-
-      userId = session.user.id;
     }
 
     // start custom keeperhub code //
@@ -195,6 +234,16 @@ export async function POST(
       executionId = execution.id;
       console.log("[API] Created execution:", executionId);
     }
+
+    // start custom keeperhub code //
+    // Record workflow execution metric in API process (workflow runs in separate context)
+    const triggerType = isInternalExecution ? "scheduled" : "manual";
+    const metrics = getMetricsCollector();
+    metrics.incrementCounter(MetricNames.WORKFLOW_EXECUTIONS_TOTAL, {
+      [LabelKeys.TRIGGER_TYPE]: triggerType,
+      [LabelKeys.WORKFLOW_ID]: workflowId,
+    });
+    // end keeperhub code //
 
     // Execute the workflow in the background (don't await)
     executeWorkflowBackground(

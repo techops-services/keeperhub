@@ -11,6 +11,9 @@ export async function register() {
 
   // Only register process handlers in Node.js runtime (not Edge)
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    // Dynamically import Sentry to ensure it's available
+    const Sentry = await import("@sentry/nextjs");
+
     // Initialize Prometheus metrics collector if enabled
     if (process.env.METRICS_COLLECTOR === "prometheus") {
       const { prometheusMetricsCollector } = await import(
@@ -28,6 +31,7 @@ export async function register() {
       setMetricsCollector(dualCollector);
       console.log("[Metrics] Prometheus dual-write collector initialized");
     }
+
     // Catch unhandled promise rejections (would otherwise be silent)
     process.on("unhandledRejection", (reason) => {
       console.error(
@@ -35,11 +39,23 @@ export async function register() {
         reason instanceof Error ? reason.message : reason,
         reason instanceof Error ? reason.stack : ""
       );
+
+      // Send to Sentry
+      if (reason instanceof Error) {
+        Sentry.captureException(reason);
+      } else {
+        Sentry.captureException(
+          new Error(`Unhandled Rejection: ${String(reason)}`)
+        );
+      }
     });
 
     // Catch uncaught exceptions
     process.on("uncaughtException", (error) => {
       console.error("Uncaught Exception:", error.message, error.stack);
+
+      // Send to Sentry
+      Sentry.captureException(error);
     });
   }
 }

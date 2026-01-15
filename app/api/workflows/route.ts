@@ -1,6 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 // start custom keeperhub code //
+import { authenticateApiKey } from "@/keeperhub/lib/api-key-auth";
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -9,37 +10,49 @@ import { workflows } from "@/lib/db/schema";
 
 export async function GET(request: Request) {
   try {
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
+    // start custom keeperhub code //
+    // Try API key authentication first
+    const apiKeyAuth = await authenticateApiKey(request);
+    let organizationId: string | null;
+    let userId: string | null = null;
 
-    if (!session?.user) {
-      return NextResponse.json([], { status: 200 });
+    if (apiKeyAuth.authenticated) {
+      // API key authentication successful
+      organizationId = apiKeyAuth.organizationId || null;
+    } else {
+      // Fall back to session authentication
+      const session = await auth.api.getSession({
+        headers: request.headers,
+      });
+
+      if (!session?.user) {
+        return NextResponse.json([], { status: 200 });
+      }
+
+      userId = session.user.id;
+
+      // Get organization context from session
+      const context = await getOrgContext();
+      organizationId = context.organization?.id || null;
     }
 
-    // start custom keeperhub code //
-    const context = await getOrgContext();
-
     const userWorkflows =
-      context.isAnonymous || !context.organization
+      !organizationId && userId
         ? // Anonymous users or users without org: show trial workflows
           await db
             .select()
             .from(workflows)
             .where(
-              and(
-                eq(workflows.userId, session.user.id),
-                eq(workflows.isAnonymous, true)
-              )
+              and(eq(workflows.userId, userId), eq(workflows.isAnonymous, true))
             )
             .orderBy(desc(workflows.updatedAt))
-        : // Authenticated users with org: show org workflows
+        : // Authenticated users with org or API key: show org workflows
           await db
             .select()
             .from(workflows)
             .where(
               and(
-                eq(workflows.organizationId, context.organization.id),
+                eq(workflows.organizationId, organizationId ?? ""),
                 eq(workflows.isAnonymous, false)
               )
             )

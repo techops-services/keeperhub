@@ -52,7 +52,9 @@ deployment:
         - |
           echo "Running database migrations..."
           pnpm db:push
-          echo "Migrations completed successfully"
+          echo "Seeding chains..."
+          pnpm db:seed
+          echo "Migrations and seeding completed successfully"
       env: *shared_env
 
 serviceAccount:
@@ -150,6 +152,27 @@ env:
   FROM_ADDRESS:
     type: kv
     value: "noreply@keeperhub.com"
+  # Sentry
+  SENTRY_DSN:
+    type: parameterStore
+    name: sentry-dsn
+    parameter_name: /eks/maker-prod/keeperhub/sentry-dsn
+  NEXT_PUBLIC_SENTRY_DSN:
+    type: parameterStore
+    name: next-public-sentry-dsn
+    parameter_name: /eks/maker-prod/keeperhub/next-public-sentry-dsn
+  SENTRY_ORG:
+    type: parameterStore
+    name: sentry-org
+    parameter_name: /eks/maker-prod/keeperhub/sentry-org
+  SENTRY_PROJECT:
+    type: parameterStore
+    name: sentry-project
+    parameter_name: /eks/maker-prod/keeperhub/sentry-project
+  SENTRY_AUTH_TOKEN:
+    type: parameterStore
+    name: sentry-auth-token
+    parameter_name: /eks/maker-prod/keeperhub/sentry-auth-token
 
 externalSecrets:
   clusterSecretStoreName: maker-prod

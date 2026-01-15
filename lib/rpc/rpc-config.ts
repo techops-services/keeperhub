@@ -67,6 +67,15 @@ export type GetRpcUrlOptions = {
 };
 
 /**
+ * Result type for parseRpcConfig with error details
+ */
+export type ParseRpcConfigResult = {
+  config: RpcConfig;
+  error?: string;
+  rawValue?: string;
+};
+
+/**
  * Parse JSON config from environment variable
  *
  * @param envValue - The CHAIN_RPC_CONFIG environment variable value
@@ -77,6 +86,31 @@ export function parseRpcConfig(envValue: string | undefined): RpcConfig {
     return JSON.parse(envValue || "{}");
   } catch {
     return {};
+  }
+}
+
+/**
+ * Parse JSON config with detailed error information for debugging
+ *
+ * @param envValue - The CHAIN_RPC_CONFIG environment variable value
+ * @returns Object containing parsed config and any error details
+ */
+export function parseRpcConfigWithDetails(
+  envValue: string | undefined
+): ParseRpcConfigResult {
+  if (!envValue) {
+    return { config: {} };
+  }
+
+  try {
+    const config = JSON.parse(envValue);
+    return { config };
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    // Truncate raw value for logging (may contain sensitive URLs)
+    const rawValue =
+      envValue.length > 100 ? `${envValue.slice(0, 100)}...` : envValue;
+    return { config: {}, error, rawValue };
   }
 }
 

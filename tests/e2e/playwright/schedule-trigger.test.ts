@@ -184,43 +184,5 @@ test.describe("Schedule Trigger", () => {
   });
 });
 
-test.describe("Schedule Trigger API", () => {
-  // biome-ignore lint/suspicious/useAwait: Playwright test framework requires async
-  // biome-ignore lint/correctness/noUnusedFunctionParameters: request is provided by Playwright but unused in stub test
-  test("execute API returns running status", async ({ request }) => {
-    // This test requires a valid workflow ID and authentication
-    // Skip if no test workflow is available
-    test.skip();
-  });
-
-  // biome-ignore lint/suspicious/useAwait: Playwright test framework requires async
-  // biome-ignore lint/correctness/noUnusedFunctionParameters: request is provided by Playwright but unused in stub test
-  test("execute API accepts internal execution header", async ({ request }) => {
-    // This test verifies the API accepts the internal execution header
-    // Skip if no test workflow is available
-    test.skip();
-  });
-});
-
-test.describe("Schedule Trigger Database", () => {
-  // biome-ignore lint/suspicious/useAwait: Playwright test framework requires async
-  test("schedule is created when workflow is saved with schedule trigger", async ({
-    page: _page,
-    request: _request,
-  }) => {
-    // This would require creating a workflow through the UI
-    // and verifying the database has a schedule entry
-    // Skip for now as it requires database access
-    test.skip();
-  });
-
-  // biome-ignore lint/suspicious/useAwait: Playwright test framework requires async
-  test("schedule is deleted when trigger type changes", async ({
-    page: _page,
-    request: _request,
-  }) => {
-    // This would require modifying a workflow and verifying database
-    // Skip for now as it requires database access
-    test.skip();
-  });
-});
+// API and Database tests for workflow execution are in:
+// - tests/e2e/workflow-runner.test.ts (vitest - execution lifecycle, database updates)

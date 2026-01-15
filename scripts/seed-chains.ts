@@ -24,16 +24,29 @@ import {
   getConfigValue,
   getWssUrl,
   PUBLIC_RPCS,
-  parseRpcConfig,
+  parseRpcConfigWithDetails,
 } from "../lib/rpc/rpc-config";
 
 // Parse JSON config from environment (if available)
 const rpcConfig = (() => {
-  const config = parseRpcConfig(process.env.CHAIN_RPC_CONFIG);
-  if (process.env.CHAIN_RPC_CONFIG && Object.keys(config).length === 0) {
+  const envValue = process.env.CHAIN_RPC_CONFIG;
+  const result = parseRpcConfigWithDetails(envValue);
+
+  if (envValue && Object.keys(result.config).length === 0) {
     console.warn("Failed to parse CHAIN_RPC_CONFIG, using individual env vars");
+    if (result.error) {
+      console.warn(`  Parse error: ${result.error}`);
+    }
+    if (result.rawValue) {
+      console.warn(`  Raw value (truncated): ${result.rawValue}`);
+    }
+    console.warn(`  Value length: ${envValue.length} characters`);
+    console.warn(
+      `  First char code: ${envValue.charCodeAt(0)} (expected 123 for '{')`
+    );
   }
-  return config;
+
+  return result.config;
 })();
 
 // Create resolver function for this script
