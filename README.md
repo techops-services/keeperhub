@@ -368,6 +368,19 @@ make scheduler-logs
 make runner-logs
 ```
 
+## Observability & Metrics
+
+KeeperHub includes a metrics system based on the **Four Golden Signals** (Latency, Traffic, Errors, Saturation). Metrics are exposed via Prometheus at `/api/metrics` and visualized in Grafana.
+
+**What's tracked:**
+- Workflow execution performance (duration, queue depth, error rates)
+- API latency (webhooks, status polling)
+- Plugin action metrics (duration, invocations, errors)
+- User & organization stats (totals, active users, members)
+- Infrastructure (Para wallets, chains, integrations, schedules)
+
+📖 **[Metrics Reference](keeperhub/lib/metrics/METRICS_REFERENCE.md)** - Complete list of 30+ metrics, labels, Prometheus names, and instrumentation patterns
+
 ## Integrations
 
 ### Resend (Email)
