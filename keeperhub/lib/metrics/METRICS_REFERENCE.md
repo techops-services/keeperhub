@@ -96,6 +96,40 @@ Gauge metrics tracking user and organization statistics.
 | `org.invitations.pending` | Pending organization invitations | - | DB |
 | `org.with_workflows` | Organizations with at least one workflow | - | DB |
 
+### Workflow Definition Metrics
+
+| Metric Name | Description | Labels | Source |
+|-------------|-------------|--------|--------|
+| `workflow.total` | Total workflow definitions | - | DB |
+| `workflow.by_visibility` | Workflows by visibility | `visibility` | DB |
+| `workflow.anonymous` | Anonymous workflows | - | DB |
+
+### Schedule Metrics
+
+| Metric Name | Description | Labels | Source |
+|-------------|-------------|--------|--------|
+| `schedule.total` | Total workflow schedules | - | DB |
+| `schedule.enabled` | Enabled workflow schedules | - | DB |
+| `schedule.by_last_status` | Schedules by last run status | `status` | DB |
+
+### Integration Metrics
+
+| Metric Name | Description | Labels | Source |
+|-------------|-------------|--------|--------|
+| `integration.total` | Total integrations | - | DB |
+| `integration.managed` | OAuth-managed integrations | - | DB |
+| `integration.by_type` | Integrations by type | `type` | DB |
+
+### Infrastructure Metrics
+
+| Metric Name | Description | Labels | Source |
+|-------------|-------------|--------|--------|
+| `apikey.total` | Total API keys | - | DB |
+| `chain.total` | Total blockchain networks configured | - | DB |
+| `chain.enabled` | Enabled blockchain networks | - | DB |
+| `para_wallet.total` | Total Para wallets | - | DB |
+| `session.active` | Active (non-expired) sessions | - | DB |
+
 ---
 
 ## Label Keys Reference
@@ -115,6 +149,8 @@ Gauge metrics tracking user and organization statistics.
 | `service` | External service name | `discord-api`, `sendgrid-api` |
 | `le` | Histogram bucket boundary | `100`, `250`, `500`, `+Inf` |
 | `role` | Organization member role | `owner`, `admin`, `member` |
+| `visibility` | Workflow visibility | `public`, `private` |
+| `type` | Integration type | `discord`, `sendgrid`, `web3` |
 
 ---
 
@@ -123,7 +159,7 @@ Gauge metrics tracking user and organization statistics.
 | Category | File | Functions |
 |----------|------|-----------|
 | Core | `keeperhub/lib/metrics/index.ts` | `getMetricsCollector()`, `createTimer()`, `withMetrics()` |
-| DB Metrics | `keeperhub/lib/metrics/db-metrics.ts` | `getWorkflowStatsFromDb()`, `getStepStatsFromDb()`, `getDailyActiveUsersFromDb()`, `getUserStatsFromDb()`, `getOrgStatsFromDb()` |
+| DB Metrics | `keeperhub/lib/metrics/db-metrics.ts` | `getWorkflowStatsFromDb()`, `getStepStatsFromDb()`, `getDailyActiveUsersFromDb()`, `getUserStatsFromDb()`, `getOrgStatsFromDb()`, `getWorkflowDefinitionStatsFromDb()`, `getScheduleStatsFromDb()`, `getIntegrationStatsFromDb()`, `getInfraStatsFromDb()` |
 | Workflow | `keeperhub/lib/metrics/instrumentation/workflow.ts` | `recordWorkflowComplete()`, `recordStepMetrics()` |
 | API | `keeperhub/lib/metrics/instrumentation/api.ts` | `recordWebhookMetrics()`, `recordStatusPollMetrics()` |
 | Plugin | `keeperhub/lib/metrics/instrumentation/plugin.ts` | `withPluginMetrics()`, `recordExternalServiceCall()` |
@@ -161,6 +197,10 @@ The following tables are queried:
 - `organization` - total organization count
 - `member` - member counts by role
 - `invitation` - pending invitation counts
+- `workflow_schedules` - schedule counts, enabled status, last run status
+- `api_keys` - API key count
+- `chains` - blockchain network count
+- `para_wallets` - Para wallet count
 
 ### ServiceMonitor (Prometheus Operator)
 
@@ -202,6 +242,20 @@ Prometheus metrics are prefixed with `keeperhub_` and use snake_case:
 | `org.members_by_role` | `keeperhub_org_members_by_role` | gauge |
 | `org.invitations.pending` | `keeperhub_org_invitations_pending` | gauge |
 | `org.with_workflows` | `keeperhub_org_with_workflows_total` | gauge |
+| `workflow.total` | `keeperhub_workflow_total` | gauge |
+| `workflow.by_visibility` | `keeperhub_workflow_by_visibility` | gauge |
+| `workflow.anonymous` | `keeperhub_workflow_anonymous_total` | gauge |
+| `schedule.total` | `keeperhub_schedule_total` | gauge |
+| `schedule.enabled` | `keeperhub_schedule_enabled_total` | gauge |
+| `schedule.by_last_status` | `keeperhub_schedule_by_last_status` | gauge |
+| `integration.total` | `keeperhub_integration_total` | gauge |
+| `integration.managed` | `keeperhub_integration_managed_total` | gauge |
+| `integration.by_type` | `keeperhub_integration_by_type` | gauge |
+| `apikey.total` | `keeperhub_apikey_total` | gauge |
+| `chain.total` | `keeperhub_chain_total` | gauge |
+| `chain.enabled` | `keeperhub_chain_enabled_total` | gauge |
+| `para_wallet.total` | `keeperhub_para_wallet_total` | gauge |
+| `session.active` | `keeperhub_session_active_total` | gauge |
 | `api.webhook.latency_ms` | `keeperhub_api_webhook_latency_ms` | histogram |
 | `api.requests.total` | `keeperhub_api_requests_total` | counter |
 | `plugin.action.errors` | `keeperhub_plugin_action_errors_total` | counter |
