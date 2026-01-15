@@ -116,6 +116,7 @@ services:
     environment:
       <<: [*env_db_connection, *env_aws, *env_sqs]
       NODE_ENV: production
+      KEEPERHUB_API_KEY: ${KEEPERHUB_API_KEY:-}
     depends_on:
       db:
         condition: service_healthy
@@ -138,6 +139,7 @@ services:
     environment:
       <<: [*env_db_connection, *env_aws, *env_sqs]
       HOSTNAME: "0.0.0.0"
+      KEEPERHUB_API_KEY: ${KEEPERHUB_API_KEY:-some-random-api-key}
     depends_on:
       db:
         condition: service_healthy
