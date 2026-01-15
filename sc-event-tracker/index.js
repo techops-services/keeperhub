@@ -1,5 +1,5 @@
 "use strict";
-const os = require("os");
+const os = require("node:os");
 const { logger } = require("./src/core/utils/logger.js");
 
 const { syncModule } = require("./src/core/synchronization/redis.js");

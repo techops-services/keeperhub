@@ -3,7 +3,7 @@ const {
   handleActiveWorkflows,
   removeExcessProcesses,
 } = require("./core/process-handlers/process.js");
-const { fetchActiveWorkflows } = require("./core/utils/fetchUtils.js");
+const { fetchActiveWorkflows } = require("./core/utils/fetch-utils.js");
 const { logger } = require("./core/utils/logger.js");
 
 /**

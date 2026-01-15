@@ -1,5 +1,5 @@
 "use strict";
-import { logger } from "./logger";
+const { logger } = require("./logger.js");
 
 function logMemoryUsage() {
   const memoryUsage = process.memoryUsage();

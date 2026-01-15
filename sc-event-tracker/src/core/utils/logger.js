@@ -1,10 +1,10 @@
 "use strict";
 class Logger {
   /**
-   * @param {console} logger - The logger object to use.
+   * @param {console} loggerInstance - The logger object to use.
    */
-  constructor(logger) {
-    this.logger = logger;
+  constructor(loggerInstance) {
+    this.logger = loggerInstance;
   }
 
   /**

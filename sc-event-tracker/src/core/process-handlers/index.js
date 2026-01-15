@@ -1,11 +1,6 @@
 "use strict";
-const { fork } = require("child_process");
-const { join } = require("path");
-
-const { SyncModule } = require("../synchronization/redis");
-const { Logger } = require("../utils/logger");
-
-const { WorkflowEvent } = require("../event/WorkflowEvent");
+const { fork } = require("node:child_process");
+const { join } = require("node:path");
 
 /**
  * @typedef {Object} ProcessDetails
@@ -18,11 +13,11 @@ class WorkflowHandler {
    * Initializes a new instance of the WorkflowHandler class.
    *
    * @param {Object} params - Parameters for the WorkflowHandler.
-   * @param {WorkflowEvent} params.event - The event to be handled.
-   * @param {Logger} params.logger - The logger instance for logging messages.
-   * @param {SyncModule} params.syncService - The synchronization service instance.
+   * @param {import("../event/workflow-event").WorkflowEvent} params.event - The event to be handled.
+   * @param {import("../utils/logger").Logger} params.logger - The logger instance for logging messages.
+   * @param {import("../synchronization/redis").SyncModule} params.syncService - The synchronization service instance.
    * @param {string} params.index - The id of the workflow.
-   * @param {{networks: {[key: number]: Network}}} params.networks - The networks to use for the chain.
+   * @param {{networks: {[key: number]: import("../config/networks").Network}}} params.networks - The networks to use for the chain.
    */
   constructor({ event, logger, syncService, index, networks, rawEventData }) {
     this.event = event;
@@ -44,7 +39,7 @@ class WorkflowHandler {
    * @returns {Promise<void>} A promise that resolves when the child process is started.
    */
   async startProcess() {
-    const _process = fork(join(__dirname, "../../childHandler.js"), [
+    const _process = fork(join(__dirname, "../../child-handler.js"), [
       this.index.toString(),
     ]);
 
@@ -132,7 +127,7 @@ class WorkflowHandler {
    * Restarts the child process associated with this WorkflowHandler instance
    * using the new event provided.
    *
-   * @param {WorkflowEvent} event - The new event to be used for restarting
+   * @param {import("../event/workflow-event").WorkflowEvent} event - The new event to be used for restarting
    * the child process.
    * @param {Object} rawEventData - The raw event data for serialization.
    *

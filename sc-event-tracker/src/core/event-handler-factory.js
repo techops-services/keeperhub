@@ -1,19 +1,15 @@
 "use strict";
-const { AbstractChain } = require("./AbstractChain.js");
 const {
   EthereumSepoliaBlockchain,
-} = require("./chains/EthSepoliaBlockchain.js");
-const { AVAILABLE_CHAINS } = require("./utils/chains.js");
-const { WorkflowEvent } = require("./event/WorkflowEvent.js");
-const { Network } = require("./config/networks.js");
+} = require("./chains/eth-sepolia-blockchain.js");
 
 class EventHandlerFactory {
   /**
    * Creates a new instance of the EventHandlerFactory class.
    *
-   * @param {WorkflowEvent} options - The event to be handled
-   * @param {Logger} logger - The logger instance for logging messages
-   * @param {{networks: {[key: number]: Network}}} networks - The networks to use for the chain
+   * @param {import("./event/workflow-event").WorkflowEvent} options - The event to be handled
+   * @param {import("./utils/logger").Logger} logger - The logger instance for logging messages
+   * @param {{networks: {[key: number]: import("./config/networks").Network}}} networks - The networks to use for the chain
    */
   constructor(options, logger, networks) {
     this.options = options;
@@ -25,7 +21,7 @@ class EventHandlerFactory {
    * Builds a concrete chain handler based on the provided chain type.
    *
    * @throws {Error} Unsupported chain type
-   * @returns {AbstractChain} A concrete chain handler
+   * @returns {import("./abstract-chain").AbstractChain} A concrete chain handler
    */
   buildChainHandler() {
     return new EthereumSepoliaBlockchain(

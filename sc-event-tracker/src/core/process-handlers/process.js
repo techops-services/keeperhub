@@ -1,6 +1,6 @@
 "use strict";
 const { WorkflowHandler } = require("./index.js");
-const { WorkflowEvent } = require("../event/WorkflowEvent");
+const { WorkflowEvent } = require("../event/workflow-event.js");
 const { syncModule } = require("../synchronization/redis");
 const { logger } = require("../utils/logger");
 
@@ -69,7 +69,7 @@ async function handleActiveWorkflows(workflows, childProcesses, networks) {
   // console.log("containersRegistered", containersRegistered);
 
   for (const container of containersRegistered) {
-    const processes = await syncModule.getContainerProcessesById(container);
+    const _processes = await syncModule.getContainerProcessesById(container);
 
     // console.log("processes", processes);
   }
@@ -82,7 +82,9 @@ async function handleActiveWorkflows(workflows, childProcesses, networks) {
       const isWorkflowRunningOnThisContainer =
         await syncModule.isWorkflowRuningOnThisContainer(event.id);
 
-      if (runningElsewhere) continue;
+      if (runningElsewhere) {
+        continue;
+      }
 
       const existingProcess = childProcesses[event.id];
 
@@ -108,13 +110,13 @@ async function handleActiveWorkflows(workflows, childProcesses, networks) {
             `Process [ ${existingProcess.process.pid} ] has different configuration. Restarting KeeperEvent: ${event.name} - ${event.id}`
           );
 
-          const workflowHandler =
+          const restartedHandler =
             await existingProcess.handler.restartWorkflowWithAnotherEvent(
               workflowEvent,
               event // Pass raw event data for serialization
             );
 
-          childProcesses[event.id] = workflowHandler.currentProcess;
+          childProcesses[event.id] = restartedHandler.currentProcess;
           continue;
         }
         if (runningElsewhere) {

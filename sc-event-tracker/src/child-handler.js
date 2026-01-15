@@ -1,6 +1,6 @@
 "use strict";
-const { EventHandlerFactory } = require("./core/EventHandlerFactory.js");
-const { WorkflowEvent } = require("./core/event/WorkflowEvent.js");
+const { EventHandlerFactory } = require("./core/event-handler-factory.js");
+const { WorkflowEvent } = require("./core/event/workflow-event.js");
 const { logger } = require("./core/utils/logger.js");
 
 /**
@@ -10,7 +10,7 @@ const { logger } = require("./core/utils/logger.js");
  * @param {WorkflowEvent|Object} message.event - The event to handle.
  * @param {{networks: {[key: number]: Network}}} message.networks - The networks to use for the chain.
  */
-async function handleEventMessage(message) {
+function handleEventMessage(message) {
   let workflowEvent;
   try {
     // Handle both old format (just event) and new format (object with event and networks)
@@ -36,7 +36,7 @@ async function handleEventMessage(message) {
       networks
     ).buildChainHandler();
 
-    process.pid &&
+    if (process.pid) {
       logger.log(
         `Starting event listener ~ process: ${
           process.pid
@@ -46,6 +46,7 @@ async function handleEventMessage(message) {
           workflowEvent.eventName
         } - workflow: ${workflowEvent.name} - id: ${workflowEvent.id}`
       );
+    }
 
     blockchainEventHandler.listenEvent();
     process?.send({

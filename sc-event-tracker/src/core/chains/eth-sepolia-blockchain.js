@@ -1,31 +1,29 @@
 "use strict";
 const { ethers } = require("ethers");
-const { AbstractChain } = require("../AbstractChain.js");
-const { WorkflowEvent, Condition } = require("../event/WorkflowEvent.js");
-const { Logger, logger } = require("../utils/logger.js");
+const { AbstractChain } = require("../abstract-chain.js");
+const { logger } = require("../utils/logger.js");
 const { ETHERSCAN_API_KEY } = require("../config/environment.js");
 const Redis = require("ioredis");
 const { WORKER_URL } = require("../config/environment.js");
 const axios = require("axios");
-const { Network } = require("../config/networks.js");
 
 class EthereumSepoliaBlockchain extends AbstractChain {
   /**
    * Creates a new EthereumSepoliaBlockchain
    *
-   * @param {WorkflowEvent} options
-   * @param {Logger} logger - The logger instance for logging messages
-   * @param {{networks: {[key: number]: Network}}} networks - The networks to use for the chain
+   * @param {import("../event/workflow-event").WorkflowEvent} options
+   * @param {import("../utils/logger").Logger} loggerInstance - The logger instance for logging messages
+   * @param {{networks: {[key: number]: import("../config/networks").Network}}} networks - The networks to use for the chain
    * @throws {Error} If the chain is not supported
    */
-  constructor(options, logger, networks) {
+  constructor(options, loggerInstance, networks) {
     const { network: chainId } = options.workflow.node.data.config;
 
     // Handle both formats: { networks: {...} } and direct dictionary {...}
     const networksDict = networks.networks || networks;
     const network = networksDict[Number(chainId)];
 
-    super(options, logger, networks);
+    super(options, loggerInstance, networks);
 
     const contractABI = options.getParsedABI();
     const contractAddress = options.contractAddress;
@@ -86,8 +84,8 @@ class EthereumSepoliaBlockchain extends AbstractChain {
         `${WORKER_URL}/keeper/${keeperId}/conditions`
       );
       return response.data.conditions;
-    } catch (error) {
-      console.error("Error fetching fresh conditions:", error.message);
+    } catch (_error) {
+      console.error("Error fetching fresh conditions:", _error.message);
       return null;
     }
   }
@@ -128,7 +126,7 @@ class EthereumSepoliaBlockchain extends AbstractChain {
     const filter = { address: this.target };
     const rawEventsAbi = this.abi.filter(({ type }) => type === "event");
     const eventsAbi = rawEventsAbi.map(this.buildEventAbi.bind(this));
-    const abiInterface = new ethers.Interface(eventsAbi);    
+    const abiInterface = new ethers.Interface(eventsAbi);
 
     const provider = this.getProvider();
 
@@ -363,7 +361,9 @@ class EthereumSepoliaBlockchain extends AbstractChain {
         };
 
         break;
-      } catch (error) {}
+      } catch (_error) {
+        console.error("Error decoding contract data:", _error.message);
+      }
     }
   }
 }

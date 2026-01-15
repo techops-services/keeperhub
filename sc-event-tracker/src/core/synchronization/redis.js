@@ -1,8 +1,7 @@
 "use strict";
-const os = require("os");
+const os = require("node:os");
 const { Redis } = require("ioredis");
-const { WorkflowEvent } = require("../event/WorkflowEvent");
-const { Logger, logger } = require("../utils/logger");
+const { logger } = require("../utils/logger");
 const { v7: uuid } = require("uuid");
 const { REDIS_HOST, REDIS_PORT } = require("../config/environment");
 
@@ -17,11 +16,11 @@ class SyncManager {
    *
    * @param {Redis} rtStorage - The RTStorage instance to use for
    * synchronizing data.
-   * @param {Logger} logger - The logger instance to use for logging messages.
+   * @param {import("../utils/logger").Logger} loggerInstance - The logger instance to use for logging messages.
    */
-  constructor(rtStorage, logger) {
+  constructor(rtStorage, loggerInstance) {
     this.rtStorage = rtStorage;
-    this.logger = logger;
+    this.logger = loggerInstance;
     this.containerId = `${os.hostname()}-${uuid()}`;
   }
 
@@ -218,7 +217,7 @@ class SyncProcessManager extends SyncContainerManager {
    *
    * @param {string} index - The index of the process to be registered
    * @param {number} pid - The process id of the process to be registered
-   * @param {WorkflowEvent} event - The event that the process is listening for
+   * @param {import("../event/workflow-event").WorkflowEvent} event - The event that the process is listening for
    * @returns {Promise<void>} A promise that resolves when the process entry is registered
    */
   async registerProcess(index, pid, event) {
@@ -363,7 +362,9 @@ class SyncModule extends SyncProcessManager {
       const containersRegistered = await this.getContainers();
 
       for (const container of containersRegistered) {
-        if (container === this.containerId) continue;
+        if (container === this.containerId) {
+          continue;
+        }
 
         const containerProcesses =
           await this.getContainerProcessesById(container);

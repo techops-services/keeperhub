@@ -1,43 +1,6 @@
 "use strict";
 const { diff } = require("deep-diff");
 
-const EXAMPLE_WORKFLOW_EVENT = {
-  id: "wtp1xd0zb8d3pp32gwd6k",
-  name: "Untitled 1",
-  userId: "Nv6zTJGAuQOWpKmIsF7SjgeYhnlKiV9N",
-  organizationId: "52d32744-0624-4344-b6a7-1196013af668",
-  enabled: true,
-  nodes: [
-    {
-      id: "HEC5h45qzsPKct1dVoxBU",
-      data: {
-        type: "trigger",
-        label: "",
-        config: {
-          network: "11155111",
-          eventName: "FavoriteNumberUpdated",
-          contractABI:
-            '[{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"_oldFavoriteNumber","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"newFavoriteNumber","type":"uint256"}],"name":"FavoriteNumberUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"_favoriteNumber","type":"uint256"},{"indexed":false,"internalType":"string","name":"name","type":"string"}],"name":"NewPersonAdded","type":"event"},{"inputs":[{"internalType":"string","name":"_name","type":"string"},{"internalType":"uint256","name":"_favoriteNumber","type":"uint256"}],"name":"addPerson","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"string","name":"","type":"string"}],"name":"nameToFavoriteNumber","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"people","outputs":[{"internalType":"string","name":"name","type":"string"},{"internalType":"uint256","name":"favoriteNumber","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"removeLastPerson","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"retrieve","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"_favoriteNumber","type":"uint256"}],"name":"store","outputs":[],"stateMutability":"nonpayable","type":"function"}]',
-          triggerType: "Event",
-          contractAddress: "0x069d34E130ccA7D435351FB30c0e97F2Ce6B42Ad",
-        },
-        status: "idle",
-        description: "",
-      },
-      type: "trigger",
-      measured: {
-        width: 192,
-        height: 192,
-      },
-      position: {
-        x: 0,
-        y: 0,
-      },
-      selected: true,
-    },
-  ],
-};
-
 class WorkflowEvent {
   /**
    * @typedef {Object} WorkflowEventOptions
@@ -53,10 +16,7 @@ class WorkflowEvent {
    * @param {WorkflowEventOptions} options - The options for the event (single workflow object).
    */
   constructor(options) {
-    if (
-      !(options && options.nodes && Array.isArray(options.nodes)) ||
-      options.nodes.length === 0
-    ) {
+    if (!(options?.nodes?.length > 0)) {
       throw new Error(
         "WorkflowEvent requires options with a non-empty nodes array"
       );
@@ -239,7 +199,7 @@ class NodeConfig {
   getParsedABI() {
     try {
       return JSON.parse(this.contractABI);
-    } catch (error) {
+    } catch (_error) {
       return [];
     }
   }

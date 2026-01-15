@@ -1,7 +1,7 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 
-const { httpService } = require("./src/services/httpService.js");
+const { httpService } = require("./src/services/http-service.js");
 const {
   API_URL,
   PORT,

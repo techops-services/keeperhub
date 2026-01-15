@@ -3,13 +3,10 @@ const axios = require("axios");
 
 const { WORKER_URL } = require("../config/environment.js");
 
-const { WorkflowEvent } = require("../event/WorkflowEvent.js");
-const { Network } = require("../config/networks.js");
-
 /**
  * Fetches active workflows from the worker service.
  *
- * @returns {Promise<{workflows: Array<WorkflowEvent>, networks: {[key: number]: Network}}}> List of active workflows.
+ * @returns {Promise<{workflows: Array<import("../event/workflow-event").WorkflowEvent>, networks: {[key: number]: import("../config/networks").Network}}}> List of active workflows.
  */
 async function fetchActiveWorkflows() {
   try {
