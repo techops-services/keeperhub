@@ -8,7 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { refetchOrganizations } from "@/keeperhub/lib/refetch-organizations";
-import { authClient, signIn, signOut, signUp, useSession } from "@/lib/auth-client";
+import {
+  authClient,
+  signIn,
+  signOut,
+  signUp,
+  useSession,
+} from "@/lib/auth-client";
 
 type InvitationData = {
   id: string;
@@ -254,7 +260,6 @@ function EmailMismatchState({
     setSigningOut(true);
     try {
       await signOut();
-      // Page will re-render after sign out and show the auth form
       window.location.reload();
     } catch (err) {
       console.error("Failed to sign out:", err);
@@ -325,6 +330,60 @@ function EmailMismatchState({
   );
 }
 
+// Helper to handle signup flow
+async function handleSignupFlow(
+  email: string,
+  password: string,
+  setAuthMode: (mode: "signin" | "signup") => void,
+  setFormError: (error: string) => void
+): Promise<{ shouldContinue: boolean }> {
+  const signUpResult = await trySignUp(email, password);
+
+  if (signUpResult.userExists) {
+    setAuthMode("signin");
+    setFormError("An account with this email already exists. Please sign in.");
+    return { shouldContinue: false };
+  }
+
+  if (!signUpResult.success) {
+    setFormError(signUpResult.error || "Failed to create account");
+    return { shouldContinue: false };
+  }
+
+  return { shouldContinue: true };
+}
+
+// Helper to handle signin and accept flow
+async function handleSigninAndAccept(params: {
+  email: string;
+  password: string;
+  invitationId: string;
+  authMode: "signin" | "signup";
+  setFormError: (error: string) => void;
+  onSuccess: () => void;
+}): Promise<void> {
+  const { email, password, invitationId, authMode, setFormError, onSuccess } =
+    params;
+
+  const signInResult = await trySignIn(email, password);
+  if (!signInResult.success) {
+    const errorMsg =
+      authMode === "signin"
+        ? "Incorrect password. Please try again."
+        : signInResult.error || "Failed to sign in";
+    setFormError(errorMsg);
+    return;
+  }
+
+  const acceptResult = await acceptInvitation(invitationId);
+  if (!acceptResult.success) {
+    setFormError(acceptResult.error || "Failed to accept invitation");
+    return;
+  }
+
+  onSuccess();
+}
+
 // Component for logged-out users with sign-in/sign-up toggle
 function AuthFormState({
   invitation,
@@ -351,52 +410,32 @@ function AuthFormState({
 
     try {
       if (authMode === "signup") {
-        // Try to sign up first
-        const signUpResult = await trySignUp(invitation.email, password);
-
-        if (signUpResult.userExists) {
-          // User already exists, switch to sign-in mode
-          setAuthMode("signin");
-          setFormError(
-            "An account with this email already exists. Please sign in."
-          );
-          setSubmitting(false);
-          return;
-        }
-
-        if (!signUpResult.success) {
-          setFormError(signUpResult.error || "Failed to create account");
-          setSubmitting(false);
-          return;
-        }
-      }
-
-      // Sign in (either after successful signup or in signin mode)
-      const signInResult = await trySignIn(invitation.email, password);
-      if (!signInResult.success) {
-        setFormError(
-          authMode === "signin"
-            ? "Incorrect password. Please try again."
-            : signInResult.error || "Failed to sign in"
+        const { shouldContinue } = await handleSignupFlow(
+          invitation.email,
+          password,
+          setAuthMode,
+          setFormError
         );
-        setSubmitting(false);
-        return;
+        if (!shouldContinue) {
+          setSubmitting(false);
+          return;
+        }
       }
 
-      // Accept invitation
-      const acceptResult = await acceptInvitation(invitation.id);
-      if (!acceptResult.success) {
-        setFormError(acceptResult.error || "Failed to accept invitation");
-        setSubmitting(false);
-        return;
-      }
-
-      onSuccess();
+      await handleSigninAndAccept({
+        email: invitation.email,
+        password,
+        invitationId: invitation.id,
+        authMode,
+        setFormError,
+        onSuccess,
+      });
     } catch (error) {
       console.error("Failed to complete auth flow:", error);
       setFormError(
         error instanceof Error ? error.message : "Something went wrong"
       );
+    } finally {
       setSubmitting(false);
     }
   };
@@ -495,20 +534,57 @@ function AuthFormState({
   );
 }
 
+function computePageState(params: {
+  inviteLoading: boolean;
+  sessionPending: boolean;
+  inviteError: InvitationError | null;
+  invitation: InvitationData | null;
+  sessionEmail: string | null | undefined;
+  sessionUserName: string | null | undefined;
+}): PageState {
+  const {
+    inviteLoading,
+    sessionPending,
+    inviteError,
+    invitation,
+    sessionEmail,
+    sessionUserName,
+  } = params;
+
+  if (inviteLoading || sessionPending) {
+    return "loading";
+  }
+  if (inviteError) {
+    return "error";
+  }
+  if (!invitation) {
+    return "not-found";
+  }
+
+  const isAnonymous =
+    sessionUserName === "Anonymous" || sessionEmail?.startsWith("temp-");
+  const isLoggedIn = sessionEmail && !isAnonymous;
+
+  if (isLoggedIn) {
+    const emailMatch =
+      sessionEmail.toLowerCase() === invitation.email.toLowerCase();
+    return emailMatch ? "logged-in-match" : "logged-in-mismatch";
+  }
+
+  return "logged-out";
+}
+
 export default function AcceptInvitePage() {
   const params = useParams();
   const router = useRouter();
   const inviteId = params.inviteId as string;
 
-  // Session state
   const { data: session, isPending: sessionPending } = useSession();
 
-  // Invitation state
   const [inviteLoading, setInviteLoading] = useState(true);
   const [invitation, setInvitation] = useState<InvitationData | null>(null);
   const [inviteError, setInviteError] = useState<InvitationError | null>(null);
 
-  // Fetch invitation
   useEffect(() => {
     async function fetchInvitation() {
       try {
@@ -534,28 +610,19 @@ export default function AcceptInvitePage() {
     }
   }, [inviteId]);
 
-  // Determine page state
-  const pageState: PageState = useMemo(() => {
-    if (inviteLoading || sessionPending) return "loading";
-    if (inviteError) return "error";
-    if (!invitation) return "not-found";
+  const pageState = useMemo(
+    () =>
+      computePageState({
+        inviteLoading,
+        sessionPending,
+        inviteError,
+        invitation,
+        sessionEmail: session?.user?.email,
+        sessionUserName: session?.user?.name,
+      }),
+    [inviteLoading, sessionPending, inviteError, invitation, session]
+  );
 
-    // Check if user is logged in (and not anonymous)
-    const isLoggedIn =
-      session?.user &&
-      session.user.name !== "Anonymous" &&
-      !session.user.email?.startsWith("temp-");
-
-    if (isLoggedIn && session?.user?.email) {
-      const emailMatch =
-        session.user.email.toLowerCase() === invitation.email.toLowerCase();
-      return emailMatch ? "logged-in-match" : "logged-in-mismatch";
-    }
-
-    return "logged-out";
-  }, [inviteLoading, sessionPending, inviteError, invitation, session]);
-
-  // Success handler - called after accepting invitation
   const handleSuccess = async () => {
     await new Promise((resolve) => setTimeout(resolve, 300));
     await authClient.getSession();
@@ -564,28 +631,32 @@ export default function AcceptInvitePage() {
     router.push("/workflows");
   };
 
-  // Render based on page state
-  switch (pageState) {
-    case "loading":
-      return <LoadingState />;
-    case "error":
-      return <ErrorState inviteError={inviteError!} />;
-    case "not-found":
-      return <NotFoundState />;
-    case "logged-in-match":
-      return (
-        <AcceptDirectState invitation={invitation!} onSuccess={handleSuccess} />
-      );
-    case "logged-in-mismatch":
-      return (
-        <EmailMismatchState
-          currentEmail={session!.user!.email!}
-          invitation={invitation!}
-        />
-      );
-    case "logged-out":
-      return (
-        <AuthFormState invitation={invitation!} onSuccess={handleSuccess} />
-      );
+  if (pageState === "loading") {
+    return <LoadingState />;
   }
+
+  if (pageState === "error" && inviteError) {
+    return <ErrorState inviteError={inviteError} />;
+  }
+
+  if (pageState === "not-found" || !invitation) {
+    return <NotFoundState />;
+  }
+
+  if (pageState === "logged-in-match") {
+    return (
+      <AcceptDirectState invitation={invitation} onSuccess={handleSuccess} />
+    );
+  }
+
+  if (pageState === "logged-in-mismatch" && session?.user?.email) {
+    return (
+      <EmailMismatchState
+        currentEmail={session.user.email}
+        invitation={invitation}
+      />
+    );
+  }
+
+  return <AuthFormState invitation={invitation} onSuccess={handleSuccess} />;
 }
