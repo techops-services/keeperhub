@@ -88,15 +88,3 @@ html.dark header {
     59
   ) !important; /* slate-800 - matches existing Nextra border */
 }
-
-/* Fix navbar bottom border to span full viewport width */
-html.dark .nextra-navbar::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  width: 100vw;
-  height: 1px;
-  background-color: rgb(30, 41, 59);
-}

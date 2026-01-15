@@ -1,5 +1,5 @@
 ---
-title: "Overview"
+title: "Documentation"
 description: "KeeperHub documentation - learn how to automate blockchain operations without coding."
 ---
 
