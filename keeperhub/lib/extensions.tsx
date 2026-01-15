@@ -10,13 +10,11 @@
 
 import { Label } from "@/components/ui/label";
 import { KeeperHubLogo } from "@/keeperhub/components/icons/keeperhub-logo";
-import { WalletDialog } from "@/keeperhub/components/settings/wallet-dialog";
 import { Web3WalletSection } from "@/keeperhub/components/settings/web3-wallet-section";
 import { AbiWithAutoFetchField } from "@/keeperhub/components/workflow/config/abi-with-auto-fetch-field";
 import { ChainSelectField } from "@/keeperhub/components/workflow/config/chain-select-field";
 import {
   registerBranding,
-  registerComponentSlot,
   registerFieldRenderer,
   registerIntegrationFormHandler,
 } from "@/lib/extension-registry";
@@ -104,21 +102,6 @@ registerBranding({
   logo: KeeperHubLogo,
   appName: "KeeperHub",
 });
-
-// ============================================================================
-// Register Component Slots
-// ============================================================================
-
-/**
- * User Menu Wallet Dialog
- * Shows wallet management in the user menu dropdown
- */
-registerComponentSlot(
-  "user-menu-wallet-dialog",
-  (props: { open: boolean; onOpenChange: (open: boolean) => void }) => (
-    <WalletDialog onOpenChange={props.onOpenChange} open={props.open} />
-  )
-);
 
 // Export a flag to indicate extensions are loaded
 export const KEEPERHUB_EXTENSIONS_LOADED = true;

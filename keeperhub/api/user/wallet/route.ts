@@ -331,6 +331,101 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PATCH(request: Request) {
+  try {
+    // 1. Validate user, organization, and admin permissions
+    const validation = await validateUserAndOrganization(request);
+    if ("error" in validation) {
+      return NextResponse.json(
+        { error: validation.error },
+        { status: validation.status }
+      );
+    }
+    const { organizationId } = validation;
+
+    // 2. Get new email from request body
+    const body = await request.json();
+    const newEmail = body.email;
+
+    if (!newEmail || typeof newEmail !== "string") {
+      return NextResponse.json(
+        { error: "Email is required to update wallet" },
+        { status: 400 }
+      );
+    }
+
+    // Basic email validation
+    if (!EMAIL_REGEX.test(newEmail)) {
+      return NextResponse.json(
+        { error: "Invalid email format" },
+        { status: 400 }
+      );
+    }
+
+    // 3. Get existing wallet from database
+    const existingWallet = await db
+      .select()
+      .from(paraWallets)
+      .where(eq(paraWallets.organizationId, organizationId))
+      .limit(1);
+
+    if (existingWallet.length === 0) {
+      return NextResponse.json(
+        { error: "No wallet found for this organization" },
+        { status: 404 }
+      );
+    }
+
+    const wallet = existingWallet[0];
+
+    // 4. Check if email is actually different
+    if (wallet.email === newEmail) {
+      return NextResponse.json(
+        { error: "New email is the same as the current email" },
+        { status: 400 }
+      );
+    }
+
+    // 5. Update wallet identifier in Para
+    const environment =
+      PARA_ENV === "prod" ? Environment.PROD : Environment.BETA;
+    const paraClient = new ParaServer(environment, PARA_API_KEY);
+
+    console.log(
+      `[Para] Updating wallet email for organization ${organizationId}: ${wallet.email} -> ${newEmail}`
+    );
+
+    await paraClient.updatePregenWalletIdentifier({
+      walletId: wallet.walletId,
+      newPregenId: { email: newEmail },
+    });
+
+    // 6. Update email in local database
+    await db
+      .update(paraWallets)
+      .set({ email: newEmail })
+      .where(eq(paraWallets.organizationId, organizationId));
+
+    console.log(
+      `[Para] ✓ Wallet email updated for organization ${organizationId}: ${newEmail}`
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: "Wallet email updated successfully",
+      wallet: {
+        address: wallet.walletAddress,
+        walletId: wallet.walletId,
+        email: newEmail,
+        organizationId,
+      },
+    });
+  } catch (error) {
+    console.error("[Para] Failed to update wallet email:", error);
+    return apiError(error, "Failed to update wallet email");
+  }
+}
+
 export async function DELETE(request: Request) {
   try {
     // 1. Validate user, organization, and admin permissions
