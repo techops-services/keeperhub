@@ -217,7 +217,7 @@ export function TriggerConfig({
             },
             {
               key: "eventName",
-              label: "Event Type",
+              label: "Event Name",
               type: "abi-event-select",
               abiField: "contractABI",
               placeholder: "Select an event",
