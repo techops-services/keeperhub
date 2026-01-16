@@ -7,8 +7,11 @@
  * Outputs detailed metrics about function calls, execution time, and operation counts.
  *
  * Usage:
- *   # Profile a workflow execution
+ *   # Profile a workflow execution (sampling mode - statistical)
  *   WORKFLOW_ID=xxx EXECUTION_ID=yyy pnpm tsx scripts/workflow-runner-profiled.ts
+ *
+ *   # Profile with PRECISE coverage (exact call counts)
+ *   PRECISE_COVERAGE=true WORKFLOW_ID=xxx EXECUTION_ID=yyy pnpm tsx scripts/workflow-runner-profiled.ts
  *
  *   # Profile with detailed output
  *   PROFILE_DETAIL=true WORKFLOW_ID=xxx EXECUTION_ID=yyy pnpm tsx scripts/workflow-runner-profiled.ts
@@ -20,6 +23,7 @@
  *   WORKFLOW_ID - ID of the workflow to execute
  *   EXECUTION_ID - ID of the execution record
  *   DATABASE_URL - PostgreSQL connection string
+ *   PRECISE_COVERAGE - Use precise coverage for exact call counts (default: false)
  *   PROFILE_DETAIL - Show detailed function breakdown (default: false)
  *   PROFILE_OUTPUT - Path to write JSON profile output
  *   PROFILE_TOP_N - Number of top functions to show (default: 20)
@@ -67,18 +71,42 @@ type CPUProfile = {
   timeDeltas?: number[];
 };
 
+// Precise coverage types (from V8 inspector protocol)
+type CoverageRange = {
+  startOffset: number;
+  endOffset: number;
+  count: number;
+};
+
+type FunctionCoverage = {
+  functionName: string;
+  ranges: CoverageRange[];
+  isBlockCoverage: boolean;
+};
+
+type ScriptCoverage = {
+  scriptId: string;
+  url: string;
+  functions: FunctionCoverage[];
+};
+
+type PreciseCoverageResult = {
+  result: ScriptCoverage[];
+};
+
 type FunctionStats = {
   name: string;
   file: string;
   line: number;
-  hitCount: number;
+  hitCount: number; // Statistical hits (sampling) or exact calls (precise)
   selfTime: number;
   totalTime: number;
   callCount: number;
 };
 
 type ProfileSummary = {
-  totalOperations: number;
+  mode: "sampling" | "precise";
+  totalOperations: number; // Sampling: sum of hits, Precise: sum of calls
   totalFunctionCalls: number;
   totalSamples: number;
   durationMs: number;
@@ -105,27 +133,48 @@ type StepMetrics = {
 
 class WorkflowProfiler {
   private readonly session: Session;
+  private readonly preciseMode: boolean;
   private profile: CPUProfile | null = null;
+  private preciseCoverage: PreciseCoverageResult | null = null;
   private readonly stepTimings: Map<string, { start: number; end?: number }> =
     new Map();
 
-  constructor() {
+  constructor(preciseMode = false) {
     this.session = new Session();
+    this.preciseMode = preciseMode;
   }
 
   async start(): Promise<void> {
     this.session.connect();
     await this.session.post("Profiler.enable");
-    await this.session.post("Profiler.start");
-    console.log("[Profiler] Started CPU profiling");
+
+    if (this.preciseMode) {
+      await this.session.post("Profiler.startPreciseCoverage", {
+        callCount: true,
+        detailed: true,
+      });
+      console.log("[Profiler] Started PRECISE coverage (exact call counts)");
+    } else {
+      await this.session.post("Profiler.start");
+      console.log("[Profiler] Started CPU profiling (sampling mode)");
+    }
   }
 
-  async stop(): Promise<CPUProfile> {
-    const result = await this.session.post("Profiler.stop");
-    this.profile = result.profile as CPUProfile;
+  async stop(): Promise<CPUProfile | null> {
+    if (this.preciseMode) {
+      this.preciseCoverage = (await this.session.post(
+        "Profiler.takePreciseCoverage"
+      )) as PreciseCoverageResult;
+      await this.session.post("Profiler.stopPreciseCoverage");
+      console.log("[Profiler] Stopped PRECISE coverage");
+    } else {
+      const result = await this.session.post("Profiler.stop");
+      this.profile = result.profile as CPUProfile;
+      console.log("[Profiler] Stopped CPU profiling");
+    }
+
     await this.session.post("Profiler.disable");
     this.session.disconnect();
-    console.log("[Profiler] Stopped CPU profiling");
     return this.profile;
   }
 
@@ -140,8 +189,140 @@ class WorkflowProfiler {
     }
   }
 
+  isPreciseMode(): boolean {
+    return this.preciseMode;
+  }
+
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Profile analysis requires categorization logic
   analyze(): ProfileSummary {
+    if (this.preciseMode) {
+      return this.analyzePrecise();
+    }
+    return this.analyzeSampling();
+  }
+
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Profile analysis requires categorization logic
+  private analyzePrecise(): ProfileSummary {
+    if (!this.preciseCoverage) {
+      throw new Error("No precise coverage data available");
+    }
+
+    const functionStats = new Map<string, FunctionStats>();
+    const categories: Record<string, CategoryStats> = {
+      "step-functions": { hitCount: 0, functionCount: 0, functions: [] },
+      "workflow-executor": { hitCount: 0, functionCount: 0, functions: [] },
+      database: { hitCount: 0, functionCount: 0, functions: [] },
+      "external-api": { hitCount: 0, functionCount: 0, functions: [] },
+      "node-internals": { hitCount: 0, functionCount: 0, functions: [] },
+      other: { hitCount: 0, functionCount: 0, functions: [] },
+    };
+
+    let totalOperations = 0;
+    let totalFunctionCalls = 0;
+
+    for (const script of this.preciseCoverage.result) {
+      const url = script.url;
+
+      for (const fn of script.functions) {
+        const callCount = fn.ranges[0]?.count || 0;
+        const functionName = fn.functionName || "(anonymous)";
+
+        if (callCount > 0) {
+          totalOperations += callCount;
+          totalFunctionCalls += 1;
+
+          // Categorize the function
+          let category = "other";
+          if (url.includes("/steps/") || functionName.includes("Step")) {
+            category = "step-functions";
+          } else if (
+            url.includes("workflow-executor") ||
+            url.includes("workflow-runner")
+          ) {
+            category = "workflow-executor";
+          } else if (
+            url.includes("drizzle") ||
+            url.includes("postgres") ||
+            functionName.includes("query")
+          ) {
+            category = "database";
+          } else if (
+            functionName.includes("fetch") ||
+            url.includes("node:http") ||
+            url.includes("node:https")
+          ) {
+            category = "external-api";
+          } else if (url.startsWith("node:") || url.includes("node_modules")) {
+            category = "node-internals";
+          }
+
+          categories[category].hitCount += callCount;
+          if (!categories[category].functions.includes(functionName)) {
+            categories[category].functions.push(functionName);
+            categories[category].functionCount += 1;
+          }
+
+          // Aggregate function stats (only track user code or high-call functions)
+          const isUserCode =
+            url &&
+            !url.startsWith("node:") &&
+            !url.includes("node_modules") &&
+            url.length > 0;
+
+          if (isUserCode || callCount > 10) {
+            const key = `${functionName}@${url}`;
+            const existing = functionStats.get(key);
+            if (existing) {
+              existing.hitCount += callCount;
+              existing.callCount += 1;
+            } else {
+              functionStats.set(key, {
+                name: functionName,
+                file: url,
+                line: 0,
+                hitCount: callCount,
+                selfTime: 0,
+                totalTime: 0,
+                callCount: 1,
+              });
+            }
+          }
+        }
+      }
+    }
+
+    const sortedFunctions = Array.from(functionStats.values())
+      .filter((f) => f.hitCount > 0)
+      .sort((a, b) => b.hitCount - a.hitCount);
+
+    const stepMetrics: StepMetrics[] = [];
+    for (const [stepName, timing] of this.stepTimings) {
+      if (timing.end) {
+        stepMetrics.push({
+          stepName,
+          operations: 0,
+          timeMs: timing.end - timing.start,
+        });
+      }
+    }
+
+    return {
+      mode: "precise",
+      totalOperations,
+      totalFunctionCalls,
+      totalSamples: 0,
+      durationMs: 0,
+      topFunctions: sortedFunctions.slice(
+        0,
+        Number.parseInt(process.env.PROFILE_TOP_N || "20", 10)
+      ),
+      byCategory: categories,
+      stepMetrics,
+    };
+  }
+
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Profile analysis requires categorization logic
+  private analyzeSampling(): ProfileSummary {
     if (!this.profile) {
       throw new Error("No profile data available");
     }
@@ -273,6 +454,7 @@ class WorkflowProfiler {
     const durationMs = (this.profile.endTime - this.profile.startTime) / 1000;
 
     return {
+      mode: "sampling",
       totalOperations,
       totalFunctionCalls,
       totalSamples: samples.length,
@@ -449,41 +631,54 @@ async function updateScheduleStatus(
 function formatProfileSummary(summary: ProfileSummary): string {
   const lines: string[] = [];
 
+  const modeLabel = summary.mode === "precise" ? "PRECISE" : "SAMPLING";
+  const countLabel = summary.mode === "precise" ? "calls" : "hits";
+
   lines.push(`\n${"=".repeat(60)}`);
-  lines.push("WORKFLOW EXECUTION PROFILE");
+  lines.push(`WORKFLOW EXECUTION PROFILE [${modeLabel}]`);
   lines.push(`${"=".repeat(60)}`);
 
   lines.push("\n📊 SUMMARY");
-  lines.push(
-    `   Total operations (samples):  ${summary.totalSamples.toLocaleString()}`
-  );
-  lines.push(
-    `   Total function hits:         ${summary.totalOperations.toLocaleString()}`
-  );
-  lines.push(
-    `   Unique functions called:     ${summary.totalFunctionCalls.toLocaleString()}`
-  );
-  lines.push(
-    `   Duration:                    ${summary.durationMs.toFixed(2)}ms`
-  );
 
-  lines.push("\n📁 BY CATEGORY");
+  if (summary.mode === "precise") {
+    lines.push(
+      `   Total function calls:    ${summary.totalOperations.toLocaleString()} (exact)`
+    );
+    lines.push(
+      `   Unique functions:        ${summary.totalFunctionCalls.toLocaleString()}`
+    );
+  } else {
+    lines.push(
+      `   Total samples:           ${summary.totalSamples.toLocaleString()}`
+    );
+    lines.push(
+      `   Total function hits:     ${summary.totalOperations.toLocaleString()} (statistical)`
+    );
+    lines.push(
+      `   Unique functions:        ${summary.totalFunctionCalls.toLocaleString()}`
+    );
+    lines.push(
+      `   Duration:                ${summary.durationMs.toFixed(2)}ms`
+    );
+  }
+
+  lines.push(`\n📁 BY CATEGORY (${countLabel})`);
   for (const [category, stats] of Object.entries(summary.byCategory)) {
     if (stats.hitCount > 0) {
       const pct = ((stats.hitCount / summary.totalOperations) * 100).toFixed(1);
       lines.push(
-        `   ${category.padEnd(20)} ${stats.hitCount.toString().padStart(8)} hits (${pct}%) - ${stats.functionCount} functions`
+        `   ${category.padEnd(20)} ${stats.hitCount.toLocaleString().padStart(10)} ${countLabel} (${pct}%) - ${stats.functionCount} functions`
       );
     }
   }
 
   if (process.env.PROFILE_DETAIL === "true") {
-    lines.push("\n🔥 TOP FUNCTIONS BY HIT COUNT");
+    lines.push(`\n🔥 TOP FUNCTIONS BY ${countLabel.toUpperCase()}`);
     for (let i = 0; i < summary.topFunctions.length; i++) {
       const fn = summary.topFunctions[i];
       const shortFile = fn.file.split("/").slice(-2).join("/") || "(native)";
       lines.push(
-        `   ${(i + 1).toString().padStart(2)}. ${fn.name.padEnd(40)} ${fn.hitCount.toString().padStart(6)} hits  ${shortFile}:${fn.line}`
+        `   ${(i + 1).toString().padStart(2)}. ${fn.name.padEnd(40)} ${fn.hitCount.toLocaleString().padStart(8)} ${countLabel}  ${shortFile}:${fn.line}`
       );
     }
   }
@@ -506,11 +701,13 @@ function formatProfileSummary(summary: ProfileSummary): string {
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Workflow execution requires sequential setup and error handling
 async function main(): Promise<void> {
-  const profiler = new WorkflowProfiler();
+  const preciseMode = process.env.PRECISE_COVERAGE === "true";
+  const profiler = new WorkflowProfiler(preciseMode);
   const startTime = Date.now();
   const { workflowId, executionId, input, scheduleId } = validateEnv();
 
-  console.log("[Runner] Starting profiled workflow execution");
+  const modeLabel = preciseMode ? "PRECISE" : "SAMPLING";
+  console.log(`[Runner] Starting profiled workflow execution [${modeLabel}]`);
   console.log(`[Runner] Workflow ID: ${workflowId}`);
   console.log(`[Runner] Execution ID: ${executionId}`);
 
