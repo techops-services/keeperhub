@@ -15,10 +15,10 @@ export async function GET(request: Request) {
   try {
     // Check for internal token authentication
     const internalToken = request.headers.get("X-Internal-Token");
-    const expectedToken = process.env.INTERNAL_API_TOKEN;
+    const expectedToken = process.env.KEEPERHUB_API_KEY;
 
     if (!expectedToken) {
-      console.error("[Workflows Events] INTERNAL_API_TOKEN not configured");
+      console.error("[Workflows Events] KEEPERHUB_API_KEY not configured");
       return NextResponse.json(
         { error: "Internal endpoint not configured" },
         { status: 500 }
