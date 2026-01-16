@@ -4,13 +4,13 @@ const { AbstractChain } = require("../abstract-chain.js");
 const { logger } = require("../utils/logger.js");
 const Redis = require("ioredis");
 
-class EthereumSepoliaBlockchain extends AbstractChain {
+class EvmChain extends AbstractChain {
   /**
-   * Creates a new EthereumSepoliaBlockchain
+   * Creates a new EvmChain
    *
-   * @param {import("../event/workflow-event").WorkflowEvent} options
-   * @param {import("../utils/logger").Logger} loggerInstance - The logger instance for logging messages
-   * @param {{networks: {[key: number]: import("../config/networks").Network}}} networks - The networks to use for the chain
+   * @param {import("../event/workflow-event.js").WorkflowEvent} options
+   * @param {import("../utils/logger.js").Logger} loggerInstance - The logger instance for logging messages
+   * @param {{networks: {[key: number]: import("../config/networks.js").Network}}} networks - The networks to use for the chain
    * @throws {Error} If the chain is not supported
    */
   constructor(options, loggerInstance, networks) {
@@ -288,4 +288,4 @@ class EthereumSepoliaBlockchain extends AbstractChain {
   }
 }
 
-module.exports = { EthereumSepoliaBlockchain };
+module.exports = { EvmChain };
