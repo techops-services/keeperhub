@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { start } from "workflow/api";
 // start custom keeperhub code //
 import { authenticateApiKey } from "@/keeperhub/lib/api-key-auth";
+import { authenticateInternalService } from "@/keeperhub/lib/internal-service-auth";
 import {
   getMetricsCollector,
   LabelKeys,
@@ -77,16 +78,18 @@ export async function POST(
   try {
     const { workflowId } = await context.params;
 
-    // Check for internal execution header (MVP auth for scheduled triggers)
-    const isInternalExecution =
-      request.headers.get("X-Internal-Execution") === "true";
+    // start custom keeperhub code //
+    // Check for internal service authentication (MCP, Events, Scheduler)
+    const internalAuth = authenticateInternalService(request);
+    const isInternalExecution = internalAuth.authenticated;
+    // end keeperhub code //
 
     let userId: string;
     let workflow: typeof workflows.$inferSelect | undefined;
 
     if (isInternalExecution) {
-      // Internal execution from scheduler - get userId from workflow
-      console.log("[Workflow Execute] Internal execution request");
+      // Internal execution from authenticated service
+      console.log(`[Workflow Execute] Internal execution from service: ${internalAuth.service}`);
 
       workflow = await db.query.workflows.findFirst({
         where: eq(workflows.id, workflowId),
