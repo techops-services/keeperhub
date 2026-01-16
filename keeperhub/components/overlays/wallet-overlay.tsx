@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Copy, ExternalLink, Plus, RefreshCw, SendHorizontal, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -30,10 +30,20 @@ import type {
 } from "@/keeperhub/lib/wallet/types";
 import { useWalletBalances } from "@/keeperhub/lib/wallet/use-wallet-balances";
 import { useSession } from "@/lib/auth-client";
+import { WithdrawModal, type WithdrawableAsset } from "./withdraw-modal";
 
 type WalletOverlayProps = {
   overlayId: string;
 };
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+function truncateAddress(address: string): string {
+  if (address.length <= 13) return address;
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
 
 // ============================================================================
 // Balance Display Components
@@ -105,12 +115,14 @@ function ChainBalanceItem({
   balance,
   isAdmin,
   onRemoveToken,
+  onWithdraw,
   supportedTokenBalances,
   tokenBalances,
 }: {
   balance: ChainBalance;
   isAdmin: boolean;
   onRemoveToken: (tokenId: string, symbol: string) => void;
+  onWithdraw: (chainId: number, tokenAddress?: string) => void;
   supportedTokenBalances: SupportedTokenBalance[];
   tokenBalances: TokenBalance[];
 }) {
@@ -121,13 +133,38 @@ function ChainBalanceItem({
     (t) => t.chainId === balance.chainId
   );
 
+  const hasBalance = Number.parseFloat(balance.balance) > 0;
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between rounded-lg border bg-muted/50 p-3">
         <div className="flex-1">
-          <div className="font-medium text-sm">{balance.name}</div>
+          <div className="flex items-center gap-1">
+            <span className="font-medium text-sm">{balance.name}</span>
+            {balance.explorerUrl && (
+              <a
+                className="text-muted-foreground hover:text-foreground"
+                href={balance.explorerUrl}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+          </div>
           <ChainBalanceDisplay balance={balance} />
         </div>
+        {isAdmin && hasBalance && (
+          <Button
+            className="h-7 px-2 text-xs"
+            onClick={() => onWithdraw(balance.chainId)}
+            size="sm"
+            variant="ghost"
+          >
+            <SendHorizontal className="h-3 w-3" />
+            Withdraw
+          </Button>
+        )}
       </div>
       {/* Supported Token Balances (Stablecoins) */}
       {chainSupportedTokens.length > 0 && (
@@ -359,6 +396,7 @@ function BalanceListSection({
   onAddToken,
   onRefresh,
   onRemoveToken,
+  onWithdraw,
   refreshing,
   showAddToken,
   setShowAddToken,
@@ -371,6 +409,7 @@ function BalanceListSection({
   onAddToken: (chainId: number, tokenAddress: string) => Promise<void>;
   onRefresh: () => void;
   onRemoveToken: (tokenId: string, symbol: string) => void;
+  onWithdraw: (chainId: number, tokenAddress?: string) => void;
   refreshing: boolean;
   showAddToken: boolean;
   setShowAddToken: (show: boolean) => void;
@@ -428,6 +467,7 @@ function BalanceListSection({
               isAdmin={isAdmin}
               key={balance.chainId}
               onRemoveToken={onRemoveToken}
+              onWithdraw={onWithdraw}
               supportedTokenBalances={supportedTokenBalances}
               tokenBalances={tokenBalances}
             />
@@ -515,21 +555,23 @@ function NoWalletSection({
 // Main Component
 // ============================================================================
 
-// Component for editing wallet email
-function WalletEmailEditor({
-  currentEmail,
+// Component for account details section (email + wallet address)
+function AccountDetailsSection({
+  email,
+  walletAddress,
   isAdmin,
   onEmailUpdated,
 }: {
-  currentEmail: string;
+  email: string;
+  walletAddress: string;
   isAdmin: boolean;
   onEmailUpdated: () => void;
 }) {
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditingEmail, setIsEditingEmail] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [updating, setUpdating] = useState(false);
 
-  const handleUpdate = async () => {
+  const handleUpdateEmail = async () => {
     if (!newEmail) {
       toast.error("Email is required");
       return;
@@ -550,7 +592,7 @@ function WalletEmailEditor({
       }
 
       toast.success("Wallet email updated successfully!");
-      setIsEditing(false);
+      setIsEditingEmail(false);
       setNewEmail("");
       onEmailUpdated();
     } catch (error) {
@@ -564,22 +606,28 @@ function WalletEmailEditor({
   };
 
   const startEditing = () => {
-    setNewEmail(currentEmail);
-    setIsEditing(true);
+    setNewEmail(email);
+    setIsEditingEmail(true);
   };
 
   const cancelEditing = () => {
-    setIsEditing(false);
+    setIsEditingEmail(false);
     setNewEmail("");
   };
 
+  const copyAddress = () => {
+    navigator.clipboard.writeText(walletAddress);
+    toast.success("Address copied to clipboard");
+  };
+
   return (
-    <div>
-      <div className="mb-1 text-muted-foreground text-sm">Associated Email</div>
-      {isEditing ? (
+    <div className="rounded-lg border bg-muted/50 p-4">
+      <div className="mb-2 text-muted-foreground text-sm">Account details</div>
+
+      {isEditingEmail ? (
         <div className="space-y-2">
           <Input
-            className="font-mono text-sm"
+            className="text-sm"
             disabled={updating}
             onChange={(e) => setNewEmail(e.target.value)}
             placeholder="newemail@example.com"
@@ -596,8 +644,8 @@ function WalletEmailEditor({
               Cancel
             </Button>
             <Button
-              disabled={updating || !newEmail || newEmail === currentEmail}
-              onClick={handleUpdate}
+              disabled={updating || !newEmail || newEmail === email}
+              onClick={handleUpdateEmail}
               size="sm"
             >
               {updating ? (
@@ -612,18 +660,32 @@ function WalletEmailEditor({
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-2">
-          <code className="break-all font-mono text-sm">{currentEmail}</code>
-          {isAdmin && (
-            <Button
-              className="h-6 px-2 text-xs"
-              onClick={startEditing}
-              size="sm"
-              variant="ghost"
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">{email}</span>
+            {isAdmin && (
+              <Button
+                className="h-5 px-1.5 text-xs"
+                onClick={startEditing}
+                size="sm"
+                variant="ghost"
+              >
+                Edit
+              </Button>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <code className="font-mono text-muted-foreground text-xs">
+              {truncateAddress(walletAddress)}
+            </code>
+            <button
+              className="text-muted-foreground hover:text-foreground"
+              onClick={copyAddress}
+              type="button"
             >
-              Edit
-            </Button>
-          )}
+              <Copy className="h-3 w-3" />
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -631,7 +693,7 @@ function WalletEmailEditor({
 }
 
 export function WalletOverlay({ overlayId }: WalletOverlayProps) {
-  const { closeAll } = useOverlay();
+  const { closeAll, push } = useOverlay();
   const { data: session } = useSession();
   const { isAdmin } = useActiveMember();
 
@@ -839,6 +901,78 @@ export function WalletOverlay({ overlayId }: WalletOverlayProps) {
     await loadWallet();
   };
 
+  const handleWithdraw = useCallback(
+    (chainId: number, tokenAddress?: string) => {
+      if (!walletData?.walletAddress) return;
+
+      // Build list of withdrawable assets
+      const assets: WithdrawableAsset[] = [];
+
+      // Add native balances
+      for (const balance of balances) {
+        const chain = chains.find((c) => c.chainId === balance.chainId);
+        if (!chain || Number.parseFloat(balance.balance) <= 0) continue;
+
+        assets.push({
+          type: "native",
+          chainId: balance.chainId,
+          chainName: balance.name,
+          symbol: balance.symbol,
+          balance: balance.balance,
+          decimals: 18,
+          rpcUrl: chain.defaultPrimaryRpc,
+          explorerUrl: balance.explorerUrl,
+        });
+      }
+
+      // Add supported token balances (stablecoins)
+      for (const token of supportedTokenBalances) {
+        if (Number.parseFloat(token.balance) <= 0) continue;
+        const chain = chains.find((c) => c.chainId === token.chainId);
+        if (!chain) continue;
+        const balance = balances.find((b) => b.chainId === token.chainId);
+
+        assets.push({
+          type: "token",
+          chainId: token.chainId,
+          chainName: chain.name,
+          symbol: token.symbol,
+          balance: token.balance,
+          tokenAddress: token.tokenAddress,
+          decimals: 6, // Stablecoins typically use 6 decimals
+          rpcUrl: chain.defaultPrimaryRpc,
+          explorerUrl: balance?.explorerUrl || null,
+        });
+      }
+
+      if (assets.length === 0) {
+        toast.error("No assets available for withdrawal");
+        return;
+      }
+
+      // Find index of the selected asset (by chainId and tokenAddress)
+      let initialIndex = 0;
+      if (tokenAddress) {
+        const idx = assets.findIndex(
+          (a) => a.chainId === chainId && a.tokenAddress === tokenAddress
+        );
+        if (idx >= 0) initialIndex = idx;
+      } else {
+        const idx = assets.findIndex(
+          (a) => a.chainId === chainId && a.type === "native"
+        );
+        if (idx >= 0) initialIndex = idx;
+      }
+
+      push(WithdrawModal, {
+        assets,
+        walletAddress: walletData.walletAddress,
+        initialAssetIndex: initialIndex,
+      });
+    },
+    [walletData?.walletAddress, balances, chains, supportedTokenBalances, push]
+  );
+
   useEffect(() => {
     loadWallet();
   }, [loadWallet]);
@@ -863,24 +997,14 @@ export function WalletOverlay({ overlayId }: WalletOverlayProps) {
 
       {!walletLoading && walletData?.hasWallet && (
         <div className="space-y-4">
-          <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
-            <div>
-              <div className="mb-1 text-muted-foreground text-sm">
-                Wallet Address
-              </div>
-              <code className="break-all font-mono text-sm">
-                {walletData.walletAddress}
-              </code>
-            </div>
-
-            {walletData.email && (
-              <WalletEmailEditor
-                currentEmail={walletData.email}
-                isAdmin={isAdmin}
-                onEmailUpdated={loadWallet}
-              />
-            )}
-          </div>
+          {walletData.email && walletData.walletAddress && (
+            <AccountDetailsSection
+              email={walletData.email}
+              isAdmin={isAdmin}
+              onEmailUpdated={loadWallet}
+              walletAddress={walletData.walletAddress}
+            />
+          )}
 
           <BalanceListSection
             balances={balances}
@@ -889,6 +1013,7 @@ export function WalletOverlay({ overlayId }: WalletOverlayProps) {
             onAddToken={handleAddToken}
             onRefresh={handleRefresh}
             onRemoveToken={handleRemoveToken}
+            onWithdraw={handleWithdraw}
             refreshing={refreshing}
             setShowAddToken={setShowAddToken}
             showAddToken={showAddToken}

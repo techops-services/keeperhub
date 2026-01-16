@@ -12,6 +12,18 @@ import type {
 } from "./types";
 
 /**
+ * Build explorer address URL for a chain
+ */
+function buildExplorerAddressUrl(
+  chain: ChainData,
+  address: string
+): string | null {
+  if (!chain.explorerUrl) return null;
+  const path = chain.explorerAddressPath || "/address/{address}";
+  return `${chain.explorerUrl}${path.replace("{address}", address)}`;
+}
+
+/**
  * Fetch native token balance for a single chain
  */
 export async function fetchNativeBalance(
@@ -45,6 +57,7 @@ export async function fetchNativeBalance(
       balance: balanceEth.toFixed(6),
       loading: false,
       isTestnet: chain.isTestnet,
+      explorerUrl: buildExplorerAddressUrl(chain, address),
     };
   } catch (error) {
     console.error(`Failed to fetch balance for ${chain.name}:`, error);
@@ -55,6 +68,7 @@ export async function fetchNativeBalance(
       balance: "0",
       loading: false,
       isTestnet: chain.isTestnet,
+      explorerUrl: buildExplorerAddressUrl(chain, address),
       error: error instanceof Error ? error.message : "Failed to fetch",
     };
   }
