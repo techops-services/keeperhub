@@ -2,6 +2,7 @@
 const axios = require("axios");
 
 const { WORKER_URL } = require("../config/environment.js");
+const { logger } = require("./logger.js");
 
 /**
  * Fetches active workflows from the worker service.
@@ -14,7 +15,7 @@ async function fetchActiveWorkflows() {
 
     return data;
   } catch (error) {
-    console.error("Error fetching parseEvents:", error.message);
+    logger.error(`Error fetching active workflows: ${error.message}`);
     return [];
   }
 }

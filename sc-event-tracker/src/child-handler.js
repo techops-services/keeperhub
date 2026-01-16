@@ -61,7 +61,7 @@ async function handleEventMessage(message) {
       `Heap Used: ${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB`
     );
   } catch (error) {
-    console.log("error", error);
+    logger.error(error);
     const eventInfo = workflowEvent
       ? `chain ${workflowEvent.chain} and WorkflowEvent: ${JSON.stringify(workflowEvent.name)}:${workflowEvent.id}`
       : "unknown event";

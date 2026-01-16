@@ -74,7 +74,7 @@ class WorkflowHandler {
     });
 
     _process.on("error", async (err) => {
-      console.log(err);
+      this.logger.error(err);
       this.logger.error(`Error in child [${this.index}]: ${err.message}`);
       this.logger.log(`Restarting child process [${this.index}]`);
 

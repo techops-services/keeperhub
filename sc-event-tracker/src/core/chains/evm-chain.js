@@ -38,7 +38,7 @@ class EvmChain extends AbstractChain {
 
     this.eventListener = null;
     this.eventFilter = null;
-    this.processedTransactions = new Set();
+
     this.redis = new Redis({
       host: REDIS_HOST,
       port: REDIS_PORT,
@@ -161,7 +161,7 @@ class EvmChain extends AbstractChain {
     const transactionHash = log.transactionHash;
 
     if (await this.isTransactionProcessed(transactionHash)) {
-      console.log("Transaction already processed: ", transactionHash);
+      logger.log(`Transaction already processed: ${transactionHash}`);
       return;
     }
     await this.markTransactionProcessed(transactionHash);
@@ -197,15 +197,14 @@ class EvmChain extends AbstractChain {
 
       if (parsedLog.args && parsedLog.name === eventName) {
         logger.log(`Event name ~ [ ${eventName} ]`);
-        console.log("Parsed log name", parsedLog.name);
+        logger.log(`Parsed log name: ${parsedLog.name}`);
         await this.handleMatchedEvent(log, parsedLog, rawEventsAbi);
       } else {
-        console.log("Event name mismatch / No args present");
-        console.log("parsedLog.name", parsedLog.name);
-        console.log("Expected eventName", eventName);
+        logger.log("Event name mismatch / No args present");
+        logger.log(`parsedLog.name: ${parsedLog.name}`);
+        logger.log(`Expected eventName: ${eventName}`);
       }
     } catch (error) {
-      console.log(error);
       logger.error(error);
     }
   }
@@ -231,7 +230,7 @@ class EvmChain extends AbstractChain {
 
     // Clean up any existing listener first if one exists
     if (this.eventListener && this.eventFilter) {
-      console.log(`[${formatDate(new Date())}] Cleaning up existing listener`);
+      logger.log(`[${formatDate(new Date())}] Cleaning up existing listener`);
       try {
         this.provider.off(this.eventFilter);
         this.eventListener = null;
@@ -241,7 +240,7 @@ class EvmChain extends AbstractChain {
       }
     }
 
-    console.log(
+    logger.log(
       `[${formatDate(new Date())}] Creating new event listener for event: ${
         this.options.eventName
       } - address: ${logger.formatAddress(this.target)} - workflow: ${
@@ -258,7 +257,7 @@ class EvmChain extends AbstractChain {
     const provider = this.getProvider();
 
     this.eventListener = provider.on(filter, async (log) => {
-      console.log(`[${formatDate(new Date())}] Event detected:`, {
+      logger.log(`[${formatDate(new Date())}] Event detected:`, {
         contractAddress: log.address,
         blockNumber: log.blockNumber,
         transactionHash: log.transactionHash,

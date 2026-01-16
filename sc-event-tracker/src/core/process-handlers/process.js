@@ -321,12 +321,6 @@ async function handleActiveWorkflows({
   syncService,
   logger,
 }) {
-  const containersRegistered = await syncService.getContainers();
-
-  for (const container of containersRegistered) {
-    const _processes = await syncService.getContainerProcessesById(container);
-  }
-
   for (const event of workflows) {
     try {
       const newProcess = await handleWorkflowEvent({
@@ -341,7 +335,7 @@ async function handleActiveWorkflows({
         childProcesses[event.id] = newProcess;
       }
     } catch (error) {
-      console.log(error);
+      logger.error(error);
       logger.error(
         `Error while handling active workflow [${event.id}]: ${error.message}`
       );

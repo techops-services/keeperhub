@@ -73,7 +73,7 @@ class AbstractChain {
       const url = `${WORKER_URL}/workflow/${keeperId}`;
 
       const { data } = await axios.get(url);
-      console.log(`Workflow: ${JSON.stringify(data)}`);
+      logger.log(`Workflow: ${JSON.stringify(data)}`);
 
       return data;
     } catch (error) {
