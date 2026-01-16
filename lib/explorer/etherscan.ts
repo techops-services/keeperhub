@@ -11,9 +11,28 @@ type EtherscanResponse = {
   result: string;
 };
 
+type EtherscanSourceCodeResponse = {
+  status: string;
+  message: string;
+  result: Array<{
+    Proxy?: string;
+    Implementation?: string;
+    ABI?: string;
+    [key: string]: unknown;
+  }>;
+};
+
 export type AbiResult = {
   success: boolean;
   abi?: unknown[];
+  error?: string;
+};
+
+export type SourceCodeResult = {
+  success: boolean;
+  isProxy?: boolean;
+  implementationAddress?: string;
+  proxyAbi?: string;
   error?: string;
 };
 
@@ -57,6 +76,70 @@ export async function fetchEtherscanAbi(
 
     const abi = JSON.parse(data.result);
     return { success: true, abi };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+/**
+ * Fetch source code and proxy metadata from Etherscan API v2
+ *
+ * @param apiUrl - Base API URL (e.g., "https://api.etherscan.io/v2/api")
+ * @param chainId - Chain ID for the request
+ * @param contractAddress - Contract address to fetch source code for
+ * @param apiKey - Optional Etherscan API key (recommended for rate limits)
+ */
+export async function fetchEtherscanSourceCode(
+  apiUrl: string,
+  chainId: number,
+  contractAddress: string,
+  apiKey?: string
+): Promise<SourceCodeResult> {
+  const params = new URLSearchParams({
+    chainid: chainId.toString(),
+    module: "contract",
+    action: "getsourcecode",
+    address: contractAddress,
+  });
+
+  if (apiKey) {
+    params.set("apikey", apiKey);
+  }
+
+  try {
+    const response = await fetch(`${apiUrl}?${params}`);
+    const data: EtherscanSourceCodeResponse = await response.json();
+
+    if (data.status !== "1") {
+      const errorMessage = parseEtherscanError(
+        data.message || "Failed to fetch source code"
+      );
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+
+    if (!data.result || data.result.length === 0) {
+      return {
+        success: false,
+        error: "No source code data returned from Etherscan",
+      };
+    }
+
+    const contractData = data.result[0];
+    const isProxy = contractData.Proxy === "1";
+    const implementationAddress = contractData.Implementation;
+
+    return {
+      success: true,
+      isProxy,
+      implementationAddress: implementationAddress || undefined,
+      proxyAbi: contractData.ABI || undefined,
+    };
   } catch (error) {
     return {
       success: false,
