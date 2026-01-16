@@ -11,7 +11,7 @@ const {
   JWT_TOKEN_USERNAME,
   JWT_TOKEN_PASSWORD,
   ETHERSCAN_API_KEY,
-  NODE_ENV
+  NODE_ENV,
 } = process.env;
 
 module.exports = {

@@ -2,6 +2,11 @@
 const { ethers } = require("ethers");
 const { AbstractChain } = require("../abstract-chain.js");
 const { logger } = require("../utils/logger.js");
+const {
+  NODE_ENV,
+  REDIS_HOST,
+  REDIS_PORT,
+} = require("../config/environment.js");
 const Redis = require("ioredis");
 
 class EvmChain extends AbstractChain {
@@ -35,8 +40,8 @@ class EvmChain extends AbstractChain {
     this.eventFilter = null;
     this.processedTransactions = new Set();
     this.redis = new Redis({
-      host: process.env.REDIS_HOST,
-      port: process.env.REDIS_PORT,
+      host: REDIS_HOST,
+      port: REDIS_PORT,
     });
   }
 
@@ -51,7 +56,7 @@ class EvmChain extends AbstractChain {
 
   // Helper to create Redis key for a transaction
   getTransactionKey(transactionHash) {
-    const key = `keeper_id:${this.options.id}:processed_tx:${transactionHash}`;
+    const key = `${NODE_ENV}:keeper_id:${this.options.id}:processed_tx:${transactionHash}`;
     logger.log(`[Redis] Generated key: ${key}`);
     return key;
   }
