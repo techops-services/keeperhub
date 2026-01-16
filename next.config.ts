@@ -12,6 +12,15 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "raw.githubusercontent.com",
+        pathname: "/trustwallet/assets/**",
+      },
+    ],
+  },
 } satisfies NextConfig & { eslint?: { ignoreDuringBuilds?: boolean } };
 
 const { SENTRY_ORG, SENTRY_PROJECT } = process.env;

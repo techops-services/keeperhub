@@ -108,7 +108,7 @@ env:
     value: "0.0.0.0"
   PARA_ENVIRONMENT:
     type: kv
-    value: "production"
+    value: "prod"
   WORKFLOW_EMBEDDED_DATA_DIR:
     type: kv
     value: "/tmp/workflow-data"

@@ -13,6 +13,7 @@ import { KeeperHubLogo } from "@/keeperhub/components/icons/keeperhub-logo";
 import { Web3WalletSection } from "@/keeperhub/components/settings/web3-wallet-section";
 import { AbiWithAutoFetchField } from "@/keeperhub/components/workflow/config/abi-with-auto-fetch-field";
 import { ChainSelectField } from "@/keeperhub/components/workflow/config/chain-select-field";
+import { TokenSelectField } from "@/keeperhub/components/workflow/config/token-select-field";
 import {
   registerBranding,
   registerFieldRenderer,
@@ -78,6 +79,35 @@ registerFieldRenderer(
           field={field}
           onChange={(val: unknown) => onUpdateConfig(field.key, val)}
           value={value}
+        />
+      </div>
+    );
+  }
+);
+
+/**
+ * Token Select Field
+ * Toggle between supported tokens (stablecoins) and custom token address
+ * In supported mode, shows multi-select of system stablecoins
+ * In custom mode, shows text input for any ERC20 address
+ */
+registerFieldRenderer(
+  "token-select",
+  ({ field, config, onUpdateConfig, disabled }) => {
+    const networkField = field.networkField || "network";
+
+    return (
+      <div className="space-y-2" key={field.key}>
+        <Label className="ml-1" htmlFor={field.key}>
+          {field.label}
+          {field.required && <span className="text-red-500">*</span>}
+        </Label>
+        <TokenSelectField
+          config={config}
+          disabled={disabled}
+          field={field}
+          networkField={networkField}
+          onUpdateConfig={onUpdateConfig}
         />
       </div>
     );
