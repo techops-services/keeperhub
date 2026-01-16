@@ -3,7 +3,7 @@ const os = require("node:os");
 const { Redis } = require("ioredis");
 const { logger } = require("../utils/logger");
 const { v7: uuid } = require("uuid");
-const { REDIS_HOST, REDIS_PORT } = require("../config/environment");
+const { REDIS_HOST, REDIS_PORT, NODE_ENV } = require("../config/environment");
 
 const redis = new Redis({
   host: REDIS_HOST,
@@ -21,7 +21,7 @@ class SyncManager {
   constructor(rtStorage, loggerInstance) {
     this.rtStorage = rtStorage;
     this.logger = loggerInstance;
-    this.containerId = `${os.hostname()}-${uuid()}`;
+    this.containerId = `${NODE_ENV}-${os.hostname()}-${uuid()}`;
   }
 
   /**
@@ -33,7 +33,7 @@ class SyncManager {
    * @returns {string} The Redis key.
    */
   buildProcessKey(containerId, index) {
-    return `container:${containerId}-process:${index}`;
+    return `container:${NODE_ENV}-${containerId}-process:${index}`;
   }
 
   /**
@@ -44,7 +44,7 @@ class SyncManager {
    * @returns {string} The Redis key.
    */
   buildContainerKey(containerId) {
-    return `container:${containerId}`;
+    return `container:${NODE_ENV}-${containerId}`;
   }
 
   /**
@@ -56,7 +56,7 @@ class SyncManager {
    * @returns {string} The Redis key.
    */
   buildContainerProcessesKey(containerId) {
-    return `container-processes:${containerId}`;
+    return `container-processes:${NODE_ENV}-${containerId}`;
   }
 }
 
@@ -68,7 +68,7 @@ class SyncContainerManager extends SyncManager {
    * @returns {Promise<void>}
    */
   async registerContainer() {
-    await this.rtStorage.rpush("containers", this.containerId);
+    await this.rtStorage.rpush(`containers:${NODE_ENV}`, this.containerId);
     this.logger.log(
       `Container ${this.containerId} registered with timestamp ${Date.now()}`
     );
@@ -113,7 +113,11 @@ class SyncContainerManager extends SyncManager {
    * @returns {Promise<Array<string>>} An array of container IDs.
    */
   async getContainers() {
-    const containers = await this.rtStorage.lrange("containers", 0, -1);
+    const containers = await this.rtStorage.lrange(
+      `containers:${NODE_ENV}`,
+      0,
+      -1
+    );
     return containers;
   }
 
@@ -127,7 +131,7 @@ class SyncContainerManager extends SyncManager {
     await this.removeAllContainerProcesses(this.containerId);
 
     const removeContainerResult = await this.rtStorage.lrem(
-      "containers",
+      `containers:${NODE_ENV}`,
       0,
       this.containerId
     );
@@ -154,7 +158,7 @@ class SyncContainerManager extends SyncManager {
         await this.removeAllContainerProcesses(container);
       }
 
-      await this.rtStorage.del("containers");
+      await this.rtStorage.del(`containers:${NODE_ENV}`);
 
       this.logger.log("Containers removed");
     } catch (error) {
@@ -197,7 +201,7 @@ class SyncContainerManager extends SyncManager {
     await this.removeAllContainerProcesses(id);
 
     const removeContainerResult = await this.rtStorage.lrem(
-      "containers",
+      `containers:${NODE_ENV}`,
       0,
       id
     );
