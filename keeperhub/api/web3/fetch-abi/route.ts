@@ -5,6 +5,7 @@ import { apiError } from "@/keeperhub/lib/api-error";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { explorerConfigs } from "@/lib/db/schema";
+import { fetchEtherscanSourceCode } from "@/lib/explorer/etherscan";
 import { getChainIdFromNetwork } from "@/lib/rpc";
 
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
@@ -16,6 +17,7 @@ const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
 async function getExplorerApiConfig(network: string): Promise<{
   baseUrl: string;
   chainId: number;
+  explorerApiType: string | null;
 }> {
   // Parse network - supports numeric strings, numbers, and legacy names
   const chainId = getChainIdFromNetwork(network);
@@ -33,6 +35,7 @@ async function getExplorerApiConfig(network: string): Promise<{
     return {
       baseUrl: explorer.explorerApiUrl,
       chainId: explorer.chainId,
+      explorerApiType: explorer.explorerApiType || null,
     };
   }
 
@@ -103,57 +106,27 @@ function parseEtherscanError(
 }
 
 /**
- * Fetch ABI from Etherscan API
+ * Fetch ABI from Etherscan API using getabi action
  */
-async function fetchAbiFromEtherscan(
-  contractAddress: string,
-  network: string
+async function fetchAbiFromAddress(
+  baseUrl: string,
+  chainId: number,
+  address: string
 ): Promise<string> {
-  console.log("[Etherscan] fetchAbiFromEtherscan called with:", {
-    contractAddress,
-    network,
-  });
-
-  if (!ETHERSCAN_API_KEY) {
-    console.error("[Etherscan] API key not configured");
-    throw new Error("Etherscan API key not configured");
-  }
-
-  console.log("[Etherscan] API key present:", ETHERSCAN_API_KEY ? "Yes" : "No");
-
-  // Validate contract address
-  if (!ethers.isAddress(contractAddress)) {
-    console.error("[Etherscan] Invalid contract address:", contractAddress);
-    throw new Error(`Invalid contract address: ${contractAddress}`);
-  }
-
-  console.log("[Etherscan] Contract address validated");
-
-  const { baseUrl, chainId } = await getExplorerApiConfig(network);
-  console.log("[Etherscan] Base URL:", baseUrl);
-  console.log("[Etherscan] Chain ID:", chainId);
-
   const url = new URL(baseUrl);
   url.searchParams.set("chainid", String(chainId));
   url.searchParams.set("module", "contract");
   url.searchParams.set("action", "getabi");
-  url.searchParams.set("address", contractAddress);
+  url.searchParams.set("address", address);
   url.searchParams.set("apikey", ETHERSCAN_API_KEY);
 
   const requestUrl = url.toString();
   console.log(
-    "[Etherscan] Full request URL:",
+    "[Etherscan] Fetching ABI from:",
     requestUrl.replace(ETHERSCAN_API_KEY, "***")
   );
 
-  console.log("[Etherscan] Making fetch request...");
   const response = await fetch(requestUrl);
-  console.log(
-    "[Etherscan] Response status:",
-    response.status,
-    response.statusText
-  );
-  console.log("[Etherscan] Response ok:", response.ok);
 
   if (!response.ok) {
     console.error("[Etherscan] HTTP error response:", {
@@ -165,28 +138,18 @@ async function fetchAbiFromEtherscan(
     );
   }
 
-  console.log("[Etherscan] Parsing JSON response...");
   const data = (await response.json()) as {
     status: string;
     message: string;
     result: string;
   };
 
-  console.log("[Etherscan] Response data:", {
-    status: data.status,
-    message: data.message,
-    resultLength: data.result ? data.result.length : 0,
-  });
-
   if (data.status === "0") {
-    // Etherscan returns status "0" for errors
-    console.error("[Etherscan] Etherscan API returned error status");
-    const errorMessage = parseEtherscanError(data, contractAddress, network);
+    const errorMessage = parseEtherscanError(data, address, "");
     throw new Error(errorMessage);
   }
 
   if (!data.result || data.result === "Contract source code not verified") {
-    console.error("[Etherscan] Contract not verified or no result");
     throw new Error(
       "Contract source code not verified on Etherscan. Please provide ABI manually."
     );
@@ -194,25 +157,167 @@ async function fetchAbiFromEtherscan(
 
   // Validate that result is valid JSON
   try {
-    console.log("[Etherscan] Validating ABI JSON...");
     const abi = JSON.parse(data.result);
     if (!Array.isArray(abi)) {
-      console.error("[Etherscan] ABI is not an array");
       throw new Error("Invalid ABI format: expected array");
     }
-    console.log(
-      "[Etherscan] ABI validated successfully, item count:",
-      abi.length
-    );
     return data.result;
   } catch (error) {
-    console.error("[Etherscan] Failed to parse ABI:", error);
     throw new Error(
       `Invalid ABI format from Etherscan: ${
         error instanceof Error ? error.message : "Unknown error"
       }`
     );
   }
+}
+
+/**
+ * Fetch ABI from Etherscan API with proxy detection
+ */
+async function fetchAbiFromEtherscan(
+  contractAddress: string,
+  network: string
+): Promise<{
+  abi: string;
+  isProxy: boolean;
+  implementationAddress?: string;
+  proxyAddress?: string;
+  warning?: string;
+}> {
+  console.log("[Etherscan] fetchAbiFromEtherscan called with:", {
+    contractAddress,
+    network,
+  });
+
+  if (!ETHERSCAN_API_KEY) {
+    console.error("[Etherscan] API key not configured");
+    throw new Error("Etherscan API key not configured");
+  }
+
+  // Validate contract address
+  if (!ethers.isAddress(contractAddress)) {
+    console.error("[Etherscan] Invalid contract address:", contractAddress);
+    throw new Error(`Invalid contract address: ${contractAddress}`);
+  }
+
+  const { baseUrl, chainId, explorerApiType } =
+    await getExplorerApiConfig(network);
+  console.log("[Etherscan] Base URL:", baseUrl);
+  console.log("[Etherscan] Chain ID:", chainId);
+  console.log("[Etherscan] Explorer API Type:", explorerApiType);
+
+  // Proxy detection only works for Etherscan-based explorers
+  // Blockscout and other explorers don't support getsourcecode the same way
+  if (explorerApiType === "etherscan") {
+    // First, check if this is a proxy contract using getsourcecode
+    console.log("[Etherscan] Checking for proxy contract...");
+    const sourceCodeResult = await fetchEtherscanSourceCode(
+      baseUrl,
+      chainId,
+      contractAddress,
+      ETHERSCAN_API_KEY
+    );
+
+    if (!sourceCodeResult.success) {
+      console.error(
+        "[Etherscan] Failed to fetch source code:",
+        sourceCodeResult.error
+      );
+      // Fall back to regular ABI fetch
+      const abi = await fetchAbiFromAddress(baseUrl, chainId, contractAddress);
+      return {
+        abi,
+        isProxy: false,
+      };
+    }
+
+    // Check if it's a proxy
+    if (sourceCodeResult.isProxy && sourceCodeResult.implementationAddress) {
+      console.log(
+        "[Etherscan] Proxy detected. Implementation:",
+        sourceCodeResult.implementationAddress
+      );
+
+      // Validate implementation address
+      if (!ethers.isAddress(sourceCodeResult.implementationAddress)) {
+        console.warn(
+          "[Etherscan] Invalid implementation address, using proxy ABI"
+        );
+        const proxyAbi = await fetchAbiFromAddress(
+          baseUrl,
+          chainId,
+          contractAddress
+        );
+        return {
+          abi: proxyAbi,
+          isProxy: true,
+          proxyAddress: contractAddress,
+          warning:
+            "Implementation contract address is invalid. Using proxy ABI.",
+        };
+      }
+
+      // Try to fetch ABI from implementation address
+      try {
+        console.log("[Etherscan] Fetching ABI from implementation address...");
+        const implementationAbi = await fetchAbiFromAddress(
+          baseUrl,
+          chainId,
+          sourceCodeResult.implementationAddress
+        );
+
+        return {
+          abi: implementationAbi,
+          isProxy: true,
+          implementationAddress: sourceCodeResult.implementationAddress,
+          proxyAddress: contractAddress,
+        };
+      } catch (error) {
+        console.warn(
+          "[Etherscan] Failed to fetch implementation ABI:",
+          error instanceof Error ? error.message : "Unknown error"
+        );
+
+        // Fall back to proxy ABI if available
+        try {
+          const proxyAbi = await fetchAbiFromAddress(
+            baseUrl,
+            chainId,
+            contractAddress
+          );
+          return {
+            abi: proxyAbi,
+            isProxy: true,
+            implementationAddress: sourceCodeResult.implementationAddress,
+            proxyAddress: contractAddress,
+            warning: "Implementation contract not verified. Using proxy ABI.",
+          };
+        } catch (proxyError) {
+          // If proxy ABI also fails, throw the original error
+          throw error;
+        }
+      }
+    }
+
+    // Not a proxy, fetch ABI normally
+    console.log("[Etherscan] Not a proxy, fetching ABI normally...");
+    const abi = await fetchAbiFromAddress(baseUrl, chainId, contractAddress);
+    return {
+      abi,
+      isProxy: false,
+    };
+  }
+
+  // For non-Etherscan explorers (Blockscout, etc.), skip proxy detection
+  // and fetch ABI normally
+  console.log(
+    "[Etherscan] Non-Etherscan explorer, skipping proxy detection..."
+  );
+  const abi = await fetchAbiFromAddress(baseUrl, chainId, contractAddress);
+  return {
+    abi,
+    isProxy: false,
+  };
 }
 
 export async function POST(request: Request) {
@@ -259,14 +364,27 @@ export async function POST(request: Request) {
 
     console.log("[Etherscan] Fetching ABI for:", { contractAddress, network });
 
-    // Fetch ABI from Etherscan
-    const abi = await fetchAbiFromEtherscan(contractAddress, network);
+    // Fetch ABI from Etherscan with proxy detection
+    const result = await fetchAbiFromEtherscan(contractAddress, network);
 
-    console.log("[Etherscan] Successfully fetched ABI, length:", abi.length);
+    console.log(
+      "[Etherscan] Successfully fetched ABI, length:",
+      result.abi.length
+    );
+    if (result.isProxy) {
+      console.log("[Etherscan] Proxy detected:", {
+        implementation: result.implementationAddress,
+        proxy: result.proxyAddress,
+      });
+    }
 
     return NextResponse.json({
       success: true,
-      abi,
+      abi: result.abi,
+      isProxy: result.isProxy,
+      implementationAddress: result.implementationAddress,
+      proxyAddress: result.proxyAddress,
+      warning: result.warning,
     });
   } catch (error) {
     return apiError(error, "Failed to fetch ABI from Etherscan");
