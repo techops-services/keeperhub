@@ -91,7 +91,9 @@ export function isFromService(
 /**
  * Middleware helper that returns the service name if authenticated
  */
-export function getInternalService(request: Request): InternalServiceName | null {
+export function getInternalService(
+  request: Request
+): InternalServiceName | null {
   const result = authenticateInternalService(request);
   return result.authenticated ? result.service || null : null;
 }

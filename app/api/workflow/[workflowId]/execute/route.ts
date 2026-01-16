@@ -89,7 +89,9 @@ export async function POST(
 
     if (isInternalExecution) {
       // Internal execution from authenticated service
-      console.log(`[Workflow Execute] Internal execution from service: ${internalAuth.service}`);
+      console.log(
+        `[Workflow Execute] Internal execution from service: ${internalAuth.service}`
+      );
 
       workflow = await db.query.workflows.findFirst({
         where: eq(workflows.id, workflowId),
