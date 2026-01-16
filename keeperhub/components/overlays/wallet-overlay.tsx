@@ -1,6 +1,13 @@
 "use client";
 
-import { Copy, ExternalLink, Plus, RefreshCw, SendHorizontal, Trash2 } from "lucide-react";
+import {
+  Copy,
+  ExternalLink,
+  Plus,
+  RefreshCw,
+  SendHorizontal,
+  Trash2,
+} from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -30,7 +37,7 @@ import type {
 } from "@/keeperhub/lib/wallet/types";
 import { useWalletBalances } from "@/keeperhub/lib/wallet/use-wallet-balances";
 import { useSession } from "@/lib/auth-client";
-import { WithdrawModal, type WithdrawableAsset } from "./withdraw-modal";
+import { type WithdrawableAsset, WithdrawModal } from "./withdraw-modal";
 
 type WalletOverlayProps = {
   overlayId: string;
@@ -41,7 +48,9 @@ type WalletOverlayProps = {
 // ============================================================================
 
 function truncateAddress(address: string): string {
-  if (address.length <= 13) return address;
+  if (address.length <= 13) {
+    return address;
+  }
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
@@ -901,76 +910,89 @@ export function WalletOverlay({ overlayId }: WalletOverlayProps) {
     await loadWallet();
   };
 
+  const buildWithdrawableAssets = useCallback((): WithdrawableAsset[] => {
+    const assets: WithdrawableAsset[] = [];
+
+    // Add native balances
+    for (const balance of balances) {
+      const chain = chains.find((c) => c.chainId === balance.chainId);
+      if (!chain || Number.parseFloat(balance.balance) <= 0) {
+        continue;
+      }
+      assets.push({
+        type: "native",
+        chainId: balance.chainId,
+        chainName: balance.name,
+        symbol: balance.symbol,
+        balance: balance.balance,
+        decimals: 18,
+        rpcUrl: chain.defaultPrimaryRpc,
+        explorerUrl: balance.explorerUrl,
+      });
+    }
+
+    // Add supported token balances (stablecoins)
+    for (const token of supportedTokenBalances) {
+      if (Number.parseFloat(token.balance) <= 0) {
+        continue;
+      }
+      const chain = chains.find((c) => c.chainId === token.chainId);
+      if (!chain) {
+        continue;
+      }
+      const balance = balances.find((b) => b.chainId === token.chainId);
+      assets.push({
+        type: "token",
+        chainId: token.chainId,
+        chainName: chain.name,
+        symbol: token.symbol,
+        balance: token.balance,
+        tokenAddress: token.tokenAddress,
+        decimals: 6,
+        rpcUrl: chain.defaultPrimaryRpc,
+        explorerUrl: balance?.explorerUrl || null,
+      });
+    }
+
+    return assets;
+  }, [balances, chains, supportedTokenBalances]);
+
+  const findAssetIndex = useCallback(
+    (assets: WithdrawableAsset[], chainId: number, tokenAddress?: string) => {
+      if (tokenAddress) {
+        const idx = assets.findIndex(
+          (a) => a.chainId === chainId && a.tokenAddress === tokenAddress
+        );
+        return idx >= 0 ? idx : 0;
+      }
+      const idx = assets.findIndex(
+        (a) => a.chainId === chainId && a.type === "native"
+      );
+      return idx >= 0 ? idx : 0;
+    },
+    []
+  );
+
   const handleWithdraw = useCallback(
     (chainId: number, tokenAddress?: string) => {
-      if (!walletData?.walletAddress) return;
-
-      // Build list of withdrawable assets
-      const assets: WithdrawableAsset[] = [];
-
-      // Add native balances
-      for (const balance of balances) {
-        const chain = chains.find((c) => c.chainId === balance.chainId);
-        if (!chain || Number.parseFloat(balance.balance) <= 0) continue;
-
-        assets.push({
-          type: "native",
-          chainId: balance.chainId,
-          chainName: balance.name,
-          symbol: balance.symbol,
-          balance: balance.balance,
-          decimals: 18,
-          rpcUrl: chain.defaultPrimaryRpc,
-          explorerUrl: balance.explorerUrl,
-        });
+      if (!walletData?.walletAddress) {
+        return;
       }
 
-      // Add supported token balances (stablecoins)
-      for (const token of supportedTokenBalances) {
-        if (Number.parseFloat(token.balance) <= 0) continue;
-        const chain = chains.find((c) => c.chainId === token.chainId);
-        if (!chain) continue;
-        const balance = balances.find((b) => b.chainId === token.chainId);
-
-        assets.push({
-          type: "token",
-          chainId: token.chainId,
-          chainName: chain.name,
-          symbol: token.symbol,
-          balance: token.balance,
-          tokenAddress: token.tokenAddress,
-          decimals: 6, // Stablecoins typically use 6 decimals
-          rpcUrl: chain.defaultPrimaryRpc,
-          explorerUrl: balance?.explorerUrl || null,
-        });
-      }
-
+      const assets = buildWithdrawableAssets();
       if (assets.length === 0) {
         toast.error("No assets available for withdrawal");
         return;
       }
 
-      // Find index of the selected asset (by chainId and tokenAddress)
-      let initialIndex = 0;
-      if (tokenAddress) {
-        const idx = assets.findIndex(
-          (a) => a.chainId === chainId && a.tokenAddress === tokenAddress
-        );
-        if (idx >= 0) initialIndex = idx;
-      } else {
-        const idx = assets.findIndex(
-          (a) => a.chainId === chainId && a.type === "native"
-        );
-        if (idx >= 0) initialIndex = idx;
-      }
-
+      const initialIndex = findAssetIndex(assets, chainId, tokenAddress);
       push(WithdrawModal, {
         assets,
         walletAddress: walletData.walletAddress,
         initialAssetIndex: initialIndex,
       });
     },
-    [walletData?.walletAddress, balances, chains, supportedTokenBalances, push]
+    [walletData?.walletAddress, buildWithdrawableAssets, findAssetIndex, push]
   );
 
   useEffect(() => {

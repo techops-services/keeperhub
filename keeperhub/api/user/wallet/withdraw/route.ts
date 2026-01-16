@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
+import { ethers } from "ethers";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
-import { ethers } from "ethers";
 import { apiError } from "@/keeperhub/lib/api-error";
 import { initializeParaSigner } from "@/keeperhub/lib/para/wallet-helpers";
 import { auth } from "@/lib/auth";
@@ -12,6 +12,61 @@ const ERC20_TRANSFER_ABI = [
   "function transfer(address to, uint256 amount) returns (bool)",
   "function decimals() view returns (uint8)",
 ];
+
+function handleTransferError(error: unknown) {
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+
+    if (message.includes("insufficient funds")) {
+      return NextResponse.json(
+        { error: "Insufficient funds for transfer and gas" },
+        { status: 400 }
+      );
+    }
+
+    if (message.includes("nonce")) {
+      return NextResponse.json(
+        { error: "Transaction nonce error. Please try again." },
+        { status: 400 }
+      );
+    }
+  }
+  return null;
+}
+
+async function executeERC20Transfer(
+  signer: ethers.Signer,
+  tokenAddress: string,
+  amount: string,
+  recipient: string
+): Promise<string> {
+  const contract = new ethers.Contract(
+    tokenAddress,
+    ERC20_TRANSFER_ABI,
+    signer
+  );
+  const decimals = await contract.decimals();
+  const amountWei = ethers.parseUnits(amount, decimals);
+  const tx = await contract.transfer(recipient, amountWei);
+  console.log(`[Withdraw] Transaction sent: ${tx.hash}`);
+  const receipt = await tx.wait();
+  return receipt.hash;
+}
+
+async function executeNativeTransfer(
+  signer: ethers.Signer,
+  amount: string,
+  recipient: string
+): Promise<string> {
+  const amountWei = ethers.parseEther(amount);
+  const tx = await signer.sendTransaction({
+    to: recipient,
+    value: amountWei,
+  });
+  console.log(`[Withdraw] Transaction sent: ${tx.hash}`);
+  const receipt = await tx.wait();
+  return receipt?.hash || tx.hash;
+}
 
 // Validate user authentication and admin permissions
 async function validateUserAndOrganization(request: Request) {
@@ -70,7 +125,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { chainId, tokenAddress, amount, recipient } = body;
 
-    if (!chainId || !amount || !recipient) {
+    if (!(chainId && amount && recipient)) {
       return NextResponse.json(
         { error: "Missing required fields: chainId, amount, recipient" },
         { status: 400 }
@@ -88,10 +143,7 @@ export async function POST(request: Request) {
     // Validate amount
     const parsedAmount = Number.parseFloat(amount);
     if (Number.isNaN(parsedAmount) || parsedAmount <= 0) {
-      return NextResponse.json(
-        { error: "Invalid amount" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
     }
 
     // 3. Get chain info from database
@@ -111,42 +163,18 @@ export async function POST(request: Request) {
     const chain = chainResult[0];
 
     // 4. Initialize Para signer
-    console.log(`[Withdraw] Initializing signer for org ${organizationId} on chain ${chain.name}`);
-    const signer = await initializeParaSigner(organizationId, chain.defaultPrimaryRpc);
-
-    let txHash: string;
+    console.log(
+      `[Withdraw] Initializing signer for org ${organizationId} on chain ${chain.name}`
+    );
+    const signer = await initializeParaSigner(
+      organizationId,
+      chain.defaultPrimaryRpc
+    );
 
     // 5. Execute transfer
-    if (tokenAddress) {
-      // ERC20 token transfer
-      console.log(`[Withdraw] ERC20 transfer: ${amount} of ${tokenAddress} to ${recipient}`);
-
-      const contract = new ethers.Contract(tokenAddress, ERC20_TRANSFER_ABI, signer);
-
-      // Get token decimals
-      const decimals = await contract.decimals();
-      const amountWei = ethers.parseUnits(amount, decimals);
-
-      const tx = await contract.transfer(recipient, amountWei);
-      console.log(`[Withdraw] Transaction sent: ${tx.hash}`);
-
-      const receipt = await tx.wait();
-      txHash = receipt.hash;
-    } else {
-      // Native token transfer
-      console.log(`[Withdraw] Native transfer: ${amount} ${chain.symbol} to ${recipient}`);
-
-      const amountWei = ethers.parseEther(amount);
-
-      const tx = await signer.sendTransaction({
-        to: recipient,
-        value: amountWei,
-      });
-      console.log(`[Withdraw] Transaction sent: ${tx.hash}`);
-
-      const receipt = await tx.wait();
-      txHash = receipt?.hash || tx.hash;
-    }
+    const txHash = tokenAddress
+      ? await executeERC20Transfer(signer, tokenAddress, amount, recipient)
+      : await executeNativeTransfer(signer, amount, recipient);
 
     console.log(`[Withdraw] Transaction confirmed: ${txHash}`);
 
@@ -160,26 +188,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("[Withdraw] Failed:", error);
-
-    // Handle specific error cases
-    if (error instanceof Error) {
-      const message = error.message.toLowerCase();
-
-      if (message.includes("insufficient funds")) {
-        return NextResponse.json(
-          { error: "Insufficient funds for transfer and gas" },
-          { status: 400 }
-        );
-      }
-
-      if (message.includes("nonce")) {
-        return NextResponse.json(
-          { error: "Transaction nonce error. Please try again." },
-          { status: 400 }
-        );
-      }
-    }
-
-    return apiError(error, "Failed to execute withdrawal");
+    const errorResponse = handleTransferError(error);
+    return errorResponse ?? apiError(error, "Failed to execute withdrawal");
   }
 }

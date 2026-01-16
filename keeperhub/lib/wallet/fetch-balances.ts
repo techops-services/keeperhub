@@ -18,7 +18,9 @@ function buildExplorerAddressUrl(
   chain: ChainData,
   address: string
 ): string | null {
-  if (!chain.explorerUrl) return null;
+  if (!chain.explorerUrl) {
+    return null;
+  }
   const path = chain.explorerAddressPath || "/address/{address}";
   return `${chain.explorerUrl}${path.replace("{address}", address)}`;
 }

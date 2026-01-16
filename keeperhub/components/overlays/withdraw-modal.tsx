@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Overlay } from "@/components/overlays/overlay";
@@ -15,7 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { ChainBalance, SupportedTokenBalance } from "@/keeperhub/lib/wallet/types";
+
+const ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
 
 export type WithdrawableAsset = {
   type: "native" | "token";
@@ -46,19 +47,18 @@ export function WithdrawModal({
 }: WithdrawModalProps) {
   const { closeAll, pop } = useOverlay();
 
-  const [selectedAssetIndex, setSelectedAssetIndex] = useState(initialAssetIndex);
+  const [selectedAssetIndex, setSelectedAssetIndex] =
+    useState(initialAssetIndex);
   const [amount, setAmount] = useState("");
   const [recipient, setRecipient] = useState("");
   const [state, setState] = useState<WithdrawState>("input");
   const [txHash, setTxHash] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [gasEstimate, setGasEstimate] = useState<string | null>(null);
+  const [gasEstimate, _setGasEstimate] = useState<string | null>(null);
 
   const selectedAsset = assets[selectedAssetIndex];
 
-  const isValidAddress = (address: string) => {
-    return /^0x[a-fA-F0-9]{40}$/.test(address);
-  };
+  const isValidAddress = (address: string) => ADDRESS_REGEX.test(address);
 
   const handleMaxClick = () => {
     if (selectedAsset) {
@@ -66,29 +66,31 @@ export function WithdrawModal({
     }
   };
 
-  const handleSubmit = async () => {
+  const validateWithdrawal = (): string | null => {
     if (!selectedAsset) {
-      toast.error("Please select an asset");
-      return;
+      return "Please select an asset";
     }
-
     if (!amount || Number.parseFloat(amount) <= 0) {
-      toast.error("Please enter a valid amount");
-      return;
+      return "Please enter a valid amount";
     }
-
     if (Number.parseFloat(amount) > Number.parseFloat(selectedAsset.balance)) {
-      toast.error("Insufficient balance");
-      return;
+      return "Insufficient balance";
     }
-
     if (!isValidAddress(recipient)) {
-      toast.error("Please enter a valid recipient address");
-      return;
+      return "Please enter a valid recipient address";
     }
-
     if (recipient.toLowerCase() === walletAddress.toLowerCase()) {
-      toast.error("Cannot withdraw to the same address");
+      return "Cannot withdraw to the same address";
+    }
+    return null;
+  };
+
+  const handleSubmit = async () => {
+    const validationError = validateWithdrawal();
+    if (validationError || !selectedAsset) {
+      if (validationError) {
+        toast.error(validationError);
+      }
       return;
     }
 
@@ -108,7 +110,6 @@ export function WithdrawModal({
       });
 
       const data = await response.json();
-
       if (!response.ok) {
         throw new Error(data.error || "Withdrawal failed");
       }
@@ -118,12 +119,12 @@ export function WithdrawModal({
       toast.success("Withdrawal successful!");
     } catch (error) {
       console.error("Withdrawal failed:", error);
-      setErrorMessage(error instanceof Error ? error.message : "Withdrawal failed");
+      setErrorMessage(
+        error instanceof Error ? error.message : "Withdrawal failed"
+      );
       setState("error");
     }
   };
-
-
 
   // Success state
   if (state === "success" && txHash) {
@@ -190,11 +191,10 @@ export function WithdrawModal({
           label: "Withdraw",
           onClick: handleSubmit,
           disabled:
-            !amount ||
-            !recipient ||
-            !isValidAddress(recipient) ||
+            !(amount && recipient && isValidAddress(recipient)) ||
             Number.parseFloat(amount) <= 0 ||
-            Number.parseFloat(amount) > Number.parseFloat(selectedAsset?.balance || "0"),
+            Number.parseFloat(amount) >
+              Number.parseFloat(selectedAsset?.balance || "0"),
         },
       ]}
       overlayId={overlayId}
@@ -220,7 +220,10 @@ export function WithdrawModal({
             </SelectTrigger>
             <SelectContent>
               {assets.map((asset, index) => (
-                <SelectItem key={`${asset.chainId}-${asset.tokenAddress || "native"}`} value={index.toString()}>
+                <SelectItem
+                  key={`${asset.chainId}-${asset.tokenAddress || "native"}`}
+                  value={index.toString()}
+                >
                   {asset.symbol} on {asset.chainName} ({asset.balance})
                 </SelectItem>
               ))}
@@ -238,7 +241,12 @@ export function WithdrawModal({
               type="number"
               value={amount}
             />
-            <Button onClick={handleMaxClick} size="sm" type="button" variant="outline">
+            <Button
+              onClick={handleMaxClick}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
               Max
             </Button>
           </div>
