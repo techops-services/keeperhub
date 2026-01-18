@@ -805,34 +805,35 @@ export function WalletOverlay({ overlayId }: WalletOverlayProps) {
   const loadWallet = useCallback(async () => {
     setWalletLoading(true);
     try {
-      const [chainList, tokenList, supportedList, walletResponse] =
-        await Promise.all([
-          fetchChains(),
-          fetchTokens(),
-          fetchSupportedTokensData(),
-          fetch("/api/user/wallet"),
-        ]);
+      // Phase 1: Fetch wallet data first (fast - just address + email)
+      const walletResponse = await fetch("/api/user/wallet");
       const data = await walletResponse.json();
 
-      if (data.hasWallet) {
-        setWalletData(data);
-        if (data.walletAddress && chainList.length > 0) {
-          await Promise.all([
-            fetchBalances(data.walletAddress, chainList, tokenList),
-            fetchSupportedBalances(
-              data.walletAddress,
-              chainList,
-              supportedList
-            ),
-          ]);
-        }
-      } else {
+      if (!data.hasWallet) {
         setWalletData({ hasWallet: false });
+        setWalletLoading(false);
+        return;
+      }
+
+      // Show wallet info immediately
+      setWalletData(data);
+      setWalletLoading(false);
+
+      // Phase 2: Fetch chains/tokens in background
+      const [chainList, tokenList, supportedList] = await Promise.all([
+        fetchChains(),
+        fetchTokens(),
+        fetchSupportedTokensData(),
+      ]);
+
+      // Phase 3: Fetch balances (they show loading states internally)
+      if (data.walletAddress && chainList.length > 0) {
+        fetchBalances(data.walletAddress, chainList, tokenList);
+        fetchSupportedBalances(data.walletAddress, chainList, supportedList);
       }
     } catch (error) {
       console.error("Failed to load wallet:", error);
       setWalletData({ hasWallet: false });
-    } finally {
       setWalletLoading(false);
     }
   }, [
