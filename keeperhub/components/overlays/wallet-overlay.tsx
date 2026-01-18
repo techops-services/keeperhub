@@ -251,6 +251,10 @@ function AddTokenForm({
       await onAdd(chainId, tokenAddress);
       setChainId(null);
       setTokenAddress("");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to add token"
+      );
     } finally {
       setAdding(false);
     }
@@ -333,6 +337,10 @@ function CreateWalletForm({
     setCreating(true);
     try {
       await onSubmit(email);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create wallet"
+      );
     } finally {
       setCreating(false);
     }
