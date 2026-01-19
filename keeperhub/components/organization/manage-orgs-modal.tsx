@@ -718,7 +718,9 @@ export function ManageOrgsModal({
                           <Input
                             disabled={createLoading}
                             id="org-slug"
-                            onChange={(e) => handleOrgSlugChange(e.target.value)}
+                            onChange={(e) =>
+                              handleOrgSlugChange(e.target.value)
+                            }
                             placeholder="acme-inc"
                             value={orgSlug}
                           />
