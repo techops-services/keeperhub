@@ -189,9 +189,9 @@ env:
     type: parameterStore
     name: mcp-service-api-key
     parameter_name: /eks/maker-staging/keeperhub-mcp/keeperhub-api-key
-  KEEPERHUB_API_KEY:
+  EVENTS_SERVICE_API_KEY:
     type: parameterStore
-    name: keeperhub-api-key
+    name: events-service-api-key
     parameter_name: /eks/maker-staging/keeperhub-events/keeperhub-api-key
   SCHEDULER_SERVICE_API_KEY:
     type: parameterStore
