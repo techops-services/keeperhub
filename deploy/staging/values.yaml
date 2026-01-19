@@ -184,6 +184,11 @@ env:
     type: parameterStore
     name: feedback-api-key
     parameter_name: /eks/maker-staging/keeperhub-feedback/feedback-api-key
+  # Internal API key for KeeperHub
+  KEEPERHUB_API_KEY:
+    type: parameterStore
+    name: keeperhub-api-key
+    parameter_name: /eks/maker-staging/keeperhub/keeperhub-api-key
 
 externalSecrets:
   clusterSecretStoreName: maker-staging

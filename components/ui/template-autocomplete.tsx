@@ -5,8 +5,9 @@ import { Check } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
-import { edgesAtom, nodesAtom, type WorkflowNode } from "@/lib/workflow-store";
+import { edgesAtom, nodesAtom, WorkflowTriggerEnum, type WorkflowNode } from "@/lib/workflow-store";
 import { findActionById } from "@/plugins";
+import { getTriggerOutputFields } from "@/keeperhub/lib/trigger-output-fields";
 
 type TemplateAutocompleteProps = {
   isOpen: boolean;
@@ -168,6 +169,19 @@ const getCommonFields = (node: WorkflowNode) => {
     const triggerType = node.data.config?.triggerType as string | undefined;
     const webhookSchema = node.data.config?.webhookSchema as string | undefined;
 
+    // start custom keeperhub code //
+    // Use keeperhub trigger output fields function for Event triggers
+    if (triggerType === WorkflowTriggerEnum.EVENT) {
+      const outputFields = getTriggerOutputFields(
+        triggerType,
+        node.data.config || {}
+      );
+      if (outputFields.length > 0) {
+        return outputFields;
+      }
+    }
+    // end custom keeperhub code //
+
     if (triggerType === "Webhook" && webhookSchema) {
       try {
         const schema = JSON.parse(webhookSchema) as SchemaField[];
@@ -178,6 +192,19 @@ const getCommonFields = (node: WorkflowNode) => {
         // If schema parsing fails, fall through to default fields
       }
     }
+
+    // start custom keeperhub code //
+    // Use keeperhub trigger output fields function for other trigger types
+    if (triggerType) {
+      const outputFields = getTriggerOutputFields(
+        triggerType,
+        node.data.config || {}
+      );
+      if (outputFields.length > 0) {
+        return outputFields;
+      }
+    }
+    // end custom keeperhub code //
 
     return [
       { field: "triggered", description: "Trigger status" },

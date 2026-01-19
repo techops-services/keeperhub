@@ -59,7 +59,7 @@ services:
     environment:
       <<: *env_db
     ports:
-      - "5433:5432"  # External 5433 to avoid host port conflicts, internal 5432
+      - "5433:5432" # External 5433 to avoid host port conflicts, internal 5432
     volumes:
       - keeperhub_db_data:/var/lib/postgresql/data
     healthcheck:
@@ -116,6 +116,7 @@ services:
     environment:
       <<: [*env_db_connection, *env_aws, *env_sqs]
       NODE_ENV: production
+      KEEPERHUB_API_KEY: ${KEEPERHUB_API_KEY:-}
     depends_on:
       db:
         condition: service_healthy
@@ -138,6 +139,7 @@ services:
     environment:
       <<: [*env_db_connection, *env_aws, *env_sqs]
       HOSTNAME: "0.0.0.0"
+      KEEPERHUB_API_KEY: ${KEEPERHUB_API_KEY:-some-random-api-key}
     depends_on:
       db:
         condition: service_healthy
@@ -179,7 +181,7 @@ services:
         sleep 60
       done'
     profiles:
-      - dev  # Only in dev profile (not minikube - uses K8s CronJob)
+      - dev # Only in dev profile (not minikube - uses K8s CronJob)
 
   # ===========================================================================
   # Schedule Executor (Direct execution for dev profile)
@@ -207,7 +209,7 @@ services:
         condition: service_started
     command: tsx scripts/schedule-executor.ts
     profiles:
-      - dev  # Only in dev profile (minikube uses job-spawner in K8s)
+      - dev # Only in dev profile (minikube uses job-spawner in K8s)
 
   # ===========================================================================
   # Database Migrator (one-shot)
@@ -227,6 +229,20 @@ services:
     command: pnpm db:push
     profiles:
       - migrator
+
+  # ===========================================================================
+  # Redis (for caching)
+  # ===========================================================================
+  redis:
+    image: valkey/valkey:latest
+    container_name: keeperhub-redis
+    hostname: redis
+    ports:
+      - 6379:6379
+    restart: unless-stopped
+    profiles:
+      - dev
+      - minikube
 
 # =============================================================================
 # Volumes
