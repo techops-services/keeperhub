@@ -6,7 +6,12 @@ import { initializeParaSigner } from "@/keeperhub/lib/para/wallet-helpers";
 import { getOrganizationIdFromExecution } from "@/keeperhub/lib/workflow-helpers";
 import { ERC20_ABI } from "@/lib/contracts";
 import { db } from "@/lib/db";
-import { supportedTokens, workflowExecutions } from "@/lib/db/schema";
+import {
+  explorerConfigs,
+  supportedTokens,
+  workflowExecutions,
+} from "@/lib/db/schema";
+import { getTransactionUrl } from "@/lib/explorer";
 import { getChainIdFromNetwork, resolveRpcConfig } from "@/lib/rpc";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
@@ -15,6 +20,7 @@ type TransferTokenResult =
   | {
       success: true;
       transactionHash: string;
+      transactionLink: string;
       amount: string;
       symbol: string;
       recipient: string;
@@ -310,9 +316,18 @@ async function stepHandler(
 
     console.log("[Transfer Token] Transaction confirmed:", receipt.hash);
 
+    // Fetch explorer config for transaction link
+    const explorerConfig = await db.query.explorerConfigs.findFirst({
+      where: eq(explorerConfigs.chainId, chainId),
+    });
+    const transactionLink = explorerConfig
+      ? getTransactionUrl(explorerConfig, receipt.hash)
+      : "";
+
     return {
       success: true,
       transactionHash: receipt.hash,
+      transactionLink,
       amount,
       symbol,
       recipient: recipientAddress,
