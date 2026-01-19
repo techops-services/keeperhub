@@ -184,11 +184,19 @@ env:
     type: parameterStore
     name: feedback-api-key
     parameter_name: /eks/maker-staging/keeperhub-feedback/feedback-api-key
-  # Internal API key for KeeperHub
-  KEEPERHUB_API_KEY:
+  # Internal service API keys for service-to-service auth
+  MCP_SERVICE_API_KEY:
     type: parameterStore
-    name: keeperhub-api-key
-    parameter_name: /eks/maker-staging/keeperhub/keeperhub-api-key
+    name: mcp-service-api-key
+    parameter_name: /eks/maker-staging/keeperhub-mcp/keeperhub-api-key
+  EVENTS_SERVICE_API_KEY:
+    type: parameterStore
+    name: events-service-api-key
+    parameter_name: /eks/maker-staging/keeperhub-events/keeperhub-api-key
+  SCHEDULER_SERVICE_API_KEY:
+    type: parameterStore
+    name: scheduler-service-api-key
+    parameter_name: /eks/maker-staging/keeperhub/scheduler-service-api-key
 
 externalSecrets:
   clusterSecretStoreName: maker-staging
@@ -238,6 +246,10 @@ cronjob:
           type: parameterStore
           name: chain-rpc-config
           parameter_name: /eks/maker-staging/keeperhub/chain-rpc-config
+        SCHEDULER_SERVICE_API_KEY:
+          type: parameterStore
+          name: scheduler-service-api-key
+          parameter_name: /eks/maker-staging/keeperhub/scheduler-service-api-key
       schedule: "* * * * *"
       command: ["/bin/sh"]
       args:
