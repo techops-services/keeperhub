@@ -20,14 +20,14 @@ import {
   type NewExplorerConfig,
 } from "../lib/db/schema";
 import {
-  createRpcUrlResolver,
+  CHAIN_CONFIG,
   getConfigValue,
+  getRpcUrlByChainId,
   getWssUrl,
-  PUBLIC_RPCS,
   parseRpcConfigWithDetails,
 } from "../lib/rpc/rpc-config";
 
-// Parse JSON config from environment (if available)
+// Parse JSON config from environment (if available) - used for WSS URLs and config values
 const rpcConfig = (() => {
   const envValue = process.env.CHAIN_RPC_CONFIG;
   const result = parseRpcConfigWithDetails(envValue);
@@ -49,11 +49,8 @@ const rpcConfig = (() => {
   return result.config;
 })();
 
-// Create resolver function for this script
-const getRpcUrl = createRpcUrlResolver(rpcConfig);
-
 // Helper to get config value with rpcConfig pre-bound
-const getChainConfig = <T>(
+const getChainConfigValue = <T>(
   jsonKey: string,
   field: "chainId" | "symbol" | "isEnabled" | "isTestnet",
   defaultValue: T
@@ -61,245 +58,165 @@ const getChainConfig = <T>(
 
 const DEFAULT_CHAINS: NewChain[] = [
   {
-    chainId: getChainConfig("eth-mainnet", "chainId", 1),
+    chainId: getChainConfigValue("eth-mainnet", "chainId", 1),
     name: "Ethereum Mainnet",
-    symbol: getChainConfig("eth-mainnet", "symbol", "ETH"),
+    symbol: getChainConfigValue("eth-mainnet", "symbol", "ETH"),
     chainType: "evm",
-    defaultPrimaryRpc: getRpcUrl(
-      "eth-mainnet",
-      "CHAIN_ETH_MAINNET_PRIMARY_RPC",
-      PUBLIC_RPCS.ETH_MAINNET,
-      "primary"
-    ),
-    defaultFallbackRpc: getRpcUrl(
-      "eth-mainnet",
-      "CHAIN_ETH_MAINNET_FALLBACK_RPC",
-      PUBLIC_RPCS.ETH_MAINNET,
-      "fallback"
-    ),
+    defaultPrimaryRpc: getRpcUrlByChainId(1, "primary"),
+    defaultFallbackRpc: getRpcUrlByChainId(1, "fallback"),
     defaultPrimaryWss: getWssUrl({
       rpcConfig,
-      jsonKey: "eth-mainnet",
+      jsonKey: CHAIN_CONFIG[1].jsonKey,
       type: "primary",
     }),
     defaultFallbackWss: getWssUrl({
       rpcConfig,
-      jsonKey: "eth-mainnet",
+      jsonKey: CHAIN_CONFIG[1].jsonKey,
       type: "fallback",
     }),
-    isTestnet: getChainConfig("eth-mainnet", "isTestnet", false),
-    isEnabled: getChainConfig("eth-mainnet", "isEnabled", true),
+    isTestnet: getChainConfigValue("eth-mainnet", "isTestnet", false),
+    isEnabled: getChainConfigValue("eth-mainnet", "isEnabled", true),
   },
   {
-    chainId: getChainConfig("sepolia", "chainId", 11_155_111),
+    chainId: getChainConfigValue("sepolia", "chainId", 11_155_111),
     name: "Sepolia Testnet",
-    symbol: getChainConfig("sepolia", "symbol", "ETH"),
+    symbol: getChainConfigValue("sepolia", "symbol", "ETH"),
     chainType: "evm",
-    defaultPrimaryRpc: getRpcUrl(
-      "sepolia",
-      "CHAIN_SEPOLIA_PRIMARY_RPC",
-      PUBLIC_RPCS.SEPOLIA,
-      "primary"
-    ),
-    defaultFallbackRpc: getRpcUrl(
-      "sepolia",
-      "CHAIN_SEPOLIA_FALLBACK_RPC",
-      PUBLIC_RPCS.SEPOLIA,
-      "fallback"
-    ),
+    defaultPrimaryRpc: getRpcUrlByChainId(11_155_111, "primary"),
+    defaultFallbackRpc: getRpcUrlByChainId(11_155_111, "fallback"),
     defaultPrimaryWss: getWssUrl({
       rpcConfig,
-      jsonKey: "sepolia",
+      jsonKey: CHAIN_CONFIG[11_155_111].jsonKey,
       type: "primary",
     }),
     defaultFallbackWss: getWssUrl({
       rpcConfig,
-      jsonKey: "sepolia",
+      jsonKey: CHAIN_CONFIG[11_155_111].jsonKey,
       type: "fallback",
     }),
-    isTestnet: getChainConfig("sepolia", "isTestnet", true),
-    isEnabled: getChainConfig("sepolia", "isEnabled", true),
+    isTestnet: getChainConfigValue("sepolia", "isTestnet", true),
+    isEnabled: getChainConfigValue("sepolia", "isEnabled", true),
   },
   {
-    chainId: getChainConfig("base-mainnet", "chainId", 8453),
+    chainId: getChainConfigValue("base-mainnet", "chainId", 8453),
     name: "Base",
-    symbol: getChainConfig("base-mainnet", "symbol", "BASE"),
+    symbol: getChainConfigValue("base-mainnet", "symbol", "BASE"),
     chainType: "evm",
-    defaultPrimaryRpc: getRpcUrl(
-      "base-mainnet",
-      "CHAIN_BASE_MAINNET_PRIMARY_RPC",
-      PUBLIC_RPCS.BASE_MAINNET,
-      "primary"
-    ),
-    defaultFallbackRpc: getRpcUrl(
-      "base-mainnet",
-      "CHAIN_BASE_MAINNET_FALLBACK_RPC",
-      PUBLIC_RPCS.BASE_MAINNET,
-      "fallback"
-    ),
+    defaultPrimaryRpc: getRpcUrlByChainId(8453, "primary"),
+    defaultFallbackRpc: getRpcUrlByChainId(8453, "fallback"),
     defaultPrimaryWss: getWssUrl({
       rpcConfig,
-      jsonKey: "base-mainnet",
+      jsonKey: CHAIN_CONFIG[8453].jsonKey,
       type: "primary",
     }),
     defaultFallbackWss: getWssUrl({
       rpcConfig,
-      jsonKey: "base-mainnet",
+      jsonKey: CHAIN_CONFIG[8453].jsonKey,
       type: "fallback",
     }),
-    isTestnet: getChainConfig("base-mainnet", "isTestnet", false),
-    isEnabled: getChainConfig("base-mainnet", "isEnabled", true),
+    isTestnet: getChainConfigValue("base-mainnet", "isTestnet", false),
+    isEnabled: getChainConfigValue("base-mainnet", "isEnabled", true),
   },
   {
-    chainId: getChainConfig("base-sepolia", "chainId", 84_532),
+    chainId: getChainConfigValue("base-sepolia", "chainId", 84_532),
     name: "Base Sepolia",
-    symbol: getChainConfig("base-sepolia", "symbol", "BASE"),
+    symbol: getChainConfigValue("base-sepolia", "symbol", "BASE"),
     chainType: "evm",
-    defaultPrimaryRpc: getRpcUrl(
-      "base-sepolia",
-      "CHAIN_BASE_SEPOLIA_PRIMARY_RPC",
-      PUBLIC_RPCS.BASE_SEPOLIA,
-      "primary"
-    ),
-    defaultFallbackRpc: getRpcUrl(
-      "base-sepolia",
-      "CHAIN_BASE_SEPOLIA_FALLBACK_RPC",
-      PUBLIC_RPCS.BASE_SEPOLIA,
-      "fallback"
-    ),
+    defaultPrimaryRpc: getRpcUrlByChainId(84_532, "primary"),
+    defaultFallbackRpc: getRpcUrlByChainId(84_532, "fallback"),
     defaultPrimaryWss: getWssUrl({
       rpcConfig,
-      jsonKey: "base-sepolia",
+      jsonKey: CHAIN_CONFIG[84_532].jsonKey,
       type: "primary",
     }),
     defaultFallbackWss: getWssUrl({
       rpcConfig,
-      jsonKey: "base-sepolia",
+      jsonKey: CHAIN_CONFIG[84_532].jsonKey,
       type: "fallback",
     }),
-    isTestnet: getChainConfig("base-sepolia", "isTestnet", true),
-    isEnabled: getChainConfig("base-sepolia", "isEnabled", true),
+    isTestnet: getChainConfigValue("base-sepolia", "isTestnet", true),
+    isEnabled: getChainConfigValue("base-sepolia", "isEnabled", true),
   },
   {
-    chainId: getChainConfig("tempo-testnet", "chainId", 42_429),
+    chainId: getChainConfigValue("tempo-testnet", "chainId", 42_429),
     name: "Tempo Testnet",
-    symbol: getChainConfig("tempo-testnet", "symbol", "TEMPO"),
+    symbol: getChainConfigValue("tempo-testnet", "symbol", "TEMPO"),
     chainType: "evm",
-    defaultPrimaryRpc: getRpcUrl(
-      "tempo-testnet",
-      "CHAIN_TEMPO_TESTNET_PRIMARY_RPC",
-      PUBLIC_RPCS.TEMPO_TESTNET,
-      "primary"
-    ),
-    defaultFallbackRpc: getRpcUrl(
-      "tempo-testnet",
-      "CHAIN_TEMPO_TESTNET_FALLBACK_RPC",
-      PUBLIC_RPCS.TEMPO_TESTNET,
-      "fallback"
-    ),
+    defaultPrimaryRpc: getRpcUrlByChainId(42_429, "primary"),
+    defaultFallbackRpc: getRpcUrlByChainId(42_429, "fallback"),
     defaultPrimaryWss: getWssUrl({
       rpcConfig,
-      jsonKey: "tempo-testnet",
+      jsonKey: CHAIN_CONFIG[42_429].jsonKey,
       type: "primary",
     }),
     defaultFallbackWss: getWssUrl({
       rpcConfig,
-      jsonKey: "tempo-testnet",
+      jsonKey: CHAIN_CONFIG[42_429].jsonKey,
       type: "fallback",
     }),
-    isTestnet: getChainConfig("tempo-testnet", "isTestnet", true),
-    isEnabled: getChainConfig("tempo-testnet", "isEnabled", true),
+    isTestnet: getChainConfigValue("tempo-testnet", "isTestnet", true),
+    isEnabled: getChainConfigValue("tempo-testnet", "isEnabled", true),
   },
   {
-    chainId: getChainConfig("tempo-mainnet", "chainId", 42_420),
+    chainId: getChainConfigValue("tempo-mainnet", "chainId", 42_420),
     name: "Tempo",
-    symbol: getChainConfig("tempo-mainnet", "symbol", "TEMPO"),
+    symbol: getChainConfigValue("tempo-mainnet", "symbol", "TEMPO"),
     chainType: "evm",
-    defaultPrimaryRpc: getRpcUrl(
-      "tempo-mainnet",
-      "CHAIN_TEMPO_MAINNET_PRIMARY_RPC",
-      PUBLIC_RPCS.TEMPO_MAINNET,
-      "primary"
-    ),
-    defaultFallbackRpc: getRpcUrl(
-      "tempo-mainnet",
-      "CHAIN_TEMPO_MAINNET_FALLBACK_RPC",
-      PUBLIC_RPCS.TEMPO_MAINNET,
-      "fallback"
-    ),
+    defaultPrimaryRpc: getRpcUrlByChainId(42_420, "primary"),
+    defaultFallbackRpc: getRpcUrlByChainId(42_420, "fallback"),
     defaultPrimaryWss: getWssUrl({
       rpcConfig,
-      jsonKey: "tempo-mainnet",
+      jsonKey: CHAIN_CONFIG[42_420].jsonKey,
       type: "primary",
     }),
     defaultFallbackWss: getWssUrl({
       rpcConfig,
-      jsonKey: "tempo-mainnet",
+      jsonKey: CHAIN_CONFIG[42_420].jsonKey,
       type: "fallback",
     }),
-    isTestnet: getChainConfig("tempo-mainnet", "isTestnet", false),
-    isEnabled: getChainConfig("tempo-mainnet", "isEnabled", false),
+    isTestnet: getChainConfigValue("tempo-mainnet", "isTestnet", false),
+    isEnabled: getChainConfigValue("tempo-mainnet", "isEnabled", false),
   },
   // Solana chains (non-EVM - uses SolanaProviderManager)
   {
-    chainId: getChainConfig("solana-mainnet", "chainId", 101),
+    chainId: getChainConfigValue("solana-mainnet", "chainId", 101),
     name: "Solana",
-    symbol: getChainConfig("solana-mainnet", "symbol", "SOL"),
+    symbol: getChainConfigValue("solana-mainnet", "symbol", "SOL"),
     chainType: "solana",
-    defaultPrimaryRpc: getRpcUrl(
-      "solana-mainnet",
-      "CHAIN_SOLANA_MAINNET_PRIMARY_RPC",
-      PUBLIC_RPCS.SOLANA_MAINNET,
-      "primary"
-    ),
-    defaultFallbackRpc: getRpcUrl(
-      "solana-mainnet",
-      "CHAIN_SOLANA_MAINNET_FALLBACK_RPC",
-      PUBLIC_RPCS.SOLANA_MAINNET,
-      "fallback"
-    ),
+    defaultPrimaryRpc: getRpcUrlByChainId(101, "primary"),
+    defaultFallbackRpc: getRpcUrlByChainId(101, "fallback"),
     defaultPrimaryWss: getWssUrl({
       rpcConfig,
-      jsonKey: "solana-mainnet",
+      jsonKey: CHAIN_CONFIG[101].jsonKey,
       type: "primary",
     }),
     defaultFallbackWss: getWssUrl({
       rpcConfig,
-      jsonKey: "solana-mainnet",
+      jsonKey: CHAIN_CONFIG[101].jsonKey,
       type: "fallback",
     }),
-    isTestnet: getChainConfig("solana-mainnet", "isTestnet", false),
-    isEnabled: getChainConfig("solana-mainnet", "isEnabled", true),
+    isTestnet: getChainConfigValue("solana-mainnet", "isTestnet", false),
+    isEnabled: getChainConfigValue("solana-mainnet", "isEnabled", true),
   },
   {
-    chainId: getChainConfig("solana-devnet", "chainId", 103),
+    chainId: getChainConfigValue("solana-devnet", "chainId", 103),
     name: "Solana Devnet",
-    symbol: getChainConfig("solana-devnet", "symbol", "SOL"),
+    symbol: getChainConfigValue("solana-devnet", "symbol", "SOL"),
     chainType: "solana",
-    defaultPrimaryRpc: getRpcUrl(
-      "solana-devnet",
-      "CHAIN_SOLANA_DEVNET_PRIMARY_RPC",
-      PUBLIC_RPCS.SOLANA_DEVNET,
-      "primary"
-    ),
-    defaultFallbackRpc: getRpcUrl(
-      "solana-devnet",
-      "CHAIN_SOLANA_DEVNET_FALLBACK_RPC",
-      PUBLIC_RPCS.SOLANA_DEVNET,
-      "fallback"
-    ),
+    defaultPrimaryRpc: getRpcUrlByChainId(103, "primary"),
+    defaultFallbackRpc: getRpcUrlByChainId(103, "fallback"),
     defaultPrimaryWss: getWssUrl({
       rpcConfig,
-      jsonKey: "solana-devnet",
+      jsonKey: CHAIN_CONFIG[103].jsonKey,
       type: "primary",
     }),
     defaultFallbackWss: getWssUrl({
       rpcConfig,
-      jsonKey: "solana-devnet",
+      jsonKey: CHAIN_CONFIG[103].jsonKey,
       type: "fallback",
     }),
-    isTestnet: getChainConfig("solana-devnet", "isTestnet", true),
-    isEnabled: getChainConfig("solana-devnet", "isEnabled", true),
+    isTestnet: getChainConfigValue("solana-devnet", "isTestnet", true),
+    isEnabled: getChainConfigValue("solana-devnet", "isEnabled", true),
   },
 ];
 

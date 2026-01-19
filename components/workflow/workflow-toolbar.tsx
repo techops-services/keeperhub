@@ -33,8 +33,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-// start custom keeperhub code //
 import { OrgSwitcher } from "@/keeperhub/components/organization/org-switcher";
+// start custom keeperhub code //
+import { Switch } from "@/keeperhub/components/ui/switch";
 import { api } from "@/lib/api-client";
 import { authClient, useSession } from "@/lib/auth-client";
 import { getCustomLogo } from "@/lib/extension-registry";
@@ -55,6 +56,7 @@ import {
   isExecutingAtom,
   isGeneratingAtom,
   isSavingAtom,
+  isWorkflowEnabled,
   isWorkflowOwnerAtom,
   nodesAtom,
   propertiesPanelActiveTabAtom,
@@ -67,6 +69,7 @@ import {
   updateNodeDataAtom,
   type WorkflowEdge,
   type WorkflowNode,
+  WorkflowTriggerEnum,
   type WorkflowVisibility,
 } from "@/lib/workflow-store";
 import {
@@ -678,6 +681,7 @@ function useWorkflowState() {
       updatedAt: string;
     }>
   >([]);
+  const [isEnabled, setIsEnabled] = useAtom(isWorkflowEnabled);
 
   // Load all workflows on mount
   useEffect(() => {
@@ -731,6 +735,8 @@ function useWorkflowState() {
     userIntegrations,
     triggerExecute,
     setTriggerExecute,
+    isEnabled,
+    setIsEnabled,
   };
 }
 
@@ -923,6 +929,25 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     }
   };
 
+  // start custom keeperhub code //
+  const handleToggleEnabled = async (newEnabled: boolean) => {
+    if (!currentWorkflowId) {
+      return;
+    }
+
+    try {
+      await api.workflow.update(currentWorkflowId, {
+        enabled: newEnabled,
+      });
+      state.setIsEnabled(newEnabled);
+      toast.success(newEnabled ? "Workflow enabled" : "Workflow disabled");
+    } catch (error) {
+      console.error("Failed to update enabled state:", error);
+      toast.error("Failed to update workflow state. Please try again.");
+    }
+  };
+  // end custom keeperhub code //
+
   const handleDuplicate = async () => {
     if (!currentWorkflowId) {
       return;
@@ -956,6 +981,7 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     handleDownload,
     loadWorkflows,
     handleToggleVisibility,
+    handleToggleEnabled,
     handleDuplicate,
   };
 }
@@ -1117,6 +1143,28 @@ function ToolbarActions({
           </Button>
         )}
       </ButtonGroup>
+
+      {/* start custom keeperhub code // */}
+      {state.nodes?.find((node) => node?.data?.type === "trigger")?.data?.config
+        ?.triggerType === WorkflowTriggerEnum.EVENT && (
+        <>
+          {/* Enable Workflow Switch - Desktop Horizontal */}
+          <div className="hidden items-center gap-2 lg:flex">
+            <label
+              className="font-medium text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              htmlFor="enable-workflow-switch"
+            >
+              {state.isEnabled ? "Deactivate" : "Activate"} workflow
+            </label>
+            <Switch
+              checked={state.isEnabled}
+              id="enable-workflow-switch"
+              onCheckedChange={actions.handleToggleEnabled}
+            />
+          </div>
+        </>
+      )}
+      {/* end custom keeperhub code // */}
 
       {/* Add Step - Desktop Horizontal */}
       <ButtonGroup className="hidden lg:flex" orientation="horizontal">

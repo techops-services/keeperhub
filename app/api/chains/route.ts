@@ -12,6 +12,7 @@ export type ChainResponse = {
   defaultPrimaryRpc: string;
   defaultFallbackRpc: string | null;
   explorerUrl: string | null;
+  explorerAddressPath: string | null;
   explorerApiUrl: string | null;
   explorerApiType: string | null;
   isTestnet: boolean;
@@ -54,6 +55,7 @@ export async function GET(request: Request) {
       defaultPrimaryRpc: chain.defaultPrimaryRpc,
       defaultFallbackRpc: chain.defaultFallbackRpc,
       explorerUrl: explorer?.explorerUrl ?? null,
+      explorerAddressPath: explorer?.explorerAddressPath ?? null,
       explorerApiUrl: explorer?.explorerApiUrl ?? null,
       explorerApiType: explorer?.explorerApiType ?? null,
       isTestnet: chain.isTestnet ?? false,

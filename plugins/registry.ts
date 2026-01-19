@@ -33,7 +33,8 @@ export type ActionConfigFieldBase = {
     | "abi-function-select" // Dynamic dropdown that parses ABI and shows functions
     | "abi-function-args" // Dynamic inputs for function arguments based on selected ABI function
     | "abi-with-auto-fetch" // ABI textarea with automatic fetch from Etherscan
-    | "token-select"; // Token selector with supported/custom toggle
+    | "token-select" // Token selector with supported/custom toggle
+    | "abi-event-select"; // Dynamic dropdown that parses ABI and shows events
 
   // For chain-select: filter by chain type (e.g., "evm" or "solana")
   chainTypeFilter?: string;
@@ -65,7 +66,7 @@ export type ActionConfigFieldBase = {
     equals: string;
   };
 
-  // For abi-function-select: which field contains the ABI JSON
+  // For abi-function-select and abi-event-select: which field contains the ABI JSON
   abiField?: string;
 
   // For abi-function-select: filter functions by type ("read" or "write")

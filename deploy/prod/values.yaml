@@ -173,6 +173,11 @@ env:
     type: parameterStore
     name: sentry-auth-token
     parameter_name: /eks/maker-prod/keeperhub/sentry-auth-token
+  # Internal API key for KeeperHub
+  KEEPERHUB_API_KEY:
+    type: parameterStore
+    name: keeperhub-api-key
+    parameter_name: /eks/maker-prod/keeperhub/keeperhub-api-key
 
 externalSecrets:
   clusterSecretStoreName: maker-prod
