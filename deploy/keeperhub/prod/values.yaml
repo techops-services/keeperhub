@@ -173,11 +173,19 @@ env:
     type: parameterStore
     name: sentry-auth-token
     parameter_name: /eks/maker-prod/keeperhub/sentry-auth-token
-  # Internal API key for KeeperHub
-  KEEPERHUB_API_KEY:
+  # Internal service API keys for service-to-service auth
+  MCP_SERVICE_API_KEY:
     type: parameterStore
-    name: keeperhub-api-key
-    parameter_name: /eks/maker-prod/keeperhub/keeperhub-api-key
+    name: mcp-service-api-key
+    parameter_name: /eks/maker-prod/keeperhub-mcp/keeperhub-api-key
+  EVENTS_SERVICE_API_KEY:
+    type: parameterStore
+    name: events-service-api-key
+    parameter_name: /eks/maker-prod/keeperhub-events/keeperhub-api-key
+  SCHEDULER_SERVICE_API_KEY:
+    type: parameterStore
+    name: scheduler-service-api-key
+    parameter_name: /eks/maker-prod/keeperhub-scheduler/keeperhub-api-key
 
 externalSecrets:
   clusterSecretStoreName: maker-prod
@@ -227,6 +235,10 @@ cronjob:
           type: parameterStore
           name: chain-rpc-config
           parameter_name: /eks/maker-prod/keeperhub/chain-rpc-config
+        SCHEDULER_SERVICE_API_KEY:
+          type: parameterStore
+          name: scheduler-service-api-key
+          parameter_name: /eks/maker-prod/keeperhub-scheduler/keeperhub-api-key
       schedule: "* * * * *"
       command: ["/bin/sh"]
       args:

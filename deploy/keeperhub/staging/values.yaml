@@ -196,7 +196,7 @@ env:
   SCHEDULER_SERVICE_API_KEY:
     type: parameterStore
     name: scheduler-service-api-key
-    parameter_name: /eks/maker-staging/keeperhub/scheduler-service-api-key
+    parameter_name: /eks/maker-staging/keeperhub-scheduler/keeperhub-api-key
 
 externalSecrets:
   clusterSecretStoreName: maker-staging
@@ -249,7 +249,7 @@ cronjob:
         SCHEDULER_SERVICE_API_KEY:
           type: parameterStore
           name: scheduler-service-api-key
-          parameter_name: /eks/maker-staging/keeperhub/scheduler-service-api-key
+          parameter_name: /eks/maker-staging/keeperhub-scheduler/keeperhub-api-key
       schedule: "* * * * *"
       command: ["/bin/sh"]
       args:
