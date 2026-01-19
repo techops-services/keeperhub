@@ -1,0 +1,21 @@
+const dotenv = require("dotenv");
+
+dotenv.config();
+
+const {
+  KEEPERHUB_API_URL,
+  KEEPERHUB_API_KEY,
+  TIMEOUT_BETWEEN_SYNC,
+  JWT_TOKEN_USERNAME,
+  JWT_TOKEN_PASSWORD,
+  PORT,
+} = process.env;
+
+module.exports = {
+  TIMEOUT_BETWEEN_SYNC,
+  JWT_TOKEN_USERNAME,
+  JWT_TOKEN_PASSWORD,
+  PORT: PORT || 3010,
+  KEEPERHUB_API_URL,
+  KEEPERHUB_API_KEY,
+};

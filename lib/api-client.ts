@@ -16,12 +16,14 @@ export type WorkflowData = {
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
   visibility?: WorkflowVisibility;
+  enabled?: boolean;
 };
 
 export type SavedWorkflow = WorkflowData & {
   id: string;
   name: string;
   visibility: WorkflowVisibility;
+  enabled: boolean;
   createdAt: string;
   updatedAt: string;
   isOwner?: boolean;

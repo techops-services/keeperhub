@@ -27,6 +27,7 @@ import {
   isPanelAnimatingAtom,
   isSavingAtom,
   isSidebarCollapsedAtom,
+  isWorkflowEnabled,
   isWorkflowOwnerAtom,
   nodesAtom,
   rightPanelWidthAtom,
@@ -130,6 +131,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
     currentWorkflowVisibilityAtom
   );
   const [isOwner, setIsWorkflowOwner] = useAtom(isWorkflowOwnerAtom);
+  const setIsWorkflowEnabled = useSetAtom(isWorkflowEnabled); // keeperhub custom field //
   const setGlobalIntegrations = useSetAtom(integrationsAtom);
   const setIntegrationsLoaded = useSetAtom(integrationsLoadedAtom);
   const integrationsVersion = useAtomValue(integrationsVersionAtom);
@@ -362,6 +364,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
         (workflow.visibility as WorkflowVisibility) ?? "private"
       );
       setIsWorkflowOwner(workflow.isOwner !== false); // Default to true if not set
+      setIsWorkflowEnabled(workflow.enabled ?? false); // keeperhub custom field //
       setHasUnsavedChanges(false);
       setWorkflowNotFound(false);
     } catch (error) {
@@ -376,6 +379,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
     setCurrentWorkflowName,
     setCurrentWorkflowVisibility,
     setIsWorkflowOwner,
+    setIsWorkflowEnabled, // keeperhub custom field //
     setHasUnsavedChanges,
     setWorkflowNotFound,
   ]);

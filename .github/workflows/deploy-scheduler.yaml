@@ -1,0 +1,167 @@
+on:
+  push:
+    branches:
+      - staging
+      - prod
+    paths:
+      - 'deploy/scheduler/**'
+      - 'scripts/job-spawner.ts'
+      - 'scripts/schedule-*.ts'
+      - 'scripts/workflow-runner.ts'
+      - 'lib/**'
+      - 'plugins/**'
+      - 'keeperhub/**'
+      - '.github/workflows/deploy-scheduler.yaml'
+  workflow_run:
+    workflows: ["deploy-keeperhub"]
+    types:
+      - completed
+    branches:
+      - staging
+      - prod
+  workflow_dispatch:
+
+name: deploy-scheduler
+
+jobs:
+  deploy-scheduler:
+    # Skip if triggered by workflow_run and the workflow failed
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    environment: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'prod') || github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}
+    runs-on: ubuntu-latest
+    env:
+      ENV_NAME: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'prod') || github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}
+      HELM_FILE: deploy/scheduler/${{ (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'prod') || github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}/values.yaml
+      REGION: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'prod') || github.ref == 'refs/heads/prod' && 'us-east-1' || 'us-east-2' }}
+      CLUSTER_NAME: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'prod') || github.ref == 'refs/heads/prod' && 'maker-prod' || 'maker-staging' }}
+      NAMESPACE: keeperhub
+      SERVICE_NAME: keeperhub-scheduler
+      AWS_ECR_NAME: keeperhub-${{ (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'prod') || github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref }}
+          fetch-depth: 0
+
+      - name: Detect changed paths
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            scheduler:
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'Dockerfile'
+              - 'scripts/schedule-*.ts'
+              - 'scripts/job-spawner.ts'
+              - 'lib/**'
+              - 'keeperhub/**'
+              - 'tsconfig.json'
+            workflow-runner:
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'Dockerfile'
+              - 'scripts/workflow-runner.ts'
+              - 'lib/**'
+              - 'plugins/**'
+              - 'keeperhub/**'
+              - 'tsconfig.json'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.REGION }}
+
+      - name: Login to AWS ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        if: ${{ !contains(github.event.head_commit.message, '[skip build]') }}
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract commit hash
+        id: vars
+        shell: bash
+        run: |
+          echo "sha_short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Build, tag, and push scheduler image to ECR
+        id: build-scheduler
+        if: ${{ !contains(github.event.head_commit.message, '[skip build]') && (steps.changes.outputs.scheduler == 'true' || github.event_name == 'workflow_dispatch') }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          target: scheduler
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:scheduler-${{ steps.vars.outputs.sha_short }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:scheduler-latest
+          cache-from: |
+            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-app
+            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:scheduler-latest
+          cache-to: type=inline
+
+      - name: Build, tag, and push workflow-runner image to ECR
+        id: build-workflow-runner
+        if: ${{ !contains(github.event.head_commit.message, '[skip build]') && (steps.changes.outputs.workflow-runner == 'true' || github.event_name == 'workflow_dispatch') }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          target: workflow-runner
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:workflow-runner-${{ steps.vars.outputs.sha_short }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:workflow-runner-latest
+          cache-from: |
+            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-app
+          cache-to: type=inline
+
+      # Re-tag existing images when builds are skipped (creates new tag pointing to -latest)
+      - name: Re-tag scheduler image if build skipped
+        if: ${{ !contains(github.event.head_commit.message, '[skip build]') && steps.changes.outputs.scheduler != 'true' && github.event_name != 'workflow_dispatch' }}
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:scheduler-${{ steps.vars.outputs.sha_short }} \
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:scheduler-latest
+
+      - name: Re-tag workflow-runner image if build skipped
+        if: ${{ !contains(github.event.head_commit.message, '[skip build]') && steps.changes.outputs.workflow-runner != 'true' && github.event_name != 'workflow_dispatch' }}
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:workflow-runner-${{ steps.vars.outputs.sha_short }} \
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:workflow-runner-latest
+
+      - name: Replace variables in the Helm values file
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
+          AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+        run: |
+          sed -i 's|${ECR_REGISTRY}|'"$ECR_REGISTRY"'|g' $HELM_FILE
+          sed -i 's|${IMAGE_TAG}|'"$IMAGE_TAG"'|g' $HELM_FILE
+          sed -i 's|${AWS_ACCOUNT_ID}|'"$AWS_ACCOUNT_ID"'|g' $HELM_FILE
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.REGION }}
+
+      - name: Deploying Scheduler to Kubernetes with Helm
+        id: deploy
+        uses: bitovi/github-actions-deploy-eks-helm@v1.2.10
+        with:
+          cluster-name: ${{ env.CLUSTER_NAME }}
+          config-files: ${{ env.HELM_FILE }}
+          chart-path: techops-services/common
+          namespace: ${{ env.NAMESPACE }}
+          timeout: 5m0s
+          name: ${{ env.SERVICE_NAME }}
+          chart-repository: https://techops-services.github.io/helm-charts
+          version: 0.2.1
+          atomic: true

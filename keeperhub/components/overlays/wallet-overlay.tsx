@@ -1,6 +1,13 @@
 "use client";
 
-import { Plus, RefreshCw, Trash2 } from "lucide-react";
+import {
+  Copy,
+  ExternalLink,
+  Plus,
+  RefreshCw,
+  SendHorizontal,
+  Trash2,
+} from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -30,10 +37,25 @@ import type {
 } from "@/keeperhub/lib/wallet/types";
 import { useWalletBalances } from "@/keeperhub/lib/wallet/use-wallet-balances";
 import { useSession } from "@/lib/auth-client";
+import { type WithdrawableAsset, WithdrawModal } from "./withdraw-modal";
 
 type WalletOverlayProps = {
   overlayId: string;
 };
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+function truncateAddress(address: string): string {
+  if (address.length <= 13) {
+    return address;
+  }
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+// TEMPO testnet uses stablecoins for gas, so we display stablecoins only (no native token)
+const TEMPO_CHAIN_ID = 42_429;
 
 // ============================================================================
 // Balance Display Components
@@ -67,11 +89,19 @@ function ChainBalanceDisplay({ balance }: { balance: ChainBalance }) {
   );
 }
 
-function SupportedTokenBalanceDisplay({
+// Stablecoin item with individual withdraw button
+function StablecoinWithWithdraw({
   token,
+  isAdmin,
+  onWithdraw,
 }: {
   token: SupportedTokenBalance;
+  isAdmin: boolean;
+  onWithdraw: (chainId: number, tokenAddress: string) => void;
 }) {
+  const numBalance = Number.parseFloat(token.balance);
+  const hasBalance = Number.isFinite(numBalance) && numBalance > 0;
+
   const renderBalance = () => {
     if (token.loading) {
       return <Spinner className="h-3 w-3" />;
@@ -83,7 +113,7 @@ function SupportedTokenBalanceDisplay({
   };
 
   return (
-    <div className="flex items-center gap-2 py-1">
+    <div className="flex items-center gap-2 py-1.5">
       {token.logoUrl && (
         <Image
           alt={token.symbol}
@@ -97,6 +127,16 @@ function SupportedTokenBalanceDisplay({
       <span className="ml-auto text-muted-foreground text-xs">
         {renderBalance()}
       </span>
+      {isAdmin && hasBalance && !token.loading && (
+        <Button
+          className="h-6 px-2 text-xs"
+          onClick={() => onWithdraw(token.chainId, token.tokenAddress)}
+          size="sm"
+          variant="ghost"
+        >
+          <SendHorizontal className="h-3 w-3" />
+        </Button>
+      )}
     </div>
   );
 }
@@ -105,12 +145,14 @@ function ChainBalanceItem({
   balance,
   isAdmin,
   onRemoveToken,
+  onWithdraw,
   supportedTokenBalances,
   tokenBalances,
 }: {
   balance: ChainBalance;
   isAdmin: boolean;
   onRemoveToken: (tokenId: string, symbol: string) => void;
+  onWithdraw: (chainId: number, tokenAddress?: string) => void;
   supportedTokenBalances: SupportedTokenBalance[];
   tokenBalances: TokenBalance[];
 }) {
@@ -121,31 +163,137 @@ function ChainBalanceItem({
     (t) => t.chainId === balance.chainId
   );
 
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between rounded-lg border bg-muted/50 p-3">
-        <div className="flex-1">
-          <div className="font-medium text-sm">{balance.name}</div>
-          <ChainBalanceDisplay balance={balance} />
-        </div>
-      </div>
-      {/* Supported Token Balances (Stablecoins) */}
-      {chainSupportedTokens.length > 0 && (
-        <div className="ml-4">
+  const isTempo = balance.chainId === TEMPO_CHAIN_ID;
+
+  // For non-TEMPO chains, check if native balance is withdrawable
+  const nativeBalance = Number.parseFloat(balance.balance);
+  const hasNativeBalance = Number.isFinite(nativeBalance) && nativeBalance > 0;
+
+  // For TEMPO, show stablecoins only (no native balance display)
+  if (isTempo) {
+    return (
+      <div className="space-y-2">
+        <div className="rounded-lg border bg-muted/50 p-3">
+          <div className="mb-2 flex items-center gap-1">
+            <span className="font-medium text-sm">TEMPO</span>
+            {balance.explorerUrl && (
+              <a
+                className="text-muted-foreground hover:text-foreground"
+                href={balance.explorerUrl}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+          </div>
           <div className="mb-1 font-medium text-muted-foreground text-xs">
             Stablecoins
           </div>
-          <div className="rounded border bg-background/50 px-2 py-1">
-            {chainSupportedTokens.map((token) => (
-              <SupportedTokenBalanceDisplay
-                key={`${token.chainId}-${token.tokenAddress}`}
-                token={token}
-              />
+          {chainSupportedTokens.length > 0 ? (
+            <div className="divide-y rounded border bg-background/50 px-2">
+              {chainSupportedTokens.map((token) => (
+                <StablecoinWithWithdraw
+                  isAdmin={isAdmin}
+                  key={`${token.chainId}-${token.tokenAddress}`}
+                  onWithdraw={onWithdraw}
+                  token={token}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-muted-foreground text-xs">
+              Loading stablecoins...
+            </div>
+          )}
+        </div>
+        {/* Custom Tracked Tokens for TEMPO */}
+        {chainTokens.length > 0 && (
+          <div className="ml-4 space-y-1">
+            <div className="font-medium text-muted-foreground text-xs">
+              Tracked Tokens
+            </div>
+            {chainTokens.map((token) => (
+              <div
+                className="flex items-center justify-between rounded border bg-background p-2"
+                key={token.tokenId}
+              >
+                <div className="flex-1">
+                  <div className="font-medium text-xs">{token.symbol}</div>
+                  <TokenBalanceDisplay token={token} />
+                </div>
+                {isAdmin && (
+                  <Button
+                    className="h-6 w-6"
+                    onClick={() => onRemoveToken(token.tokenId, token.symbol)}
+                    size="icon"
+                    variant="ghost"
+                  >
+                    <Trash2 className="h-3 w-3 text-muted-foreground" />
+                  </Button>
+                )}
+              </div>
             ))}
           </div>
+        )}
+      </div>
+    );
+  }
+
+  // Non-TEMPO chains: show native balance and stablecoins in same card
+  return (
+    <div className="space-y-2">
+      <div className="rounded-lg border bg-muted/50 p-3">
+        {/* Chain header with native balance */}
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <div className="flex items-center gap-1">
+              <span className="font-medium text-sm">{balance.name}</span>
+              {balance.explorerUrl && (
+                <a
+                  className="text-muted-foreground hover:text-foreground"
+                  href={balance.explorerUrl}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
+            </div>
+            <ChainBalanceDisplay balance={balance} />
+          </div>
+          {isAdmin && hasNativeBalance && (
+            <Button
+              className="h-7 px-2 text-xs"
+              onClick={() => onWithdraw(balance.chainId)}
+              size="sm"
+              variant="ghost"
+            >
+              <SendHorizontal className="h-3 w-3" />
+              Withdraw
+            </Button>
+          )}
         </div>
-      )}
-      {/* Custom Tracked Tokens */}
+        {/* Stablecoins inside same card */}
+        {chainSupportedTokens.length > 0 && (
+          <div className="mt-3">
+            <div className="mb-1 font-medium text-muted-foreground text-xs">
+              Stablecoins
+            </div>
+            <div className="divide-y rounded border bg-background/50 px-2">
+              {chainSupportedTokens.map((token) => (
+                <StablecoinWithWithdraw
+                  isAdmin={isAdmin}
+                  key={`${token.chainId}-${token.tokenAddress}`}
+                  onWithdraw={onWithdraw}
+                  token={token}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+      {/* Custom Tracked Tokens (outside main card) */}
       {chainTokens.length > 0 && (
         <div className="ml-4 space-y-1">
           <div className="font-medium text-muted-foreground text-xs">
@@ -205,6 +353,10 @@ function AddTokenForm({
       await onAdd(chainId, tokenAddress);
       setChainId(null);
       setTokenAddress("");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to add token"
+      );
     } finally {
       setAdding(false);
     }
@@ -287,6 +439,10 @@ function CreateWalletForm({
     setCreating(true);
     try {
       await onSubmit(email);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create wallet"
+      );
     } finally {
       setCreating(false);
     }
@@ -359,6 +515,7 @@ function BalanceListSection({
   onAddToken,
   onRefresh,
   onRemoveToken,
+  onWithdraw,
   refreshing,
   showAddToken,
   setShowAddToken,
@@ -371,6 +528,7 @@ function BalanceListSection({
   onAddToken: (chainId: number, tokenAddress: string) => Promise<void>;
   onRefresh: () => void;
   onRemoveToken: (tokenId: string, symbol: string) => void;
+  onWithdraw: (chainId: number, tokenAddress?: string) => void;
   refreshing: boolean;
   showAddToken: boolean;
   setShowAddToken: (show: boolean) => void;
@@ -428,6 +586,7 @@ function BalanceListSection({
               isAdmin={isAdmin}
               key={balance.chainId}
               onRemoveToken={onRemoveToken}
+              onWithdraw={onWithdraw}
               supportedTokenBalances={supportedTokenBalances}
               tokenBalances={tokenBalances}
             />
@@ -515,21 +674,23 @@ function NoWalletSection({
 // Main Component
 // ============================================================================
 
-// Component for editing wallet email
-function WalletEmailEditor({
-  currentEmail,
+// Component for account details section (email + wallet address)
+function AccountDetailsSection({
+  email,
+  walletAddress,
   isAdmin,
   onEmailUpdated,
 }: {
-  currentEmail: string;
+  email: string;
+  walletAddress: string;
   isAdmin: boolean;
   onEmailUpdated: () => void;
 }) {
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditingEmail, setIsEditingEmail] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [updating, setUpdating] = useState(false);
 
-  const handleUpdate = async () => {
+  const handleUpdateEmail = async () => {
     if (!newEmail) {
       toast.error("Email is required");
       return;
@@ -550,7 +711,7 @@ function WalletEmailEditor({
       }
 
       toast.success("Wallet email updated successfully!");
-      setIsEditing(false);
+      setIsEditingEmail(false);
       setNewEmail("");
       onEmailUpdated();
     } catch (error) {
@@ -564,22 +725,28 @@ function WalletEmailEditor({
   };
 
   const startEditing = () => {
-    setNewEmail(currentEmail);
-    setIsEditing(true);
+    setNewEmail(email);
+    setIsEditingEmail(true);
   };
 
   const cancelEditing = () => {
-    setIsEditing(false);
+    setIsEditingEmail(false);
     setNewEmail("");
   };
 
+  const copyAddress = () => {
+    navigator.clipboard.writeText(walletAddress);
+    toast.success("Address copied to clipboard");
+  };
+
   return (
-    <div>
-      <div className="mb-1 text-muted-foreground text-sm">Associated Email</div>
-      {isEditing ? (
+    <div className="rounded-lg border bg-muted/50 p-4">
+      <div className="mb-2 text-muted-foreground text-sm">Account details</div>
+
+      {isEditingEmail ? (
         <div className="space-y-2">
           <Input
-            className="font-mono text-sm"
+            className="text-sm"
             disabled={updating}
             onChange={(e) => setNewEmail(e.target.value)}
             placeholder="newemail@example.com"
@@ -596,8 +763,8 @@ function WalletEmailEditor({
               Cancel
             </Button>
             <Button
-              disabled={updating || !newEmail || newEmail === currentEmail}
-              onClick={handleUpdate}
+              disabled={updating || !newEmail || newEmail === email}
+              onClick={handleUpdateEmail}
               size="sm"
             >
               {updating ? (
@@ -612,18 +779,32 @@ function WalletEmailEditor({
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-2">
-          <code className="break-all font-mono text-sm">{currentEmail}</code>
-          {isAdmin && (
-            <Button
-              className="h-6 px-2 text-xs"
-              onClick={startEditing}
-              size="sm"
-              variant="ghost"
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">{email}</span>
+            {isAdmin && (
+              <Button
+                className="h-5 px-1.5 text-xs"
+                onClick={startEditing}
+                size="sm"
+                variant="ghost"
+              >
+                Edit
+              </Button>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <code className="font-mono text-muted-foreground text-xs">
+              {truncateAddress(walletAddress)}
+            </code>
+            <button
+              className="text-muted-foreground hover:text-foreground"
+              onClick={copyAddress}
+              type="button"
             >
-              Edit
-            </Button>
-          )}
+              <Copy className="h-3 w-3" />
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -631,7 +812,7 @@ function WalletEmailEditor({
 }
 
 export function WalletOverlay({ overlayId }: WalletOverlayProps) {
-  const { closeAll } = useOverlay();
+  const { closeAll, push } = useOverlay();
   const { data: session } = useSession();
   const { isAdmin } = useActiveMember();
 
@@ -726,34 +907,35 @@ export function WalletOverlay({ overlayId }: WalletOverlayProps) {
   const loadWallet = useCallback(async () => {
     setWalletLoading(true);
     try {
-      const [chainList, tokenList, supportedList, walletResponse] =
-        await Promise.all([
-          fetchChains(),
-          fetchTokens(),
-          fetchSupportedTokensData(),
-          fetch("/api/user/wallet"),
-        ]);
+      // Phase 1: Fetch wallet data first (fast - just address + email)
+      const walletResponse = await fetch("/api/user/wallet");
       const data = await walletResponse.json();
 
-      if (data.hasWallet) {
-        setWalletData(data);
-        if (data.walletAddress && chainList.length > 0) {
-          await Promise.all([
-            fetchBalances(data.walletAddress, chainList, tokenList),
-            fetchSupportedBalances(
-              data.walletAddress,
-              chainList,
-              supportedList
-            ),
-          ]);
-        }
-      } else {
+      if (!data.hasWallet) {
         setWalletData({ hasWallet: false });
+        setWalletLoading(false);
+        return;
+      }
+
+      // Show wallet info immediately
+      setWalletData(data);
+      setWalletLoading(false);
+
+      // Phase 2: Fetch chains/tokens in background
+      const [chainList, tokenList, supportedList] = await Promise.all([
+        fetchChains(),
+        fetchTokens(),
+        fetchSupportedTokensData(),
+      ]);
+
+      // Phase 3: Fetch balances (they show loading states internally)
+      if (data.walletAddress && chainList.length > 0) {
+        fetchBalances(data.walletAddress, chainList, tokenList);
+        fetchSupportedBalances(data.walletAddress, chainList, supportedList);
       }
     } catch (error) {
       console.error("Failed to load wallet:", error);
       setWalletData({ hasWallet: false });
-    } finally {
       setWalletLoading(false);
     }
   }, [
@@ -839,6 +1021,100 @@ export function WalletOverlay({ overlayId }: WalletOverlayProps) {
     await loadWallet();
   };
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Logic is straightforward, two loops with validation
+  const buildWithdrawableAssets = useCallback((): WithdrawableAsset[] => {
+    const assets: WithdrawableAsset[] = [];
+
+    // Add native balances (skip TEMPO - it uses stablecoins, not native tokens)
+    for (const balance of balances) {
+      // Skip TEMPO native balance - it uses stablecoins only
+      if (balance.chainId === TEMPO_CHAIN_ID) {
+        continue;
+      }
+      const chain = chains.find((c) => c.chainId === balance.chainId);
+      // Skip if not a valid positive number
+      const numBalance = Number.parseFloat(balance.balance);
+      if (!(chain && Number.isFinite(numBalance)) || numBalance <= 0) {
+        continue;
+      }
+      assets.push({
+        type: "native",
+        chainId: balance.chainId,
+        chainName: balance.name,
+        symbol: balance.symbol,
+        balance: balance.balance,
+        decimals: 18,
+        rpcUrl: chain.defaultPrimaryRpc,
+        explorerUrl: balance.explorerUrl,
+      });
+    }
+
+    // Add supported token balances (stablecoins)
+    for (const token of supportedTokenBalances) {
+      // Skip if not a valid positive number
+      const numBalance = Number.parseFloat(token.balance);
+      if (!Number.isFinite(numBalance) || numBalance <= 0) {
+        continue;
+      }
+      const chain = chains.find((c) => c.chainId === token.chainId);
+      if (!chain) {
+        continue;
+      }
+      const balance = balances.find((b) => b.chainId === token.chainId);
+      assets.push({
+        type: "token",
+        chainId: token.chainId,
+        chainName: chain.name,
+        symbol: token.symbol,
+        balance: token.balance,
+        tokenAddress: token.tokenAddress,
+        decimals: 6,
+        rpcUrl: chain.defaultPrimaryRpc,
+        explorerUrl: balance?.explorerUrl || null,
+      });
+    }
+
+    return assets;
+  }, [balances, chains, supportedTokenBalances]);
+
+  const findAssetIndex = useCallback(
+    (assets: WithdrawableAsset[], chainId: number, tokenAddress?: string) => {
+      if (tokenAddress) {
+        const idx = assets.findIndex(
+          (a) => a.chainId === chainId && a.tokenAddress === tokenAddress
+        );
+        return idx >= 0 ? idx : 0;
+      }
+      const idx = assets.findIndex(
+        (a) => a.chainId === chainId && a.type === "native"
+      );
+      return idx >= 0 ? idx : 0;
+    },
+    []
+  );
+
+  const handleWithdraw = useCallback(
+    (chainId: number, tokenAddress?: string) => {
+      if (!walletData?.walletAddress) {
+        return;
+      }
+
+      const assets = buildWithdrawableAssets();
+      if (assets.length === 0) {
+        toast.error("No assets available for withdrawal");
+        return;
+      }
+
+      const initialIndex = findAssetIndex(assets, chainId, tokenAddress);
+      push(WithdrawModal, {
+        assets,
+        walletAddress: walletData.walletAddress,
+        initialAssetIndex: initialIndex,
+      });
+    },
+    [walletData?.walletAddress, buildWithdrawableAssets, findAssetIndex, push]
+  );
+
   useEffect(() => {
     loadWallet();
   }, [loadWallet]);
@@ -863,24 +1139,14 @@ export function WalletOverlay({ overlayId }: WalletOverlayProps) {
 
       {!walletLoading && walletData?.hasWallet && (
         <div className="space-y-4">
-          <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
-            <div>
-              <div className="mb-1 text-muted-foreground text-sm">
-                Wallet Address
-              </div>
-              <code className="break-all font-mono text-sm">
-                {walletData.walletAddress}
-              </code>
-            </div>
-
-            {walletData.email && (
-              <WalletEmailEditor
-                currentEmail={walletData.email}
-                isAdmin={isAdmin}
-                onEmailUpdated={loadWallet}
-              />
-            )}
-          </div>
+          {walletData.email && walletData.walletAddress && (
+            <AccountDetailsSection
+              email={walletData.email}
+              isAdmin={isAdmin}
+              onEmailUpdated={loadWallet}
+              walletAddress={walletData.walletAddress}
+            />
+          )}
 
           <BalanceListSection
             balances={balances}
@@ -889,6 +1155,7 @@ export function WalletOverlay({ overlayId }: WalletOverlayProps) {
             onAddToken={handleAddToken}
             onRefresh={handleRefresh}
             onRemoveToken={handleRemoveToken}
+            onWithdraw={handleWithdraw}
             refreshing={refreshing}
             setShowAddToken={setShowAddToken}
             showAddToken={showAddToken}

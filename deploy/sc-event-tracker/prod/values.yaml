@@ -1,0 +1,92 @@
+replicaCount: 1
+
+service:
+  enabled: true
+  name: sc-event-tracker-prod
+  port: 3000
+  type: ClusterIP
+  containerPort: 3000
+  tls:
+    enabled: false
+
+ingress:
+  enabled: false
+
+image:
+  repository: ${ECR_REGISTRY}/sc-event-tracker-prod
+  tag: app-${IMAGE_TAG}
+  pullPolicy: Always
+
+deployment:
+  enabled: true
+
+serviceAccount:
+  create: false
+
+podAnnotations:
+  reloader.stakater.com/auto: "true"
+
+resources:
+  limits:
+    memory: 512Mi
+  requests:
+    cpu: 50m
+    memory: 128Mi
+
+env:
+  NODE_ENV:
+    type: kv
+    value: "production"
+  LOG_LEVEL:
+    type: kv
+    value: "info"
+  KEEPERHUB_API_URL:
+    type: kv
+    value: "http://keeperhub-common:3000"
+  WORKER_URL:
+    type: kv
+    value: "http://keeperhub-events-worker-common:3010"
+  REDIS_HOST:
+    type: parameterStore
+    name: redis-host
+    parameter_name: /eks/maker-prod/keeperhub-events/redis-host
+  REDIS_PORT:
+    type: parameterStore
+    name: redis-port
+    parameter_name: /eks/maker-prod/keeperhub-events/redis-port
+  REDIS_PASSWORD:
+    type: parameterStore
+    name: redis-password
+    parameter_name: /eks/maker-prod/keeperhub-events/redis-password
+  JWT_TOKEN_USERNAME:
+    type: parameterStore
+    name: jwt-token-username
+    parameter_name: /eks/maker-prod/keeperhub-events/jwt-token-username
+  JWT_TOKEN_PASSWORD:
+    type: parameterStore
+    name: jwt-token-password
+    parameter_name: /eks/maker-prod/keeperhub-events/jwt-token-password
+  ETHERSCAN_API_KEY:
+    type: parameterStore
+    name: etherscan-api-key
+    parameter_name: /eks/maker-prod/keeper-app/etherscan-api-key
+
+externalSecrets:
+  clusterSecretStoreName: maker-prod
+
+livenessProbe:
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  exec:
+    command:
+      - node
+      - -e
+      - "process.exit(0)"
+readinessProbe:
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  exec:
+    command:
+      - node
+      - -e
+      - "process.exit(0)"

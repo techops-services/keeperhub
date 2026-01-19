@@ -48,6 +48,9 @@ export function useWalletBalances(): UseWalletBalancesReturn {
           balance: "0",
           loading: true,
           isTestnet: chain.isTestnet,
+          explorerUrl: chain.explorerUrl
+            ? `${chain.explorerUrl}${(chain.explorerAddressPath || "/address/{address}").replace("{address}", address)}`
+            : null,
         }))
       );
 
