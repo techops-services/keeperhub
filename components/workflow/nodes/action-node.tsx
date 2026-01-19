@@ -342,6 +342,20 @@ export const ActionNode = memo(({ data, selected, id }: ActionNodeProps) => {
   const aiModel = getAiModel();
   const isDisabled = data.enabled === false;
 
+  // start custom keeperhub code //
+  // Detect if this is a condition node and provide multiple handles
+  const isConditionNode = actionType === "Condition";
+  const nodeHandles = isConditionNode
+    ? {
+        target: true,
+        source: [
+          { id: "true" },
+          { id: "false" },
+        ],
+      }
+    : { target: true, source: true };
+  // end keeperhub code //
+
   return (
     <Node
       className={cn(
@@ -350,7 +364,7 @@ export const ActionNode = memo(({ data, selected, id }: ActionNodeProps) => {
         isDisabled && "opacity-50"
       )}
       data-testid={`action-node-${id}`}
-      handles={{ target: true, source: true }}
+      handles={nodeHandles}
       status={status}
     >
       {/* Disabled badge in top left */}

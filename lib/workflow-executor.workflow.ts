@@ -375,14 +375,23 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
   const outputs: NodeOutputs = {};
   const results: Record<string, ExecutionResult> = {};
 
+  // start custom keeperhub code //
   // Build node and edge maps
+  // Store edges with sourceHandle to support condition branching
   const nodeMap = new Map(nodes.map((n) => [n.id, n]));
-  const edgesBySource = new Map<string, string[]>();
+  const edgesBySource = new Map<
+    string,
+    { target: string; sourceHandle?: string }[]
+  >();
   for (const edge of edges) {
     const targets = edgesBySource.get(edge.source) || [];
-    targets.push(edge.target);
+    targets.push({
+      target: edge.target,
+      sourceHandle: edge.sourceHandle ?? undefined,
+    });
     edgesBySource.set(edge.source, targets);
   }
+  // end keeperhub code //
 
   // Find trigger nodes
   const nodesWithIncoming = new Set(edges.map((e) => e.target));
@@ -446,10 +455,12 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
         data: null,
       };
 
-      const nextNodes = edgesBySource.get(nodeId) || [];
+      // start custom keeperhub code //
+      const nextEdges = edgesBySource.get(nodeId) || [];
       await Promise.all(
-        nextNodes.map((nextNodeId) => executeNode(nextNodeId, visited))
+        nextEdges.map((edge) => executeNode(edge.target, visited))
       );
+      // end keeperhub code //
       return;
     }
 
@@ -607,6 +618,7 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
         success: result.success,
       });
 
+      // start custom keeperhub code //
       // Execute next nodes
       if (result.success) {
         // Check if this is a condition node
@@ -615,44 +627,77 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
           node.data.config?.actionType === "Condition";
 
         if (isConditionNode) {
-          // For condition nodes, only execute next nodes if condition is true
-          const conditionResult = (result.data as { condition?: boolean })
-            ?.condition;
+          // For condition nodes, filter edges by sourceHandle based on condition result
+          // Validate condition result structure
+          const conditionData = result.data as { condition?: boolean } | undefined;
+          if (!conditionData || typeof conditionData.condition !== 'boolean') {
+            console.error(
+              "[Workflow Executor] Condition node returned invalid result:",
+              conditionData
+            );
+            // Don't execute any branch if condition evaluation failed
+            return;
+          }
+          const conditionResult = conditionData.condition;
           console.log(
             "[Workflow Executor] Condition node result:",
             conditionResult
           );
 
-          if (conditionResult === true) {
-            const nextNodes = edgesBySource.get(nodeId) || [];
-            console.log(
-              "[Workflow Executor] Condition is true, executing",
-              nextNodes.length,
-              "next nodes in parallel"
+          const allEdges = edgesBySource.get(nodeId) || [];
+          const targetHandle = conditionResult ? "true" : "false";
+
+          // Check if any edges from this condition node have sourceHandle defined
+          const hasAnySourceHandles = allEdges.some(
+            (e) => e.sourceHandle !== undefined && e.sourceHandle !== null
+          );
+
+          let filteredEdges: typeof allEdges;
+          if (hasAnySourceHandles) {
+            // New workflow: strict sourceHandle matching
+            filteredEdges = allEdges.filter(
+              (edge) => edge.sourceHandle === targetHandle
             );
-            // Execute all next nodes in parallel
-            await Promise.all(
-              nextNodes.map((nextNodeId) => executeNode(nextNodeId, visited))
+            console.log(
+              "[Workflow Executor] New workflow - Condition is",
+              conditionResult,
+              ", executing",
+              filteredEdges.length,
+              "next nodes (filtered by sourceHandle:",
+              targetHandle,
+              ")"
             );
           } else {
+            // Legacy workflow: execute all edges if condition is true, none if false
+            filteredEdges = conditionResult ? allEdges : [];
             console.log(
-              "[Workflow Executor] Condition is false, skipping next nodes"
+              "[Workflow Executor] Legacy workflow - Condition is",
+              conditionResult,
+              ", executing",
+              filteredEdges.length,
+              "next nodes (legacy behavior)"
             );
           }
+
+          // Execute filtered next nodes in parallel
+          await Promise.all(
+            filteredEdges.map((edge) => executeNode(edge.target, visited))
+          );
         } else {
           // For non-condition nodes, execute all next nodes in parallel
-          const nextNodes = edgesBySource.get(nodeId) || [];
+          const nextEdges = edgesBySource.get(nodeId) || [];
           console.log(
             "[Workflow Executor] Executing",
-            nextNodes.length,
+            nextEdges.length,
             "next nodes in parallel"
           );
           // Execute all next nodes in parallel
           await Promise.all(
-            nextNodes.map((nextNodeId) => executeNode(nextNodeId, visited))
+            nextEdges.map((edge) => executeNode(edge.target, visited))
           );
         }
       }
+      // end keeperhub code //
     } catch (error) {
       console.error("[Workflow Executor] Error executing node:", nodeId, error);
       const errorMessage = await getErrorMessageAsync(error);
