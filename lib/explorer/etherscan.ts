@@ -18,6 +18,9 @@ type EtherscanSourceCodeResponse = {
     Proxy?: string;
     Implementation?: string;
     ABI?: string;
+    ContractName?: string;
+    Facets?: string;
+    IsDiamond?: string;
     [key: string]: unknown;
   }>;
 };
@@ -31,7 +34,10 @@ export type AbiResult = {
 export type SourceCodeResult = {
   success: boolean;
   isProxy?: boolean;
+  isDiamond?: boolean;
   implementationAddress?: string;
+  facetAddresses?: string[];
+  contractName?: string;
   proxyAbi?: string;
   error?: string;
 };
@@ -132,12 +138,25 @@ export async function fetchEtherscanSourceCode(
 
     const contractData = data.result[0];
     const isProxy = contractData.Proxy === "1";
+    const isDiamond = contractData.IsDiamond === "1";
     const implementationAddress = contractData.Implementation;
+    const contractName = contractData.ContractName;
+
+    // Parse facet addresses if this is a Diamond contract
+    let facetAddresses: string[] | undefined;
+    if (isDiamond && contractData.Facets) {
+      facetAddresses = contractData.Facets.split(",")
+        .map((addr) => addr.trim())
+        .filter((addr) => addr.length > 0);
+    }
 
     return {
       success: true,
       isProxy,
+      isDiamond,
       implementationAddress: implementationAddress || undefined,
+      facetAddresses,
+      contractName: contractName || undefined,
       proxyAbi: contractData.ABI || undefined,
     };
   } catch (error) {
