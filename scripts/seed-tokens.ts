@@ -114,6 +114,38 @@ const TOKEN_CONFIGS: TokenConfig[] = [
     isStablecoin: true,
     sortOrder: 1,
   },
+
+  // ==========================================================================
+  // Tempo Testnet (chainId: 42429)
+  // ==========================================================================
+  {
+    chainId: 42_429,
+    tokenAddress: "0x20c0000000000000000000000000000000000000", // pathUSD
+    logoUrl: null, // Tempo testnet token
+    isStablecoin: true,
+    sortOrder: 1,
+  },
+  {
+    chainId: 42_429,
+    tokenAddress: "0x20c0000000000000000000000000000000000001", // AlphaUSD
+    logoUrl: null, // Tempo testnet token
+    isStablecoin: true,
+    sortOrder: 2,
+  },
+  {
+    chainId: 42_429,
+    tokenAddress: "0x20c0000000000000000000000000000000000002", // BetaUSD
+    logoUrl: null, // Tempo testnet token
+    isStablecoin: true,
+    sortOrder: 3,
+  },
+  {
+    chainId: 42_429,
+    tokenAddress: "0x20c0000000000000000000000000000000000003", // ThetaUSD
+    logoUrl: null, // Tempo testnet token
+    isStablecoin: true,
+    sortOrder: 4,
+  },
 ];
 
 /**

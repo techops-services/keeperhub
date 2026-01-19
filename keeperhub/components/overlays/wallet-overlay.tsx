@@ -54,6 +54,10 @@ function truncateAddress(address: string): string {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
+// TEMPO testnet uses stablecoins for gas, so we display pathUSD as the primary balance
+const TEMPO_CHAIN_ID = 42_429;
+const TEMPO_PATHUSD_ADDRESS = "0x20c0000000000000000000000000000000000000";
+
 // ============================================================================
 // Balance Display Components
 // ============================================================================
@@ -142,14 +146,73 @@ function ChainBalanceItem({
     (t) => t.chainId === balance.chainId
   );
 
-  const hasBalance = Number.parseFloat(balance.balance) > 0;
+  const isTempo = balance.chainId === TEMPO_CHAIN_ID;
+
+  // For TEMPO, find pathUSD as the primary balance token
+  const pathUsdToken = isTempo
+    ? chainSupportedTokens.find(
+        (t) =>
+          t.tokenAddress.toLowerCase() === TEMPO_PATHUSD_ADDRESS.toLowerCase()
+      )
+    : null;
+
+  // For TEMPO, show other stablecoins (not pathUSD) as secondary
+  const secondaryStablecoins = isTempo
+    ? chainSupportedTokens.filter(
+        (t) =>
+          t.tokenAddress.toLowerCase() !== TEMPO_PATHUSD_ADDRESS.toLowerCase()
+      )
+    : chainSupportedTokens;
+
+  // For TEMPO, use pathUSD balance; for others, use native balance
+  const primaryBalance = isTempo
+    ? (pathUsdToken?.balance ?? "0")
+    : balance.balance;
+
+  const hasBalance =
+    primaryBalance !== "∞" && Number.parseFloat(primaryBalance) > 0;
+
+  // Display label: for TEMPO show "TEMPO pathUSD", otherwise chain name
+  const displayLabel = isTempo ? "TEMPO pathUSD" : balance.name;
+
+  // Check if any supported token on this chain is still loading
+  const isLoadingTokens = chainSupportedTokens.some((t) => t.loading);
+
+  // For TEMPO, show pathUSD balance; for others, show native balance
+  const renderPrimaryBalance = () => {
+    if (isTempo) {
+      // Still loading supported tokens
+      if (isLoadingTokens) {
+        return (
+          <div className="mt-1 text-muted-foreground text-xs">Loading...</div>
+        );
+      }
+      // pathUSD not found - fall back to native display
+      if (!pathUsdToken) {
+        return <ChainBalanceDisplay balance={balance} />;
+      }
+      if (pathUsdToken.error) {
+        return (
+          <div className="mt-1 text-destructive text-xs">
+            {pathUsdToken.error}
+          </div>
+        );
+      }
+      return (
+        <div className="mt-1 text-muted-foreground text-xs">
+          {pathUsdToken.balance} {pathUsdToken.symbol}
+        </div>
+      );
+    }
+    return <ChainBalanceDisplay balance={balance} />;
+  };
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between rounded-lg border bg-muted/50 p-3">
         <div className="flex-1">
           <div className="flex items-center gap-1">
-            <span className="font-medium text-sm">{balance.name}</span>
+            <span className="font-medium text-sm">{displayLabel}</span>
             {balance.explorerUrl && (
               <a
                 className="text-muted-foreground hover:text-foreground"
@@ -161,12 +224,16 @@ function ChainBalanceItem({
               </a>
             )}
           </div>
-          <ChainBalanceDisplay balance={balance} />
+          {renderPrimaryBalance()}
         </div>
         {isAdmin && hasBalance && (
           <Button
             className="h-7 px-2 text-xs"
-            onClick={() => onWithdraw(balance.chainId)}
+            onClick={() =>
+              isTempo && pathUsdToken
+                ? onWithdraw(balance.chainId, pathUsdToken.tokenAddress)
+                : onWithdraw(balance.chainId)
+            }
             size="sm"
             variant="ghost"
           >
@@ -175,14 +242,14 @@ function ChainBalanceItem({
           </Button>
         )}
       </div>
-      {/* Supported Token Balances (Stablecoins) */}
-      {chainSupportedTokens.length > 0 && (
+      {/* Supported Token Balances (Stablecoins) - for TEMPO, excludes pathUSD */}
+      {secondaryStablecoins.length > 0 && (
         <div className="ml-4">
           <div className="mb-1 font-medium text-muted-foreground text-xs">
             Stablecoins
           </div>
           <div className="rounded border bg-background/50 px-2 py-1">
-            {chainSupportedTokens.map((token) => (
+            {secondaryStablecoins.map((token) => (
               <SupportedTokenBalanceDisplay
                 key={`${token.chainId}-${token.tokenAddress}`}
                 token={token}
@@ -918,13 +985,20 @@ export function WalletOverlay({ overlayId }: WalletOverlayProps) {
     await loadWallet();
   };
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Logic is straightforward, two loops with validation
   const buildWithdrawableAssets = useCallback((): WithdrawableAsset[] => {
     const assets: WithdrawableAsset[] = [];
 
-    // Add native balances
+    // Add native balances (skip TEMPO - it uses stablecoins for gas, not native tokens)
     for (const balance of balances) {
+      // Skip TEMPO native balance - it's meaningless (shows as ∞)
+      if (balance.chainId === TEMPO_CHAIN_ID) {
+        continue;
+      }
       const chain = chains.find((c) => c.chainId === balance.chainId);
-      if (!chain || Number.parseFloat(balance.balance) <= 0) {
+      // Skip if balance is ∞ (testnet mock) or not a valid positive number
+      const numBalance = Number.parseFloat(balance.balance);
+      if (!(chain && Number.isFinite(numBalance)) || numBalance <= 0) {
         continue;
       }
       assets.push({
@@ -941,7 +1015,9 @@ export function WalletOverlay({ overlayId }: WalletOverlayProps) {
 
     // Add supported token balances (stablecoins)
     for (const token of supportedTokenBalances) {
-      if (Number.parseFloat(token.balance) <= 0) {
+      // Skip if balance is ∞ (testnet mock) or not a valid positive number
+      const numBalance = Number.parseFloat(token.balance);
+      if (!Number.isFinite(numBalance) || numBalance <= 0) {
         continue;
       }
       const chain = chains.find((c) => c.chainId === token.chainId);
