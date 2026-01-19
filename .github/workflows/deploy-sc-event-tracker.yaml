@@ -2,27 +2,27 @@ on:
   push:
     branches:
       - staging
-      - main
+      - prod
     paths:
-      - 'sc-event-tracker/**'
-      - 'deploy/sc-event-tracker/**'
-      - '.github/workflows/deploy-sc-event-tracker.yaml'
+      - "sc-event-tracker/**"
+      - "deploy/sc-event-tracker/**"
+      - ".github/workflows/deploy-sc-event-tracker.yaml"
   workflow_dispatch:
 
 name: deploy-sc-event-tracker
 
 jobs:
   build-and-deploy:
-    environment: ${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
+    environment: ${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}
     runs-on: ubuntu-latest
     env:
-      HELM_FILE: deploy/sc-event-tracker/${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}/values.yaml
-      REGION: ${{ github.ref == 'refs/heads/main' && 'us-east-1' || 'us-east-2' }}
-      CLUSTER_NAME: ${{ github.ref == 'refs/heads/main' && 'maker-prod' || 'maker-staging' }}
-      ENVIRONMENT_TAG: ${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
+      HELM_FILE: deploy/sc-event-tracker/${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}/values.yaml
+      REGION: ${{ github.ref == 'refs/heads/prod' && 'us-east-1' || 'us-east-2' }}
+      CLUSTER_NAME: ${{ github.ref == 'refs/heads/prod' && 'maker-prod' || 'maker-staging' }}
+      ENVIRONMENT_TAG: ${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}
       NAMESPACE: keeperhub
       SERVICE_NAME: sc-event-tracker
-      AWS_ECR_NAME: sc-event-tracker-${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
+      AWS_ECR_NAME: sc-event-tracker-${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}
 
     steps:
       - name: Checkout
@@ -33,8 +33,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ github.ref == 'refs/heads/main' && secrets.AWS_ACCESS_KEY_ID || secrets.STAGING_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ github.ref == 'refs/heads/main' && secrets.AWS_SECRET_ACCESS_KEY || secrets.STAGING_AWS_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ github.ref == 'refs/heads/prod' && secrets.AWS_ACCESS_KEY_ID || secrets.STAGING_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ github.ref == 'refs/heads/prod' && secrets.AWS_SECRET_ACCESS_KEY || secrets.STAGING_AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.REGION }}
 
       - name: Login to AWS ECR
