@@ -7,13 +7,7 @@
 
 import "server-only";
 
-import {
-  Counter,
-  collectDefaultMetrics,
-  Gauge,
-  Histogram,
-  Registry,
-} from "prom-client";
+import { Counter, Gauge, Histogram, Registry } from "prom-client";
 import type { ErrorContext, MetricLabels, MetricsCollector } from "../types";
 
 // Use global singleton to prevent duplicate registration during hot reload
@@ -25,12 +19,6 @@ const globalForProm = globalThis as unknown as {
 // Create a dedicated registry for application metrics (singleton)
 const registry = globalForProm.prometheusRegistry ?? new Registry();
 globalForProm.prometheusRegistry = registry;
-
-// Collect default Node.js metrics (memory, CPU, event loop, etc.)
-// Only register if not already registered (handles hot reload)
-if (!registry.getSingleMetric("keeperhub_process_cpu_seconds_total")) {
-  collectDefaultMetrics({ register: registry, prefix: "keeperhub_" });
-}
 
 // Pre-defined label names for each metric
 const _WORKFLOW_LABELS = [
