@@ -21,7 +21,7 @@ jobs:
       CLUSTER_NAME: ${{ github.ref == 'refs/heads/prod' && 'maker-prod' || 'maker-staging' }}
       ENVIRONMENT_TAG: ${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}
       NAMESPACE: keeperhub
-      SERVICE_NAME: sc-event-worker
+      SERVICE_NAME: keeperhub-events-worker
       AWS_ECR_NAME: sc-event-worker-${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}
 
     steps:
