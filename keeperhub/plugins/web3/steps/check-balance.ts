@@ -4,7 +4,8 @@ import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
 import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 import { db } from "@/lib/db";
-import { workflowExecutions } from "@/lib/db/schema";
+import { explorerConfigs, workflowExecutions } from "@/lib/db/schema";
+import { getAddressUrl } from "@/lib/explorer";
 import { getChainIdFromNetwork, resolveRpcConfig } from "@/lib/rpc";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
@@ -29,7 +30,13 @@ async function getUserIdFromExecution(
 }
 
 type CheckBalanceResult =
-  | { success: true; balance: string; balanceWei: string; address: string }
+  | {
+      success: true;
+      balance: string;
+      balanceWei: string;
+      address: string;
+      addressLink: string;
+    }
   | { success: false; error: string };
 
 export type CheckBalanceCoreInput = {
@@ -120,11 +127,20 @@ async function stepHandler(
       balanceEth,
     });
 
+    // Fetch explorer config for address link
+    const explorerConfig = await db.query.explorerConfigs.findFirst({
+      where: eq(explorerConfigs.chainId, chainId),
+    });
+    const addressLink = explorerConfig
+      ? getAddressUrl(explorerConfig, address)
+      : "";
+
     return {
       success: true,
       balance: balanceEth,
       balanceWei: balance.toString(),
       address,
+      addressLink,
     };
   } catch (error) {
     console.error("[Check Balance] Failed to check balance:", error);
