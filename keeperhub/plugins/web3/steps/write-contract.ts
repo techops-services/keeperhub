@@ -6,13 +6,19 @@ import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugi
 import { initializeParaSigner } from "@/keeperhub/lib/para/wallet-helpers";
 import { getOrganizationIdFromExecution } from "@/keeperhub/lib/workflow-helpers";
 import { db } from "@/lib/db";
-import { workflowExecutions } from "@/lib/db/schema";
+import { explorerConfigs, workflowExecutions } from "@/lib/db/schema";
+import { getTransactionUrl } from "@/lib/explorer";
 import { getChainIdFromNetwork, resolveRpcConfig } from "@/lib/rpc";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
 
 type WriteContractResult =
-  | { success: true; transactionHash: string; result?: unknown }
+  | {
+      success: true;
+      transactionHash: string;
+      transactionLink: string;
+      result?: unknown;
+    }
   | { success: false; error: string };
 
 export type WriteContractCoreInput = {
@@ -216,9 +222,18 @@ async function stepHandler(
 
     console.log("[Write Contract] Transaction confirmed:", receipt.hash);
 
+    // Fetch explorer config for transaction link
+    const explorerConfig = await db.query.explorerConfigs.findFirst({
+      where: eq(explorerConfigs.chainId, chainId),
+    });
+    const transactionLink = explorerConfig
+      ? getTransactionUrl(explorerConfig, receipt.hash)
+      : "";
+
     return {
       success: true,
       transactionHash: receipt.hash,
+      transactionLink,
       result: undefined,
     };
   } catch (error) {

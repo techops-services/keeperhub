@@ -6,6 +6,8 @@ import {
   apiKeys,
   chains,
   chainsRelations,
+  explorerConfigs,
+  explorerConfigsRelations,
   integrations,
   // start custom keeperhub code //
   organizationApiKeys,
@@ -42,6 +44,8 @@ const schema = {
   integrations,
   chains,
   chainsRelations,
+  explorerConfigs,
+  explorerConfigsRelations,
   userRpcPreferences,
   userRpcPreferencesRelations,
 };

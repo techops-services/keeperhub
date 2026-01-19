@@ -4,7 +4,8 @@ import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
 import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 import { db } from "@/lib/db";
-import { workflowExecutions } from "@/lib/db/schema";
+import { explorerConfigs, workflowExecutions } from "@/lib/db/schema";
+import { getAddressUrl } from "@/lib/explorer";
 import { getChainIdFromNetwork, resolveRpcConfig } from "@/lib/rpc";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
@@ -29,7 +30,7 @@ async function getUserIdFromExecution(
 }
 
 type ReadContractResult =
-  | { success: true; result: unknown }
+  | { success: true; result: unknown; addressLink: string }
   | { success: false; error: string };
 
 export type ReadContractCoreInput = {
@@ -250,9 +251,18 @@ async function stepHandler(
       }
     }
 
+    // Fetch explorer config for address link
+    const explorerConfig = await db.query.explorerConfigs.findFirst({
+      where: eq(explorerConfigs.chainId, chainId),
+    });
+    const addressLink = explorerConfig
+      ? getAddressUrl(explorerConfig, contractAddress)
+      : "";
+
     return {
       success: true,
       result: structuredResult,
+      addressLink,
     };
   } catch (error) {
     console.error("[Read Contract] Function call failed:", error);
