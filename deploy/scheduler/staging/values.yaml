@@ -1,28 +1,31 @@
-# Job Spawner Deployment - Production
+# Scheduler Deployment - Staging
 # Polls SQS for scheduled workflow triggers and creates K8s Jobs to execute them
 #
-# NOTE: Production deployment not yet enabled - this is a placeholder
-# Update SQS_QUEUE_URL and parameter paths when ready
+# This is a long-running deployment that:
+# 1. Receives messages from SQS (sent by schedule-dispatcher)
+# 2. Creates workflow execution records in the database
+# 3. Spawns K8s Jobs to run the actual workflows
 
 replicaCount: 1
 
 service:
-  enabled: false
+  enabled: false  # No service needed - this is a background worker
 
 ingress:
   enabled: false
 
 image:
-  repository: ${ECR_REGISTRY}/keeperhub-prod
+  repository: ${ECR_REGISTRY}/keeperhub-staging
   tag: scheduler-${IMAGE_TAG}
   pullPolicy: Always
 
 deployment:
   enabled: true
 
+# Use the same service account as main app (has K8s job creation permissions)
 serviceAccount:
   create: false
-  name: keeperhub-prod
+  name: keeperhub-staging
 
 podAnnotations:
   reloader.stakater.com/auto: "true"
@@ -39,24 +42,26 @@ command: ["/bin/sh"]
 args:
   - "-c"
   - |
-    echo "$(date) - [JobSpawner] Starting..."
+    echo "$(date) - [Scheduler] Starting..."
     tsx scripts/job-spawner.ts
 
 env:
+  # Database connection
   DATABASE_URL:
     type: parameterStore
     name: db-url
-    parameter_name: /eks/maker-prod/keeperhub/db-url
+    parameter_name: /eks/maker-staging/keeperhub/db-url
+  # AWS/SQS configuration (no endpoint for real AWS)
   AWS_REGION:
     type: kv
-    value: "us-east-1"
-  # TODO: Create production SQS queue
+    value: "us-east-2"
   SQS_QUEUE_URL:
     type: kv
-    value: "https://sqs.us-east-1.amazonaws.com/${AWS_ACCOUNT_ID}/keeperhub-workflow-queue-prod"
+    value: "https://sqs.us-east-2.amazonaws.com/${AWS_ACCOUNT_ID}/keeperhub-workflow-queue-staging"
+  # K8s Job configuration
   RUNNER_IMAGE:
     type: kv
-    value: "${ECR_REGISTRY}/keeperhub-prod:workflow-runner-${IMAGE_TAG}"
+    value: "${ECR_REGISTRY}/keeperhub-staging:workflow-runner-${IMAGE_TAG}"
   IMAGE_PULL_POLICY:
     type: kv
     value: "Always"
@@ -69,14 +74,16 @@ env:
   JOB_ACTIVE_DEADLINE:
     type: kv
     value: "300"
+  # For workflow runner jobs - passed to created K8s Jobs
   INTEGRATION_ENCRYPTION_KEY:
     type: parameterStore
     name: integration-encryption-key
-    parameter_name: /eks/maker-prod/keeperhub/integration-encryption-key
+    parameter_name: /eks/maker-staging/keeperhub/integration-encryption-key
 
 externalSecrets:
-  clusterSecretStoreName: maker-prod
+  clusterSecretStoreName: maker-staging
 
+# Exec probe to check if the node process is running
 livenessProbe:
   exec:
     command:

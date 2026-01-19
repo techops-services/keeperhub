@@ -2,17 +2,17 @@ shared_env: &shared_env
   DATABASE_URL:
     type: parameterStore
     name: db-url
-    parameter_name: /eks/maker-staging/keeperhub/db-url
+    parameter_name: /eks/maker-prod/keeperhub/db-url
   CHAIN_RPC_CONFIG:
     type: parameterStore
     name: chain-rpc-config
-    parameter_name: /eks/maker-staging/keeperhub/chain-rpc-config
+    parameter_name: /eks/maker-prod/keeperhub/chain-rpc-config
 
-replicaCount: 1
+replicaCount: 2
 
 service:
   enabled: true
-  name: keeperhub-staging
+  name: keeperhub-prod
   port: 3000
   type: ClusterIP
   containerPort: 3000
@@ -23,7 +23,7 @@ service:
 ingress:
   enabled: true
   hosts:
-    - workflows-staging.keeperhub.com
+    - workflows.keeperhub.com
   annotations:
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
@@ -36,7 +36,7 @@ httpBasicAuth:
   enabled: false
 
 image:
-  repository: ${ECR_REGISTRY}/keeperhub-staging
+  repository: ${ECR_REGISTRY}/keeperhub-prod
   tag: app-${IMAGE_TAG}
   pullPolicy: Always
 
@@ -44,7 +44,7 @@ deployment:
   enabled: true
   initContainers:
     - name: db-migration
-      image: "${ECR_REGISTRY}/keeperhub-staging:migrator-${IMAGE_TAG}"
+      image: "${ECR_REGISTRY}/keeperhub-prod:migrator-${IMAGE_TAG}"
       command:
         - /bin/sh
         - -c
@@ -61,7 +61,7 @@ serviceAccount:
   create: true
   annotations:
     eks.amazonaws.com/role-arn: ${SERVICE_ACCOUNT_ROLE_ARN}
-  name: keeperhub-staging
+  name: keeperhub-prod
   rules:
     - apiGroups: ["batch"]
       resources: ["jobs"]
@@ -89,8 +89,8 @@ resources:
   limits:
     memory: 2Gi
   requests:
-    cpu: 1m
-    memory: 256Mi
+    cpu: 100m
+    memory: 512Mi
 
 env:
   <<: *shared_env
@@ -102,13 +102,13 @@ env:
     value: "prometheus"
   NODE_OPTIONS:
     type: kv
-    value: "--enable-source-maps --trace-warnings --trace-uncaught --trace-exit"
+    value: "--enable-source-maps"
   HOSTNAME:
     type: kv
     value: "0.0.0.0"
   PARA_ENVIRONMENT:
     type: kv
-    value: "beta"
+    value: "prod"
   WORKFLOW_EMBEDDED_DATA_DIR:
     type: kv
     value: "/tmp/workflow-data"
@@ -117,41 +117,38 @@ env:
     value: "http://localhost:3000"
   BETTER_AUTH_URL:
     type: kv
-    value: "https://workflows-staging.keeperhub.com"
+    value: "https://workflows.keeperhub.com"
   BETTER_AUTH_SECRET:
     type: parameterStore
     name: better-auth-secret
-    parameter_name: /eks/maker-staging/keeperhub/better-auth-secret
+    parameter_name: /eks/maker-prod/keeperhub/better-auth-secret
   OPENAI_API_KEY:
     type: parameterStore
     name: openai-api-key
-    parameter_name: /eks/maker-staging/keeperhub/openai-api-key
-  # Examples: "gpt-4o", "gpt-4o-mini", "claude-3-5-sonnet-20241022", "openai/gpt-4" (gateway)
+    parameter_name: /eks/maker-prod/keeperhub/openai-api-key
   AI_MODEL:
     type: kv
     value: "gpt-4o"
   PARA_API_KEY:
     type: parameterStore
     name: para-api-key
-    parameter_name: /eks/maker-staging/keeperhub/para-api-key
+    parameter_name: /eks/maker-prod/keeperhub/para-api-key
   WALLET_ENCRYPTION_KEY:
     type: parameterStore
     name: wallet-encryption-key
-    parameter_name: /eks/maker-staging/keeperhub/wallet-encryption-key
+    parameter_name: /eks/maker-prod/keeperhub/wallet-encryption-key
   INTEGRATION_ENCRYPTION_KEY:
     type: parameterStore
     name: integration-encryption-key
-    parameter_name: /eks/maker-staging/keeperhub/integration-encryption-key
-  # TODO rename the path
+    parameter_name: /eks/maker-prod/keeperhub/integration-encryption-key
   ETHERSCAN_API_KEY:
     type: parameterStore
     name: etherscan-api-key
-    parameter_name: /eks/maker-staging/keeper-app/etherscan-api-key
-  # TODO rename the path
+    parameter_name: /eks/maker-prod/keeperhub/etherscan-api-key
   SENDGRID_API_KEY:
     type: parameterStore
     name: sendgrid-api-key
-    parameter_name: /eks/maker-staging/keeper-app/sendgrid-api-key
+    parameter_name: /eks/maker-prod/keeperhub/sendgrid-api-key
   FROM_ADDRESS:
     type: kv
     value: "noreply@keeperhub.com"
@@ -159,42 +156,47 @@ env:
   SENTRY_DSN:
     type: parameterStore
     name: sentry-dsn
-    parameter_name: /eks/maker-staging/keeperhub/sentry-dsn
+    parameter_name: /eks/maker-prod/keeperhub/sentry-dsn
   NEXT_PUBLIC_SENTRY_DSN:
     type: parameterStore
     name: next-public-sentry-dsn
-    parameter_name: /eks/maker-staging/keeperhub/next-public-sentry-dsn
+    parameter_name: /eks/maker-prod/keeperhub/next-public-sentry-dsn
   SENTRY_ORG:
     type: parameterStore
     name: sentry-org
-    parameter_name: /eks/maker-staging/keeperhub/sentry-org
+    parameter_name: /eks/maker-prod/keeperhub/sentry-org
   SENTRY_PROJECT:
     type: parameterStore
     name: sentry-project
-    parameter_name: /eks/maker-staging/keeperhub/sentry-project
+    parameter_name: /eks/maker-prod/keeperhub/sentry-project
   SENTRY_AUTH_TOKEN:
     type: parameterStore
     name: sentry-auth-token
-    parameter_name: /eks/maker-staging/keeperhub/sentry-auth-token
-  # Feedback service (internal cluster communication)
-  FEEDBACK_SERVICE_URL:
-    type: kv
-    value: "http://keeperhub-feedback-common.keeperhub:3001/api/feedback"
-  FEEDBACK_API_KEY:
+    parameter_name: /eks/maker-prod/keeperhub/sentry-auth-token
+  # Internal service API keys for service-to-service auth
+  MCP_SERVICE_API_KEY:
     type: parameterStore
-    name: feedback-api-key
-    parameter_name: /eks/maker-staging/keeperhub-feedback/feedback-api-key
+    name: mcp-service-api-key
+    parameter_name: /eks/maker-prod/keeperhub-mcp/keeperhub-api-key
+  EVENTS_SERVICE_API_KEY:
+    type: parameterStore
+    name: events-service-api-key
+    parameter_name: /eks/maker-prod/keeperhub-events/keeperhub-api-key
+  SCHEDULER_SERVICE_API_KEY:
+    type: parameterStore
+    name: scheduler-service-api-key
+    parameter_name: /eks/maker-prod/keeperhub-scheduler/keeperhub-api-key
 
 externalSecrets:
-  clusterSecretStoreName: maker-staging
+  clusterSecretStoreName: maker-prod
 
 livenessProbe:
-  initialDelaySeconds: 5
+  initialDelaySeconds: 10
   periodSeconds: 30
   tcpSocket:
     port: 3000
 readinessProbe:
-  initialDelaySeconds: 5
+  initialDelaySeconds: 10
   periodSeconds: 30
   tcpSocket:
     port: 3000
@@ -204,18 +206,18 @@ cronjob:
   jobs:
     - name: schedule-dispatcher
       image:
-        repository: ${ECR_REGISTRY}/keeperhub-staging
+        repository: ${ECR_REGISTRY}/keeperhub-prod
         tag: scheduler-${IMAGE_TAG}
       env:
         AWS_REGION:
           type: kv
-          value: "us-east-2"
+          value: "us-east-1"
         SQS_QUEUE_URL:
           type: kv
-          value: "https://sqs.us-east-2.amazonaws.com/${AWS_ACCOUNT_ID}/keeperhub-workflow-queue-staging"
+          value: "https://sqs.us-east-1.amazonaws.com/${AWS_ACCOUNT_ID}/keeperhub-workflow-queue-prod"
         RUNNER_IMAGE:
           type: kv
-          value: "${ECR_REGISTRY}/keeperhub-staging:workflow-runner-${IMAGE_TAG}"
+          value: "${ECR_REGISTRY}/keeperhub-prod:workflow-runner-${IMAGE_TAG}"
         K8S_NAMESPACE:
           type: kv
           value: "keeperhub"
@@ -228,18 +230,22 @@ cronjob:
         DATABASE_URL:
           type: parameterStore
           name: db-url
-          parameter_name: /eks/maker-staging/keeperhub/db-url
+          parameter_name: /eks/maker-prod/keeperhub/db-url
         CHAIN_RPC_CONFIG:
           type: parameterStore
           name: chain-rpc-config
-          parameter_name: /eks/maker-staging/keeperhub/chain-rpc-config
+          parameter_name: /eks/maker-prod/keeperhub/chain-rpc-config
+        SCHEDULER_SERVICE_API_KEY:
+          type: parameterStore
+          name: scheduler-service-api-key
+          parameter_name: /eks/maker-prod/keeperhub-scheduler/keeperhub-api-key
       schedule: "* * * * *"
       command: ["/bin/sh"]
       args:
         - "-c"
         - "echo $(date) - [Dispatcher] Starting && tsx scripts/schedule-dispatcher.ts && echo $(date) - [Dispatcher] Completed"
       serviceAccount:
-        name: "keeperhub-staging"
+        name: "keeperhub-prod"
       resources:
         requests:
           memory: "128Mi"

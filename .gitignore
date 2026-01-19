@@ -69,3 +69,6 @@ tailwindcss-*.log
 
 # Sentry Config File
 .env.sentry-build-plugin
+
+# Subdirectory node_modules
+*/node_modules/*

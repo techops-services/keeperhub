@@ -189,7 +189,7 @@ async function processScheduledWorkflow(
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Internal-Execution": "true",
+          "X-Service-Key": process.env.SCHEDULER_SERVICE_API_KEY || "",
         },
         body: JSON.stringify({
           executionId,

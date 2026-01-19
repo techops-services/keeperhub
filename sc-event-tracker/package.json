@@ -1,0 +1,22 @@
+{
+  "name": "contracts-event-tracker",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "axios": "^1.11.0",
+    "deep-diff": "^1.0.2",
+    "dotenv": "^16.4.7",
+    "ethers": "^6.13.4",
+    "ioredis": "^5.4.2",
+    "redis": "^4.7.0",
+    "uuid": "^11.0.4"
+  }
+}

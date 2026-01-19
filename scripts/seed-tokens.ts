@@ -5,6 +5,11 @@
  * for each supported chain. Token metadata (symbol, name, decimals) is fetched
  * directly from the blockchain to ensure accuracy.
  *
+ * RPC URL resolution priority:
+ *   1. CHAIN_RPC_CONFIG JSON (for Helm/AWS Parameter Store)
+ *   2. Individual env vars (CHAIN_ETH_MAINNET_PRIMARY_RPC, etc.)
+ *   3. Public RPC defaults (no API keys required)
+ *
  * Run with: pnpm tsx scripts/seed-tokens.ts
  */
 
@@ -15,20 +20,13 @@ import { ethers } from "ethers";
 import postgres from "postgres";
 import { supportedTokens } from "../keeperhub/db/schema-extensions";
 import { ERC20_ABI } from "../lib/contracts";
+import { getRpcUrlByChainId } from "../lib/rpc/rpc-config";
 
 // Token logo URLs (using popular token list sources)
 const LOGOS = {
   USDC: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
   USDT: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png",
   USDS: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdC035D45d973E3EC169d2276DDab16f1e407384F/logo.png",
-};
-
-// RPC URLs for each chain (using public endpoints for seeding)
-const RPC_URLS: Record<number, string> = {
-  1: "https://eth.llamarpc.com",
-  11155111: "https://ethereum-sepolia-rpc.publicnode.com",
-  8453: "https://base.llamarpc.com",
-  84532: "https://base-sepolia-rpc.publicnode.com",
 };
 
 /**
@@ -116,19 +114,49 @@ const TOKEN_CONFIGS: TokenConfig[] = [
     isStablecoin: true,
     sortOrder: 1,
   },
+
+  // ==========================================================================
+  // Tempo Testnet (chainId: 42429)
+  // ==========================================================================
+  {
+    chainId: 42_429,
+    tokenAddress: "0x20c0000000000000000000000000000000000000", // pathUSD
+    logoUrl: null, // Tempo testnet token
+    isStablecoin: true,
+    sortOrder: 1,
+  },
+  {
+    chainId: 42_429,
+    tokenAddress: "0x20c0000000000000000000000000000000000001", // AlphaUSD
+    logoUrl: null, // Tempo testnet token
+    isStablecoin: true,
+    sortOrder: 2,
+  },
+  {
+    chainId: 42_429,
+    tokenAddress: "0x20c0000000000000000000000000000000000002", // BetaUSD
+    logoUrl: null, // Tempo testnet token
+    isStablecoin: true,
+    sortOrder: 3,
+  },
+  {
+    chainId: 42_429,
+    tokenAddress: "0x20c0000000000000000000000000000000000003", // ThetaUSD
+    logoUrl: null, // Tempo testnet token
+    isStablecoin: true,
+    sortOrder: 4,
+  },
 ];
 
 /**
  * Fetch token metadata from the blockchain
+ * Uses CHAIN_RPC_CONFIG for RPC URLs (same as seed-chains.ts)
  */
 async function fetchTokenMetadata(
   chainId: number,
   tokenAddress: string
 ): Promise<{ symbol: string; name: string; decimals: number }> {
-  const rpcUrl = RPC_URLS[chainId];
-  if (!rpcUrl) {
-    throw new Error(`No RPC URL configured for chain ${chainId}`);
-  }
+  const rpcUrl = getRpcUrlByChainId(chainId, "primary");
 
   const provider = new ethers.JsonRpcProvider(rpcUrl);
   const contract = new ethers.Contract(tokenAddress, ERC20_ABI, provider);

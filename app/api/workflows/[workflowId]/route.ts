@@ -175,7 +175,14 @@ function buildUpdateData(
     updatedAt: new Date(),
   };
 
-  const fields = ["name", "description", "nodes", "edges", "visibility"];
+  const fields = [
+    "name",
+    "description",
+    "nodes",
+    "edges",
+    "visibility",
+    "enabled", // keeperhub custom field //
+  ];
   for (const field of fields) {
     if (body[field] !== undefined) {
       updateData[field] = body[field];
