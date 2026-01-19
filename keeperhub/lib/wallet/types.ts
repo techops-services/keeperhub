@@ -16,6 +16,8 @@ export type ChainData = {
   symbol: string;
   chainType: string;
   defaultPrimaryRpc: string;
+  explorerUrl: string | null;
+  explorerAddressPath: string | null;
   isTestnet: boolean;
   isEnabled: boolean;
 };
@@ -27,6 +29,7 @@ export type ChainBalance = {
   balance: string;
   loading: boolean;
   isTestnet: boolean;
+  explorerUrl: string | null;
   error?: string;
 };
 
