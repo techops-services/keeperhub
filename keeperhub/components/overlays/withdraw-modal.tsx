@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/select";
 
 const ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
-const UNLIMITED_BALANCE = "∞";
 
 export type WithdrawableAsset = {
   type: "native" | "token";
@@ -62,12 +61,10 @@ export function WithdrawModal({
   const isValidAddress = (address: string) => ADDRESS_REGEX.test(address);
 
   const handleMaxClick = () => {
-    if (selectedAsset && !isUnlimitedBalance(selectedAsset.balance)) {
+    if (selectedAsset) {
       setAmount(selectedAsset.balance);
     }
   };
-
-  const isUnlimitedBalance = (balance: string) => balance === UNLIMITED_BALANCE;
 
   const validateWithdrawal = (): string | null => {
     if (!selectedAsset) {
@@ -76,11 +73,7 @@ export function WithdrawModal({
     if (!amount || Number.parseFloat(amount) <= 0) {
       return "Please enter a valid amount";
     }
-    // Skip balance check for unlimited (testnet mock) balances
-    if (
-      !isUnlimitedBalance(selectedAsset.balance) &&
-      Number.parseFloat(amount) > Number.parseFloat(selectedAsset.balance)
-    ) {
+    if (Number.parseFloat(amount) > Number.parseFloat(selectedAsset.balance)) {
       return "Insufficient balance";
     }
     if (!isValidAddress(recipient)) {
@@ -200,9 +193,8 @@ export function WithdrawModal({
           disabled:
             !(amount && recipient && isValidAddress(recipient)) ||
             Number.parseFloat(amount) <= 0 ||
-            (!isUnlimitedBalance(selectedAsset?.balance || "0") &&
-              Number.parseFloat(amount) >
-                Number.parseFloat(selectedAsset?.balance || "0")),
+            Number.parseFloat(amount) >
+              Number.parseFloat(selectedAsset?.balance || "0"),
         },
       ]}
       overlayId={overlayId}

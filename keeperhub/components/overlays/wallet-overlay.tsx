@@ -54,9 +54,8 @@ function truncateAddress(address: string): string {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
-// TEMPO testnet uses stablecoins for gas, so we display pathUSD as the primary balance
+// TEMPO testnet uses stablecoins for gas, so we display stablecoins only (no native token)
 const TEMPO_CHAIN_ID = 42_429;
-const TEMPO_PATHUSD_ADDRESS = "0x20c0000000000000000000000000000000000000";
 
 // ============================================================================
 // Balance Display Components
@@ -90,11 +89,19 @@ function ChainBalanceDisplay({ balance }: { balance: ChainBalance }) {
   );
 }
 
-function SupportedTokenBalanceDisplay({
+// Stablecoin item with individual withdraw button
+function StablecoinWithWithdraw({
   token,
+  isAdmin,
+  onWithdraw,
 }: {
   token: SupportedTokenBalance;
+  isAdmin: boolean;
+  onWithdraw: (chainId: number, tokenAddress: string) => void;
 }) {
+  const numBalance = Number.parseFloat(token.balance);
+  const hasBalance = Number.isFinite(numBalance) && numBalance > 0;
+
   const renderBalance = () => {
     if (token.loading) {
       return <Spinner className="h-3 w-3" />;
@@ -106,7 +113,7 @@ function SupportedTokenBalanceDisplay({
   };
 
   return (
-    <div className="flex items-center gap-2 py-1">
+    <div className="flex items-center gap-2 py-1.5">
       {token.logoUrl && (
         <Image
           alt={token.symbol}
@@ -120,6 +127,16 @@ function SupportedTokenBalanceDisplay({
       <span className="ml-auto text-muted-foreground text-xs">
         {renderBalance()}
       </span>
+      {isAdmin && hasBalance && !token.loading && (
+        <Button
+          className="h-6 px-2 text-xs"
+          onClick={() => onWithdraw(token.chainId, token.tokenAddress)}
+          size="sm"
+          variant="ghost"
+        >
+          <SendHorizontal className="h-3 w-3" />
+        </Button>
+      )}
     </div>
   );
 }
@@ -148,71 +165,17 @@ function ChainBalanceItem({
 
   const isTempo = balance.chainId === TEMPO_CHAIN_ID;
 
-  // For TEMPO, find pathUSD as the primary balance token
-  const pathUsdToken = isTempo
-    ? chainSupportedTokens.find(
-        (t) =>
-          t.tokenAddress.toLowerCase() === TEMPO_PATHUSD_ADDRESS.toLowerCase()
-      )
-    : null;
+  // For non-TEMPO chains, check if native balance is withdrawable
+  const nativeBalance = Number.parseFloat(balance.balance);
+  const hasNativeBalance = Number.isFinite(nativeBalance) && nativeBalance > 0;
 
-  // For TEMPO, show other stablecoins (not pathUSD) as secondary
-  const secondaryStablecoins = isTempo
-    ? chainSupportedTokens.filter(
-        (t) =>
-          t.tokenAddress.toLowerCase() !== TEMPO_PATHUSD_ADDRESS.toLowerCase()
-      )
-    : chainSupportedTokens;
-
-  // For TEMPO, use pathUSD balance; for others, use native balance
-  const primaryBalance = isTempo
-    ? (pathUsdToken?.balance ?? "0")
-    : balance.balance;
-
-  const hasBalance =
-    primaryBalance !== "∞" && Number.parseFloat(primaryBalance) > 0;
-
-  // Display label: for TEMPO show "TEMPO pathUSD", otherwise chain name
-  const displayLabel = isTempo ? "TEMPO pathUSD" : balance.name;
-
-  // Check if any supported token on this chain is still loading
-  const isLoadingTokens = chainSupportedTokens.some((t) => t.loading);
-
-  // For TEMPO, show pathUSD balance; for others, show native balance
-  const renderPrimaryBalance = () => {
-    if (isTempo) {
-      // Still loading supported tokens
-      if (isLoadingTokens) {
-        return (
-          <div className="mt-1 text-muted-foreground text-xs">Loading...</div>
-        );
-      }
-      // pathUSD not found - fall back to native display
-      if (!pathUsdToken) {
-        return <ChainBalanceDisplay balance={balance} />;
-      }
-      if (pathUsdToken.error) {
-        return (
-          <div className="mt-1 text-destructive text-xs">
-            {pathUsdToken.error}
-          </div>
-        );
-      }
-      return (
-        <div className="mt-1 text-muted-foreground text-xs">
-          {pathUsdToken.balance} {pathUsdToken.symbol}
-        </div>
-      );
-    }
-    return <ChainBalanceDisplay balance={balance} />;
-  };
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between rounded-lg border bg-muted/50 p-3">
-        <div className="flex-1">
-          <div className="flex items-center gap-1">
-            <span className="font-medium text-sm">{displayLabel}</span>
+  // For TEMPO, show stablecoins only (no native balance display)
+  if (isTempo) {
+    return (
+      <div className="space-y-2">
+        <div className="rounded-lg border bg-muted/50 p-3">
+          <div className="mb-2 flex items-center gap-1">
+            <span className="font-medium text-sm">TEMPO</span>
             {balance.explorerUrl && (
               <a
                 className="text-muted-foreground hover:text-foreground"
@@ -224,41 +187,113 @@ function ChainBalanceItem({
               </a>
             )}
           </div>
-          {renderPrimaryBalance()}
-        </div>
-        {isAdmin && hasBalance && (
-          <Button
-            className="h-7 px-2 text-xs"
-            onClick={() =>
-              isTempo && pathUsdToken
-                ? onWithdraw(balance.chainId, pathUsdToken.tokenAddress)
-                : onWithdraw(balance.chainId)
-            }
-            size="sm"
-            variant="ghost"
-          >
-            <SendHorizontal className="h-3 w-3" />
-            Withdraw
-          </Button>
-        )}
-      </div>
-      {/* Supported Token Balances (Stablecoins) - for TEMPO, excludes pathUSD */}
-      {secondaryStablecoins.length > 0 && (
-        <div className="ml-4">
           <div className="mb-1 font-medium text-muted-foreground text-xs">
             Stablecoins
           </div>
-          <div className="rounded border bg-background/50 px-2 py-1">
-            {secondaryStablecoins.map((token) => (
-              <SupportedTokenBalanceDisplay
-                key={`${token.chainId}-${token.tokenAddress}`}
-                token={token}
-              />
+          {chainSupportedTokens.length > 0 ? (
+            <div className="divide-y rounded border bg-background/50 px-2">
+              {chainSupportedTokens.map((token) => (
+                <StablecoinWithWithdraw
+                  isAdmin={isAdmin}
+                  key={`${token.chainId}-${token.tokenAddress}`}
+                  onWithdraw={onWithdraw}
+                  token={token}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-muted-foreground text-xs">
+              Loading stablecoins...
+            </div>
+          )}
+        </div>
+        {/* Custom Tracked Tokens for TEMPO */}
+        {chainTokens.length > 0 && (
+          <div className="ml-4 space-y-1">
+            <div className="font-medium text-muted-foreground text-xs">
+              Tracked Tokens
+            </div>
+            {chainTokens.map((token) => (
+              <div
+                className="flex items-center justify-between rounded border bg-background p-2"
+                key={token.tokenId}
+              >
+                <div className="flex-1">
+                  <div className="font-medium text-xs">{token.symbol}</div>
+                  <TokenBalanceDisplay token={token} />
+                </div>
+                {isAdmin && (
+                  <Button
+                    className="h-6 w-6"
+                    onClick={() => onRemoveToken(token.tokenId, token.symbol)}
+                    size="icon"
+                    variant="ghost"
+                  >
+                    <Trash2 className="h-3 w-3 text-muted-foreground" />
+                  </Button>
+                )}
+              </div>
             ))}
           </div>
+        )}
+      </div>
+    );
+  }
+
+  // Non-TEMPO chains: show native balance and stablecoins in same card
+  return (
+    <div className="space-y-2">
+      <div className="rounded-lg border bg-muted/50 p-3">
+        {/* Chain header with native balance */}
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <div className="flex items-center gap-1">
+              <span className="font-medium text-sm">{balance.name}</span>
+              {balance.explorerUrl && (
+                <a
+                  className="text-muted-foreground hover:text-foreground"
+                  href={balance.explorerUrl}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
+            </div>
+            <ChainBalanceDisplay balance={balance} />
+          </div>
+          {isAdmin && hasNativeBalance && (
+            <Button
+              className="h-7 px-2 text-xs"
+              onClick={() => onWithdraw(balance.chainId)}
+              size="sm"
+              variant="ghost"
+            >
+              <SendHorizontal className="h-3 w-3" />
+              Withdraw
+            </Button>
+          )}
         </div>
-      )}
-      {/* Custom Tracked Tokens */}
+        {/* Stablecoins inside same card */}
+        {chainSupportedTokens.length > 0 && (
+          <div className="mt-3">
+            <div className="mb-1 font-medium text-muted-foreground text-xs">
+              Stablecoins
+            </div>
+            <div className="divide-y rounded border bg-background/50 px-2">
+              {chainSupportedTokens.map((token) => (
+                <StablecoinWithWithdraw
+                  isAdmin={isAdmin}
+                  key={`${token.chainId}-${token.tokenAddress}`}
+                  onWithdraw={onWithdraw}
+                  token={token}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+      {/* Custom Tracked Tokens (outside main card) */}
       {chainTokens.length > 0 && (
         <div className="ml-4 space-y-1">
           <div className="font-medium text-muted-foreground text-xs">
@@ -989,14 +1024,14 @@ export function WalletOverlay({ overlayId }: WalletOverlayProps) {
   const buildWithdrawableAssets = useCallback((): WithdrawableAsset[] => {
     const assets: WithdrawableAsset[] = [];
 
-    // Add native balances (skip TEMPO - it uses stablecoins for gas, not native tokens)
+    // Add native balances (skip TEMPO - it uses stablecoins, not native tokens)
     for (const balance of balances) {
-      // Skip TEMPO native balance - it's meaningless (shows as ∞)
+      // Skip TEMPO native balance - it uses stablecoins only
       if (balance.chainId === TEMPO_CHAIN_ID) {
         continue;
       }
       const chain = chains.find((c) => c.chainId === balance.chainId);
-      // Skip if balance is ∞ (testnet mock) or not a valid positive number
+      // Skip if not a valid positive number
       const numBalance = Number.parseFloat(balance.balance);
       if (!(chain && Number.isFinite(numBalance)) || numBalance <= 0) {
         continue;
@@ -1015,7 +1050,7 @@ export function WalletOverlay({ overlayId }: WalletOverlayProps) {
 
     // Add supported token balances (stablecoins)
     for (const token of supportedTokenBalances) {
-      // Skip if balance is ∞ (testnet mock) or not a valid positive number
+      // Skip if not a valid positive number
       const numBalance = Number.parseFloat(token.balance);
       if (!Number.isFinite(numBalance) || numBalance <= 0) {
         continue;

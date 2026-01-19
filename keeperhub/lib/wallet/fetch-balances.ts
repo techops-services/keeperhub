@@ -13,7 +13,7 @@ import type {
 
 /**
  * Maximum balance threshold (1 trillion tokens) - balances above this are considered
- * testnet mock balances and displayed as "unlimited"
+ * testnet mock balances and treated as zero (not meaningful)
  */
 const MAX_DISPLAY_BALANCE = BigInt("1000000000000"); // 1 trillion
 const BIGINT_ZERO = BigInt(0);
@@ -28,7 +28,7 @@ const BIGINT_TEN = BigInt(10);
  * @param weiValue - The balance in wei as BigInt
  * @param decimals - Number of decimals (18 for ETH, varies for tokens)
  * @param displayDecimals - Number of decimal places to show in output (default 6)
- * @returns Formatted balance string, or "∞" for testnet mock balances
+ * @returns Formatted balance string, or "0.000000" for testnet mock balances
  */
 export function formatWeiToBalance(
   weiValue: bigint,
@@ -43,9 +43,9 @@ export function formatWeiToBalance(
   const divisor = BIGINT_TEN ** BigInt(decimals);
   const wholePart = weiValue / divisor;
 
-  // Check for testnet mock balances (unrealistically large values)
+  // Testnet mock balances (unrealistically large values) are not meaningful - show as zero
   if (wholePart > MAX_DISPLAY_BALANCE) {
-    return "∞";
+    return `0.${"0".repeat(displayDecimals)}`;
   }
 
   // Calculate fractional part with extra precision for rounding

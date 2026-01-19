@@ -143,25 +143,25 @@ describe("formatWeiToBalance", () => {
     });
   });
 
-  describe("Testnet mock balances (unlimited)", () => {
+  describe("Testnet mock balances (treated as zero)", () => {
     const DECIMALS = 18;
 
-    it("should return infinity for TEMPO testnet mock balance", () => {
+    it("should return zero for TEMPO testnet mock balance", () => {
       // This is the actual hex value returned by TEMPO testnet RPC for new accounts
       // 0x9612084f0316e0ebd5182f398e5195a51b5ca47667d4c9b26c9b26c9b26c9b2
       const tempoMock = BigInt(
         "0x9612084f0316e0ebd5182f398e5195a51b5ca47667d4c9b26c9b26c9b26c9b2"
       );
-      expect(formatWeiToBalance(tempoMock, DECIMALS)).toBe("∞");
+      expect(formatWeiToBalance(tempoMock, DECIMALS)).toBe("0.000000");
     });
 
-    it("should return infinity for balance exceeding 1 trillion tokens", () => {
+    it("should return zero for balance exceeding 1 trillion tokens", () => {
       // 1 trillion + 1 token in wei
       const overTrillion = BigInt("1000000000001000000000000000000");
-      expect(formatWeiToBalance(overTrillion, DECIMALS)).toBe("∞");
+      expect(formatWeiToBalance(overTrillion, DECIMALS)).toBe("0.000000");
     });
 
-    it("should NOT return infinity for exactly 1 trillion tokens", () => {
+    it("should NOT return zero for exactly 1 trillion tokens", () => {
       // Exactly 1 trillion tokens in wei
       const oneTrillion = BigInt("1000000000000000000000000000000");
       expect(formatWeiToBalance(oneTrillion, DECIMALS)).toBe(
@@ -169,7 +169,7 @@ describe("formatWeiToBalance", () => {
       );
     });
 
-    it("should NOT return infinity for 999 billion tokens", () => {
+    it("should NOT return zero for 999 billion tokens", () => {
       // 999 billion tokens in wei
       const underTrillion = BigInt("999000000000000000000000000000");
       expect(formatWeiToBalance(underTrillion, DECIMALS)).toBe(
@@ -177,12 +177,12 @@ describe("formatWeiToBalance", () => {
       );
     });
 
-    it("should handle repeating pattern mock values", () => {
+    it("should handle repeating pattern mock values as zero", () => {
       // Some testnets use repeating patterns like 42424242...
       const repeatingMock = BigInt(
         "424242424242424242424242424242424242424242424242"
       );
-      expect(formatWeiToBalance(repeatingMock, DECIMALS)).toBe("∞");
+      expect(formatWeiToBalance(repeatingMock, DECIMALS)).toBe("0.000000");
     });
   });
 
@@ -302,12 +302,12 @@ describe("formatWeiToBalance", () => {
         expect(formatWeiToBalance(faucetDrip, 6)).toBe("1000000.000000");
       });
 
-      it("should handle native TEMPO mock balance as unlimited", () => {
-        // The massive value TEMPO testnet returns
+      it("should treat native TEMPO mock balance as zero", () => {
+        // The massive value TEMPO testnet returns - treated as zero since it's meaningless
         const mockBalance = BigInt(
           "4242424242424242424242424242424242424242424242424242424242424242424242424242"
         );
-        expect(formatWeiToBalance(mockBalance, 18)).toBe("∞");
+        expect(formatWeiToBalance(mockBalance, 18)).toBe("0.000000");
       });
     });
 
