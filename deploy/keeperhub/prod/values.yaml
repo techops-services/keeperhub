@@ -144,11 +144,11 @@ env:
   ETHERSCAN_API_KEY:
     type: parameterStore
     name: etherscan-api-key
-    parameter_name: /eks/maker-prod/keeper-app/etherscan-api-key
+    parameter_name: /eks/maker-prod/keeperhub/etherscan-api-key
   SENDGRID_API_KEY:
     type: parameterStore
     name: sendgrid-api-key
-    parameter_name: /eks/maker-prod/keeper-app/sendgrid-api-key
+    parameter_name: /eks/maker-prod/keeperhub/sendgrid-api-key
   FROM_ADDRESS:
     type: kv
     value: "noreply@keeperhub.com"
