@@ -2,14 +2,99 @@
 
 import { ethers } from "ethers";
 import { Info } from "lucide-react";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { TemplateBadgeTextarea } from "@/components/ui/template-badge-textarea";
 import type { ActionConfigFieldBase } from "@/plugins";
+
+type DiamondProxyAlertProps = {
+  facets: Array<{ address: string; name: string | null; abi?: string }>;
+  selectedFacetAddress: string | "proxy" | "direct";
+  diamondDirectAbi: string | null;
+  isLoading: boolean;
+  proxyWarning: string | null;
+  onFacetSelection: (selection: string) => void;
+};
+
+function DiamondProxyAlert({
+  facets,
+  selectedFacetAddress,
+  diamondDirectAbi,
+  isLoading,
+  proxyWarning,
+  onFacetSelection,
+}: DiamondProxyAlertProps) {
+  return (
+    <Alert className="border-purple-200 bg-purple-50 dark:border-purple-800 dark:bg-purple-950">
+      <Info className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+      <AlertTitle className="text-purple-900 dark:text-purple-100">
+        Diamond Proxy Contract Detected
+      </AlertTitle>
+      <AlertDescription className="text-purple-800 dark:text-purple-200">
+        <div className="mt-1 space-y-2">
+          <div className="space-y-2">
+            <div>
+              <Label className="font-medium text-xs">
+                Select Contract/Facet:
+              </Label>
+              <Select
+                disabled={isLoading}
+                onValueChange={onFacetSelection}
+                value={selectedFacetAddress}
+              >
+                <SelectTrigger className="mt-1 w-full">
+                  <SelectValue placeholder="Select contract or facet" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="proxy">
+                    Diamond Proxy (All Facets - {facets.length} facet
+                    {facets.length !== 1 ? "s" : ""})
+                  </SelectItem>
+                  {diamondDirectAbi && (
+                    <SelectItem value="direct">
+                      Direct Contract (Diamond's own ABI)
+                    </SelectItem>
+                  )}
+                  {facets.map((facet) => {
+                    const displayName = facet.name
+                      ? `${facet.name} (${facet.address.slice(0, 6)}...${facet.address.slice(-4)})`
+                      : `${facet.address.slice(0, 6)}...${facet.address.slice(-4)}`;
+                    return (
+                      <SelectItem
+                        disabled={!facet.abi}
+                        key={facet.address}
+                        value={facet.address}
+                      >
+                        {displayName}
+                        {!facet.abi && " (ABI unavailable)"}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+            {proxyWarning && (
+              <p className="text-amber-700 text-xs dark:text-amber-300">
+                {proxyWarning}
+              </p>
+            )}
+          </div>
+        </div>
+      </AlertDescription>
+    </Alert>
+  );
+}
 
 type FieldProps = {
   field: ActionConfigFieldBase;
@@ -47,9 +132,68 @@ export function AbiWithAutoFetchField({
   const [implementationAbi, setImplementationAbi] = useState<string | null>(
     null
   );
+  // Diamond contract state
+  const [isDiamond, setIsDiamond] = useState(false);
+  const [diamondProxyAbi, setDiamondProxyAbi] = useState<string | null>(null);
+  const [diamondDirectAbi, setDiamondDirectAbi] = useState<string | null>(null);
+  const [facets, setFacets] = useState<
+    Array<{ address: string; name: string | null; abi?: string }>
+  >([]);
+  const [selectedFacetAddress, setSelectedFacetAddress] = useState<
+    string | "proxy" | "direct"
+  >("proxy"); // "proxy" = combined, "direct" = Diamond's own, or facet address
 
   const contractAddress = (config[contractAddressField] as string) || "";
   const network = (config[networkField] as string) || "";
+
+  // Debug: Log when value prop changes
+  useEffect(() => {
+    console.log("[ABI Field] Value prop changed:", {
+      valueLength: value?.length || 0,
+      isProxy,
+      useProxyAbi,
+      isDiamond,
+      selectedFacetAddress,
+    });
+  }, [value, isProxy, useProxyAbi, isDiamond, selectedFacetAddress]);
+
+  // Sync ABI when toggle state changes for regular proxies
+  // Use a ref to track the last synced toggle state to avoid infinite loops
+  const lastUseProxyAbiRef = React.useRef<boolean | null>(null);
+
+  useEffect(() => {
+    if (isProxy && !isDiamond && implementationAddress) {
+      // Only sync if the toggle state actually changed
+      if (lastUseProxyAbiRef.current !== useProxyAbi) {
+        lastUseProxyAbiRef.current = useProxyAbi;
+
+        if (useProxyAbi && proxyAbi) {
+          const abiString =
+            typeof proxyAbi === "string" ? proxyAbi : JSON.stringify(proxyAbi);
+
+          console.log("[Proxy UI] useEffect: Calling onChange with proxy ABI");
+          // This forces the parent to update its config state
+          onChange(abiString);
+        } else if (!useProxyAbi && implementationAbi) {
+          const abiString =
+            typeof implementationAbi === "string"
+              ? implementationAbi
+              : JSON.stringify(implementationAbi);
+
+          onChange(abiString);
+        }
+      }
+    }
+  }, [
+    useProxyAbi,
+    proxyAbi,
+    implementationAbi,
+    isProxy,
+    isDiamond,
+    implementationAddress,
+    onChange,
+    value,
+  ]);
 
   // Validate contract address
   const isValidAddress = React.useMemo(() => {
@@ -78,6 +222,11 @@ export function AbiWithAutoFetchField({
     setProxyWarning(null);
     setProxyAbi(null);
     setImplementationAbi(null);
+    setIsDiamond(false);
+    setDiamondProxyAbi(null);
+    setDiamondDirectAbi(null);
+    setFacets([]);
+    setSelectedFacetAddress("proxy");
 
     try {
       const response = await fetch("/api/web3/fetch-abi", {
@@ -95,8 +244,13 @@ export function AbiWithAutoFetchField({
         success?: boolean;
         abi?: string;
         isProxy?: boolean;
+        isDiamond?: boolean;
         implementationAddress?: string;
         proxyAddress?: string;
+        proxyAbi?: string;
+        facets?: Array<{ address: string; name: string | null; abi?: string }>;
+        diamondProxyAbi?: string;
+        diamondDirectAbi?: string;
         warning?: string;
         error?: string;
       };
@@ -106,20 +260,34 @@ export function AbiWithAutoFetchField({
         throw new Error(errorMessage);
       }
 
-      // Handle proxy detection
-      if (data.isProxy && data.implementationAddress) {
+      // Handle Diamond contract detection (check before regular proxy)
+      if (data.isDiamond && data.diamondProxyAbi) {
+        setIsDiamond(true);
+        setIsProxy(true);
+        setDiamondProxyAbi(data.diamondProxyAbi);
+        setDiamondDirectAbi(data.diamondDirectAbi || null);
+        const facetsData = data.facets || [];
+        setFacets(facetsData);
+        setProxyAddress(data.proxyAddress || contractAddress);
+        setProxyWarning(data.warning || null);
+        setSelectedFacetAddress("proxy");
+
+        // Use diamondProxyAbi explicitly to ensure we're using the combined ABI
+        onChange(data.diamondProxyAbi);
+      } else if (data.isProxy && data.implementationAddress) {
         setIsProxy(true);
         setImplementationAddress(data.implementationAddress);
         setProxyAddress(data.proxyAddress || contractAddress);
         setImplementationAbi(data.abi);
+        setProxyAbi(data.proxyAbi || null);
         setProxyWarning(data.warning || null);
 
         // If we have a warning (e.g., unverified implementation), we're using proxy ABI
         if (data.warning) {
-          setProxyAbi(data.abi);
           setUseProxyAbi(true);
+          onChange(data.proxyAbi || data.abi);
         } else {
-          // Default to implementation ABI for proxies
+          setUseProxyAbi(false);
           onChange(data.abi);
         }
       } else {
@@ -137,53 +305,141 @@ export function AbiWithAutoFetchField({
     }
   };
 
-  const handleToggleProxyAbi = async (useProxy: boolean) => {
-    setUseProxyAbi(useProxy);
+  const handleFacetSelection = (selection: string) => {
+    setSelectedFacetAddress(selection);
 
-    if (useProxy) {
-      // User wants to use proxy ABI
-      if (proxyAbi) {
-        // We already have it
-        onChange(proxyAbi);
-      } else if (proxyAddress) {
-        // Need to fetch proxy ABI
-        setIsLoading(true);
-        try {
-          const response = await fetch("/api/web3/fetch-abi", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              contractAddress: proxyAddress,
-              network,
-            }),
-          });
-
-          const data = (await response.json()) as {
-            success?: boolean;
-            abi?: string;
-            error?: string;
-          };
-
-          if (response.ok && data.success && data.abi) {
-            setProxyAbi(data.abi);
-            onChange(data.abi);
-          } else {
-            throw new Error(data.error || "Failed to fetch proxy ABI");
-          }
-        } catch (err) {
-          const errorMessage =
-            err instanceof Error ? err.message : "Failed to fetch proxy ABI";
-          setError(errorMessage);
-        } finally {
-          setIsLoading(false);
+    if (selection === "proxy") {
+      // User wants to use Diamond Proxy mode (combined facets)
+      if (diamondProxyAbi) {
+        console.log(
+          "[Diamond UI] Switching to Diamond Proxy mode (combined facets)"
+        );
+        onChange(diamondProxyAbi);
+      } else {
+        console.error("[Diamond UI] Diamond Proxy ABI not available!");
+      }
+    } else if (selection === "direct") {
+      // User wants to use Direct Contract mode (Diamond's own ABI)
+      if (diamondDirectAbi) {
+        console.log(
+          "[Diamond UI] Switching to Direct Contract mode (Diamond's own ABI)"
+        );
+        onChange(diamondDirectAbi);
+      } else {
+        setError(
+          "Diamond contract's own ABI is not available (contract may not be verified). Using Diamond Proxy mode."
+        );
+        setSelectedFacetAddress("proxy");
+        if (diamondProxyAbi) {
+          onChange(diamondProxyAbi);
         }
       }
     } else {
-      // User wants to use implementation ABI
-      if (implementationAbi) {
-        onChange(implementationAbi);
+      // User selected a specific facet
+      const selectedFacet = facets.find((f) => f.address === selection);
+      console.log("[Diamond UI] Facet selection:", {
+        selection,
+        foundFacet: !!selectedFacet,
+        facetName: selectedFacet?.name,
+        hasAbi: !!selectedFacet?.abi,
+        abiLength: selectedFacet?.abi?.length || 0,
+        allFacets: facets.map((f) => ({
+          address: f.address,
+          name: f.name,
+          hasAbi: !!f.abi,
+        })),
+      });
+
+      if (selectedFacet?.abi) {
+        console.log(
+          `[Diamond UI] Switching to facet: ${selectedFacet.name || selection}, ABI length: ${selectedFacet.abi.length}`
+        );
+        // Parse and log function count
+        try {
+          const parsedAbi = JSON.parse(selectedFacet.abi) as unknown[];
+          const functionCount = parsedAbi.filter(
+            (item) => (item as { type?: string }).type === "function"
+          ).length;
+          console.log(
+            `[Diamond UI] Facet ABI contains ${functionCount} functions`
+          );
+        } catch (e) {
+          console.error("[Diamond UI] Failed to parse facet ABI:", e);
+        }
+        onChange(selectedFacet.abi);
+      } else {
+        const errorMsg = `ABI for selected facet ${selectedFacet?.name || selection} is not available.`;
+        console.error("[Diamond UI]", errorMsg);
+        setError(errorMsg);
+        // Fall back to proxy mode
+        setSelectedFacetAddress("proxy");
+        if (diamondProxyAbi) {
+          onChange(diamondProxyAbi);
+        }
+      }
+    }
+  };
+
+  const handleToggleProxyAbi = async (useProxy: boolean) => {
+    console.log("[Proxy UI] Toggle clicked, useProxy:", useProxy);
+    console.log("[Proxy UI] Current state:", {
+      proxyAbi: proxyAbi ? `Length: ${proxyAbi.length}` : "null",
+      implementationAbi: implementationAbi
+        ? `Length: ${implementationAbi.length}`
+        : "null",
+      useProxyAbi,
+    });
+
+    setUseProxyAbi(useProxy);
+    // Don't call onChange here - let the useEffect handle it
+    // This ensures the state update happens first, then the useEffect triggers
+    // However, if we need to fetch the proxy ABI, we still need to do that
+    if (useProxy && !proxyAbi && proxyAddress) {
+      // Need to fetch proxy ABI - but skip proxy detection to get the actual proxy ABI
+      setIsLoading(true);
+      try {
+        console.log("[Proxy UI] Fetching proxy ABI directly...");
+        // Fetch directly without proxy detection by calling getsourcecode
+        const response = await fetch("/api/web3/fetch-abi", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contractAddress: proxyAddress,
+            network,
+          }),
+        });
+
+        const data = (await response.json()) as {
+          success?: boolean;
+          abi?: string;
+          proxyAbi?: string;
+          error?: string;
+        };
+
+        if (response.ok && data.success) {
+          // Use proxyAbi if available, otherwise use abi (which might be implementation)
+          const abiToUse = data.proxyAbi || data.abi;
+          if (abiToUse) {
+            setProxyAbi(abiToUse);
+            console.log("[Proxy UI] Fetched and set proxy ABI");
+            // The useEffect will handle calling onChange
+          } else {
+            throw new Error("No ABI returned from API");
+          }
+        } else {
+          throw new Error(data.error || "Failed to fetch proxy ABI");
+        }
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to fetch proxy ABI";
+        console.error("[Proxy UI] Error:", errorMessage);
+        setError(errorMessage);
+        // Revert toggle on error
+        setUseProxyAbi(false);
+      } finally {
+        setIsLoading(false);
       }
     }
   };
@@ -236,7 +492,18 @@ export function AbiWithAutoFetchField({
         </div>
       )}
 
-      {isProxy && implementationAddress && (
+      {isDiamond && diamondProxyAbi && (
+        <DiamondProxyAlert
+          diamondDirectAbi={diamondDirectAbi}
+          facets={facets}
+          isLoading={isLoading}
+          onFacetSelection={handleFacetSelection}
+          proxyWarning={proxyWarning}
+          selectedFacetAddress={selectedFacetAddress}
+        />
+      )}
+
+      {isProxy && !isDiamond && implementationAddress && (
         <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
           <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
           <AlertTitle className="text-blue-900 dark:text-blue-100">
@@ -276,7 +543,12 @@ export function AbiWithAutoFetchField({
       <TemplateBadgeTextarea
         disabled={disabled || isLoading || !useManualAbi}
         id={field.key}
+        key={`${field.key}-${value?.length || 0}-${useProxyAbi ? "proxy" : "impl"}-${selectedFacetAddress}`}
         onChange={(val) => {
+          console.log(
+            "[ABI Field] Textarea onChange called with length:",
+            val?.toString().length || 0
+          );
           onChange(val);
           setError(null);
         }}
