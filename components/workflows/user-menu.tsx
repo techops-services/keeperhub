@@ -8,7 +8,6 @@ import {
   Plug,
   Settings,
   Sun,
-  Users,
   Wallet,
 } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -165,10 +164,6 @@ export const UserMenu = () => {
               <span>Settings</span>
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem onClick={() => setOrgModalOpen(true)}>
-            <Users className="size-4" />
-            <span>Organization</span>
-          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => openOverlay(IntegrationsOverlay)}>
             <Plug className="size-4" />
             <span>Connections</span>
