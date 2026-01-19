@@ -12,6 +12,67 @@ import type {
 } from "./types";
 
 /**
+ * Maximum balance threshold (1 trillion tokens) - balances above this are considered
+ * testnet mock balances and treated as zero (not meaningful)
+ */
+const MAX_DISPLAY_BALANCE = BigInt("1000000000000"); // 1 trillion
+const BIGINT_ZERO = BigInt(0);
+const BIGINT_ONE = BigInt(1);
+const BIGINT_FIVE = BigInt(5);
+const BIGINT_TEN = BigInt(10);
+
+/**
+ * Format a BigInt wei value to a decimal string with proper precision.
+ * Handles arbitrarily large values without JavaScript Number precision loss.
+ *
+ * @param weiValue - The balance in wei as BigInt
+ * @param decimals - Number of decimals (18 for ETH, varies for tokens)
+ * @param displayDecimals - Number of decimal places to show in output (default 6)
+ * @returns Formatted balance string, or "0.000000" for testnet mock balances
+ */
+export function formatWeiToBalance(
+  weiValue: bigint,
+  decimals: number,
+  displayDecimals = 6
+): string {
+  // Handle zero case
+  if (weiValue === BIGINT_ZERO) {
+    return `0.${"0".repeat(displayDecimals)}`;
+  }
+
+  const divisor = BIGINT_TEN ** BigInt(decimals);
+  const wholePart = weiValue / divisor;
+
+  // Testnet mock balances (unrealistically large values) are not meaningful - show as zero
+  if (wholePart > MAX_DISPLAY_BALANCE) {
+    return `0.${"0".repeat(displayDecimals)}`;
+  }
+
+  // Calculate fractional part with extra precision for rounding
+  const remainder = weiValue % divisor;
+  const scaleFactor = BIGINT_TEN ** BigInt(displayDecimals + 1); // +1 for rounding digit
+  const scaledFraction = (remainder * scaleFactor) / divisor;
+
+  // Round the last digit
+  const roundedFraction = (scaledFraction + BIGINT_FIVE) / BIGINT_TEN;
+
+  // Handle carry from rounding
+  const maxFraction = BIGINT_TEN ** BigInt(displayDecimals);
+  let finalWhole = wholePart;
+  let finalFraction = roundedFraction;
+
+  if (finalFraction >= maxFraction) {
+    finalWhole += BIGINT_ONE;
+    finalFraction = BIGINT_ZERO;
+  }
+
+  // Format the fractional part with leading zeros
+  const fractionStr = finalFraction.toString().padStart(displayDecimals, "0");
+
+  return `${finalWhole}.${fractionStr}`;
+}
+
+/**
  * Build explorer address URL for a chain
  */
 function buildExplorerAddressUrl(
@@ -50,13 +111,12 @@ export async function fetchNativeBalance(
     }
 
     const balanceWei = BigInt(result.result);
-    const balanceEth = Number(balanceWei) / 1e18;
 
     return {
       chainId: chain.chainId,
       name: chain.name,
       symbol: chain.symbol,
-      balance: balanceEth.toFixed(6),
+      balance: formatWeiToBalance(balanceWei, 18),
       loading: false,
       isTestnet: chain.isTestnet,
       explorerUrl: buildExplorerAddressUrl(chain, address),
@@ -127,14 +187,13 @@ export async function fetchTokenBalance(
     }
 
     const balanceWei = BigInt(result.result);
-    const balance = Number(balanceWei) / 10 ** token.decimals;
 
     return {
       tokenId: token.id,
       chainId: token.chainId,
       symbol: token.symbol,
       name: token.name,
-      balance: balance.toFixed(6),
+      balance: formatWeiToBalance(balanceWei, token.decimals),
       loading: false,
     };
   } catch (error) {
@@ -254,7 +313,6 @@ export function fetchSupportedTokenBalance(
       }
 
       const balanceWei = BigInt(result.result);
-      const balance = Number(balanceWei) / 10 ** token.decimals;
 
       return {
         chainId: token.chainId,
@@ -262,7 +320,7 @@ export function fetchSupportedTokenBalance(
         symbol: token.symbol,
         name: token.name,
         logoUrl: token.logoUrl,
-        balance: balance.toFixed(6),
+        balance: formatWeiToBalance(balanceWei, token.decimals),
         loading: false,
       };
     } catch (error) {
