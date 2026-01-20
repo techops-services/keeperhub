@@ -7,90 +7,22 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { TemplateBadgeTextarea } from "@/components/ui/template-badge-textarea";
 import type { ActionConfigFieldBase } from "@/plugins";
 
-type DiamondProxyAlertProps = {
-  facets: Array<{ address: string; name: string | null; abi?: string }>;
-  selectedFacetAddress: string | "proxy" | "direct";
-  diamondDirectAbi: string | null;
-  isLoading: boolean;
-  proxyWarning: string | null;
-  onFacetSelection: (selection: string) => void;
-};
-
-function DiamondProxyAlert({
-  facets,
-  selectedFacetAddress,
-  diamondDirectAbi,
-  isLoading,
-  proxyWarning,
-  onFacetSelection,
-}: DiamondProxyAlertProps) {
+function DiamondUnsupportedAlert() {
   return (
-    <Alert className="border-purple-200 bg-purple-50 dark:border-purple-800 dark:bg-purple-950">
-      <Info className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-      <AlertTitle className="text-purple-900 dark:text-purple-100">
+    <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
+      <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+      <AlertTitle className="text-amber-900 dark:text-amber-100">
         Diamond Proxy Contract Detected
       </AlertTitle>
-      <AlertDescription className="text-purple-800 dark:text-purple-200">
-        <div className="mt-1 space-y-2">
-          <div className="space-y-2">
-            <div>
-              <Label className="font-medium text-xs">
-                Select Contract/Facet:
-              </Label>
-              <Select
-                disabled={isLoading}
-                onValueChange={onFacetSelection}
-                value={selectedFacetAddress}
-              >
-                <SelectTrigger className="mt-1 w-full">
-                  <SelectValue placeholder="Select contract or facet" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="proxy">
-                    Diamond Proxy (All Facets - {facets.length} facet
-                    {facets.length !== 1 ? "s" : ""})
-                  </SelectItem>
-                  {diamondDirectAbi && (
-                    <SelectItem value="direct">
-                      Direct Contract (Diamond's own ABI)
-                    </SelectItem>
-                  )}
-                  {facets.map((facet) => {
-                    const displayName = facet.name
-                      ? `${facet.name} (${facet.address.slice(0, 6)}...${facet.address.slice(-4)})`
-                      : `${facet.address.slice(0, 6)}...${facet.address.slice(-4)}`;
-                    return (
-                      <SelectItem
-                        disabled={!facet.abi}
-                        key={facet.address}
-                        value={facet.address}
-                      >
-                        {displayName}
-                        {!facet.abi && " (ABI unavailable)"}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-            {proxyWarning && (
-              <p className="text-amber-700 text-xs dark:text-amber-300">
-                {proxyWarning}
-              </p>
-            )}
-          </div>
-        </div>
+      <AlertDescription className="text-amber-800 dark:text-amber-200">
+        <p className="text-sm">
+          Diamond proxy contracts (EIP-2535) are not currently supported. Please
+          use a regular contract or proxy contract instead.
+        </p>
       </AlertDescription>
     </Alert>
   );
@@ -107,6 +39,7 @@ type AbiWithAutoFetchProps = FieldProps & {
   contractAddressField?: string;
   networkField?: string;
   config: Record<string, unknown>;
+  onUpdateConfig?: (key: string, value: unknown) => void;
 };
 
 export function AbiWithAutoFetchField({
@@ -117,6 +50,7 @@ export function AbiWithAutoFetchField({
   contractAddressField = "contractAddress",
   networkField = "network",
   config,
+  onUpdateConfig,
 }: AbiWithAutoFetchProps) {
   const [useManualAbi, setUseManualAbi] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -269,8 +203,10 @@ export function AbiWithAutoFetchField({
         setProxyWarning(data.warning || null);
         setSelectedFacetAddress("proxy");
 
-        // Use diamondProxyAbi explicitly to ensure we're using the combined ABI
-        onChange(data.diamondProxyAbi);
+        // Diamond contracts are not supported - don't set the ABI
+        setError(
+          "Diamond proxy contracts (EIP-2535) are not currently supported. Please use a regular contract or proxy contract instead."
+        );
       } else if (data.isProxy && data.implementationAddress) {
         setIsProxy(true);
         setImplementationAddress(data.implementationAddress);
@@ -278,6 +214,24 @@ export function AbiWithAutoFetchField({
         setImplementationAbi(data.abi);
         setProxyAbi(data.proxyAbi || null);
         setProxyWarning(data.warning || null);
+
+        // Auto-populate proxy fields in config (stored silently, no UI changes)
+        if (onUpdateConfig) {
+          console.log(
+            "[Proxy] Setting isProxy=true, implementationAddress=",
+            data.implementationAddress
+          );
+          // Update both fields - React will batch these updates
+          onUpdateConfig("isProxy", true);
+          onUpdateConfig(
+            "contractImplementationAddress",
+            data.implementationAddress
+          );
+        } else {
+          console.warn(
+            "[Proxy] onUpdateConfig not available, cannot save proxy fields"
+          );
+        }
 
         // If we have a warning (e.g., unverified implementation), we're using proxy ABI
         if (data.warning) {
@@ -288,6 +242,12 @@ export function AbiWithAutoFetchField({
           onChange(data.abi);
         }
       } else {
+        // Not a proxy, clear proxy fields if they exist
+        if (onUpdateConfig) {
+          console.log("[Proxy] Clearing proxy fields (not a proxy)");
+          onUpdateConfig("isProxy", false);
+          onUpdateConfig("contractImplementationAddress", "");
+        }
         // Not a proxy, use the ABI directly
         onChange(data.abi);
       }
@@ -302,7 +262,7 @@ export function AbiWithAutoFetchField({
     } finally {
       setIsLoading(false);
     }
-  }, [contractAddress, network, onChange]);
+  }, [contractAddress, network, onChange, onUpdateConfig]);
 
   const handleFetchAbi = useCallback(
     async (skipValidation = false) => {
@@ -325,81 +285,6 @@ export function AbiWithAutoFetchField({
 
   const handleButtonClick = () => {
     handleFetchAbi(false);
-  };
-
-  const handleFacetSelection = (selection: string) => {
-    setSelectedFacetAddress(selection);
-
-    if (selection === "proxy") {
-      // User wants to use Diamond Proxy mode (combined facets)
-      if (diamondProxyAbi) {
-        console.log(
-          "[Diamond UI] Switching to Diamond Proxy mode (combined facets)"
-        );
-        onChange(diamondProxyAbi);
-      } else {
-        console.error("[Diamond UI] Diamond Proxy ABI not available!");
-      }
-    } else if (selection === "direct") {
-      // User wants to use Direct Contract mode (Diamond's own ABI)
-      if (diamondDirectAbi) {
-        console.log(
-          "[Diamond UI] Switching to Direct Contract mode (Diamond's own ABI)"
-        );
-        onChange(diamondDirectAbi);
-      } else {
-        setError(
-          "Diamond contract's own ABI is not available (contract may not be verified). Using Diamond Proxy mode."
-        );
-        setSelectedFacetAddress("proxy");
-        if (diamondProxyAbi) {
-          onChange(diamondProxyAbi);
-        }
-      }
-    } else {
-      // User selected a specific facet
-      const selectedFacet = facets.find((f) => f.address === selection);
-      console.log("[Diamond UI] Facet selection:", {
-        selection,
-        foundFacet: !!selectedFacet,
-        facetName: selectedFacet?.name,
-        hasAbi: !!selectedFacet?.abi,
-        abiLength: selectedFacet?.abi?.length || 0,
-        allFacets: facets.map((f) => ({
-          address: f.address,
-          name: f.name,
-          hasAbi: !!f.abi,
-        })),
-      });
-
-      if (selectedFacet?.abi) {
-        console.log(
-          `[Diamond UI] Switching to facet: ${selectedFacet.name || selection}, ABI length: ${selectedFacet.abi.length}`
-        );
-        // Parse and log function count
-        try {
-          const parsedAbi = JSON.parse(selectedFacet.abi) as unknown[];
-          const functionCount = parsedAbi.filter(
-            (item) => (item as { type?: string }).type === "function"
-          ).length;
-          console.log(
-            `[Diamond UI] Facet ABI contains ${functionCount} functions`
-          );
-        } catch (e) {
-          console.error("[Diamond UI] Failed to parse facet ABI:", e);
-        }
-        onChange(selectedFacet.abi);
-      } else {
-        const errorMsg = `ABI for selected facet ${selectedFacet?.name || selection} is not available.`;
-        console.error("[Diamond UI]", errorMsg);
-        setError(errorMsg);
-        // Fall back to proxy mode
-        setSelectedFacetAddress("proxy");
-        if (diamondProxyAbi) {
-          onChange(diamondProxyAbi);
-        }
-      }
-    }
   };
 
   const handleToggleProxyAbi = async (useProxy: boolean) => {
@@ -567,16 +452,7 @@ export function AbiWithAutoFetchField({
         </div>
       )}
 
-      {isDiamond && diamondProxyAbi && (
-        <DiamondProxyAlert
-          diamondDirectAbi={diamondDirectAbi}
-          facets={facets}
-          isLoading={isLoading}
-          onFacetSelection={handleFacetSelection}
-          proxyWarning={proxyWarning}
-          selectedFacetAddress={selectedFacetAddress}
-        />
-      )}
+      {isDiamond && diamondProxyAbi && <DiamondUnsupportedAlert />}
 
       {isProxy && !isDiamond && implementationAddress && (
         <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
