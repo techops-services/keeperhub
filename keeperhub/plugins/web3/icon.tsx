@@ -1,7 +1,11 @@
-export function Web3Icon({ className }: { className?: string }) {
+export function Web3Icon({
+  className,
+  style,
+}: { className?: string; style?: React.CSSProperties }) {
   return (
     <svg
       className={className}
+      style={style}
       fill="none"
       height="148"
       stroke="currentColor"

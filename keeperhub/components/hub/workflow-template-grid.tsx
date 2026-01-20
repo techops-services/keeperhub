@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -16,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import { api, type SavedWorkflow } from "@/lib/api-client";
 import { authClient, useSession } from "@/lib/auth-client";
+import { WorkflowMiniMap } from "./workflow-mini-map";
 
 type WorkflowTemplateGridProps = {
   workflows: SavedWorkflow[];
@@ -83,23 +83,17 @@ export function WorkflowTemplateGrid({
     >
       {workflows.map((workflow) => {
         const isDuplicating = duplicatingIds.has(workflow.id);
-        const nodeCount = Array.isArray(workflow.nodes)
-          ? workflow.nodes.length
-          : 0;
 
         return (
           <Card className="flex flex-col overflow-hidden" key={workflow.id}>
-            {isFeatured && workflow.displayImage && (
-              <div className="relative -mt-6 aspect-video w-full overflow-hidden">
-                <Image
-                  alt={workflow.name}
-                  className="object-cover"
-                  fill
-                  src={workflow.displayImage}
-                  unoptimized
-                />
-              </div>
-            )}
+            <div className="-mt-6 flex aspect-video w-full items-center justify-center overflow-hidden bg-slate-100 dark:bg-slate-900">
+              <WorkflowMiniMap
+                nodes={workflow.nodes}
+                edges={workflow.edges}
+                width={280}
+                height={160}
+              />
+            </div>
             <CardHeader>
               <div className="flex items-start justify-between gap-2">
                 <CardTitle className="line-clamp-2">{workflow.name}</CardTitle>
@@ -113,11 +107,7 @@ export function WorkflowTemplateGrid({
                 </CardDescription>
               )}
             </CardHeader>
-            <CardContent className="flex-1">
-              <div className="text-muted-foreground text-sm">
-                {nodeCount} {nodeCount === 1 ? "node" : "nodes"}
-              </div>
-            </CardContent>
+            <CardContent className="flex-1" />
             <CardFooter>
               <Button
                 className="w-full"

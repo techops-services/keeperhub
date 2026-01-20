@@ -1,7 +1,11 @@
-export function DiscordIcon({ className }: { className?: string }) {
+export function DiscordIcon({
+  className,
+  style,
+}: { className?: string; style?: React.CSSProperties }) {
   return (
     <svg
       className={className}
+      style={style}
       fill="none"
       height="446"
       role="img"
