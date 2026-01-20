@@ -1,7 +1,7 @@
 "use client";
 
 import { ethers } from "ethers";
-import { Info } from "lucide-react";
+import { ExternalLink, Info } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { TemplateBadgeTextarea } from "@/components/ui/template-badge-textarea";
+import { getExplorerAddressUrl } from "@/keeperhub/lib/explorer-client";
 import type { ActionConfigFieldBase } from "@/plugins";
 
 function DiamondUnsupportedAlert() {
@@ -28,6 +29,71 @@ function DiamondUnsupportedAlert() {
   );
 }
 
+type ProxyContractAlertProps = {
+  implementationAddress: string;
+  network: string;
+  proxyWarning: string | null;
+  useProxyAbi: boolean;
+  isLoading: boolean;
+  onToggleProxyAbi: (useProxy: boolean) => void;
+};
+
+function ProxyContractAlert({
+  implementationAddress,
+  network,
+  proxyWarning,
+  useProxyAbi,
+  isLoading,
+  onToggleProxyAbi,
+}: ProxyContractAlertProps) {
+  const explorerUrl = getExplorerAddressUrl(network, implementationAddress);
+
+  return (
+    <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+      <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+      <AlertTitle className="text-blue-900 dark:text-blue-100">
+        Proxy Contract Detected
+      </AlertTitle>
+      <AlertDescription className="text-blue-800 dark:text-blue-200">
+        <div className="mt-1 space-y-2">
+          <p>
+            Using implementation ABI from{" "}
+            <code className="rounded bg-blue-100 px-1 py-0.5 text-xs dark:bg-blue-900">
+              {`${implementationAddress.slice(0, 6)}...${implementationAddress.slice(-4)}`}
+            </code>
+            {explorerUrl && (
+              <a
+                className="ml-1.5 inline-flex items-center text-blue-700 underline hover:text-blue-800 dark:text-blue-300 dark:hover:text-blue-200"
+                href={explorerUrl}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+          </p>
+          {proxyWarning && (
+            <p className="text-amber-700 dark:text-amber-300">{proxyWarning}</p>
+          )}
+          <div className="flex items-center gap-2">
+            <Button
+              className="h-auto p-0 text-blue-700 underline dark:text-blue-300"
+              disabled={isLoading}
+              onClick={() => onToggleProxyAbi(!useProxyAbi)}
+              size="sm"
+              variant="link"
+            >
+              {useProxyAbi
+                ? "Use implementation ABI instead"
+                : "Use proxy ABI instead"}
+            </Button>
+          </div>
+        </div>
+      </AlertDescription>
+    </Alert>
+  );
+}
+
 type FieldProps = {
   field: ActionConfigFieldBase;
   value: string;
@@ -39,7 +105,6 @@ type AbiWithAutoFetchProps = FieldProps & {
   contractAddressField?: string;
   networkField?: string;
   config: Record<string, unknown>;
-  onUpdateConfig?: (key: string, value: unknown) => void;
 };
 
 export function AbiWithAutoFetchField({
@@ -50,7 +115,6 @@ export function AbiWithAutoFetchField({
   contractAddressField = "contractAddress",
   networkField = "network",
   config,
-  onUpdateConfig,
 }: AbiWithAutoFetchProps) {
   const [useManualAbi, setUseManualAbi] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -68,30 +132,11 @@ export function AbiWithAutoFetchField({
   );
   // Diamond contract state
   const [isDiamond, setIsDiamond] = useState(false);
-  const [diamondProxyAbi, setDiamondProxyAbi] = useState<string | null>(null);
-  const [diamondDirectAbi, setDiamondDirectAbi] = useState<string | null>(null);
-  const [facets, setFacets] = useState<
-    Array<{ address: string; name: string | null; abi?: string }>
-  >([]);
-  const [selectedFacetAddress, setSelectedFacetAddress] = useState<
-    string | "proxy" | "direct"
-  >("proxy"); // "proxy" = combined, "direct" = Diamond's own, or facet address
   const lastFetchedRef = useRef<string>("");
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const contractAddress = (config[contractAddressField] as string) || "";
   const network = (config[networkField] as string) || "";
-
-  // Debug: Log when value prop changes
-  useEffect(() => {
-    console.log("[ABI Field] Value prop changed:", {
-      valueLength: value?.length || 0,
-      isProxy,
-      useProxyAbi,
-      isDiamond,
-      selectedFacetAddress,
-    });
-  }, [value, isProxy, useProxyAbi, isDiamond, selectedFacetAddress]);
 
   // Sync ABI when toggle state changes for regular proxies
   // Use a ref to track the last synced toggle state to avoid infinite loops
@@ -154,10 +199,6 @@ export function AbiWithAutoFetchField({
     setProxyAbi(null);
     setImplementationAbi(null);
     setIsDiamond(false);
-    setDiamondProxyAbi(null);
-    setDiamondDirectAbi(null);
-    setFacets([]);
-    setSelectedFacetAddress("proxy");
 
     try {
       const response = await fetch("/api/web3/fetch-abi", {
@@ -179,59 +220,32 @@ export function AbiWithAutoFetchField({
         implementationAddress?: string;
         proxyAddress?: string;
         proxyAbi?: string;
-        facets?: Array<{ address: string; name: string | null; abi?: string }>;
-        diamondProxyAbi?: string;
-        diamondDirectAbi?: string;
         warning?: string;
         error?: string;
       };
+
+      // Handle Diamond contract detection first (before ABI validation)
+      if (data.isDiamond) {
+        // Diamond contracts are not supported - set state and return
+        setIsDiamond(true);
+
+        const fetchKey = `${contractAddress.toLowerCase()}-${network}`;
+        lastFetchedRef.current = fetchKey;
+        return;
+      }
 
       if (!(response.ok && data.success && data.abi)) {
         const errorMessage = data.error || "Failed to fetch ABI from Etherscan";
         throw new Error(errorMessage);
       }
 
-      // Handle Diamond contract detection (check before regular proxy)
-      if (data.isDiamond && data.diamondProxyAbi) {
-        setIsDiamond(true);
-        setIsProxy(true);
-        setDiamondProxyAbi(data.diamondProxyAbi);
-        setDiamondDirectAbi(data.diamondDirectAbi || null);
-        const facetsData = data.facets || [];
-        setFacets(facetsData);
-        setProxyAddress(data.proxyAddress || contractAddress);
-        setProxyWarning(data.warning || null);
-        setSelectedFacetAddress("proxy");
-
-        // Diamond contracts are not supported - don't set the ABI
-        setError(
-          "Diamond proxy contracts (EIP-2535) are not currently supported. Please use a regular contract or proxy contract instead."
-        );
-      } else if (data.isProxy && data.implementationAddress) {
+      if (data.isProxy && data.implementationAddress) {
         setIsProxy(true);
         setImplementationAddress(data.implementationAddress);
         setProxyAddress(data.proxyAddress || contractAddress);
         setImplementationAbi(data.abi);
         setProxyAbi(data.proxyAbi || null);
         setProxyWarning(data.warning || null);
-
-        // Auto-populate proxy fields in config (stored silently, no UI changes)
-        if (onUpdateConfig) {
-          console.log(
-            "[Proxy] Setting isProxy=true, implementationAddress=",
-            data.implementationAddress
-          );
-          // Update both fields - React will batch these updates
-          onUpdateConfig("isProxy", true);
-          onUpdateConfig(
-            "contractImplementationAddress",
-            data.implementationAddress
-          );
-        } else {
-          console.warn(
-            "[Proxy] onUpdateConfig not available, cannot save proxy fields"
-          );
-        }
 
         // If we have a warning (e.g., unverified implementation), we're using proxy ABI
         if (data.warning) {
@@ -242,12 +256,6 @@ export function AbiWithAutoFetchField({
           onChange(data.abi);
         }
       } else {
-        // Not a proxy, clear proxy fields if they exist
-        if (onUpdateConfig) {
-          console.log("[Proxy] Clearing proxy fields (not a proxy)");
-          onUpdateConfig("isProxy", false);
-          onUpdateConfig("contractImplementationAddress", "");
-        }
         // Not a proxy, use the ABI directly
         onChange(data.abi);
       }
@@ -262,7 +270,7 @@ export function AbiWithAutoFetchField({
     } finally {
       setIsLoading(false);
     }
-  }, [contractAddress, network, onChange, onUpdateConfig]);
+  }, [contractAddress, network, onChange]);
 
   const handleFetchAbi = useCallback(
     async (skipValidation = false) => {
@@ -452,49 +460,23 @@ export function AbiWithAutoFetchField({
         </div>
       )}
 
-      {isDiamond && diamondProxyAbi && <DiamondUnsupportedAlert />}
+      {isDiamond && <DiamondUnsupportedAlert />}
 
       {isProxy && !isDiamond && implementationAddress && (
-        <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
-          <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-          <AlertTitle className="text-blue-900 dark:text-blue-100">
-            Proxy Contract Detected
-          </AlertTitle>
-          <AlertDescription className="text-blue-800 dark:text-blue-200">
-            <div className="mt-1 space-y-2">
-              <p>
-                Using implementation ABI from{" "}
-                <code className="rounded bg-blue-100 px-1 py-0.5 text-xs dark:bg-blue-900">
-                  {`${implementationAddress.slice(0, 6)}...${implementationAddress.slice(-4)}`}
-                </code>
-              </p>
-              {proxyWarning && (
-                <p className="text-amber-700 dark:text-amber-300">
-                  {proxyWarning}
-                </p>
-              )}
-              <div className="flex items-center gap-2">
-                <Button
-                  className="h-auto p-0 text-blue-700 underline dark:text-blue-300"
-                  disabled={isLoading}
-                  onClick={() => handleToggleProxyAbi(!useProxyAbi)}
-                  size="sm"
-                  variant="link"
-                >
-                  {useProxyAbi
-                    ? "Use implementation ABI instead"
-                    : "Use proxy ABI instead"}
-                </Button>
-              </div>
-            </div>
-          </AlertDescription>
-        </Alert>
+        <ProxyContractAlert
+          implementationAddress={implementationAddress}
+          isLoading={isLoading}
+          network={network}
+          onToggleProxyAbi={handleToggleProxyAbi}
+          proxyWarning={proxyWarning}
+          useProxyAbi={useProxyAbi}
+        />
       )}
 
       <TemplateBadgeTextarea
         disabled={disabled || isLoading || !useManualAbi}
         id={field.key}
-        key={`${field.key}-${value?.length || 0}-${useProxyAbi ? "proxy" : "impl"}-${selectedFacetAddress}`}
+        key={`${field.key}-${value?.length || 0}-${useProxyAbi ? "proxy" : "impl"}`}
         onChange={(val) => {
           console.log(
             "[ABI Field] Textarea onChange called with length:",
