@@ -336,9 +336,9 @@ function processAbiString(
       // For functions, check for duplicates by selector
       const selector = getFunctionSelector(abiItem);
       if (selector) {
-        functionCount++;
+        functionCount += 1;
         if (seenSelectors.has(selector)) {
-          duplicateCount++;
+          duplicateCount += 1;
           console.log(
             `[Diamond] Skipping duplicate function: ${abiItem.name} (selector: ${selector})`
           );
@@ -536,6 +536,249 @@ async function handleDiamondContract(
 }
 
 /**
+ * Validate inputs for ABI fetching
+ */
+function validateAbiFetchInputs(contractAddress: string): void {
+  if (!ETHERSCAN_API_KEY) {
+    console.error("[Etherscan] API key not configured");
+    throw new Error("Etherscan API key not configured");
+  }
+
+  if (!ethers.isAddress(contractAddress)) {
+    console.error("[Etherscan] Invalid contract address:", contractAddress);
+    throw new Error(`Invalid contract address: ${contractAddress}`);
+  }
+}
+
+/**
+ * Try to detect Diamond contract via RPC
+ */
+async function tryDetectDiamondViaRpc(
+  contractAddress: string,
+  baseUrl: string,
+  chainId: number
+): Promise<{
+  abi: string;
+  isProxy: boolean;
+  isDiamond: boolean;
+  proxyAddress: string;
+  facets: Array<{ address: string; name: string | null; abi?: string }>;
+  diamondProxyAbi: string;
+  diamondDirectAbi?: string;
+  warning?: string;
+} | null> {
+  console.log("[Diamond] Attempting to detect Diamond contract via RPC...");
+  try {
+    const facetAddresses = await getDiamondFacets(contractAddress, chainId);
+    if (facetAddresses && facetAddresses.length > 0) {
+      console.log(
+        `[Diamond] Detected Diamond contract with ${facetAddresses.length} facets via RPC`
+      );
+      return await handleDiamondContract(contractAddress, baseUrl, chainId, {
+        facetAddresses,
+      });
+    }
+  } catch (error) {
+    console.log(
+      "[Diamond] Not a Diamond contract:",
+      error instanceof Error ? error.message : "Unknown error"
+    );
+  }
+  return null;
+}
+
+/**
+ * Fetch proxy ABI from source code result or directly
+ */
+async function fetchProxyAbi(
+  baseUrl: string,
+  chainId: number,
+  contractAddress: string,
+  sourceCodeResult: { proxyAbi?: string }
+): Promise<string | undefined> {
+  // Try to use ABI from getsourcecode response if available
+  if (sourceCodeResult.proxyAbi) {
+    try {
+      JSON.parse(sourceCodeResult.proxyAbi);
+      console.log("[Etherscan] Using proxy ABI from getsourcecode response");
+      return sourceCodeResult.proxyAbi;
+    } catch {
+      console.log(
+        "[Etherscan] Proxy ABI from getsourcecode is invalid, will fetch directly"
+      );
+    }
+  }
+
+  // Fetch proxy ABI directly
+  try {
+    const proxyAbi = await fetchAbiFromAddress(
+      baseUrl,
+      chainId,
+      contractAddress
+    );
+    console.log("[Etherscan] Fetched proxy ABI directly");
+    return proxyAbi;
+  } catch (error) {
+    console.warn(
+      "[Etherscan] Failed to fetch proxy ABI:",
+      error instanceof Error ? error.message : "Unknown error"
+    );
+    return;
+  }
+}
+
+/**
+ * Handle regular proxy contract
+ */
+async function handleRegularProxy(
+  contractAddress: string,
+  baseUrl: string,
+  chainId: number,
+  sourceCodeResult: {
+    implementationAddress?: string;
+    proxyAbi?: string;
+  }
+): Promise<{
+  abi: string;
+  isProxy: boolean;
+  implementationAddress: string;
+  proxyAddress: string;
+  proxyAbi?: string;
+  warning?: string;
+}> {
+  const implementationAddress = sourceCodeResult.implementationAddress;
+  if (!implementationAddress) {
+    throw new Error("Implementation address is required for proxy contract");
+  }
+
+  console.log(
+    "[Etherscan] Proxy detected. Implementation:",
+    implementationAddress
+  );
+
+  // Validate implementation address
+  if (!ethers.isAddress(implementationAddress)) {
+    console.warn("[Etherscan] Invalid implementation address, using proxy ABI");
+    const proxyAbi = await fetchAbiFromAddress(
+      baseUrl,
+      chainId,
+      contractAddress
+    );
+    return {
+      abi: proxyAbi,
+      isProxy: true,
+      implementationAddress,
+      proxyAddress: contractAddress,
+      warning: "Implementation contract address is invalid. Using proxy ABI.",
+    };
+  }
+
+  // Fetch proxy ABI
+  const proxyAbi = await fetchProxyAbi(
+    baseUrl,
+    chainId,
+    contractAddress,
+    sourceCodeResult
+  );
+
+  // Try to fetch ABI from implementation address
+  try {
+    console.log("[Etherscan] Fetching ABI from implementation address...");
+    const implementationAbi = await fetchAbiFromAddress(
+      baseUrl,
+      chainId,
+      implementationAddress
+    );
+
+    return {
+      abi: implementationAbi,
+      isProxy: true,
+      implementationAddress,
+      proxyAddress: contractAddress,
+      proxyAbi,
+    };
+  } catch (error) {
+    console.warn(
+      "[Etherscan] Failed to fetch implementation ABI:",
+      error instanceof Error ? error.message : "Unknown error"
+    );
+
+    if (proxyAbi) {
+      return {
+        abi: proxyAbi,
+        isProxy: true,
+        implementationAddress,
+        proxyAddress: contractAddress,
+        proxyAbi,
+        warning: "Implementation contract not verified. Using proxy ABI.",
+      };
+    }
+
+    throw error;
+  }
+}
+
+/**
+ * Handle Etherscan-based explorer with proxy detection
+ */
+async function handleEtherscanExplorer(
+  contractAddress: string,
+  baseUrl: string,
+  chainId: number
+): Promise<{
+  abi: string;
+  isProxy: boolean;
+  isDiamond?: boolean;
+  implementationAddress?: string;
+  proxyAddress?: string;
+  proxyAbi?: string;
+  facets?: Array<{ address: string; name: string | null; abi?: string }>;
+  diamondProxyAbi?: string;
+  diamondDirectAbi?: string;
+  warning?: string;
+}> {
+  console.log("[Etherscan] Checking for proxy contract...");
+  const sourceCodeResult = await fetchEtherscanSourceCode(
+    baseUrl,
+    chainId,
+    contractAddress,
+    ETHERSCAN_API_KEY
+  );
+
+  if (!sourceCodeResult.success) {
+    console.error(
+      "[Etherscan] Failed to fetch source code:",
+      sourceCodeResult.error
+    );
+    const abi = await fetchAbiFromAddress(baseUrl, chainId, contractAddress);
+    return { abi, isProxy: false };
+  }
+
+  if (sourceCodeResult.isDiamond) {
+    return await handleDiamondContract(
+      contractAddress,
+      baseUrl,
+      chainId,
+      sourceCodeResult
+    );
+  }
+
+  if (sourceCodeResult.isProxy && sourceCodeResult.implementationAddress) {
+    return await handleRegularProxy(
+      contractAddress,
+      baseUrl,
+      chainId,
+      sourceCodeResult
+    );
+  }
+
+  // Not a proxy, fetch ABI normally
+  console.log("[Etherscan] Not a proxy, fetching ABI normally...");
+  const abi = await fetchAbiFromAddress(baseUrl, chainId, contractAddress);
+  return { abi, isProxy: false };
+}
+
+/**
  * Fetch ABI from Etherscan API with proxy and Diamond detection
  */
 async function fetchAbiFromEtherscan(
@@ -558,16 +801,7 @@ async function fetchAbiFromEtherscan(
     network,
   });
 
-  if (!ETHERSCAN_API_KEY) {
-    console.error("[Etherscan] API key not configured");
-    throw new Error("Etherscan API key not configured");
-  }
-
-  // Validate contract address
-  if (!ethers.isAddress(contractAddress)) {
-    console.error("[Etherscan] Invalid contract address:", contractAddress);
-    throw new Error(`Invalid contract address: ${contractAddress}`);
-  }
+  validateAbiFetchInputs(contractAddress);
 
   const { baseUrl, chainId, explorerApiType } =
     await getExplorerApiConfig(network);
@@ -575,178 +809,27 @@ async function fetchAbiFromEtherscan(
   console.log("[Etherscan] Chain ID:", chainId);
   console.log("[Etherscan] Explorer API Type:", explorerApiType);
 
-  console.log("[Diamond] Attempting to detect Diamond contract via RPC...");
-  try {
-    const facetAddresses = await getDiamondFacets(contractAddress, chainId);
-    if (facetAddresses && facetAddresses.length > 0) {
-      console.log(
-        `[Diamond] Detected Diamond contract with ${facetAddresses.length} facets via RPC`
-      );
-      return await handleDiamondContract(contractAddress, baseUrl, chainId, {
-        facetAddresses,
-      });
-    }
-  } catch (error) {
-    // Not a Diamond contract, continue to regular proxy detection
-    console.log(
-      "[Diamond] Not a Diamond contract:",
-      error instanceof Error ? error.message : "Unknown error"
-    );
+  // Try Diamond detection via RPC first
+  const diamondResult = await tryDetectDiamondViaRpc(
+    contractAddress,
+    baseUrl,
+    chainId
+  );
+  if (diamondResult) {
+    return diamondResult;
   }
 
-  // Proxy detection only works for Etherscan-based explorers
-  // Blockscout and other explorers don't support getsourcecode the same way
+  // For Etherscan explorers, check for proxy contracts
   if (explorerApiType === "etherscan") {
-    // Check if this is a proxy contract using getsourcecode
-    console.log("[Etherscan] Checking for proxy contract...");
-    const sourceCodeResult = await fetchEtherscanSourceCode(
-      baseUrl,
-      chainId,
-      contractAddress,
-      ETHERSCAN_API_KEY
-    );
-
-    if (!sourceCodeResult.success) {
-      console.error(
-        "[Etherscan] Failed to fetch source code:",
-        sourceCodeResult.error
-      );
-      // Fall back to regular ABI fetch
-      const abi = await fetchAbiFromAddress(baseUrl, chainId, contractAddress);
-      return {
-        abi,
-        isProxy: false,
-      };
-    }
-
-    if (sourceCodeResult.isDiamond) {
-      return await handleDiamondContract(
-        contractAddress,
-        baseUrl,
-        chainId,
-        sourceCodeResult
-      );
-    }
-
-    // Check if it's a regular proxy
-    if (sourceCodeResult.isProxy && sourceCodeResult.implementationAddress) {
-      console.log(
-        "[Etherscan] Proxy detected. Implementation:",
-        sourceCodeResult.implementationAddress
-      );
-
-      // Validate implementation address
-      if (!ethers.isAddress(sourceCodeResult.implementationAddress)) {
-        console.warn(
-          "[Etherscan] Invalid implementation address, using proxy ABI"
-        );
-        const proxyAbi = await fetchAbiFromAddress(
-          baseUrl,
-          chainId,
-          contractAddress
-        );
-        return {
-          abi: proxyAbi,
-          isProxy: true,
-          proxyAddress: contractAddress,
-          warning:
-            "Implementation contract address is invalid. Using proxy ABI.",
-        };
-      }
-
-      // Fetch proxy's own ABI (from getsourcecode response or directly)
-      let proxyAbi: string | undefined;
-      if (sourceCodeResult.proxyAbi) {
-        // Use ABI from getsourcecode response if available
-        try {
-          // Validate it's valid JSON
-          JSON.parse(sourceCodeResult.proxyAbi);
-          proxyAbi = sourceCodeResult.proxyAbi;
-          console.log(
-            "[Etherscan] Using proxy ABI from getsourcecode response"
-          );
-        } catch {
-          console.log(
-            "[Etherscan] Proxy ABI from getsourcecode is invalid, will fetch directly"
-          );
-        }
-      }
-
-      // If we don't have proxy ABI yet, try to fetch it directly
-      if (!proxyAbi) {
-        try {
-          proxyAbi = await fetchAbiFromAddress(
-            baseUrl,
-            chainId,
-            contractAddress
-          );
-          console.log("[Etherscan] Fetched proxy ABI directly");
-        } catch (error) {
-          console.warn(
-            "[Etherscan] Failed to fetch proxy ABI:",
-            error instanceof Error ? error.message : "Unknown error"
-          );
-        }
-      }
-
-      // Try to fetch ABI from implementation address
-      try {
-        console.log("[Etherscan] Fetching ABI from implementation address...");
-        const implementationAbi = await fetchAbiFromAddress(
-          baseUrl,
-          chainId,
-          sourceCodeResult.implementationAddress
-        );
-
-        return {
-          abi: implementationAbi, // Default to implementation ABI
-          isProxy: true,
-          implementationAddress: sourceCodeResult.implementationAddress,
-          proxyAddress: contractAddress,
-          proxyAbi, // Include proxy ABI for toggle
-        };
-      } catch (error) {
-        console.warn(
-          "[Etherscan] Failed to fetch implementation ABI:",
-          error instanceof Error ? error.message : "Unknown error"
-        );
-
-        // Fall back to proxy ABI if available
-        if (proxyAbi) {
-          return {
-            abi: proxyAbi,
-            isProxy: true,
-            implementationAddress: sourceCodeResult.implementationAddress,
-            proxyAddress: contractAddress,
-            proxyAbi,
-            warning: "Implementation contract not verified. Using proxy ABI.",
-          };
-        }
-
-        // If proxy ABI also fails, throw the original error
-        throw error;
-      }
-    }
-
-    // Not a proxy, fetch ABI normally
-    console.log("[Etherscan] Not a proxy, fetching ABI normally...");
-    const abi = await fetchAbiFromAddress(baseUrl, chainId, contractAddress);
-    return {
-      abi,
-      isProxy: false,
-    };
+    return await handleEtherscanExplorer(contractAddress, baseUrl, chainId);
   }
 
-  // For non-Etherscan explorers (Blockscout, etc.), skip proxy detection
-  // and fetch ABI normally
+  // For non-Etherscan explorers, skip proxy detection
   console.log(
     "[Etherscan] Non-Etherscan explorer, skipping proxy detection..."
   );
   const abi = await fetchAbiFromAddress(baseUrl, chainId, contractAddress);
-  return {
-    abi,
-    isProxy: false,
-  };
+  return { abi, isProxy: false };
 }
 
 export async function POST(request: Request) {
