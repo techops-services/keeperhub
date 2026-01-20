@@ -67,9 +67,11 @@ app.post("/workflow/:id/execute", async (req, res) => {
       }
     );
 
+    logger.log(`Workflow ${id} executed successfully - response: ${response}`);
+
     return res.status(200).json(response);
   } catch (error) {
-    logger.error(error.message);
+    logger.error(`Workflow ${id} execution failed - error: ${error.message}`);
     return res.status(500).json({ error: "Error executing workflow" });
   }
 });

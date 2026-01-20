@@ -3,7 +3,7 @@ const {
   JWT_TOKEN_USERNAME,
   JWT_TOKEN_PASSWORD,
   KEEPERHUB_API_URL,
-  KEEPERHUB_API_KEY,
+  EVENTS_SERVICE_API_KEY,
 } = require("../config/environment.js");
 
 class HttpService {
@@ -56,7 +56,8 @@ class HttpService {
     return {
       Authorization: `Bearer ${this.accessToken}`,
       "Content-Type": "application/json",
-      "X-Internal-Token": KEEPERHUB_API_KEY,
+      "X-Internal-Token": EVENTS_SERVICE_API_KEY,
+      "X-Service-Key": EVENTS_SERVICE_API_KEY,
       ...extraHeaders,
     };
   }
