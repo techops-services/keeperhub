@@ -19,10 +19,17 @@ import { join } from "node:path";
 const PROJECT_ROOT = join(__dirname, "..", "..");
 
 // ============================================================================
+// Constants
+// ============================================================================
+
+const STEP_PROFILE_REGEX = /^(\S+\/\S+)\s+(\d+)\s+(\d+)\s+([\d.]+)ms/;
+const CALIBRATION_FUEL_REGEX = /Running (\S+)\.\.\. ([\d,]+) fuel/;
+
+// ============================================================================
 // Types
 // ============================================================================
 
-interface StepAnalysis {
+type StepAnalysis = {
   pluginName: string;
   stepName: string;
   lines: number;
@@ -31,9 +38,9 @@ interface StepAnalysis {
   externalCalls: Array<{ name: string; type: string; line: number }>;
   tryCatchBlocks: number;
   loops: number;
-}
+};
 
-interface StaticAnalysis {
+type StaticAnalysis = {
   totalSteps: number;
   summary: {
     avgCyclomaticComplexity: number;
@@ -43,24 +50,24 @@ interface StaticAnalysis {
     leastComplex: string;
   };
   plugins: Record<string, StepAnalysis[]>;
-}
+};
 
-interface StepProfile {
+type StepProfile = {
   step: string;
   hits: number;
   samples: number;
   duration: number;
-}
+};
 
-interface CalibrationResult {
+type CalibrationResult = {
   name: string;
   iterations: number;
   fuelConsumed: number;
   fuelPerOp: number;
   status: string;
-}
+};
 
-interface Report {
+type Report = {
   timestamp: string;
   staticAnalysis: StaticAnalysis | null;
   stepProfiles: StepProfile[];
@@ -70,7 +77,7 @@ interface Report {
     medium: string[];
     heavy: string[];
   };
-}
+};
 
 // ============================================================================
 // Helpers
@@ -82,7 +89,7 @@ function runCommand(cmd: string): string {
       cwd: PROJECT_ROOT,
       encoding: "utf8",
       stdio: ["pipe", "pipe", "pipe"],
-      timeout: 120000,
+      timeout: 120_000,
     });
   } catch {
     return "";
@@ -90,10 +97,14 @@ function runCommand(cmd: string): string {
 }
 
 function parseJSON<T>(output: string): T | null {
-  if (!output) return null;
+  if (!output) {
+    return null;
+  }
   try {
     const jsonStart = output.indexOf("{");
-    if (jsonStart === -1) return null;
+    if (jsonStart === -1) {
+      return null;
+    }
     return JSON.parse(output.slice(jsonStart));
   } catch {
     return null;
@@ -114,13 +125,13 @@ function collectStepProfiles(): StepProfile[] {
   const profiles: StepProfile[] = [];
 
   for (const line of output.split("\n")) {
-    const match = line.match(/^(\S+\/\S+)\s+(\d+)\s+(\d+)\s+([\d.]+)ms/);
+    const match = line.match(STEP_PROFILE_REGEX);
     if (match) {
       profiles.push({
         step: match[1],
-        hits: parseInt(match[2]),
-        samples: parseInt(match[3]),
-        duration: parseFloat(match[4]),
+        hits: Number.parseInt(match[2], 10),
+        samples: Number.parseInt(match[3], 10),
+        duration: Number.parseFloat(match[4]),
       });
     }
   }
@@ -130,7 +141,9 @@ function collectStepProfiles(): StepProfile[] {
 
 function collectCalibration(): CalibrationResult[] {
   // Check if sandbox is available
-  const healthCheck = runCommand("curl -s -o /dev/null -w '%{http_code}' http://localhost:3001/health 2>/dev/null");
+  const healthCheck = runCommand(
+    "curl -s -o /dev/null -w '%{http_code}' http://localhost:3001/health 2>/dev/null"
+  );
   if (healthCheck.trim() !== "200") {
     return [];
   }
@@ -142,10 +155,10 @@ function collectCalibration(): CalibrationResult[] {
   const lines = output.split("\n");
   for (const line of lines) {
     // Match: "Running arithmetic-add... 8,558,701 fuel"
-    const runMatch = line.match(/Running (\S+)\.\.\. ([\d,]+) fuel/);
+    const runMatch = line.match(CALIBRATION_FUEL_REGEX);
     if (runMatch) {
       const name = runMatch[1];
-      const fuel = parseInt(runMatch[2].replace(/,/g, ""));
+      const fuel = Number.parseInt(runMatch[2].replace(/,/g, ""), 10);
       results.push({
         name,
         iterations: 0, // Will be filled from detailed output
@@ -160,7 +173,11 @@ function collectCalibration(): CalibrationResult[] {
 }
 
 function categorizeByCost(profiles: StepProfile[]): Report["costTiers"] {
-  const tiers = { light: [] as string[], medium: [] as string[], heavy: [] as string[] };
+  const tiers = {
+    light: [] as string[],
+    medium: [] as string[],
+    heavy: [] as string[],
+  };
 
   for (const p of profiles) {
     if (p.hits < 20) {
@@ -210,28 +227,35 @@ function printTable(headers: string[], rows: string[][], colWidths: number[]) {
   }
 }
 
-function generateReport(jsonOutput: boolean, outputPath: string | null) {
-  if (!jsonOutput) {
-    console.log("╔══════════════════════════════════════════════════════════════════╗");
-    console.log("║              WORKFLOW PROFILING REPORT                           ║");
-    console.log("╚══════════════════════════════════════════════════════════════════╝");
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Report generation has many conditional branches for formatting
+function generateReport(isJsonOutput: boolean, outputFilePath: string | null) {
+  if (!isJsonOutput) {
+    console.log(
+      "╔══════════════════════════════════════════════════════════════════╗"
+    );
+    console.log(
+      "║              WORKFLOW PROFILING REPORT                           ║"
+    );
+    console.log(
+      "╚══════════════════════════════════════════════════════════════════╝"
+    );
     console.log();
     console.log("Collecting data...");
   }
 
   // Collect all data
   const staticAnalysis = collectStaticAnalysis();
-  if (!jsonOutput && staticAnalysis) {
+  if (!isJsonOutput && staticAnalysis) {
     console.log(`  ✓ Static analysis: ${staticAnalysis.totalSteps} steps`);
   }
 
   const stepProfiles = collectStepProfiles();
-  if (!jsonOutput) {
+  if (!isJsonOutput) {
     console.log(`  ✓ Step profiling: ${stepProfiles.length} steps`);
   }
 
   const calibration = collectCalibration();
-  if (!jsonOutput) {
+  if (!isJsonOutput) {
     if (calibration.length > 0) {
       console.log(`  ✓ WASM calibration: ${calibration.length} operations`);
     } else {
@@ -250,7 +274,7 @@ function generateReport(jsonOutput: boolean, outputPath: string | null) {
   };
 
   // JSON output mode
-  if (jsonOutput) {
+  if (isJsonOutput) {
     console.log(JSON.stringify(report, null, 2));
     return;
   }
@@ -264,16 +288,28 @@ function generateReport(jsonOutput: boolean, outputPath: string | null) {
 
     printSection("Summary");
     console.log(`  Total steps analyzed:     ${staticAnalysis.totalSteps}`);
-    console.log(`  Avg cyclomatic complexity: ${staticAnalysis.summary.avgCyclomaticComplexity.toFixed(1)}`);
-    console.log(`  Avg await expressions:     ${staticAnalysis.summary.avgAwaitExpressions.toFixed(1)}`);
-    console.log(`  Avg external calls:        ${staticAnalysis.summary.avgExternalCalls.toFixed(1)}`);
-    console.log(`  Most complex step:         ${staticAnalysis.summary.mostComplex}`);
-    console.log(`  Least complex step:        ${staticAnalysis.summary.leastComplex}`);
+    console.log(
+      `  Avg cyclomatic complexity: ${staticAnalysis.summary.avgCyclomaticComplexity.toFixed(1)}`
+    );
+    console.log(
+      `  Avg await expressions:     ${staticAnalysis.summary.avgAwaitExpressions.toFixed(1)}`
+    );
+    console.log(
+      `  Avg external calls:        ${staticAnalysis.summary.avgExternalCalls.toFixed(1)}`
+    );
+    console.log(
+      `  Most complex step:         ${staticAnalysis.summary.mostComplex}`
+    );
+    console.log(
+      `  Least complex step:        ${staticAnalysis.summary.leastComplex}`
+    );
 
     printSection("By Plugin");
     const pluginRows: string[][] = [];
     for (const [plugin, steps] of Object.entries(staticAnalysis.plugins)) {
-      const avgComplexity = steps.reduce((sum, s) => sum + s.cyclomaticComplexity, 0) / steps.length;
+      const avgComplexity =
+        steps.reduce((sum, s) => sum + s.cyclomaticComplexity, 0) /
+        steps.length;
       const totalLines = steps.reduce((sum, s) => sum + s.lines, 0);
       pluginRows.push([
         plugin,
@@ -282,7 +318,9 @@ function generateReport(jsonOutput: boolean, outputPath: string | null) {
         avgComplexity.toFixed(1),
       ]);
     }
-    pluginRows.sort((a, b) => parseFloat(b[3]) - parseFloat(a[3]));
+    pluginRows.sort(
+      (a, b) => Number.parseFloat(b[3]) - Number.parseFloat(a[3])
+    );
     printTable(
       ["Plugin", "Steps", "Lines", "Avg Complexity"],
       pluginRows,
@@ -302,7 +340,9 @@ function generateReport(jsonOutput: boolean, outputPath: string | null) {
         ]);
       }
     }
-    stepRows.sort((a, b) => parseInt(b[1]) - parseInt(a[1]));
+    stepRows.sort(
+      (a, b) => Number.parseInt(b[1], 10) - Number.parseInt(a[1], 10)
+    );
     printTable(
       ["Step", "Complexity", "Awaits", "External", "Lines"],
       stepRows.slice(0, 15),
@@ -336,9 +376,15 @@ function generateReport(jsonOutput: boolean, outputPath: string | null) {
     );
 
     printSection("Cost Tiers (based on function hits)");
-    console.log(`  Light  (<20 hits):   ${costTiers.light.join(", ") || "(none)"}`);
-    console.log(`  Medium (20-100):     ${costTiers.medium.join(", ") || "(none)"}`);
-    console.log(`  Heavy  (>100 hits):  ${costTiers.heavy.join(", ") || "(none)"}`);
+    console.log(
+      `  Light  (<20 hits):   ${costTiers.light.join(", ") || "(none)"}`
+    );
+    console.log(
+      `  Medium (20-100):     ${costTiers.medium.join(", ") || "(none)"}`
+    );
+    console.log(
+      `  Heavy  (>100 hits):  ${costTiers.heavy.join(", ") || "(none)"}`
+    );
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -353,15 +399,8 @@ function generateReport(jsonOutput: boolean, outputPath: string | null) {
       .filter((c) => c.fuelConsumed > 0)
       .sort((a, b) => b.fuelConsumed - a.fuelConsumed)
       .slice(0, 15)
-      .map((c) => [
-        c.name,
-        c.fuelConsumed.toLocaleString(),
-      ]);
-    printTable(
-      ["Operation", "Fuel Consumed"],
-      calibrationRows,
-      [35, 20]
-    );
+      .map((c) => [c.name, c.fuelConsumed.toLocaleString()]);
+    printTable(["Operation", "Fuel Consumed"], calibrationRows, [35, 20]);
   } else {
     printHeader("WASM FUEL CALIBRATION");
     console.log();
@@ -393,7 +432,9 @@ function generateReport(jsonOutput: boolean, outputPath: string | null) {
         ]);
       }
     }
-    crossRef.sort((a, b) => parseInt(b[2]) - parseInt(a[2]));
+    crossRef.sort(
+      (a, b) => Number.parseInt(b[2], 10) - Number.parseInt(a[2], 10)
+    );
     printTable(
       ["Step", "Static Complexity", "Runtime Hits", "Load Time"],
       crossRef,
@@ -401,8 +442,12 @@ function generateReport(jsonOutput: boolean, outputPath: string | null) {
     );
 
     console.log();
-    console.log("  Note: Static complexity does not correlate with runtime cost.");
-    console.log("  Runtime cost is dominated by dependencies, not application code.");
+    console.log(
+      "  Note: Static complexity does not correlate with runtime cost."
+    );
+    console.log(
+      "  Runtime cost is dominated by dependencies, not application code."
+    );
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -456,15 +501,19 @@ function generateReport(jsonOutput: boolean, outputPath: string | null) {
   console.log("═".repeat(70));
   console.log("For detailed analysis:");
   console.log("  pnpm profile:analyze --verbose        # Full AST breakdown");
-  console.log("  pnpm profile:step --step <n> --precise # Exact function counts");
-  console.log("  pnpm profile:workflow                 # Full execution profile");
+  console.log(
+    "  pnpm profile:step --step <n> --precise # Exact function counts"
+  );
+  console.log(
+    "  pnpm profile:workflow                 # Full execution profile"
+  );
   console.log("  pnpm profile:calibrate                # WASM fuel details");
   console.log("═".repeat(70));
 
   // Save to file if requested
-  if (outputPath) {
-    writeFileSync(outputPath, JSON.stringify(report, null, 2));
-    console.log(`\nReport saved to: ${outputPath}`);
+  if (outputFilePath) {
+    writeFileSync(outputFilePath, JSON.stringify(report, null, 2));
+    console.log(`\nReport saved to: ${outputFilePath}`);
   }
 }
 

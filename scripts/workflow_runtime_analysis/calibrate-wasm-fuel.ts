@@ -70,46 +70,46 @@ const CALIBRATION_TESTS: Array<{
     name: "baseline",
     description: "Empty function call overhead",
     iterations: 1,
-    code: `function fn() { return true; }`,
+    code: "function fn() { return true; }",
   },
 
   // Arithmetic operations
   {
     name: "arithmetic-add",
     description: "Addition operations",
-    iterations: 10000,
-    code: `function fn() { let sum = 0; for (let i = 0; i < 10000; i++) { sum = sum + i; } return sum; }`,
+    iterations: 10_000,
+    code: "function fn() { let sum = 0; for (let i = 0; i < 10000; i++) { sum = sum + i; } return sum; }",
   },
   {
     name: "arithmetic-multiply",
     description: "Multiplication operations",
-    iterations: 10000,
-    code: `function fn() { let product = 1; for (let i = 1; i < 10000; i++) { product = (product * i) % 1000000; } return product; }`,
+    iterations: 10_000,
+    code: "function fn() { let product = 1; for (let i = 1; i < 10000; i++) { product = (product * i) % 1000000; } return product; }",
   },
   {
     name: "arithmetic-division",
     description: "Division operations",
-    iterations: 10000,
-    code: `function fn() { let result = 1000000; for (let i = 1; i < 10000; i++) { result = result / (1 + (i % 10)); if (result < 1) result = 1000000; } return result; }`,
+    iterations: 10_000,
+    code: "function fn() { let result = 1000000; for (let i = 1; i < 10000; i++) { result = result / (1 + (i % 10)); if (result < 1) result = 1000000; } return result; }",
   },
 
   // Property access
   {
     name: "property-read",
     description: "Object property reads",
-    iterations: 10000,
-    code: `function fn() { const obj = { a: 1, b: 2, c: 3, d: 4, e: 5 }; let sum = 0; for (let i = 0; i < 10000; i++) { sum += obj.a + obj.b + obj.c + obj.d + obj.e; } return sum; }`,
+    iterations: 10_000,
+    code: "function fn() { const obj = { a: 1, b: 2, c: 3, d: 4, e: 5 }; let sum = 0; for (let i = 0; i < 10000; i++) { sum += obj.a + obj.b + obj.c + obj.d + obj.e; } return sum; }",
   },
   {
     name: "property-write",
     description: "Object property writes",
-    iterations: 10000,
-    code: `function fn() { const obj = {}; for (let i = 0; i < 10000; i++) { obj.value = i; } return obj.value; }`,
+    iterations: 10_000,
+    code: "function fn() { const obj = {}; for (let i = 0; i < 10000; i++) { obj.value = i; } return obj.value; }",
   },
   {
     name: "property-dynamic",
     description: "Dynamic property access (bracket notation)",
-    iterations: 10000,
+    iterations: 10_000,
     code: `function fn() { const obj = { key0: 0, key1: 1, key2: 2, key3: 3, key4: 4 }; let sum = 0; for (let i = 0; i < 10000; i++) { sum += obj["key" + (i % 5)]; } return sum; }`,
   },
 
@@ -117,34 +117,34 @@ const CALIBRATION_TESTS: Array<{
   {
     name: "array-push",
     description: "Array push operations",
-    iterations: 10000,
-    code: `function fn() { const arr = []; for (let i = 0; i < 10000; i++) { arr.push(i); } return arr.length; }`,
+    iterations: 10_000,
+    code: "function fn() { const arr = []; for (let i = 0; i < 10000; i++) { arr.push(i); } return arr.length; }",
   },
   {
     name: "array-index",
     description: "Array index access",
-    iterations: 10000,
-    code: `function fn() { const arr = Array.from({ length: 1000 }, (_, i) => i); let sum = 0; for (let i = 0; i < 10000; i++) { sum += arr[i % 1000]; } return sum; }`,
+    iterations: 10_000,
+    code: "function fn() { const arr = Array.from({ length: 1000 }, (_, i) => i); let sum = 0; for (let i = 0; i < 10000; i++) { sum += arr[i % 1000]; } return sum; }",
   },
   {
     name: "array-map",
     description: "Array map operation",
     iterations: 1000,
-    code: `function fn() { const arr = Array.from({ length: 1000 }, (_, i) => i); return arr.map(x => x * 2).reduce((a, b) => a + b, 0); }`,
+    code: "function fn() { const arr = Array.from({ length: 1000 }, (_, i) => i); return arr.map(x => x * 2).reduce((a, b) => a + b, 0); }",
   },
 
   // Function calls
   {
     name: "function-call-simple",
     description: "Simple function calls",
-    iterations: 10000,
-    code: `function fn() { function add(a, b) { return a + b; } let sum = 0; for (let i = 0; i < 10000; i++) { sum = add(sum, i); } return sum; }`,
+    iterations: 10_000,
+    code: "function fn() { function add(a, b) { return a + b; } let sum = 0; for (let i = 0; i < 10000; i++) { sum = add(sum, i); } return sum; }",
   },
   {
     name: "function-call-recursive",
     description: "Recursive function calls (fibonacci)",
     iterations: 25,
-    code: `function fn() { function fib(n) { if (n <= 1) return n; return fib(n - 1) + fib(n - 2); } return fib(25); }`,
+    code: "function fn() { function fib(n) { if (n <= 1) return n; return fib(n - 1) + fib(n - 2); } return fib(25); }",
   },
 
   // String operations
@@ -158,7 +158,8 @@ const CALIBRATION_TESTS: Array<{
     name: "string-template",
     description: "Template literal operations",
     iterations: 1000,
-    code: "function fn() { let result = \"\"; for (let i = 0; i < 1000; i++) { result = `value: ${i}, prev: ${result.length}`; } return result.length; }",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: Code string intentionally contains template literal syntax
+    code: 'function fn() { let result = ""; for (let i = 0; i < 1000; i++) { result = `value: ${i}, prev: ${result.length}`; } return result.length; }',
   },
 
   // Object creation
@@ -187,16 +188,16 @@ const CALIBRATION_TESTS: Array<{
   {
     name: "comparison-numeric",
     description: "Numeric comparisons",
-    iterations: 10000,
-    code: `function fn() { let count = 0; for (let i = 0; i < 10000; i++) { if (i > 5000) count++; if (i < 2500) count++; if (i === 7500) count++; } return count; }`,
+    iterations: 10_000,
+    code: "function fn() { let count = 0; for (let i = 0; i < 10000; i++) { if (i > 5000) count++; if (i < 2500) count++; if (i === 7500) count++; } return count; }",
   },
 
   // Logical operations
   {
     name: "logical-and-or",
     description: "Logical AND/OR operations",
-    iterations: 10000,
-    code: `function fn() { let count = 0; for (let i = 0; i < 10000; i++) { if (i > 1000 && i < 9000) count++; if (i < 500 || i > 9500) count++; } return count; }`,
+    iterations: 10_000,
+    code: "function fn() { let count = 0; for (let i = 0; i < 10000; i++) { if (i > 1000 && i < 9000) count++; if (i < 500 || i > 9500) count++; } return count; }",
   },
 
   // Complex scenario - simulating workflow step
@@ -236,7 +237,10 @@ async function checkSandboxHealth(): Promise<boolean> {
     const response = await fetch(`${SANDBOX_URL}/evaluate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: "function test() { return 1; }", parameters: [] }),
+      body: JSON.stringify({
+        code: "function test() { return 1; }",
+        parameters: [],
+      }),
     });
     return response.ok;
   } catch {
@@ -296,10 +300,11 @@ async function runCalibration(
 // Output Formatting
 // ============================================================================
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Report formatting has many branches for categories
 function formatResults(results: CalibrationResult[]): string {
   const lines: string[] = [];
 
-  lines.push("\n" + "=".repeat(80));
+  lines.push(`\n${"=".repeat(80)}`);
   lines.push("WASM FUEL CALIBRATION RESULTS");
   lines.push("=".repeat(80));
 
@@ -307,7 +312,9 @@ function formatResults(results: CalibrationResult[]): string {
   const baseline = results.find((r) => r.name === "baseline");
   const baselineFuel = baseline?.fuelConsumed || 0;
 
-  lines.push(`\nBaseline (empty function): ${baselineFuel.toLocaleString()} fuel\n`);
+  lines.push(
+    `\nBaseline (empty function): ${baselineFuel.toLocaleString()} fuel\n`
+  );
 
   // Group by category
   const categories: Record<string, CalibrationResult[]> = {
@@ -323,7 +330,9 @@ function formatResults(results: CalibrationResult[]): string {
   };
 
   for (const result of results) {
-    if (result.name === "baseline") continue;
+    if (result.name === "baseline") {
+      continue;
+    }
 
     const category = result.name.split("-")[0];
     if (categories[category]) {
@@ -334,7 +343,9 @@ function formatResults(results: CalibrationResult[]): string {
   }
 
   for (const [category, categoryResults] of Object.entries(categories)) {
-    if (categoryResults.length === 0) continue;
+    if (categoryResults.length === 0) {
+      continue;
+    }
 
     lines.push(`\n${"─".repeat(80)}`);
     lines.push(`${category.toUpperCase()} OPERATIONS`);
@@ -391,19 +402,27 @@ function formatResults(results: CalibrationResult[]): string {
       successful.reduce((sum, r) => sum + r.fuelPerIteration, 0) /
       successful.length;
 
-    lines.push("\n" + "─".repeat(80));
+    lines.push(`\n${"─".repeat(80)}`);
     lines.push("RECOMMENDED FUEL BUDGETS");
     lines.push("─".repeat(80));
     lines.push(`Average fuel per operation: ${avgFuelPerOp.toFixed(1)}`);
     lines.push("");
     lines.push("Estimated budgets for operation counts:");
-    lines.push(`  1,000 ops:     ${(avgFuelPerOp * 1000).toLocaleString()} fuel`);
-    lines.push(`  10,000 ops:    ${(avgFuelPerOp * 10000).toLocaleString()} fuel`);
-    lines.push(`  100,000 ops:   ${(avgFuelPerOp * 100000).toLocaleString()} fuel`);
-    lines.push(`  1,000,000 ops: ${(avgFuelPerOp * 1000000).toLocaleString()} fuel`);
+    lines.push(
+      `  1,000 ops:     ${(avgFuelPerOp * 1000).toLocaleString()} fuel`
+    );
+    lines.push(
+      `  10,000 ops:    ${(avgFuelPerOp * 10_000).toLocaleString()} fuel`
+    );
+    lines.push(
+      `  100,000 ops:   ${(avgFuelPerOp * 100_000).toLocaleString()} fuel`
+    );
+    lines.push(
+      `  1,000,000 ops: ${(avgFuelPerOp * 1_000_000).toLocaleString()} fuel`
+    );
   }
 
-  lines.push("\n" + "=".repeat(80));
+  lines.push(`\n${"=".repeat(80)}`);
 
   return lines.join("\n");
 }
@@ -498,3 +517,5 @@ main().catch((error) => {
   console.error("Error:", error);
   process.exit(1);
 });
+
+export {};

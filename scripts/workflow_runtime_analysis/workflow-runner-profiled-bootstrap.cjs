@@ -31,8 +31,10 @@ if (fs.existsSync(envPath)) {
         const key = trimmed.slice(0, eqIndex);
         let value = trimmed.slice(eqIndex + 1);
         // Remove surrounding quotes if present
-        if ((value.startsWith('"') && value.endsWith('"')) ||
-            (value.startsWith("'") && value.endsWith("'"))) {
+        if (
+          (value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))
+        ) {
           value = value.slice(1, -1);
         }
         // Only set if not already in environment (allow overrides)

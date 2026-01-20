@@ -193,7 +193,6 @@ class WorkflowProfiler {
     return this.preciseMode;
   }
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Profile analysis requires categorization logic
   analyze(): ProfileSummary {
     if (this.preciseMode) {
       return this.analyzePrecise();
