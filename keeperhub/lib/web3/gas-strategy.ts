@@ -99,7 +99,7 @@ function parseGwei(gwei: string | number): bigint {
  */
 async function measureVolatility(
   provider: ethers.Provider,
-  blockCount = 10
+  blockCount = 40
 ): Promise<VolatilityMetrics> {
   try {
     // Cast to JsonRpcProvider to access send method
