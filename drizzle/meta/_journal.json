@@ -92,6 +92,13 @@
       "when": 1768870546117,
       "tag": "0012_nonce-manager-tables",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1768880520000,
+      "tag": "0013_chain-gas-config",
+      "breakpoints": true
     }
   ]
 }
