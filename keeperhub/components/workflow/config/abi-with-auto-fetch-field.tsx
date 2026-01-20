@@ -2,14 +2,14 @@
 
 import { ethers } from "ethers";
 import { ExternalLink, Info } from "lucide-react";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ChainResponse } from "@/app/api/chains/route";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { TemplateBadgeTextarea } from "@/components/ui/template-badge-textarea";
-import { getExplorerAddressUrl } from "@/keeperhub/lib/explorer-client";
 import type { ActionConfigFieldBase } from "@/plugins";
 
 function DiamondUnsupportedAlert() {
@@ -35,6 +35,7 @@ type ProxyContractAlertProps = {
   proxyWarning: string | null;
   useProxyAbi: boolean;
   isLoading: boolean;
+  chains: ChainResponse[];
   onToggleProxyAbi: (useProxy: boolean) => void;
 };
 
@@ -44,9 +45,36 @@ function ProxyContractAlert({
   proxyWarning,
   useProxyAbi,
   isLoading,
+  chains,
   onToggleProxyAbi,
 }: ProxyContractAlertProps) {
-  const explorerUrl = getExplorerAddressUrl(network, implementationAddress);
+  const explorerUrl = useMemo(() => {
+    if (!(network && implementationAddress) || chains.length === 0) {
+      return null;
+    }
+
+    const chainIdNum =
+      typeof network === "string" ? Number.parseInt(network, 10) : network;
+
+    if (Number.isNaN(chainIdNum)) {
+      return null;
+    }
+
+    const chain = chains.find((c) => c.chainId === chainIdNum);
+    if (
+      chain?.explorerUrl &&
+      chain?.explorerAddressPath &&
+      implementationAddress
+    ) {
+      const path = chain.explorerAddressPath.replace(
+        "{address}",
+        implementationAddress
+      );
+      return `${chain.explorerUrl}${path}`;
+    }
+
+    return null;
+  }, [network, implementationAddress, chains]);
 
   return (
     <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
@@ -132,52 +160,73 @@ export function AbiWithAutoFetchField({
   );
   // Diamond contract state
   const [isDiamond, setIsDiamond] = useState(false);
+  const [chains, setChains] = useState<ChainResponse[]>([]);
   const lastFetchedRef = useRef<string>("");
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const contractAddress = (config[contractAddressField] as string) || "";
   const network = (config[networkField] as string) || "";
 
+  // Fetch chains once on mount
+  useEffect(() => {
+    async function fetchChains() {
+      try {
+        const response = await fetch("/api/chains");
+        const data = (await response.json()) as ChainResponse[];
+        setChains(data);
+      } catch (err) {
+        console.error("Failed to fetch chains:", err);
+      }
+    }
+
+    fetchChains();
+  }, []);
+
   // Sync ABI when toggle state changes for regular proxies
   // Use a ref to track the last synced toggle state to avoid infinite loops
-  const lastUseProxyAbiRef = React.useRef<boolean | null>(null);
+  const lastUseProxyAbiRef = useRef<boolean | null>(null);
+
+  const abiToString = useCallback((abi: string | null): string | null => {
+    if (!abi) {
+      return null;
+    }
+    return typeof abi === "string" ? abi : JSON.stringify(abi);
+  }, []);
+
+  const getAbiForToggle = useCallback((): string | null => {
+    if (useProxyAbi) {
+      return abiToString(proxyAbi);
+    }
+    return abiToString(implementationAbi);
+  }, [useProxyAbi, proxyAbi, implementationAbi, abiToString]);
 
   useEffect(() => {
-    if (isProxy && !isDiamond && implementationAddress) {
-      // Only sync if the toggle state actually changed
-      if (lastUseProxyAbiRef.current !== useProxyAbi) {
-        lastUseProxyAbiRef.current = useProxyAbi;
+    if (!isProxy || isDiamond || !implementationAddress) {
+      return;
+    }
 
-        if (useProxyAbi && proxyAbi) {
-          const abiString =
-            typeof proxyAbi === "string" ? proxyAbi : JSON.stringify(proxyAbi);
+    // Only sync if the toggle state actually changed
+    if (lastUseProxyAbiRef.current === useProxyAbi) {
+      return;
+    }
 
-          console.log("[Proxy UI] useEffect: Calling onChange with proxy ABI");
-          // This forces the parent to update its config state
-          onChange(abiString);
-        } else if (!useProxyAbi && implementationAbi) {
-          const abiString =
-            typeof implementationAbi === "string"
-              ? implementationAbi
-              : JSON.stringify(implementationAbi);
+    lastUseProxyAbiRef.current = useProxyAbi;
 
-          onChange(abiString);
-        }
-      }
+    const abiString = getAbiForToggle();
+    if (abiString) {
+      onChange(abiString);
     }
   }, [
     useProxyAbi,
-    proxyAbi,
-    implementationAbi,
     isProxy,
     isDiamond,
     implementationAddress,
     onChange,
-    value,
+    getAbiForToggle,
   ]);
 
   // Validate contract address
-  const isValidAddress = React.useMemo(() => {
+  const isValidAddress = useMemo(() => {
     if (!contractAddress || contractAddress.trim() === "") {
       return false;
     }
@@ -188,9 +237,7 @@ export function AbiWithAutoFetchField({
     }
   }, [contractAddress]);
 
-  const performAbiFetch = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  const resetProxyState = useCallback(() => {
     setIsProxy(false);
     setImplementationAddress(null);
     setProxyAddress(null);
@@ -199,6 +246,40 @@ export function AbiWithAutoFetchField({
     setProxyAbi(null);
     setImplementationAbi(null);
     setIsDiamond(false);
+  }, []);
+
+  const handleDiamondContract = useCallback(() => {
+    setIsDiamond(true);
+    const fetchKey = `${contractAddress.toLowerCase()}-${network}`;
+    lastFetchedRef.current = fetchKey;
+  }, [contractAddress, network]);
+
+  const handleProxyContract = useCallback(
+    (data: {
+      implementationAddress: string;
+      proxyAddress?: string;
+      abi: string;
+      proxyAbi?: string;
+      warning?: string;
+    }) => {
+      setIsProxy(true);
+      setImplementationAddress(data.implementationAddress);
+      setProxyAddress(data.proxyAddress || contractAddress);
+      setImplementationAbi(data.abi);
+      setProxyAbi(data.proxyAbi || null);
+      setProxyWarning(data.warning || null);
+
+      const useProxy = Boolean(data.warning);
+      setUseProxyAbi(useProxy);
+      onChange(useProxy ? data.proxyAbi || data.abi : data.abi);
+    },
+    [contractAddress, onChange]
+  );
+
+  const performAbiFetch = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    resetProxyState();
 
     try {
       const response = await fetch("/api/web3/fetch-abi", {
@@ -224,13 +305,8 @@ export function AbiWithAutoFetchField({
         error?: string;
       };
 
-      // Handle Diamond contract detection first (before ABI validation)
       if (data.isDiamond) {
-        // Diamond contracts are not supported - set state and return
-        setIsDiamond(true);
-
-        const fetchKey = `${contractAddress.toLowerCase()}-${network}`;
-        lastFetchedRef.current = fetchKey;
+        handleDiamondContract();
         return;
       }
 
@@ -240,23 +316,14 @@ export function AbiWithAutoFetchField({
       }
 
       if (data.isProxy && data.implementationAddress) {
-        setIsProxy(true);
-        setImplementationAddress(data.implementationAddress);
-        setProxyAddress(data.proxyAddress || contractAddress);
-        setImplementationAbi(data.abi);
-        setProxyAbi(data.proxyAbi || null);
-        setProxyWarning(data.warning || null);
-
-        // If we have a warning (e.g., unverified implementation), we're using proxy ABI
-        if (data.warning) {
-          setUseProxyAbi(true);
-          onChange(data.proxyAbi || data.abi);
-        } else {
-          setUseProxyAbi(false);
-          onChange(data.abi);
-        }
+        handleProxyContract({
+          implementationAddress: data.implementationAddress,
+          proxyAddress: data.proxyAddress,
+          abi: data.abi,
+          proxyAbi: data.proxyAbi,
+          warning: data.warning,
+        });
       } else {
-        // Not a proxy, use the ABI directly
         onChange(data.abi);
       }
 
@@ -270,7 +337,14 @@ export function AbiWithAutoFetchField({
     } finally {
       setIsLoading(false);
     }
-  }, [contractAddress, network, onChange]);
+  }, [
+    contractAddress,
+    network,
+    onChange,
+    resetProxyState,
+    handleDiamondContract,
+    handleProxyContract,
+  ]);
 
   const handleFetchAbi = useCallback(
     async (skipValidation = false) => {
@@ -295,67 +369,60 @@ export function AbiWithAutoFetchField({
     handleFetchAbi(false);
   };
 
-  const handleToggleProxyAbi = async (useProxy: boolean) => {
-    console.log("[Proxy UI] Toggle clicked, useProxy:", useProxy);
-    console.log("[Proxy UI] Current state:", {
-      proxyAbi: proxyAbi ? `Length: ${proxyAbi.length}` : "null",
-      implementationAbi: implementationAbi
-        ? `Length: ${implementationAbi.length}`
-        : "null",
-      useProxyAbi,
+  const fetchProxyAbi = useCallback(async (): Promise<string> => {
+    if (!proxyAddress) {
+      throw new Error("Proxy address not available");
+    }
+
+    const response = await fetch("/api/web3/fetch-abi", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        contractAddress: proxyAddress,
+        network,
+      }),
     });
 
+    const data = (await response.json()) as {
+      success?: boolean;
+      abi?: string;
+      proxyAbi?: string;
+      error?: string;
+    };
+
+    if (!(response.ok && data.success)) {
+      throw new Error(data.error || "Failed to fetch proxy ABI");
+    }
+
+    const abiToUse = data.proxyAbi || data.abi;
+    if (!abiToUse) {
+      throw new Error("No ABI returned from API");
+    }
+
+    return abiToUse;
+  }, [proxyAddress, network]);
+
+  const handleToggleProxyAbi = async (useProxy: boolean) => {
     setUseProxyAbi(useProxy);
-    // Don't call onChange here - let the useEffect handle it
-    // This ensures the state update happens first, then the useEffect triggers
-    // However, if we need to fetch the proxy ABI, we still need to do that
-    if (useProxy && !proxyAbi && proxyAddress) {
-      // Need to fetch proxy ABI - but skip proxy detection to get the actual proxy ABI
-      setIsLoading(true);
-      try {
-        console.log("[Proxy UI] Fetching proxy ABI directly...");
-        // Fetch directly without proxy detection by calling getsourcecode
-        const response = await fetch("/api/web3/fetch-abi", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contractAddress: proxyAddress,
-            network,
-          }),
-        });
 
-        const data = (await response.json()) as {
-          success?: boolean;
-          abi?: string;
-          proxyAbi?: string;
-          error?: string;
-        };
+    if (!useProxy || proxyAbi || !proxyAddress) {
+      return;
+    }
 
-        if (response.ok && data.success) {
-          // Use proxyAbi if available, otherwise use abi (which might be implementation)
-          const abiToUse = data.proxyAbi || data.abi;
-          if (abiToUse) {
-            setProxyAbi(abiToUse);
-            console.log("[Proxy UI] Fetched and set proxy ABI");
-            // The useEffect will handle calling onChange
-          } else {
-            throw new Error("No ABI returned from API");
-          }
-        } else {
-          throw new Error(data.error || "Failed to fetch proxy ABI");
-        }
-      } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : "Failed to fetch proxy ABI";
-        console.error("[Proxy UI] Error:", errorMessage);
-        setError(errorMessage);
-        // Revert toggle on error
-        setUseProxyAbi(false);
-      } finally {
-        setIsLoading(false);
-      }
+    setIsLoading(true);
+    try {
+      const abi = await fetchProxyAbi();
+      setProxyAbi(abi);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to fetch proxy ABI";
+      console.error("[Proxy UI] Error:", errorMessage);
+      setError(errorMessage);
+      setUseProxyAbi(false);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -464,6 +531,7 @@ export function AbiWithAutoFetchField({
 
       {isProxy && !isDiamond && implementationAddress && (
         <ProxyContractAlert
+          chains={chains}
           implementationAddress={implementationAddress}
           isLoading={isLoading}
           network={network}
