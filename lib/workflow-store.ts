@@ -3,7 +3,19 @@ import { applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
 import { atom } from "jotai";
 import { api } from "./api-client";
 
+// start custom keeperhub code //
 export type WorkflowNodeType = "trigger" | "action" | "add";
+
+// biome-ignore lint/style/noEnum: Prefer to use enums as make it easier to maintain and read.
+export enum WorkflowTriggerEnum {
+  MANUAL = "Manual",
+  SCHEDULE = "Schedule",
+  WEBHOOK = "Webhook",
+  EVENT = "Event", // keeperhub custom field //
+}
+// end custom keeperhub code //
+
+export type WorkflowTriggerType = `${WorkflowTriggerEnum}`;
 
 export type WorkflowNodeData = {
   label: string;
@@ -34,6 +46,7 @@ export const currentWorkflowNameAtom = atom<string>("");
 export const currentWorkflowVisibilityAtom =
   atom<WorkflowVisibility>("private");
 export const isWorkflowOwnerAtom = atom<boolean>(true); // Whether current user owns this workflow
+export const isWorkflowEnabled = atom<boolean>(false);
 
 // UI state atoms
 export const propertiesPanelActiveTabAtom = atom<string>("properties");

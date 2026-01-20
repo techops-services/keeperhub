@@ -1,0 +1,270 @@
+shared_env: &shared_env
+  DATABASE_URL:
+    type: parameterStore
+    name: db-url
+    parameter_name: /eks/maker-staging/keeperhub/db-url
+  CHAIN_RPC_CONFIG:
+    type: parameterStore
+    name: chain-rpc-config
+    parameter_name: /eks/maker-staging/keeperhub/chain-rpc-config
+
+replicaCount: 1
+
+service:
+  enabled: true
+  name: keeperhub-staging
+  port: 3000
+  type: ClusterIP
+  containerPort: 3000
+  tls:
+    enabled: true
+    issuerName: cloudflare
+
+ingress:
+  enabled: true
+  hosts:
+    - workflows-staging.keeperhub.com
+  annotations:
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "true"
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.tls.options: traefik-cloudflare-origin-pull@kubernetescrd
+
+httpWwwRedirect:
+  enabled: false
+httpBasicAuth:
+  enabled: false
+
+image:
+  repository: ${ECR_REGISTRY}/keeperhub-staging
+  tag: app-${IMAGE_TAG}
+  pullPolicy: Always
+
+deployment:
+  enabled: true
+  initContainers:
+    - name: db-migration
+      image: "${ECR_REGISTRY}/keeperhub-staging:migrator-${IMAGE_TAG}"
+      command:
+        - /bin/sh
+        - -c
+      args:
+        - |
+          echo "Running database migrations..."
+          pnpm db:push
+          echo "Seeding chains..."
+          pnpm db:seed
+          echo "Migrations and seeding completed successfully"
+      env: *shared_env
+
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: ${SERVICE_ACCOUNT_ROLE_ARN}
+  name: keeperhub-staging
+  rules:
+    - apiGroups: ["batch"]
+      resources: ["jobs"]
+      verbs: ["create", "get", "list", "watch", "delete"]
+    - apiGroups: [""]
+      resources: ["pods"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: [""]
+      resources: ["pods/log"]
+      verbs: ["get"]
+
+podAnnotations:
+  reloader.stakater.com/auto: "true"
+
+serviceMonitors:
+  enabled: true
+  monitors:
+    - name: metrics
+      port: http
+      path: /api/metrics
+      interval: 30s
+      scrapeTimeout: 10s
+
+resources:
+  limits:
+    memory: 2Gi
+  requests:
+    cpu: 1m
+    memory: 256Mi
+
+env:
+  <<: *shared_env
+  LOG_LEVEL:
+    type: kv
+    value: "info"
+  METRICS_COLLECTOR:
+    type: kv
+    value: "prometheus"
+  NODE_OPTIONS:
+    type: kv
+    value: "--enable-source-maps --trace-warnings --trace-uncaught --trace-exit"
+  HOSTNAME:
+    type: kv
+    value: "0.0.0.0"
+  PARA_ENVIRONMENT:
+    type: kv
+    value: "beta"
+  WORKFLOW_EMBEDDED_DATA_DIR:
+    type: kv
+    value: "/tmp/workflow-data"
+  NEXT_PUBLIC_API_URL:
+    type: kv
+    value: "http://localhost:3000"
+  BETTER_AUTH_URL:
+    type: kv
+    value: "https://workflows-staging.keeperhub.com"
+  BETTER_AUTH_SECRET:
+    type: parameterStore
+    name: better-auth-secret
+    parameter_name: /eks/maker-staging/keeperhub/better-auth-secret
+  OPENAI_API_KEY:
+    type: parameterStore
+    name: openai-api-key
+    parameter_name: /eks/maker-staging/keeperhub/openai-api-key
+  # Examples: "gpt-4o", "gpt-4o-mini", "claude-3-5-sonnet-20241022", "openai/gpt-4" (gateway)
+  AI_MODEL:
+    type: kv
+    value: "gpt-4o"
+  PARA_API_KEY:
+    type: parameterStore
+    name: para-api-key
+    parameter_name: /eks/maker-staging/keeperhub/para-api-key
+  WALLET_ENCRYPTION_KEY:
+    type: parameterStore
+    name: wallet-encryption-key
+    parameter_name: /eks/maker-staging/keeperhub/wallet-encryption-key
+  INTEGRATION_ENCRYPTION_KEY:
+    type: parameterStore
+    name: integration-encryption-key
+    parameter_name: /eks/maker-staging/keeperhub/integration-encryption-key
+  # TODO rename the path
+  ETHERSCAN_API_KEY:
+    type: parameterStore
+    name: etherscan-api-key
+    parameter_name: /eks/maker-staging/keeper-app/etherscan-api-key
+  # TODO rename the path
+  SENDGRID_API_KEY:
+    type: parameterStore
+    name: sendgrid-api-key
+    parameter_name: /eks/maker-staging/keeper-app/sendgrid-api-key
+  FROM_ADDRESS:
+    type: kv
+    value: "noreply@keeperhub.com"
+  # Sentry
+  SENTRY_DSN:
+    type: parameterStore
+    name: sentry-dsn
+    parameter_name: /eks/maker-staging/keeperhub/sentry-dsn
+  NEXT_PUBLIC_SENTRY_DSN:
+    type: parameterStore
+    name: next-public-sentry-dsn
+    parameter_name: /eks/maker-staging/keeperhub/next-public-sentry-dsn
+  SENTRY_ORG:
+    type: parameterStore
+    name: sentry-org
+    parameter_name: /eks/maker-staging/keeperhub/sentry-org
+  SENTRY_PROJECT:
+    type: parameterStore
+    name: sentry-project
+    parameter_name: /eks/maker-staging/keeperhub/sentry-project
+  SENTRY_AUTH_TOKEN:
+    type: parameterStore
+    name: sentry-auth-token
+    parameter_name: /eks/maker-staging/keeperhub/sentry-auth-token
+  # Feedback service (internal cluster communication)
+  FEEDBACK_SERVICE_URL:
+    type: kv
+    value: "http://keeperhub-feedback-common.keeperhub:3001/api/feedback"
+  FEEDBACK_API_KEY:
+    type: parameterStore
+    name: feedback-api-key
+    parameter_name: /eks/maker-staging/keeperhub-feedback/feedback-api-key
+  # Internal service API keys for service-to-service auth
+  MCP_SERVICE_API_KEY:
+    type: parameterStore
+    name: mcp-service-api-key
+    parameter_name: /eks/maker-staging/keeperhub-mcp/keeperhub-api-key
+  EVENTS_SERVICE_API_KEY:
+    type: parameterStore
+    name: events-service-api-key
+    parameter_name: /eks/maker-staging/keeperhub-events/keeperhub-api-key
+  SCHEDULER_SERVICE_API_KEY:
+    type: parameterStore
+    name: scheduler-service-api-key
+    parameter_name: /eks/maker-staging/keeperhub-scheduler/keeperhub-api-key
+
+externalSecrets:
+  clusterSecretStoreName: maker-staging
+
+livenessProbe:
+  initialDelaySeconds: 5
+  periodSeconds: 30
+  tcpSocket:
+    port: 3000
+readinessProbe:
+  initialDelaySeconds: 5
+  periodSeconds: 30
+  tcpSocket:
+    port: 3000
+
+cronjob:
+  enabled: true
+  jobs:
+    - name: schedule-dispatcher
+      image:
+        repository: ${ECR_REGISTRY}/keeperhub-staging
+        tag: scheduler-${IMAGE_TAG}
+      env:
+        AWS_REGION:
+          type: kv
+          value: "us-east-2"
+        SQS_QUEUE_URL:
+          type: kv
+          value: "https://sqs.us-east-2.amazonaws.com/${AWS_ACCOUNT_ID}/keeperhub-workflow-queue-staging"
+        RUNNER_IMAGE:
+          type: kv
+          value: "${ECR_REGISTRY}/keeperhub-staging:workflow-runner-${IMAGE_TAG}"
+        K8S_NAMESPACE:
+          type: kv
+          value: "keeperhub"
+        JOB_TTL_SECONDS:
+          type: kv
+          value: "3600"
+        JOB_ACTIVE_DEADLINE:
+          type: kv
+          value: "300"
+        DATABASE_URL:
+          type: parameterStore
+          name: db-url
+          parameter_name: /eks/maker-staging/keeperhub/db-url
+        CHAIN_RPC_CONFIG:
+          type: parameterStore
+          name: chain-rpc-config
+          parameter_name: /eks/maker-staging/keeperhub/chain-rpc-config
+        SCHEDULER_SERVICE_API_KEY:
+          type: parameterStore
+          name: scheduler-service-api-key
+          parameter_name: /eks/maker-staging/keeperhub-scheduler/keeperhub-api-key
+      schedule: "* * * * *"
+      command: ["/bin/sh"]
+      args:
+        - "-c"
+        - "echo $(date) - [Dispatcher] Starting && tsx scripts/schedule-dispatcher.ts && echo $(date) - [Dispatcher] Completed"
+      serviceAccount:
+        name: "keeperhub-staging"
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "50m"
+        limits:
+          memory: "256Mi"
+          cpu: "200m"
+      restartPolicy: OnFailure
+      concurrencyPolicy: Forbid
+      successfulJobsHistoryLimit: 3
+      failedJobsHistoryLimit: 3

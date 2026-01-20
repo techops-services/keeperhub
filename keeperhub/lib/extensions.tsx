@@ -10,13 +10,13 @@
 
 import { Label } from "@/components/ui/label";
 import { KeeperHubLogo } from "@/keeperhub/components/icons/keeperhub-logo";
-import { WalletDialog } from "@/keeperhub/components/settings/wallet-dialog";
 import { Web3WalletSection } from "@/keeperhub/components/settings/web3-wallet-section";
+import { AbiEventSelectField } from "@/keeperhub/components/workflow/config/abi-event-select-field";
 import { AbiWithAutoFetchField } from "@/keeperhub/components/workflow/config/abi-with-auto-fetch-field";
 import { ChainSelectField } from "@/keeperhub/components/workflow/config/chain-select-field";
+import { TokenSelectField } from "@/keeperhub/components/workflow/config/token-select-field";
 import {
   registerBranding,
-  registerComponentSlot,
   registerFieldRenderer,
   registerIntegrationFormHandler,
 } from "@/lib/extension-registry";
@@ -86,6 +86,65 @@ registerFieldRenderer(
   }
 );
 
+/**
+ * Token Select Field
+ * Toggle between supported tokens (stablecoins) and custom token address
+ * In supported mode, shows multi-select of system stablecoins
+ * In custom mode, shows text input for any ERC20 address
+ */
+registerFieldRenderer(
+  "token-select",
+  ({ field, config, onUpdateConfig, disabled }) => {
+    const networkField = field.networkField || "network";
+
+    return (
+      <div className="space-y-2" key={field.key}>
+        <Label className="ml-1" htmlFor={field.key}>
+          {field.label}
+          {field.required && <span className="text-red-500">*</span>}
+        </Label>
+        <TokenSelectField
+          config={config}
+          disabled={disabled}
+          field={field}
+          networkField={networkField}
+          onUpdateConfig={onUpdateConfig}
+        />
+      </div>
+    );
+  }
+);
+
+/**
+ * ABI Event Select Field
+ * Dynamic dropdown that parses ABI and shows available events (type === "event")
+ */
+registerFieldRenderer(
+  "abi-event-select",
+  ({ field, config, onUpdateConfig, disabled }) => {
+    const abiField = field.abiField || "abi";
+    const abiValue = (config[abiField] as string | undefined) || "";
+    const value =
+      (config[field.key] as string | undefined) || field.defaultValue || "";
+
+    return (
+      <div className="space-y-2" key={field.key}>
+        <Label className="ml-1" htmlFor={field.key}>
+          {field.label}
+          {field.required && <span className="text-red-500">*</span>}
+        </Label>
+        <AbiEventSelectField
+          abiValue={abiValue}
+          disabled={disabled}
+          field={field}
+          onChange={(val: unknown) => onUpdateConfig(field.key, val)}
+          value={value}
+        />
+      </div>
+    );
+  }
+);
+
 // ============================================================================
 // Register Custom Integration Form Handlers
 // ============================================================================
@@ -104,21 +163,6 @@ registerBranding({
   logo: KeeperHubLogo,
   appName: "KeeperHub",
 });
-
-// ============================================================================
-// Register Component Slots
-// ============================================================================
-
-/**
- * User Menu Wallet Dialog
- * Shows wallet management in the user menu dropdown
- */
-registerComponentSlot(
-  "user-menu-wallet-dialog",
-  (props: { open: boolean; onOpenChange: (open: boolean) => void }) => (
-    <WalletDialog onOpenChange={props.onOpenChange} open={props.open} />
-  )
-);
 
 // Export a flag to indicate extensions are loaded
 export const KEEPERHUB_EXTENSIONS_LOADED = true;

@@ -19,16 +19,22 @@ export function OrganizationSetup() {
   const [mode, setMode] = useState<"choice" | "create" | "join">("choice");
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [inviteCode, setInviteCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Auto-generate slug from name
+  // Auto-generate slug from name (unless user has manually edited it)
   const handleNameChange = (value: string) => {
     setName(value);
-    if (!slug) {
+    if (!slugManuallyEdited) {
       setSlug(value.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
     }
+  };
+
+  const handleSlugChange = (value: string) => {
+    setSlug(value);
+    setSlugManuallyEdited(true);
   };
 
   const handleCreate = async () => {
@@ -143,7 +149,7 @@ export function OrganizationSetup() {
               <Input
                 disabled={loading}
                 id="slug"
-                onChange={(e) => setSlug(e.target.value)}
+                onChange={(e) => handleSlugChange(e.target.value)}
                 placeholder="acme-inc"
                 value={slug}
               />

@@ -92,9 +92,12 @@ function getMetricsCollectorType(): "console" | "prometheus" | "noop" {
 }
 
 /**
- * Singleton metrics collector instance
+ * Singleton metrics collector instance using globalThis
+ * This ensures the collector persists across module instances in Next.js bundling
  */
-let metricsCollectorInstance: MetricsCollector | null = null;
+const globalForMetrics = globalThis as unknown as {
+  metricsCollectorInstance: MetricsCollector | undefined;
+};
 
 /**
  * Get the metrics collector instance
@@ -113,13 +116,13 @@ let metricsCollectorInstance: MetricsCollector | null = null;
  * @returns MetricsCollector instance
  */
 export function getMetricsCollector(): MetricsCollector {
-  if (metricsCollectorInstance) {
-    return metricsCollectorInstance;
+  if (globalForMetrics.metricsCollectorInstance) {
+    return globalForMetrics.metricsCollectorInstance;
   }
 
   if (!(isServerEnvironment() && isMetricsEnabled())) {
-    metricsCollectorInstance = noopMetricsCollector;
-    return metricsCollectorInstance;
+    globalForMetrics.metricsCollectorInstance = noopMetricsCollector;
+    return globalForMetrics.metricsCollectorInstance;
   }
 
   const collectorType = getMetricsCollectorType();
@@ -128,17 +131,17 @@ export function getMetricsCollector(): MetricsCollector {
     case "prometheus":
       // For prometheus mode, use console collector in workflow code
       // The /api/metrics endpoint imports prometheus collector directly
-      metricsCollectorInstance = consoleMetricsCollector;
+      globalForMetrics.metricsCollectorInstance = consoleMetricsCollector;
       break;
     case "noop":
-      metricsCollectorInstance = noopMetricsCollector;
+      globalForMetrics.metricsCollectorInstance = noopMetricsCollector;
       break;
     default:
-      metricsCollectorInstance = consoleMetricsCollector;
+      globalForMetrics.metricsCollectorInstance = consoleMetricsCollector;
       break;
   }
 
-  return metricsCollectorInstance;
+  return globalForMetrics.metricsCollectorInstance;
 }
 
 /**
@@ -147,7 +150,7 @@ export function getMetricsCollector(): MetricsCollector {
  * @param collector - Custom MetricsCollector implementation
  */
 export function setMetricsCollector(collector: MetricsCollector): void {
-  metricsCollectorInstance = collector;
+  globalForMetrics.metricsCollectorInstance = collector;
 }
 
 /**
@@ -155,7 +158,7 @@ export function setMetricsCollector(collector: MetricsCollector): void {
  * Useful for testing cleanup
  */
 export function resetMetricsCollector(): void {
-  metricsCollectorInstance = null;
+  globalForMetrics.metricsCollectorInstance = undefined;
 }
 
 /**

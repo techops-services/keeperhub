@@ -8,7 +8,6 @@ import {
   Plug,
   Settings,
   Sun,
-  Users,
   Wallet,
 } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -36,8 +35,8 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ManageOrgsModal } from "@/keeperhub/components/organization/manage-orgs-modal";
 // start custom keeperhub code //
+import { ManageOrgsModal } from "@/keeperhub/components/organization/manage-orgs-modal";
 import { FeedbackOverlay } from "@/keeperhub/components/overlays/feedback-overlay";
 import { WalletOverlay } from "@/keeperhub/components/overlays/wallet-overlay";
 // end keeperhub code //
@@ -165,10 +164,6 @@ export const UserMenu = () => {
               <span>Settings</span>
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem onClick={() => setOrgModalOpen(true)}>
-            <Users className="size-4" />
-            <span>Organization</span>
-          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => openOverlay(IntegrationsOverlay)}>
             <Plug className="size-4" />
             <span>Connections</span>
@@ -177,12 +172,10 @@ export const UserMenu = () => {
             <Key className="size-4" />
             <span>API Keys</span>
           </DropdownMenuItem>
-          {/* start custom keeperhub code */}
           <DropdownMenuItem onClick={() => openOverlay(WalletOverlay)}>
             <Wallet className="size-4" />
             <span>Wallet</span>
           </DropdownMenuItem>
-          {/* end keeperhub code */}
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
               <Sun className="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />

@@ -27,6 +27,7 @@ import {
   isPanelAnimatingAtom,
   isSavingAtom,
   isSidebarCollapsedAtom,
+  isWorkflowEnabled,
   isWorkflowOwnerAtom,
   nodesAtom,
   rightPanelWidthAtom,
@@ -130,6 +131,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
     currentWorkflowVisibilityAtom
   );
   const [isOwner, setIsWorkflowOwner] = useAtom(isWorkflowOwnerAtom);
+  const setIsWorkflowEnabled = useSetAtom(isWorkflowEnabled); // keeperhub custom field //
   const setGlobalIntegrations = useSetAtom(integrationsAtom);
   const setIntegrationsLoaded = useSetAtom(integrationsLoadedAtom);
   const integrationsVersion = useAtomValue(integrationsVersionAtom);
@@ -362,11 +364,12 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
         (workflow.visibility as WorkflowVisibility) ?? "private"
       );
       setIsWorkflowOwner(workflow.isOwner !== false); // Default to true if not set
+      setIsWorkflowEnabled(workflow.enabled ?? false); // keeperhub custom field //
       setHasUnsavedChanges(false);
       setWorkflowNotFound(false);
     } catch (error) {
       console.error("Failed to load workflow:", error);
-      toast.error("Failed to load workflow");
+      setWorkflowNotFound(true);
     }
   }, [
     workflowId,
@@ -376,6 +379,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
     setCurrentWorkflowName,
     setCurrentWorkflowVisibility,
     setIsWorkflowOwner,
+    setIsWorkflowEnabled, // keeperhub custom field //
     setHasUnsavedChanges,
     setWorkflowNotFound,
   ]);
@@ -698,7 +702,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
       {/* Right panel overlay (desktop only) */}
       {!isMobile && (
         <div
-          className="pointer-events-auto absolute inset-y-0 right-0 z-20 border-l bg-background transition-transform duration-300 ease-out"
+          className="pointer-events-auto absolute top-[60px] right-0 bottom-0 z-20 border-l bg-background transition-transform duration-300 ease-out"
           style={{
             width: `${panelWidth}%`,
             transform:

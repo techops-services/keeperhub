@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 // start custom keeperhub code //
+import { authenticateApiKey } from "@/keeperhub/lib/api-key-auth";
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -38,15 +39,68 @@ function sanitizeNodesForPublicView(
   });
 }
 
+// Helper to get authenticated user context for PATCH
+async function getAuthContextForPatch(
+  request: Request
+): Promise<
+  | { userId: string | null; organizationId: string | null }
+  | { error: string; status: number }
+> {
+  const apiKeyAuth = await authenticateApiKey(request);
+
+  if (apiKeyAuth.authenticated) {
+    return {
+      userId: null,
+      organizationId: apiKeyAuth.organizationId || null,
+    };
+  }
+
+  const session = await auth.api.getSession({
+    headers: request.headers,
+  });
+
+  if (!session?.user) {
+    return { error: "Unauthorized", status: 401 };
+  }
+
+  const orgContext = await getOrgContext();
+  return {
+    userId: session.user.id,
+    organizationId: orgContext.organization?.id || null,
+  };
+}
+
 export async function GET(
   request: Request,
   context: { params: Promise<{ workflowId: string }> }
 ) {
   try {
     const { workflowId } = await context.params;
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
+
+    // start custom keeperhub code //
+    // Try API key authentication first
+    const apiKeyAuth = await authenticateApiKey(request);
+    let userId: string | null = null;
+    let organizationId: string | null = null;
+
+    if (apiKeyAuth.authenticated) {
+      // API key authentication successful
+      organizationId = apiKeyAuth.organizationId || null;
+    } else {
+      // Fall back to session authentication
+      const session = await auth.api.getSession({
+        headers: request.headers,
+      });
+
+      if (session?.user) {
+        userId = session.user.id;
+
+        // Get organization context from session
+        const orgContext = await getOrgContext();
+        organizationId = orgContext.organization?.id || null;
+      }
+    }
+    // end keeperhub code //
 
     // First, try to find the workflow
     const workflow = await db.query.workflows.findFirst({
@@ -60,15 +114,14 @@ export async function GET(
       );
     }
 
-    const isOwner = session?.user?.id === workflow.userId;
+    const isOwner = userId === workflow.userId;
 
     // start custom keeperhub code //
     // Check organization membership for private workflows
-    const orgContext = await getOrgContext();
     const isSameOrg =
       !workflow.isAnonymous &&
       workflow.organizationId &&
-      orgContext.organization?.id === workflow.organizationId;
+      organizationId === workflow.organizationId;
 
     // Access control:
     // - Public workflows: anyone can view (sanitized)
@@ -122,7 +175,14 @@ function buildUpdateData(
     updatedAt: new Date(),
   };
 
-  const fields = ["name", "description", "nodes", "edges", "visibility"];
+  const fields = [
+    "name",
+    "description",
+    "nodes",
+    "edges",
+    "visibility",
+    "enabled", // keeperhub custom field //
+  ];
   for (const field of fields) {
     if (body[field] !== undefined) {
       updateData[field] = body[field];
@@ -144,8 +204,8 @@ function isValidVisibility(visibility: unknown): boolean {
 // Helper to validate workflow access for PATCH/DELETE operations
 async function validateWorkflowAccess(
   workflowId: string,
-  userId: string,
-  orgContext: { organization?: { id: string } | null }
+  userId: string | null,
+  organizationId: string | null
 ): Promise<{
   workflow: typeof workflows.$inferSelect | null;
   hasAccess: boolean;
@@ -158,11 +218,11 @@ async function validateWorkflowAccess(
     return { workflow: null, hasAccess: false };
   }
 
-  const isOwner = existingWorkflow.userId === userId;
+  const isOwner = userId ? existingWorkflow.userId === userId : false;
   const isSameOrg =
     !existingWorkflow.isAnonymous &&
     existingWorkflow.organizationId &&
-    orgContext.organization?.id === existingWorkflow.organizationId;
+    organizationId === existingWorkflow.organizationId;
 
   return {
     workflow: existingWorkflow,
@@ -176,18 +236,19 @@ export async function PATCH(
 ) {
   try {
     const { workflowId } = await context.params;
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
     // start custom keeperhub code //
-    const orgContext = await getOrgContext();
+    const authContext = await getAuthContextForPatch(request);
+    if ("error" in authContext) {
+      return NextResponse.json(
+        { error: authContext.error },
+        { status: authContext.status }
+      );
+    }
+
+    const { userId, organizationId } = authContext;
     const { workflow: existingWorkflow, hasAccess } =
-      await validateWorkflowAccess(workflowId, session.user.id, orgContext);
+      await validateWorkflowAccess(workflowId, userId, organizationId);
 
     if (!(existingWorkflow && hasAccess)) {
       return NextResponse.json(
@@ -203,10 +264,8 @@ export async function PATCH(
     if (Array.isArray(body.nodes)) {
       const validation = await validateWorkflowIntegrations(
         body.nodes,
-        session.user.id,
-        // start custom keeperhub code //
-        orgContext.organization?.id || null
-        // end keeperhub code //
+        userId || existingWorkflow.userId,
+        organizationId
       );
       if (!validation.valid) {
         return NextResponse.json(
@@ -275,20 +334,37 @@ export async function DELETE(
 ) {
   try {
     const { workflowId } = await context.params;
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
     // start custom keeperhub code //
-    const orgContext = await getOrgContext();
+    // Try API key authentication first
+    const apiKeyAuth = await authenticateApiKey(request);
+    let userId: string | null = null;
+    let organizationId: string | null = null;
+
+    if (apiKeyAuth.authenticated) {
+      // API key authentication successful
+      organizationId = apiKeyAuth.organizationId || null;
+    } else {
+      // Fall back to session authentication
+      const session = await auth.api.getSession({
+        headers: request.headers,
+      });
+
+      if (!session?.user) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      userId = session.user.id;
+
+      // Get organization context from session
+      const orgContext = await getOrgContext();
+      organizationId = orgContext.organization?.id || null;
+    }
+
     const { hasAccess } = await validateWorkflowAccess(
       workflowId,
-      session.user.id,
-      orgContext
+      userId,
+      organizationId
     );
 
     if (!hasAccess) {
