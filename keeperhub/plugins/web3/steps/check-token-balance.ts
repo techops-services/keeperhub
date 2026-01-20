@@ -8,7 +8,12 @@ import type {
 } from "@/keeperhub/lib/wallet/types";
 import { ERC20_ABI } from "@/lib/contracts";
 import { db } from "@/lib/db";
-import { supportedTokens, workflowExecutions } from "@/lib/db/schema";
+import {
+  explorerConfigs,
+  supportedTokens,
+  workflowExecutions,
+} from "@/lib/db/schema";
+import { getAddressUrl } from "@/lib/explorer";
 import { getChainIdFromNetwork, resolveRpcConfig } from "@/lib/rpc";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
@@ -46,6 +51,7 @@ type CheckTokenBalanceResult =
       success: true;
       balances: TokenBalance[];
       address: string;
+      addressLink: string;
     }
   | { success: false; error: string };
 
@@ -326,10 +332,19 @@ async function stepHandler(
       }
     );
 
+    // Fetch explorer config for address link
+    const explorerConfig = await db.query.explorerConfigs.findFirst({
+      where: eq(explorerConfigs.chainId, chainId),
+    });
+    const addressLink = explorerConfig
+      ? getAddressUrl(explorerConfig, address)
+      : "";
+
     return {
       success: true,
       balances,
       address,
+      addressLink,
     };
   } catch (error) {
     console.error(
