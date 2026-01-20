@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  CreditCard,
   Github,
   Key,
   LogOut,
@@ -10,6 +11,7 @@ import {
   Sun,
   Wallet,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import {
@@ -47,6 +49,7 @@ export const UserMenu = () => {
   const { data: session, isPending } = useSession();
   const { theme, setTheme } = useTheme();
   const { open: openOverlay } = useOverlay();
+  const router = useRouter();
   const [providerId, setProviderId] = useState<string | null>(null);
   const [orgModalOpen, setOrgModalOpen] = useState(false);
 
@@ -175,6 +178,10 @@ export const UserMenu = () => {
           <DropdownMenuItem onClick={() => openOverlay(WalletOverlay)}>
             <Wallet className="size-4" />
             <span>Wallet</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => router.push("/billing")}>
+            <CreditCard className="size-4" />
+            <span>Billing</span>
           </DropdownMenuItem>
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>

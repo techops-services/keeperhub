@@ -70,14 +70,24 @@ export const verifications = pgTable("verifications", {
 
 // start custom keeperhub code //
 // Organization tables
-export const organization = pgTable("organization", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  slug: text("slug").notNull().unique(),
-  logo: text("logo"),
-  createdAt: timestamp("created_at").notNull(),
-  metadata: text("metadata"),
-});
+export const organization = pgTable(
+  "organization",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    slug: text("slug").notNull().unique(),
+    logo: text("logo"),
+    createdAt: timestamp("created_at").notNull(),
+    metadata: text("metadata"),
+    // Billing fields
+    creditBalance: integer("credit_balance").default(0).notNull(),
+    tier: text("tier").default("developer").notNull(),
+    tierExpiresAt: timestamp("tier_expires_at"),
+    tierIsLifetime: boolean("tier_is_lifetime").default(false).notNull(),
+    orgIdHash: text("org_id_hash"), // keccak256 hash for smart contract mapping
+  },
+  (table) => [index("idx_organization_org_id_hash").on(table.orgIdHash)]
+);
 
 export const member = pgTable("member", {
   id: text("id").primaryKey(),
@@ -104,6 +114,41 @@ export const invitation = pgTable("invitation", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
 });
+
+// Credit transactions table for billing history
+export const creditTransactions = pgTable(
+  "credit_transactions",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => generateId()),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    type: text("type")
+      .notNull()
+      .$type<"deposit" | "workflow_run" | "bonus" | "adjustment">(),
+    amount: integer("amount").notNull(), // Positive for deposits, negative for usage
+    balanceAfter: integer("balance_after").notNull(),
+    // For deposits
+    txHash: text("tx_hash"), // Blockchain transaction hash
+    paymentToken: text("payment_token"), // "ETH", "USDC", "USDT", "USDS"
+    paymentAmount: text("payment_amount"), // Amount paid in token units
+    usdValue: text("usd_value"), // USD value at time of purchase (6 decimals)
+    // For workflow runs
+    workflowId: text("workflow_id"),
+    executionId: text("execution_id"),
+    // Metadata
+    note: text("note"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("idx_credit_transactions_org").on(table.organizationId),
+    index("idx_credit_transactions_type").on(table.type),
+    index("idx_credit_transactions_created").on(table.createdAt),
+    index("idx_credit_transactions_tx_hash").on(table.txHash),
+  ]
+);
 // end keeperhub code //
 
 // Workflow visibility type
@@ -476,6 +521,8 @@ export type Member = typeof member.$inferSelect;
 export type NewMember = typeof member.$inferInsert;
 export type Invitation = typeof invitation.$inferSelect;
 export type NewInvitation = typeof invitation.$inferInsert;
+export type CreditTransaction = typeof creditTransactions.$inferSelect;
+export type NewCreditTransaction = typeof creditTransactions.$inferInsert;
 // end keeperhub code //
 export type Chain = typeof chains.$inferSelect;
 export type NewChain = typeof chains.$inferInsert;
