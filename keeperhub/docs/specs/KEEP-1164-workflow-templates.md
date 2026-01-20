@@ -2,7 +2,7 @@
 
 ## Overview
 
-Add a curated templates system for workflows created and managed by the KeeperHub internal team. Templates are distinct from user-shared public workflows - they have richer metadata and are promoted via an internal admin endpoint.
+Add a curated templates system for workflows created and managed by the KeeperHub internal team. Templates are distinct from user-shared public workflows - they have richer metadata and are promoted via an internal hub service endpoint.
 
 ## User Flow
 
@@ -36,13 +36,13 @@ Note: `description` already exists on the workflow table.
 
 ## API Changes
 
-### 1. Admin Endpoint: Promote/Update Template
+### 1. Hub Service Endpoint: Promote/Update Template
 
-**Route:** `POST /keeperhub/api/admin/templates`
+**Route:** `POST /keeperhub/api/hub/templates`
 
 **Authentication:** Internal service key via `X-Service-Key` header
 
-**Environment Variable:** `ADMIN_SERVICE_API_KEY`
+**Environment Variable:** `HUB_SERVICE_API_KEY`
 
 **Request Body:**
 ```typescript
@@ -72,9 +72,9 @@ Note: `description` already exists on the workflow table.
 
 **Usage:**
 ```bash
-curl -X POST https://app.keeperhub.com/api/admin/templates \
+curl -X POST https://app.keeperhub.com/api/hub/templates \
   -H "Content-Type: application/json" \
-  -H "X-Service-Key: $ADMIN_SERVICE_API_KEY" \
+  -H "X-Service-Key: $HUB_SERVICE_API_KEY" \
   -d '{
     "workflowId": "abc123",
     "displayImage": "https://...",
@@ -89,9 +89,9 @@ This endpoint extends the existing internal service authentication system at `ke
 
 **Extending the existing system:**
 
-1. Add `"admin"` to the `InternalServiceName` type:
+1. Add `"hub"` to the `InternalServiceName` type:
 ```typescript
-export type InternalServiceName = "mcp" | "events" | "scheduler" | "admin";
+export type InternalServiceName = "mcp" | "events" | "scheduler" | "hub";
 ```
 
 2. Add the key mapping in `SERVICE_KEYS`:
@@ -100,7 +100,7 @@ const SERVICE_KEYS: Record<InternalServiceName, string | undefined> = {
   mcp: process.env.MCP_SERVICE_API_KEY,
   events: process.env.EVENTS_SERVICE_API_KEY,
   scheduler: process.env.SCHEDULER_SERVICE_API_KEY,
-  admin: process.env.ADMIN_SERVICE_API_KEY,  // new
+  hub: process.env.HUB_SERVICE_API_KEY,  // new
 };
 ```
 
@@ -108,19 +108,19 @@ const SERVICE_KEYS: Record<InternalServiceName, string | undefined> = {
 1. Request includes `X-Service-Key: <secret>` header
 2. Server loops through registered services and compares keys
 3. Uses timing-safe comparison (`crypto.timingSafeEqual`) to prevent timing attacks
-4. Returns `{ authenticated: true, service: "admin" }` on success
+4. Returns `{ authenticated: true, service: "hub" }` on success
 
 **Endpoint authorization:**
 ```typescript
 const auth = authenticateInternalService(request);
-if (!auth.authenticated || auth.service !== 'admin') {
+if (!auth.authenticated || auth.service !== 'hub') {
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 }
 ```
 
 #### Field Restriction (Allowlist)
 
-The admin endpoint restricts which workflow fields can be modified. Only template-specific fields are editable:
+The hub service endpoint restricts which workflow fields can be modified. Only template-specific fields are editable:
 
 ```typescript
 const ALLOWED_TEMPLATE_FIELDS = [
@@ -187,7 +187,7 @@ Following KeeperHub custom code policy:
 | Change | Location |
 |--------|----------|
 | Schema fields | `lib/db/schema.ts` (within markers) |
-| Admin endpoint | `keeperhub/api/admin/templates/route.ts` |
+| Hub service endpoint | `keeperhub/api/hub/templates/route.ts` |
 | Service auth update | `keeperhub/lib/internal-service-auth.ts` |
 | Public API filter | `app/api/workflows/public/route.ts` (within markers) |
 | Hub UI updates | `keeperhub/components/hub/workflow-template-grid.tsx` |
@@ -196,23 +196,23 @@ Following KeeperHub custom code policy:
 
 1. Add schema fields to `lib/db/schema.ts`
 2. Run `pnpm db:push` to apply migration
-3. Add `admin` to allowed services in `internal-service-auth.ts`
-4. Create admin endpoint at `keeperhub/api/admin/templates/route.ts`
+3. Add `hub` to allowed services in `internal-service-auth.ts`
+4. Create hub service endpoint at `keeperhub/api/hub/templates/route.ts`
 5. Update `/api/workflows/public` to support `?templates=true` filter
 6. Update Hub UI to fetch and display templates
-7. Add `ADMIN_SERVICE_API_KEY` to environment variables
+7. Add `HUB_SERVICE_API_KEY` to environment variables
 
 ## Environment Variables
 
 ```
-ADMIN_SERVICE_API_KEY=<generate-secure-key>
+HUB_SERVICE_API_KEY=<generate-secure-key>
 ```
 
 ## Security Considerations
 
-- Admin endpoint protected by service key (not exposed to users)
+- Hub service endpoint protected by service key (not exposed to users)
 - Timing-safe key comparison prevents timing attacks
-- Field allowlist restricts admin to template-specific fields only (defense-in-depth)
+- Field allowlist restricts hub service to template-specific fields only (defense-in-depth)
 - Templates inherit existing public workflow sanitization (integration IDs stripped)
 - Duplicate flow already handles safe copying
 
