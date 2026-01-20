@@ -82,6 +82,16 @@ vi.mock("@/lib/db", () => ({
         }),
       }),
     }),
+    query: {
+      explorerConfigs: {
+        findFirst: vi.fn().mockResolvedValue({
+          chainId: 1,
+          name: "Etherscan",
+          explorerUrl: "https://etherscan.io",
+          apiUrl: "https://api.etherscan.io",
+        }),
+      },
+    },
   },
 }));
 

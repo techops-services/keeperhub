@@ -7,7 +7,6 @@
  */
 
 // Re-export ABIs
-// biome-ignore lint/performance/noBarrelFile: intentional barrel for contract ABIs
 export { default as ERC20_ABI } from "./abis/erc20.json";
 export { default as MULTICALL3_ABI } from "./abis/multicall3.json";
 

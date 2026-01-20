@@ -71,7 +71,6 @@ export type WorkflowExecutionInput = {
 /**
  * Helper to replace template variables in conditions
  */
-// biome-ignore lint/nursery/useMaxParams: Helper function needs all parameters for template replacement
 function replaceTemplateVariable(
   match: string,
   nodeId: string,

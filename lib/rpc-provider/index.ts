@@ -436,5 +436,4 @@ export function clearRpcProviderManagerCache(): void {
 }
 
 // Re-export Solana provider
-// biome-ignore lint/performance/noBarrelFile: Intentional barrel for module API
 export * from "./solana";

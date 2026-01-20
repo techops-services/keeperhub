@@ -1,11 +1,38 @@
 import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+// Unmock db to use real database for integration tests
+vi.unmock("@/lib/db");
+
 import { db } from "@/lib/db";
 import {
   organizationApiKeys,
   workflows as workflowsTable,
 } from "@/lib/db/schema";
+
+// Check if we can connect to the database
+async function canConnectToDatabase(): Promise<boolean> {
+  try {
+    // Simple query to test connection
+    await db.select().from(workflowsTable).limit(1);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Check if the server is running
+async function isServerRunning(baseUrl: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${baseUrl}/api/health`, {
+      signal: AbortSignal.timeout(2000),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Integration tests for API Key Authentication
@@ -25,16 +52,29 @@ describe("API Key Authentication", () => {
   let testApiKeyId: string;
   let testOrgId: string;
   let testWorkflowId: string;
+  let shouldSkip = false;
   const testUserId = "test-user-123";
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
   beforeAll(async () => {
+    // Check prerequisites
+    const dbAvailable = await canConnectToDatabase();
+    const serverRunning = await isServerRunning(baseUrl);
+
+    if (!(dbAvailable && serverRunning)) {
+      console.log(
+        `Skipping API Key Auth tests - DB: ${dbAvailable}, Server: ${serverRunning}`
+      );
+      shouldSkip = true;
+      return;
+    }
+
     // Create a test organization and API key
     testOrgId = `test-org-${Date.now()}`;
     testApiKey = `kh_test_${Date.now()}_${Math.random().toString(36)}`;
     const keyHash = createHash("sha256").update(testApiKey).digest("hex");
 
-    const [apiKey] = await db
+    const apiKeys = await db
       .insert(organizationApiKeys)
       .values({
         organizationId: testOrgId,
@@ -45,10 +85,10 @@ describe("API Key Authentication", () => {
       })
       .returning();
 
-    testApiKeyId = apiKey.id;
+    testApiKeyId = apiKeys[0].id;
 
     // Create a test workflow for this organization
-    const [workflow] = await db
+    const workflows = await db
       .insert(workflowsTable)
       .values({
         name: "Test Workflow",
@@ -73,17 +113,24 @@ describe("API Key Authentication", () => {
       })
       .returning();
 
-    testWorkflowId = workflow.id;
+    testWorkflowId = workflows[0].id;
   });
 
   afterAll(async () => {
+    if (shouldSkip) {
+      return;
+    }
     // Clean up test data
-    await db
-      .delete(workflowsTable)
-      .where(eq(workflowsTable.id, testWorkflowId));
-    await db
-      .delete(organizationApiKeys)
-      .where(eq(organizationApiKeys.id, testApiKeyId));
+    if (testWorkflowId) {
+      await db
+        .delete(workflowsTable)
+        .where(eq(workflowsTable.id, testWorkflowId));
+    }
+    if (testApiKeyId) {
+      await db
+        .delete(organizationApiKeys)
+        .where(eq(organizationApiKeys.id, testApiKeyId));
+    }
   });
 
   describe("GET /api/workflows", () => {
@@ -206,7 +253,7 @@ describe("API Key Authentication", () => {
       const otherKeyHash = createHash("sha256")
         .update(otherApiKey)
         .digest("hex");
-      const [otherKey] = await db
+      const otherKeys = await db
         .insert(organizationApiKeys)
         .values({
           organizationId: "other-org-123",
@@ -230,7 +277,7 @@ describe("API Key Authentication", () => {
       // Clean up
       await db
         .delete(organizationApiKeys)
-        .where(eq(organizationApiKeys.id, otherKey.id));
+        .where(eq(organizationApiKeys.id, otherKeys[0].id));
     });
   });
 
@@ -283,7 +330,7 @@ describe("API Key Authentication", () => {
       const otherKeyHash = createHash("sha256")
         .update(otherApiKey)
         .digest("hex");
-      const [otherKey] = await db
+      const otherKeys = await db
         .insert(organizationApiKeys)
         .values({
           organizationId: "other-org-exec-123",
@@ -312,7 +359,7 @@ describe("API Key Authentication", () => {
       // Clean up
       await db
         .delete(organizationApiKeys)
-        .where(eq(organizationApiKeys.id, otherKey.id));
+        .where(eq(organizationApiKeys.id, otherKeys[0].id));
     });
   });
 

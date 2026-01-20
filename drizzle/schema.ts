@@ -347,6 +347,8 @@ export const chains = pgTable(
     defaultPrimaryWss: text("default_primary_wss"),
     defaultFallbackWss: text("default_fallback_wss"),
     chainType: text("chain_type").default("evm").notNull(),
+    // KEEP-1240: Chain-specific gas configuration
+    gasConfig: jsonb("gas_config").default({}),
   },
   (table) => [
     index("idx_chains_chain_id").using(
