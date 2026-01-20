@@ -633,9 +633,36 @@ function useWorkflowHandlers({
     await executeWorkflow();
   };
 
+  const handleValidate = (callback?: () => void) => {
+    const brokenRefs = getBrokenTemplateReferences(nodes);
+    const missingFields = getMissingRequiredFields(nodes);
+    const missingIntegrations = getMissingIntegrations(nodes, userIntegrations);
+
+    if (
+      brokenRefs.length > 0 ||
+      missingFields.length > 0 ||
+      missingIntegrations.length > 0
+    ) {
+      openOverlay(WorkflowIssuesOverlay, {
+        issues: {
+          brokenReferences: brokenRefs,
+          missingRequiredFields: missingFields,
+          missingIntegrations,
+        },
+        onGoToStep: handleGoToStep,
+        onRunAnyway: executeWorkflow,
+      });
+      return;
+    }
+
+    callback?.();
+  };
+
   return {
     handleSave,
     handleExecute,
+    handleValidate,
+    handleGoToStep,
   };
 }
 
@@ -770,7 +797,7 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     session,
   } = state;
 
-  const { handleSave, handleExecute } = useWorkflowHandlers({
+  const { handleSave, handleExecute, handleGoToStep } = useWorkflowHandlers({
     currentWorkflowId,
     nodes,
     edges,
@@ -930,21 +957,59 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
   };
 
   // start custom keeperhub code //
-  const handleToggleEnabled = async (newEnabled: boolean) => {
+  const updateWorkflowEnabled = async (enabled: boolean) => {
     if (!currentWorkflowId) {
       return;
     }
 
     try {
       await api.workflow.update(currentWorkflowId, {
-        enabled: newEnabled,
+        enabled,
       });
-      state.setIsEnabled(newEnabled);
-      toast.success(newEnabled ? "Workflow enabled" : "Workflow disabled");
+      state.setIsEnabled(enabled);
+      toast.success(enabled ? "Workflow enabled" : "Workflow disabled");
     } catch (error) {
       console.error("Failed to update enabled state:", error);
       toast.error("Failed to update workflow state. Please try again.");
     }
+  };
+
+  const handleToggleEnabled = async (newEnabled: boolean) => {
+    if (!currentWorkflowId) {
+      return;
+    }
+
+    // When disabling, update directly without validation
+    if (!newEnabled) {
+      await updateWorkflowEnabled(false);
+      return;
+    }
+
+    // When enabling, validate first
+    const brokenRefs = getBrokenTemplateReferences(nodes);
+    const missingFields = getMissingRequiredFields(nodes);
+    const missingIntegrations = getMissingIntegrations(nodes, userIntegrations);
+
+    if (
+      brokenRefs.length > 0 ||
+      missingFields.length > 0 ||
+      missingIntegrations.length > 0
+    ) {
+      openOverlay(WorkflowIssuesOverlay, {
+        issues: {
+          brokenReferences: brokenRefs,
+          missingRequiredFields: missingFields,
+          missingIntegrations,
+        },
+        onGoToStep: handleGoToStep,
+        actionLabel: "Enable Anyway",
+        onRunAnyway: () => updateWorkflowEnabled(true),
+      });
+      return;
+    }
+
+    // Validation passed, update the database
+    await updateWorkflowEnabled(true);
   };
   // end custom keeperhub code //
 
@@ -1103,6 +1168,11 @@ function ToolbarActions({
     state.setActiveTab("properties");
   };
 
+  const triggerType = state.nodes.find((node) => node?.data?.type === "trigger")
+    ?.data?.config?.triggerType;
+
+  const shouldDisplayEnableWorkflowSwitch = triggerType === WorkflowTriggerEnum.EVENT || triggerType === WorkflowTriggerEnum.SCHEDULE;
+
   return (
     <>
       {/* Add Step - Mobile Vertical */}
@@ -1143,28 +1213,6 @@ function ToolbarActions({
           </Button>
         )}
       </ButtonGroup>
-
-      {/* start custom keeperhub code // */}
-      {state.nodes?.find((node) => node?.data?.type === "trigger")?.data?.config
-        ?.triggerType === WorkflowTriggerEnum.EVENT && (
-        <>
-          {/* Enable Workflow Switch - Desktop Horizontal */}
-          <div className="hidden items-center gap-2 lg:flex">
-            <label
-              className="font-medium text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              htmlFor="enable-workflow-switch"
-            >
-              {state.isEnabled ? "Deactivate" : "Activate"} workflow
-            </label>
-            <Switch
-              checked={state.isEnabled}
-              id="enable-workflow-switch"
-              onCheckedChange={actions.handleToggleEnabled}
-            />
-          </div>
-        </>
-      )}
-      {/* end custom keeperhub code // */}
 
       {/* Add Step - Desktop Horizontal */}
       <ButtonGroup className="hidden lg:flex" orientation="horizontal">
@@ -1242,6 +1290,27 @@ function ToolbarActions({
 
       {/* Visibility Toggle */}
       <VisibilityButton actions={actions} state={state} />
+
+      {/* start custom keeperhub code // */}
+      {shouldDisplayEnableWorkflowSwitch && (
+        <>
+          {/* Enable Workflow Switch - Desktop Horizontal */}
+          <div className="hidden items-center gap-2 lg:flex">
+            <label
+              className="font-medium text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              htmlFor="enable-workflow-switch"
+            >
+              {state.isEnabled ? "Deactivate" : "Activate"} workflow
+            </label>
+            <Switch
+              checked={state.isEnabled}
+              id="enable-workflow-switch"
+              onCheckedChange={actions.handleToggleEnabled}
+            />
+          </div>
+        </>
+      )}
+      {/* end custom keeperhub code // */}
 
       <RunButtonGroup actions={actions} state={state} />
     </>
