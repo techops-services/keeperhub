@@ -18,19 +18,19 @@ Add 4 fields to the `workflows` table in `lib/db/schema.ts`:
 
 ```typescript
 // start custom keeperhub code //
-isTemplate: boolean("is_template").default(false).notNull(),
-templateImage: text("template_image"),
-templateCategory: text("template_category"),
-templateOrder: integer("template_order").default(0),
+featured: boolean("featured").default(false).notNull(),
+displayImage: text("display_image"),
+category: text("category"),
+featuredOrder: integer("featured_order").default(0),
 // end keeperhub code //
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `isTemplate` | boolean | Flag that marks workflow as a template (the "featured" flag) |
-| `templateImage` | text | URL to template thumbnail/preview image |
-| `templateCategory` | text | Optional category for grouping (e.g., "Web3", "Notifications") |
-| `templateOrder` | integer | Sort priority (higher = appears first) |
+| `featured` | boolean | Flag that marks workflow as a featured template |
+| `displayImage` | text | Optional. URL to template thumbnail/preview image |
+| `category` | text | Optional. Category for grouping (e.g., "Web3", "Notifications") |
+| `featuredOrder` | integer | Sort priority (higher = appears first) |
 
 Note: `description` already exists on the workflow table.
 
@@ -48,10 +48,10 @@ Note: `description` already exists on the workflow table.
 ```typescript
 {
   workflowId: string;          // Required - workflow to promote
-  isTemplate?: boolean;        // Default: true (set false to demote)
-  templateImage?: string;      // Image URL
-  templateCategory?: string;   // Category name
-  templateOrder?: number;      // Sort priority
+  featured?: boolean;          // Default: true (set false to demote)
+  displayImage?: string;       // Optional. Image URL
+  category?: string;           // Optional. Category name
+  featuredOrder?: number;      // Sort priority
 }
 ```
 
@@ -62,10 +62,10 @@ Note: `description` already exists on the workflow table.
   workflow: {
     id: string;
     name: string;
-    isTemplate: boolean;
-    templateImage: string | null;
-    templateCategory: string | null;
-    templateOrder: number;
+    featured: boolean;
+    displayImage: string | null;
+    category: string | null;
+    featuredOrder: number;
   }
 }
 ```
@@ -77,11 +77,64 @@ curl -X POST https://app.keeperhub.com/api/admin/templates \
   -H "X-Service-Key: $ADMIN_SERVICE_API_KEY" \
   -d '{
     "workflowId": "abc123",
-    "templateImage": "https://...",
-    "templateCategory": "Web3",
-    "templateOrder": 10
+    "displayImage": "https://...",
+    "category": "Web3",
+    "featuredOrder": 10
   }'
 ```
+
+#### How Service Key Authentication Works
+
+This endpoint extends the existing internal service authentication system at `keeperhub/lib/internal-service-auth.ts`. The system already authenticates requests from internal K8s services (scheduler, events, mcp).
+
+**Extending the existing system:**
+
+1. Add `"admin"` to the `InternalServiceName` type:
+```typescript
+export type InternalServiceName = "mcp" | "events" | "scheduler" | "admin";
+```
+
+2. Add the key mapping in `SERVICE_KEYS`:
+```typescript
+const SERVICE_KEYS: Record<InternalServiceName, string | undefined> = {
+  mcp: process.env.MCP_SERVICE_API_KEY,
+  events: process.env.EVENTS_SERVICE_API_KEY,
+  scheduler: process.env.SCHEDULER_SERVICE_API_KEY,
+  admin: process.env.ADMIN_SERVICE_API_KEY,  // new
+};
+```
+
+**Authentication flow:**
+1. Request includes `X-Service-Key: <secret>` header
+2. Server loops through registered services and compares keys
+3. Uses timing-safe comparison (`crypto.timingSafeEqual`) to prevent timing attacks
+4. Returns `{ authenticated: true, service: "admin" }` on success
+
+**Endpoint authorization:**
+```typescript
+const auth = authenticateInternalService(request);
+if (!auth.authenticated || auth.service !== 'admin') {
+  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+}
+```
+
+#### Field Restriction (Allowlist)
+
+The admin endpoint restricts which workflow fields can be modified. Only template-specific fields are editable:
+
+```typescript
+const ALLOWED_TEMPLATE_FIELDS = [
+  'featured',
+  'displayImage',
+  'category',
+  'featuredOrder',
+] as const;
+```
+
+**What this prevents:**
+- Cannot modify `name`, `description`, `nodes`, `edges`, `userId`, `orgId`, or any other workflow field
+- Extra fields in the request body are silently ignored
+- Provides defense-in-depth even if the service key is compromised
 
 ### 2. Update Public Workflows Endpoint
 
@@ -90,17 +143,17 @@ curl -X POST https://app.keeperhub.com/api/admin/templates \
 **New Query Parameter:** `templates=true`
 
 **Behavior:**
-- `?templates=true` - Returns only workflows where `isTemplate = true`, ordered by `templateOrder DESC, updatedAt DESC`
-- No parameter or `templates=false` - Returns public workflows where `isTemplate = false` (existing behavior)
+- `?templates=true` - Returns only workflows where `featured = true`, ordered by `featuredOrder DESC, updatedAt DESC`
+- No parameter or `templates=false` - Returns public workflows where `featured = false` (existing behavior)
 
 **Response Addition:**
 ```typescript
 {
   // Existing fields...
-  isTemplate: boolean;
-  templateImage: string | null;
-  templateCategory: string | null;
-  templateOrder: number;
+  featured: boolean;
+  displayImage: string | null;
+  category: string | null;
+  featuredOrder: number;
 }
 ```
 
@@ -112,16 +165,16 @@ Location: `app/hub/page.tsx` and `keeperhub/components/hub/workflow-template-gri
 
 1. Fetch templates via `/api/workflows/public?templates=true`
 2. Display templates section with:
-   - Template image (if available, fallback to placeholder)
+   - Display image (if available, fallback to placeholder)
    - Name and description
    - Category badge (if set)
-3. Sort by `templateOrder` (already handled by API)
+3. Sort by `featuredOrder` (already handled by API)
 4. Keep existing "Use Template" button and duplicate flow
 
 ### Template Card Component
 
 Create or update card to display:
-- Thumbnail image (aspect ratio ~16:9 or 4:3)
+- Display image (aspect ratio ~16:9 or 4:3, optional)
 - Template name
 - Description (line-clamp-2)
 - Category badge (optional)
@@ -158,6 +211,8 @@ ADMIN_SERVICE_API_KEY=<generate-secure-key>
 ## Security Considerations
 
 - Admin endpoint protected by service key (not exposed to users)
+- Timing-safe key comparison prevents timing attacks
+- Field allowlist restricts admin to template-specific fields only (defense-in-depth)
 - Templates inherit existing public workflow sanitization (integration IDs stripped)
 - Duplicate flow already handles safe copying
 
