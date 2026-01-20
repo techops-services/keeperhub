@@ -18,15 +18,11 @@ spec:
     spec:
       containers:
         - name: executor
-          image: node:22-alpine
+          # Use pre-built scheduler image (Bun-based, no tsx needed)
+          image: keeperhub-scheduler:latest
           command:
-            - /bin/sh
-            - -c
-            - |
-              cd /app
-              npm install -g pnpm
-              pnpm install --frozen-lockfile
-              npx tsx scripts/schedule-executor.ts
+            - bun
+            - scripts/schedule-executor.ts
           env:
             - name: DATABASE_URL
               valueFrom:
@@ -45,9 +41,7 @@ spec:
               value: "http://localstack:4566/000000000000/keeperhub-workflow-queue"
             - name: KEEPERHUB_URL
               value: "http://keeperhub-app:3000"
-          volumeMounts:
-            - name: app-code
-              mountPath: /app
+          # volumeMounts removed - using pre-built image
           resources:
             requests:
               memory: "128Mi"
@@ -60,13 +54,10 @@ spec:
               command:
                 - /bin/sh
                 - -c
-                - "pgrep -f schedule-executor"
+                - "pgrep -f bun"
             initialDelaySeconds: 30
             periodSeconds: 30
-      volumes:
-        - name: app-code
-          persistentVolumeClaim:
-            claimName: keeperhub-code-pvc
+      # volumes removed - using pre-built image
 ---
 # Secrets template (create with actual values)
 apiVersion: v1

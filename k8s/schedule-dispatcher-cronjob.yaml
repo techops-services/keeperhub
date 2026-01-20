@@ -17,15 +17,11 @@ spec:
         spec:
           containers:
             - name: dispatcher
-              image: node:22-alpine
+              # Use pre-built scheduler image (Bun-based, no tsx needed)
+              image: keeperhub-scheduler:latest
               command:
-                - /bin/sh
-                - -c
-                - |
-                  cd /app
-                  npm install -g pnpm
-                  pnpm install --frozen-lockfile
-                  npx tsx scripts/schedule-dispatcher.ts
+                - bun
+                - scripts/schedule-dispatcher.ts
               env:
                 - name: DATABASE_URL
                   valueFrom:
@@ -42,9 +38,7 @@ spec:
                   value: "test"
                 - name: SQS_QUEUE_URL
                   value: "http://localstack:4566/000000000000/keeperhub-workflow-queue"
-              volumeMounts:
-                - name: app-code
-                  mountPath: /app
+              # volumeMounts removed - using pre-built image
               resources:
                 requests:
                   memory: "128Mi"
@@ -52,10 +46,7 @@ spec:
                 limits:
                   memory: "256Mi"
                   cpu: "200m"
-          volumes:
-            - name: app-code
-              persistentVolumeClaim:
-                claimName: keeperhub-code-pvc
+          # volumes removed - using pre-built image
           restartPolicy: OnFailure
       backoffLimit: 2
 ---

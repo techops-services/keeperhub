@@ -40,7 +40,7 @@ args:
   - "-c"
   - |
     echo "$(date) - [Scheduler] Starting..."
-    tsx scripts/job-spawner.ts
+    bun scripts/job-spawner.ts
 
 env:
   DATABASE_URL:
@@ -82,7 +82,7 @@ livenessProbe:
     command:
       - /bin/sh
       - -c
-      - "pgrep -f 'job-spawner' || exit 1"
+      - "pgrep -f 'bun' || exit 1"
   initialDelaySeconds: 30
   periodSeconds: 30
   failureThreshold: 3
@@ -91,6 +91,6 @@ readinessProbe:
     command:
       - /bin/sh
       - -c
-      - "pgrep -f 'job-spawner' || exit 1"
+      - "pgrep -f 'bun' || exit 1"
   initialDelaySeconds: 10
   periodSeconds: 10

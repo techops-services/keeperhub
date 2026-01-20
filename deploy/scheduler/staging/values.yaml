@@ -43,7 +43,7 @@ args:
   - "-c"
   - |
     echo "$(date) - [Scheduler] Starting..."
-    tsx scripts/job-spawner.ts
+    bun scripts/job-spawner.ts
 
 env:
   # Database connection
@@ -83,13 +83,13 @@ env:
 externalSecrets:
   clusterSecretStoreName: maker-staging
 
-# Exec probe to check if the node process is running
+# Exec probe to check if the bun process is running
 livenessProbe:
   exec:
     command:
       - /bin/sh
       - -c
-      - "pgrep -f 'job-spawner' || exit 1"
+      - "pgrep -f 'bun' || exit 1"
   initialDelaySeconds: 30
   periodSeconds: 30
   failureThreshold: 3
@@ -98,6 +98,6 @@ readinessProbe:
     command:
       - /bin/sh
       - -c
-      - "pgrep -f 'job-spawner' || exit 1"
+      - "pgrep -f 'bun' || exit 1"
   initialDelaySeconds: 10
   periodSeconds: 10
