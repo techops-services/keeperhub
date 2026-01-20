@@ -47,9 +47,9 @@ env:
   KEEPERHUB_API_URL:
     type: kv
     value: "http://keeperhub-common:3000"
-  EVENTS_SERVICE_API_KEY:
+  KEEPERHUB_API_KEY:
     type: parameterStore
-    name: events-service-api-key
+    name: keeperhub-api-key
     parameter_name: /eks/maker-prod/keeperhub-events/keeperhub-api-key
   TIMEOUT_BETWEEN_SYNC:
     type: parameterStore
