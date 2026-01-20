@@ -35,15 +35,15 @@ import { CronExpressionParser } from "cron-parser";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { validateWorkflowIntegrations } from "../lib/db/integrations";
+import { validateWorkflowIntegrations } from "../../lib/db/integrations";
 import {
   workflowExecutions,
   workflowSchedules,
   workflows,
-} from "../lib/db/schema";
-import { executeWorkflow } from "../lib/workflow-executor.workflow";
-import { calculateTotalSteps } from "../lib/workflow-progress";
-import type { WorkflowEdge, WorkflowNode } from "../lib/workflow-store";
+} from "../../lib/db/schema";
+import { executeWorkflow } from "../../lib/workflow-executor.workflow";
+import { calculateTotalSteps } from "../../lib/workflow-progress";
+import type { WorkflowEdge, WorkflowNode } from "../../lib/workflow-store";
 
 // ============================================================================
 // Profiler Types

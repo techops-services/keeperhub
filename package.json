@@ -30,8 +30,9 @@
     "test:e2e:schedule:full": "FULL_E2E=true vitest run tests/e2e/schedule-pipeline.test.ts",
     "profile:analyze": "tsx scripts/workflow_runtime_analysis/analyze-steps.ts",
     "profile:step": "tsx scripts/workflow_runtime_analysis/profile-step.ts",
-    "profile:workflow": "tsx scripts/workflow_runtime_analysis/workflow-runner-profiled.ts",
-    "profile:calibrate": "tsx scripts/workflow_runtime_analysis/calibrate-wasm-fuel.ts"
+    "profile:workflow": "node scripts/workflow_runtime_analysis/workflow-runner-profiled-bootstrap.cjs",
+    "profile:calibrate": "tsx scripts/workflow_runtime_analysis/calibrate-wasm-fuel.ts",
+    "profile:report": "tsx scripts/workflow_runtime_analysis/generate-report.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.54",

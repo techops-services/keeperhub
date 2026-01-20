@@ -7,21 +7,22 @@
  * secure-javascript-sandbox. Used to establish baselines for operation counting.
  *
  * Prerequisites:
- *   docker pull forbeslindesay/secure-js-sandbox
+ *   docker compose --profile profile-workflows up -d
  *
  * Usage:
- *   # Start sandbox in background, then run calibration
- *   docker run --rm -d -p 3000:3000 --name js-sandbox forbeslindesay/secure-js-sandbox
- *   pnpm tsx scripts/calibrate-wasm-fuel.ts
+ *   # Start profiling infrastructure (includes js-sandbox on port 3001)
+ *   docker compose --profile profile-workflows up -d
+ *   pnpm profile:calibrate
  *
- *   # Or with custom sandbox URL
- *   SANDBOX_URL=http://localhost:3000 pnpm tsx scripts/calibrate-wasm-fuel.ts
+ *   # Or run sandbox manually on different port
+ *   docker run --rm -d -p 3002:3000 --name js-sandbox forbeslindesay/secure-js-sandbox
+ *   SANDBOX_URL=http://localhost:3002 pnpm profile:calibrate
  *
  *   # Cleanup
- *   docker stop js-sandbox
+ *   docker compose --profile profile-workflows down
  */
 
-const SANDBOX_URL = process.env.SANDBOX_URL || "http://localhost:3000";
+const SANDBOX_URL = process.env.SANDBOX_URL || "http://localhost:3001";
 
 // ============================================================================
 // Types

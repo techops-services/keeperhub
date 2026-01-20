@@ -2,14 +2,16 @@
 # KeeperHub Docker Compose
 #
 # Profiles:
-#   dev      - Full development stack (no K8s Jobs, dispatcher runs as cron)
-#   minikube - Hybrid mode (services in Docker, job-spawner in Minikube)
-#   prod     - Production-ready containers
+#   dev              - Full development stack (no K8s Jobs, dispatcher runs as cron)
+#   minikube         - Hybrid mode (services in Docker, job-spawner in Minikube)
+#   prod             - Production-ready containers
+#   profile-workflows - Workflow profiling tools (js-sandbox for WASM fuel calibration)
 #
 # Usage:
-#   docker compose --profile dev up -d        # Development (no K8s)
-#   docker compose --profile minikube up -d   # Hybrid mode
-#   make hybrid-setup                         # Full hybrid setup
+#   docker compose --profile dev up -d              # Development (no K8s)
+#   docker compose --profile minikube up -d         # Hybrid mode
+#   docker compose --profile profile-workflows up -d # Profiling tools
+#   make hybrid-setup                               # Full hybrid setup
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -70,6 +72,7 @@ services:
     profiles:
       - dev
       - minikube
+      - profile-workflows
 
   # ===========================================================================
   # LocalStack (SQS)
@@ -228,6 +231,43 @@ services:
     profiles:
       - migrator
 
+  # ===========================================================================
+  # Workflow Profiling Tools
+  # ===========================================================================
+
+  # JS Sandbox for WASM fuel calibration
+  # Uses Spidermonkey compiled to WASM for deterministic instruction counting
+  # See: scripts/workflow_runtime_analysis/calibrate-wasm-fuel.ts
+  js-sandbox:
+    image: forbeslindesay/secure-js-sandbox:latest
+    container_name: keeperhub-js-sandbox
+    hostname: js-sandbox
+    ports:
+      - "3001:3000"  # External 3001 to avoid conflict with app on 3000
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    profiles:
+      - profile-workflows
+
+  # Redis for caching and session management
+  redis:
+    image: redis:7-alpine
+    container_name: keeperhub-redis
+    hostname: redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    profiles:
+      - dev
+      - minikube
+
 # =============================================================================
 # Volumes
 # =============================================================================
@@ -245,3 +285,4 @@ volumes:
 networks:
   default:
     name: keeperhub-network
+    external: true
