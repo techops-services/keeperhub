@@ -1,8 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,9 +19,13 @@ import { authClient, useSession } from "@/lib/auth-client";
 
 type WorkflowTemplateGridProps = {
   workflows: SavedWorkflow[];
+  isFeatured?: boolean;
 };
 
-export function WorkflowTemplateGrid({ workflows }: WorkflowTemplateGridProps) {
+export function WorkflowTemplateGrid({
+  workflows,
+  isFeatured = false,
+}: WorkflowTemplateGridProps) {
   const router = useRouter();
   const { data: session } = useSession();
   const [duplicatingIds, setDuplicatingIds] = useState<Set<string>>(new Set());
@@ -60,7 +66,9 @@ export function WorkflowTemplateGrid({ workflows }: WorkflowTemplateGridProps) {
     return (
       <div className="">
         <p className="text-muted-foreground">
-          No public workflows available yet.
+          {isFeatured
+            ? "No featured workflows available yet."
+            : "No public workflows available yet."}
         </p>
       </div>
     );
@@ -80,9 +88,25 @@ export function WorkflowTemplateGrid({ workflows }: WorkflowTemplateGridProps) {
           : 0;
 
         return (
-          <Card className="flex flex-col" key={workflow.id}>
+          <Card className="flex flex-col overflow-hidden" key={workflow.id}>
+            {isFeatured && workflow.displayImage && (
+              <div className="relative -mt-6 aspect-video w-full overflow-hidden">
+                <Image
+                  alt={workflow.name}
+                  className="object-cover"
+                  fill
+                  src={workflow.displayImage}
+                  unoptimized
+                />
+              </div>
+            )}
             <CardHeader>
-              <CardTitle className="line-clamp-2">{workflow.name}</CardTitle>
+              <div className="flex items-start justify-between gap-2">
+                <CardTitle className="line-clamp-2">{workflow.name}</CardTitle>
+                {isFeatured && workflow.category && (
+                  <Badge variant="secondary">{workflow.category}</Badge>
+                )}
+              </div>
               {workflow.description && (
                 <CardDescription className="line-clamp-2">
                   {workflow.description}

@@ -36,9 +36,9 @@ Note: `description` already exists on the workflow table.
 
 ## API Changes
 
-### 1. Hub Service Endpoint: Promote/Update Template
+### 1. Hub Service Endpoint: Promote/Update Featured Workflow
 
-**Route:** `POST /keeperhub/api/hub/templates`
+**Route:** `POST /keeperhub/api/hub/featured`
 
 **Authentication:** Internal service key via `X-Service-Key` header
 
@@ -72,7 +72,7 @@ Note: `description` already exists on the workflow table.
 
 **Usage:**
 ```bash
-curl -X POST https://app.keeperhub.com/api/hub/templates \
+curl -X POST https://app.keeperhub.com/api/hub/featured \
   -H "Content-Type: application/json" \
   -H "X-Service-Key: $HUB_SERVICE_API_KEY" \
   -d '{
@@ -120,10 +120,10 @@ if (!auth.authenticated || auth.service !== 'hub') {
 
 #### Field Restriction (Allowlist)
 
-The hub service endpoint restricts which workflow fields can be modified. Only template-specific fields are editable:
+The hub service endpoint restricts which workflow fields can be modified. Only featured-specific fields are editable:
 
 ```typescript
-const ALLOWED_TEMPLATE_FIELDS = [
+const ALLOWED_FEATURED_FIELDS = [
   'featured',
   'displayImage',
   'category',
@@ -140,11 +140,11 @@ const ALLOWED_TEMPLATE_FIELDS = [
 
 **Route:** `GET /api/workflows/public`
 
-**New Query Parameter:** `templates=true`
+**New Query Parameter:** `featured=true`
 
 **Behavior:**
-- `?templates=true` - Returns only workflows where `featured = true`, ordered by `featuredOrder DESC, updatedAt DESC`
-- No parameter or `templates=false` - Returns public workflows where `featured = false` (existing behavior)
+- `?featured=true` - Returns only workflows where `featured = true`, ordered by `featuredOrder DESC, updatedAt DESC`
+- No parameter or `featured=false` - Returns public workflows where `featured = false` (existing behavior)
 
 **Response Addition:**
 ```typescript
@@ -163,8 +163,8 @@ const ALLOWED_TEMPLATE_FIELDS = [
 
 Location: `app/hub/page.tsx` and `keeperhub/components/hub/workflow-template-grid.tsx`
 
-1. Fetch templates via `/api/workflows/public?templates=true`
-2. Display templates section with:
+1. Fetch featured workflows via `/api/workflows/public?featured=true`
+2. Display featured section with:
    - Display image (if available, fallback to placeholder)
    - Name and description
    - Category badge (if set)
@@ -187,7 +187,7 @@ Following KeeperHub custom code policy:
 | Change | Location |
 |--------|----------|
 | Schema fields | `lib/db/schema.ts` (within markers) |
-| Hub service endpoint | `keeperhub/api/hub/templates/route.ts` |
+| Hub service endpoint | `keeperhub/api/hub/featured/route.ts` |
 | Service auth update | `keeperhub/lib/internal-service-auth.ts` |
 | Public API filter | `app/api/workflows/public/route.ts` (within markers) |
 | Hub UI updates | `keeperhub/components/hub/workflow-template-grid.tsx` |
@@ -197,9 +197,9 @@ Following KeeperHub custom code policy:
 1. Add schema fields to `lib/db/schema.ts`
 2. Run `pnpm db:push` to apply migration
 3. Add `hub` to allowed services in `internal-service-auth.ts`
-4. Create hub service endpoint at `keeperhub/api/hub/templates/route.ts`
-5. Update `/api/workflows/public` to support `?templates=true` filter
-6. Update Hub UI to fetch and display templates
+4. Create hub service endpoint at `keeperhub/api/hub/featured/route.ts`
+5. Update `/api/workflows/public` to support `?featured=true` filter
+6. Update Hub UI to fetch and display featured workflows
 7. Add `HUB_SERVICE_API_KEY` to environment variables
 
 ## Environment Variables
