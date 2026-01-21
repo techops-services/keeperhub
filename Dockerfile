@@ -1,41 +1,51 @@
-# Multi-stage Dockerfile for Next.js application
-# Stage 1: Dependencies
-FROM node:25-alpine AS deps
+# Multi-stage Dockerfile for Next.js application (Hybrid Node.js + Bun)
+#
+# Strategy:
+# - Node.js for production app (full Sentry tracing support)
+# - Bun for background services (faster startup, native TypeScript)
+#
+# See docs/keeperhub/KEEP-1241/ for migration notes and known issues.
+#
+# =============================================================================
+# Stage 1: Dependencies (Bun for fast installs)
+# =============================================================================
+FROM oven/bun:1.2-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm
-
-# Copy package files
-COPY package.json pnpm-lock.yaml* ./
+# Copy package files (supports both pnpm and bun lockfiles)
+COPY package.json pnpm-lock.yaml* bun.lockb* ./
 COPY .npmrc* ./
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install dependencies with Bun (faster than pnpm/npm)
+RUN bun install --frozen-lockfile
 
+# =============================================================================
 # Stage 2: Source (dependencies + source files, no build)
-FROM node:25-alpine AS source
+# =============================================================================
+FROM oven/bun:1.2-alpine AS source
 WORKDIR /app
-RUN npm install -g pnpm
 
 # Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# =============================================================================
 # Stage 2.5: Builder (runs Next.js build, only needed for runner stage)
+# =============================================================================
 FROM source AS builder
 
 # Create README.md if it doesn't exist to avoid build errors
 RUN touch README.md || true
 
 # Build the application
-RUN pnpm build
+RUN bun run build
 
-# Stage 2.6: Migration stage (for running migrations and seeding)
-FROM node:25-alpine AS migrator
+# =============================================================================
+# Stage 2.6: Migration stage (Bun - no tracing needed)
+# =============================================================================
+FROM oven/bun:1.2-alpine AS migrator
 WORKDIR /app
-RUN npm install -g pnpm tsx
 
 # Copy dependencies, migration files, and seed scripts
 COPY --from=deps /app/node_modules ./node_modules
@@ -49,14 +59,16 @@ COPY --from=source /app/tsconfig.json ./tsconfig.json
 
 # This stage runs migrations and seeds default data
 # Build with: docker build --target migrator -t keeperhub-migrator .
-# Run setup (migrations + seed): docker run --env DATABASE_URL=xxx keeperhub-migrator pnpm db:setup
-# Run migrations only: docker run --env DATABASE_URL=xxx keeperhub-migrator pnpm db:migrate
-# Run seed only: docker run --env DATABASE_URL=xxx keeperhub-migrator pnpm db:seed
+# Run setup (migrations + seed): docker run --env DATABASE_URL=xxx keeperhub-migrator bun run db:setup
+# Run migrations only: docker run --env DATABASE_URL=xxx keeperhub-migrator bun run db:migrate
+# Run seed only: docker run --env DATABASE_URL=xxx keeperhub-migrator bun run db:seed
 
-# Stage 2.7: Scheduler stage (for schedule dispatcher and job spawner)
-FROM node:25-alpine AS scheduler
+# =============================================================================
+# Stage 2.7: Scheduler stage (Bun - no tracing needed)
+# For schedule dispatcher and job spawner - background processes
+# =============================================================================
+FROM oven/bun:1.2-alpine AS scheduler
 WORKDIR /app
-RUN npm install -g pnpm tsx
 
 # Copy dependencies and scheduler files
 COPY --from=deps /app/node_modules ./node_modules
@@ -73,13 +85,15 @@ ENV NODE_ENV=production
 # - Job spawner (Deployment): polls SQS, creates K8s Jobs
 #
 # Build with: docker build --target scheduler -t keeperhub-scheduler .
-# Run dispatcher: docker run keeperhub-scheduler tsx scripts/schedule-dispatcher.ts
-# Run job spawner: docker run keeperhub-scheduler tsx scripts/job-spawner.ts
+# Run dispatcher: docker run keeperhub-scheduler bun scripts/schedule-dispatcher.ts
+# Run job spawner: docker run keeperhub-scheduler bun scripts/job-spawner.ts
 
-# Stage 2.8: Workflow Runner stage (for executing workflows in K8s Jobs)
-FROM node:25-alpine AS workflow-runner
+# =============================================================================
+# Stage 2.8: Workflow Runner stage (Bun - no tracing needed)
+# Executes workflows in K8s Jobs - errors logged to DB
+# =============================================================================
+FROM oven/bun:1.2-alpine AS workflow-runner
 WORKDIR /app
-RUN npm install -g pnpm tsx
 
 # Copy dependencies and workflow execution files
 COPY --from=deps /app/node_modules ./node_modules
@@ -100,7 +114,6 @@ COPY --from=builder /app/keeperhub/plugins/index.ts ./keeperhub/plugins/index.ts
 
 # Create a shim for 'server-only' package - the runner runs outside Next.js
 # so we replace the package with an empty module that doesn't throw
-# We need to replace it in the .pnpm folder where the actual package lives
 RUN find /app/node_modules -path "*server-only*/index.js" | while read f; do echo 'module.exports = {};' > "$f"; done
 
 ENV NODE_ENV=production
@@ -110,10 +123,13 @@ ENV NODE_ENV=production
 #   WORKFLOW_ID, EXECUTION_ID, SCHEDULE_ID, WORKFLOW_INPUT, DATABASE_URL
 #
 # Build with: docker build --target workflow-runner -t keeperhub-runner .
-CMD ["tsx", "scripts/workflow-runner.ts"]
+CMD ["bun", "scripts/workflow-runner.ts"]
 
-# Stage 3: Runner (main Next.js app)
-FROM node:25-alpine AS runner
+# =============================================================================
+# Stage 3: Runner (Bun - EXPERIMENTAL full Bun runtime)
+# Bun has AsyncLocalStorage implemented - testing if Sentry tracing works
+# =============================================================================
+FROM oven/bun:1.2-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -136,7 +152,8 @@ EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3000/ || exit 1
+  CMD wget -q --spider http://localhost:3000/ || exit 1
 
-# Start the application
-CMD ["node", "server.js"]
+# Start the application with Bun
+# Note: AsyncLocalStorage is implemented, testing if Sentry tracing works
+CMD ["bun", "server.js"]

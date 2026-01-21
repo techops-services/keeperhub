@@ -51,9 +51,9 @@ deployment:
       args:
         - |
           echo "Running database migrations..."
-          pnpm db:push
+          bun run db:push
           echo "Seeding chains..."
-          pnpm db:seed
+          bun run db:seed
           echo "Migrations and seeding completed successfully"
       env: *shared_env
 
@@ -100,9 +100,8 @@ env:
   METRICS_COLLECTOR:
     type: kv
     value: "prometheus"
-  NODE_OPTIONS:
-    type: kv
-    value: "--enable-source-maps"
+  # NODE_OPTIONS removed - using Bun runtime which doesn't use Node.js flags
+  # Bun has source maps enabled by default
   HOSTNAME:
     type: kv
     value: "0.0.0.0"
@@ -247,7 +246,7 @@ cronjob:
       command: ["/bin/sh"]
       args:
         - "-c"
-        - "echo $(date) - [Dispatcher] Starting && tsx scripts/schedule-dispatcher.ts && echo $(date) - [Dispatcher] Completed"
+        - "echo $(date) - [Dispatcher] Starting && bun scripts/schedule-dispatcher.ts && echo $(date) - [Dispatcher] Completed"
       serviceAccount:
         name: "keeperhub-prod"
       resources:

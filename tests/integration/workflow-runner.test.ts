@@ -437,12 +437,18 @@ describe("workflow-runner output validation", () => {
       const result = await waitForExit(testProcess, SHUTDOWN_WAIT);
 
       // Process should exit properly
-      expect(result.exitCode === 1 || result.signal === "SIGTERM").toBe(true);
+      // Exit code 1 (Node.js), 143 (Bun: 128+SIGTERM), or signal SIGTERM
+      expect(
+        result.exitCode === 1 ||
+          result.exitCode === 143 ||
+          result.signal === "SIGTERM"
+      ).toBe(true);
 
-      // Check output - should see the Runner logs if we captured output
-      // Note: Output capture depends on timing and may not always succeed
+      // Check output if available - signal handling may not flush logs before exit
+      // Bun may not flush stdout/stderr before SIGTERM kills the process
       const output = result.stdout + result.stderr;
       if (output.length > 0) {
+        // At minimum we should see the Runner starting (if any output)
         expect(output).toMatch(RUNNER_LOG_PATTERN);
       }
     });
