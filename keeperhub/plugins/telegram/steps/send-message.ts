@@ -3,7 +3,6 @@ import "server-only";
 import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 import { fetchCredentials } from "@/lib/credential-fetcher";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
-import { getErrorMessage } from "@/lib/utils";
 import type { TelegramCredentials } from "../credentials";
 
 type TelegramApiResponse = {
@@ -28,12 +27,93 @@ type SendTelegramMessageResult =
 export type SendTelegramMessageCoreInput = {
   chatId: string;
   message: string;
+  parseMode?: string;
 };
 
 export type SendTelegramMessageInput = StepInput &
   SendTelegramMessageCoreInput & {
     integrationId: string;
   };
+
+/**
+ * Enhance error message for MarkdownV2 parsing errors
+ */
+function enhanceErrorMessage(
+  description: string | undefined,
+  parseMode: string | undefined
+): string {
+  if (
+    parseMode === "MarkdownV2" &&
+    description?.includes("can't parse entities") &&
+    description?.includes("reserved and must be escaped")
+  ) {
+    return `${description} When using MarkdownV2, special characters (., -, _, *, [, ], (, ), ~, \`, >, #, +, =, |, {, }, !) must be escaped with a backslash (\\) before them.`;
+  }
+  return description || "Failed to send Telegram message";
+}
+
+/**
+ * Send a message to Telegram API
+ */
+async function sendMessage(
+  apiUrl: string,
+  params: URLSearchParams,
+  parseMode: string | undefined
+): Promise<SendTelegramMessageResult> {
+  try {
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: params.toString(),
+    });
+
+    if (!response.ok) {
+      const errorData = (await response
+        .json()
+        .catch(() => ({}))) as TelegramApiResponse;
+      console.error("[Telegram] HTTP error response:", {
+        status: response.status,
+        statusText: response.statusText,
+        errorData,
+      });
+      return {
+        success: false,
+        error:
+          errorData.description ||
+          `HTTP ${response.status}: Failed to send Telegram message`,
+      };
+    }
+
+    const data = (await response
+      .json()
+      .catch(() => ({}))) as TelegramApiResponse;
+    console.log("[Telegram] Response data:", data);
+
+    if (!data.ok) {
+      console.error("[Telegram] API error in response:", data);
+      return {
+        success: false,
+        error:
+          enhanceErrorMessage(data.description, parseMode) ||
+          `HTTP ${response.status}: Failed to send Telegram message`,
+      };
+    }
+
+    console.log("[Telegram] Message sent successfully");
+    return {
+      success: true,
+      messageId: data.result?.message_id || 0,
+    };
+  } catch (error) {
+    console.error("[Telegram] Fetch error:", error);
+    return {
+      success: false,
+      error: `Failed to send Telegram message: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
 
 /**
  * Core logic - portable between app and export
@@ -71,45 +151,30 @@ async function stepHandler(
     };
   }
 
+  const apiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+
+  // Build request body as URLSearchParams
+  const params = new URLSearchParams({
+    chat_id: input.chatId,
+    text: input.message,
+  });
+
+  // Only include parse_mode if it's provided and not "none"
+  if (
+    input.parseMode &&
+    input.parseMode !== "none" &&
+    input.parseMode.trim() !== ""
+  ) {
+    params.append("parse_mode", input.parseMode);
+  }
+
   try {
-    const apiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
-
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        chat_id: input.chatId,
-        text: input.message,
-      }),
-    });
-
-    const data = (await response
-      .json()
-      .catch(() => ({}))) as TelegramApiResponse;
-
-    if (!(response.ok && data.ok)) {
-      console.error("[Telegram] API error:", data);
-      return {
-        success: false,
-        error:
-          data.description ||
-          `HTTP ${response.status}: Failed to send Telegram message`,
-      };
-    }
-
-    console.log("[Telegram] Message sent successfully");
-
-    return {
-      success: true,
-      messageId: data.result?.message_id || 0,
-    };
+    return await sendMessage(apiUrl, params, input.parseMode);
   } catch (error) {
     console.error("[Telegram] Error sending message:", error);
     return {
       success: false,
-      error: `Failed to send Telegram message: ${getErrorMessage(error)}`,
+      error: `Failed to send Telegram message: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 }

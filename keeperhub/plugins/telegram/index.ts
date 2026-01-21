@@ -61,10 +61,25 @@ const telegramPlugin: IntegrationPlugin = {
           label: "Message",
           type: "template-textarea",
           placeholder:
-            "Your message. Use {{NodeName.field}} to insert data from previous nodes.",
+            "Your message. Use {{NodeName.field}} to insert data from previous nodes. Note: If using MarkdownV2, special characters (., -, _, *, [, ], (, ), ~, `, >, #, +, =, |, {, }, !) must be escaped with \\.",
           rows: 4,
           example: "Hello from my workflow!",
           required: true,
+        },
+        {
+          key: "parseMode",
+          label: "Parse Mode",
+          type: "select",
+          options: [
+            { value: "none", label: "None (Plain Text)" },
+            {
+              value: "MarkdownV2",
+              label: "MarkdownV2 (requires escaping special chars)",
+            },
+          ],
+          defaultValue: "none",
+          placeholder: "Select parse mode",
+          example: "none",
         },
       ],
     },
