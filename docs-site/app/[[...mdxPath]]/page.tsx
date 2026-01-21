@@ -4,8 +4,6 @@ import { useMDXComponents } from "../../mdx-components";
 
 export const generateStaticParams = generateStaticParamsFor("mdxPath");
 
-export const dynamicParams = false;
-
 export async function generateMetadata(props: PageProps) {
   const params = await props.params;
   try {
@@ -22,7 +20,14 @@ type PageProps = {
 
 export default async function Page(props: PageProps) {
   const params = await props.params;
-  const result = await importPage(params.mdxPath);
+
+  let result;
+  try {
+    result = await importPage(params.mdxPath);
+  } catch {
+    notFound();
+  }
+
   const { default: MDXContent, ...rest } = result;
   const Wrapper = useMDXComponents().wrapper;
 
