@@ -366,8 +366,22 @@ async function seedChains() {
       .limit(1);
 
     if (existing.length > 0) {
+      // Update existing explorer config with new values (except id and timestamps)
+      await db
+        .update(explorerConfigs)
+        .set({
+          chainType: config.chainType,
+          explorerUrl: config.explorerUrl,
+          explorerApiType: config.explorerApiType,
+          explorerApiUrl: config.explorerApiUrl,
+          explorerTxPath: config.explorerTxPath,
+          explorerAddressPath: config.explorerAddressPath,
+          explorerContractPath: config.explorerContractPath,
+          updatedAt: new Date(),
+        })
+        .where(eq(explorerConfigs.chainId, config.chainId));
       console.log(
-        `  - Explorer config for chain ${config.chainId} already exists, skipping`
+        `  ~ Explorer config for chain ${config.chainId} (${config.explorerApiType}) updated`
       );
       continue;
     }
