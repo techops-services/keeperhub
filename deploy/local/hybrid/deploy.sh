@@ -101,7 +101,12 @@ generate_manifest() {
     local ENCRYPTION_KEY="${INTEGRATION_ENCRYPTION_KEY:-$(openssl rand -hex 32 2>/dev/null || echo '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef')}"
     local ENCRYPTION_KEY_BASE64=$(echo -n "$ENCRYPTION_KEY" | base64 -w0)
 
+    # Support custom database name for worktrees (default: keeperhub)
+    # Uses POSTGRES_DB from .env for consistency with docker-compose
+    local DB_NAME="${POSTGRES_DB:-keeperhub}"
+
     log_info "Using encryption key (first 8 chars): ${ENCRYPTION_KEY:0:8}..."
+    log_info "Using database: $DB_NAME"
 
     # Generate the schedule-trigger.yaml with hybrid settings
     # First part with variable expansion for the secret
@@ -136,7 +141,7 @@ data:
   AWS_SECRET_ACCESS_KEY: "test"
   SQS_QUEUE_URL: "http://host.minikube.internal:4566/000000000000/keeperhub-workflow-queue"
   # Database - connects to Docker Compose PostgreSQL (port 5433 exposed on host)
-  DATABASE_URL: "postgresql://postgres:postgres@host.minikube.internal:5433/keeperhub"
+  DATABASE_URL: "postgresql://postgres:postgres@host.minikube.internal:5433/__DB_NAME__"
   # Job spawner settings
   RUNNER_IMAGE: "keeperhub-runner:latest"
   K8S_NAMESPACE: "local"
@@ -280,6 +285,10 @@ spec:
             periodSeconds: 30
             failureThreshold: 3
 EOF
+
+    # Replace placeholder with actual database name
+    sed -i "s/__DB_NAME__/$DB_NAME/g" "$SCRIPT_DIR/schedule-trigger-hybrid.yaml"
+
     log_info "Generated hybrid manifest: $SCRIPT_DIR/schedule-trigger-hybrid.yaml"
 }
 

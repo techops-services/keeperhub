@@ -247,6 +247,7 @@ describe.skipIf(shouldSkip)("Graceful Shutdown E2E", () => {
         nodes: [triggerNode, checkBalanceNode],
         edges: [{ id: "e1", source: "trigger_1", target: "check_1" }],
         visibility: "private",
+        enabled: true,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -326,6 +327,7 @@ describe.skipIf(shouldSkip)("Graceful Shutdown E2E", () => {
         nodes: [triggerNode, checkBalanceNode],
         edges: [{ id: "e1", source: "trigger_1", target: "check_1" }],
         visibility: "private",
+        enabled: true,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -420,6 +422,7 @@ describe.skipIf(shouldSkip)("Graceful Shutdown E2E", () => {
         nodes: [triggerNode, failingNode],
         edges: [{ id: "e1", source: "trigger_1", target: "fail_1" }],
         visibility: "private",
+        enabled: true,
         createdAt: new Date(),
         updatedAt: new Date(),
       });

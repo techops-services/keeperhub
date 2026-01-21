@@ -15,16 +15,16 @@
 
 import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { CronExpressionParser } from "cron-parser";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { workflowSchedules } from "../lib/db/schema";
+import { workflowSchedules, workflows } from "../lib/db/schema";
 
 // Database connection
 const connectionString =
   process.env.DATABASE_URL || "postgres://localhost:5432/workflow";
 const queryClient = postgres(connectionString);
-const db = drizzle(queryClient, { schema: { workflowSchedules } });
+const db = drizzle(queryClient, { schema: { workflowSchedules, workflows } });
 
 // SQS client - only use custom endpoint/credentials for local development
 const sqsConfig: ConstructorParameters<typeof SQSClient>[0] = {
@@ -116,7 +116,7 @@ async function dispatch(): Promise<{
     `[${runId}] Starting dispatch run at ${new Date().toISOString()}`
   );
 
-  // Query all enabled schedules
+  // Query all enabled schedules for enabled workflows
   const schedules = await db
     .select({
       id: workflowSchedules.id,
@@ -125,7 +125,10 @@ async function dispatch(): Promise<{
       timezone: workflowSchedules.timezone,
     })
     .from(workflowSchedules)
-    .where(eq(workflowSchedules.enabled, true));
+    .innerJoin(workflows, eq(workflowSchedules.workflowId, workflows.id))
+    .where(
+      and(eq(workflowSchedules.enabled, true), eq(workflows.enabled, true))
+    );
 
   console.log(`[${runId}] Found ${schedules.length} enabled schedules`);
 
