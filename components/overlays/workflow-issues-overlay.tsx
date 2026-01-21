@@ -50,6 +50,7 @@ type WorkflowIssuesOverlayProps = OverlayComponentProps<{
   issues: WorkflowIssues;
   onGoToStep: (nodeId: string, fieldKey?: string) => void;
   onRunAnyway: () => void;
+  actionLabel?: string;
 }>;
 
 export function WorkflowIssuesOverlay({
@@ -57,6 +58,7 @@ export function WorkflowIssuesOverlay({
   issues,
   onGoToStep,
   onRunAnyway,
+  actionLabel = "Run Anyway",
 }: WorkflowIssuesOverlayProps) {
   const { push, closeAll } = useOverlay();
   const setIntegrationsVersion = useSetAtom(integrationsVersionAtom);
@@ -120,7 +122,7 @@ export function WorkflowIssuesOverlay({
   return (
     <Overlay
       actions={[
-        { label: "Run Anyway", variant: "outline", onClick: handleRunAnyway },
+        { label: actionLabel, variant: "outline", onClick: handleRunAnyway },
         { label: "Cancel", onClick: closeAll },
       ]}
       overlayId={overlayId}

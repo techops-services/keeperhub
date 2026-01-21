@@ -161,7 +161,7 @@ process.on("SIGINT", () => handleGracefulShutdown("SIGINT"));
  */
 async function updateExecutionStatus(
   executionId: string,
-  status: "running" | "success" | "error",
+  status: "running" | "success" | "error" | "cancelled",
   result?: {
     output?: unknown;
     error?: string;
@@ -302,6 +302,16 @@ async function main(): Promise<void> {
 
     if (!workflow) {
       throw new Error(`Workflow not found: ${workflowId}`);
+    }
+
+    // Verify workflow is enabled (defense in depth - also checked by job-spawner/schedule-executor)
+    // Only skip if explicitly disabled (enabled === false), not if null/undefined
+    if (workflow.enabled === false) {
+      console.log(
+        `[Runner] Workflow disabled, skipping execution: ${workflowId}`
+      );
+      await updateExecutionStatus(executionId, "cancelled");
+      return;
     }
 
     console.log(`[Runner] Loaded workflow: ${workflow.name || workflowId}`);
