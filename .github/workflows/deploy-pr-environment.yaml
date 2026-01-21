@@ -209,15 +209,15 @@ jobs:
           DB_PASSWORD: ${{ steps.db-password.outputs.password }}
           SERVICE_ACCOUNT_ROLE_ARN: ${{ vars.KEEPERHUB_STAGING_SERVICE_ACCOUNT_ROLE_ARN }}
         run: |
-          envsubst < deploy/pr-environment/values.template.yaml > /tmp/values-pr-${{ env.PR_NUMBER }}.yaml
+          envsubst < deploy/pr-environment/values.template.yaml > ${{ github.workspace }}/values-pr-${{ env.PR_NUMBER }}.yaml
           echo "Generated Helm values:"
-          cat /tmp/values-pr-${{ env.PR_NUMBER }}.yaml
+          cat ${{ github.workspace }}/values-pr-${{ env.PR_NUMBER }}.yaml
 
       - name: Deploy Keeperhub application with Helm
         uses: bitovi/github-actions-deploy-eks-helm@v1.2.10
         with:
           cluster-name: ${{ env.CLUSTER_NAME }}
-          config-files: /tmp/values-pr-${{ env.PR_NUMBER }}.yaml
+          config-files: ${{ github.workspace }}/values-pr-${{ env.PR_NUMBER }}.yaml
           chart-path: techops-services/common
           namespace: ${{ env.NAMESPACE }}
           timeout: 10m0s
