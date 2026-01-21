@@ -267,20 +267,6 @@ describe("schedule-executor", () => {
       expect(shouldSkip).toBe(true);
     });
 
-    it("validates workflow is enabled before execution", () => {
-      const workflow = { enabled: false };
-      const shouldSkip = !workflow.enabled;
-
-      expect(shouldSkip).toBe(true);
-    });
-
-    it("allows execution when workflow is enabled", () => {
-      const workflow = { enabled: true };
-      const shouldSkip = !workflow.enabled;
-
-      expect(shouldSkip).toBe(false);
-    });
-
     it("validates schedule is enabled before execution", () => {
       const schedule = { enabled: false };
       const shouldSkip = !schedule.enabled;
@@ -291,21 +277,6 @@ describe("schedule-executor", () => {
     it("validates schedule exists before execution", () => {
       const schedule: null = null;
       const shouldSkip = !schedule;
-
-      expect(shouldSkip).toBe(true);
-    });
-
-    it("skips execution when workflow disabled after dispatch", () => {
-      // Simulates the race condition where workflow is disabled
-      // after dispatcher sends message but before executor processes it
-      const workflow = {
-        id: "wf_123",
-        enabled: false, // Disabled after dispatch
-        name: "Test Workflow",
-      };
-
-      // This is the check added to schedule-executor.ts
-      const shouldSkip = !workflow.enabled;
 
       expect(shouldSkip).toBe(true);
     });

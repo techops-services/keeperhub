@@ -249,6 +249,7 @@ describe.skipIf(SKIP_INFRA_TESTS)("Full Pipeline E2E", () => {
       nodes: [triggerNode, checkBalanceNode],
       edges: [{ id: "e1", source: "trigger_1", target: "check_balance_1" }],
       visibility: "private",
+      enabled: true,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -650,6 +651,7 @@ describe.skipIf(SKIP_INFRA_TESTS)("Full Pipeline E2E", () => {
         nodes: [triggerNode, badNode],
         edges: [{ id: "e1", source: "trigger_1", target: "bad_1" }],
         visibility: "private",
+        enabled: true,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -976,42 +978,27 @@ describe.skipIf(SKIP_INFRA_TESTS)("Full Pipeline E2E", () => {
           startedAt: new Date(),
         });
 
-        // Step 7: Run workflow-runner (should check workflow.enabled and skip)
-        // The check in schedule-executor.ts and job-spawner.ts prevents this
+        // Step 7: Run workflow-runner - it should detect the disabled workflow
+        // and cancel the execution (defense in depth check)
         const result = await runWorkflowRunner(workflowId, executionId, {
           scheduleId,
           timeout: PIPELINE_TIMEOUT,
         });
 
-        // With the fix in KEEP-1253, the runner/executor should detect disabled workflow
-        // and either skip or mark as skipped. The exit code depends on implementation:
-        // - If it logs and skips gracefully: exit 0
-        // - If workflow fails to run: execution status shows the skip reason
-        console.log(
-          `[Test] Disabled workflow runner result: exit=${result.exitCode}`
+        // Runner should exit cleanly (0) after detecting disabled workflow
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout).toContain(
+          "Workflow disabled, skipping execution"
         );
-        console.log(`[Test] stdout: ${result.stdout}`);
 
-        // Verify the execution was recorded appropriately
+        // Verify the execution was marked as cancelled
         const execution = await db
           .select()
           .from(workflowExecutions)
           .where(eq(workflowExecutions.id, executionId))
           .limit(1);
 
-        // The execution should either be:
-        // - skipped/cancelled (if the runner checks workflow.enabled)
-        // - error with message about disabled workflow
-        // - success if workflow ran anyway (which would indicate the check failed)
-        console.log(`[Test] Execution status: ${execution[0]?.status}`);
-
-        // The key verification: if workflow is disabled, it should not complete successfully
-        // unless the check is missing (which this test helps catch)
-        if (execution[0]?.status === "success") {
-          console.warn(
-            "[Test] WARNING: Disabled workflow executed successfully - check may be missing"
-          );
-        }
+        expect(execution[0]?.status).toBe("cancelled");
       },
       PIPELINE_TIMEOUT
     );
