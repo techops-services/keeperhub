@@ -1,12 +1,19 @@
 import { generateStaticParamsFor, importPage } from "nextra/pages";
+import { notFound } from "next/navigation";
 import { useMDXComponents } from "../../mdx-components";
 
 export const generateStaticParams = generateStaticParamsFor("mdxPath");
 
+export const dynamicParams = false;
+
 export async function generateMetadata(props: PageProps) {
   const params = await props.params;
-  const { metadata } = await importPage(params.mdxPath);
-  return metadata;
+  try {
+    const { metadata } = await importPage(params.mdxPath);
+    return metadata;
+  } catch {
+    return { title: "Not Found" };
+  }
 }
 
 type PageProps = {
