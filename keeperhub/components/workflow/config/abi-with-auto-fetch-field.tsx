@@ -158,6 +158,7 @@ export function AbiWithAutoFetchField({
   const [implementationAbi, setImplementationAbi] = useState<string | null>(
     null
   );
+  // Diamond contract state
   const [isDiamond, setIsDiamond] = useState(false);
   const [chains, setChains] = useState<ChainResponse[]>([]);
 
@@ -180,6 +181,7 @@ export function AbiWithAutoFetchField({
   }, []);
 
   // Sync ABI when toggle state changes for regular proxies
+  // Use a ref to track the last synced toggle state to avoid infinite loops
   const lastUseProxyAbiRef = useRef<boolean | null>(null);
 
   const abiToString = useCallback((abi: string | null): string | null => {
@@ -270,12 +272,7 @@ export function AbiWithAutoFetchField({
     [contractAddress, onChange]
   );
 
-  const handleFetchAbi = async () => {
-    if (!(isValidAddress && network)) {
-      setError("Please enter a valid contract address and select a network");
-      return;
-    }
-
+  const performAbiFetch = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     resetProxyState();
@@ -334,7 +331,22 @@ export function AbiWithAutoFetchField({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [
+    contractAddress,
+    network,
+    onChange,
+    resetProxyState,
+    handleDiamondContract,
+    handleProxyContract,
+  ]);
+
+  const handleFetchAbi = useCallback(async () => {
+    if (!(isValidAddress && network)) {
+      setError("Please enter a valid contract address and select a network");
+      return;
+    }
+    await performAbiFetch();
+  }, [isValidAddress, network, performAbiFetch]);
 
   const fetchProxyAbi = useCallback(async (): Promise<string> => {
     if (!proxyAddress) {
@@ -478,9 +490,15 @@ export function AbiWithAutoFetchField({
 
       {!(useManualAbi || error) && (
         <p className="text-muted-foreground text-xs">
-          {isValidAddress && network
-            ? "Click the button above to fetch the ABI from Etherscan"
-            : "Enter a contract address and select a network to fetch the ABI"}
+          {(() => {
+            if (!(isValidAddress && network)) {
+              return "Enter a contract address and select a network to fetch the ABI";
+            }
+            if (isLoading) {
+              return "Fetching ABI from Etherscan...";
+            }
+            return "ABI will be fetched automatically, or click the button above to fetch manually";
+          })()}
         </p>
       )}
     </div>
