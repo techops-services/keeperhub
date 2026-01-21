@@ -1,5 +1,4 @@
 import { generateStaticParamsFor, importPage } from "nextra/pages";
-import { notFound } from "next/navigation";
 import { useMDXComponents } from "../../mdx-components";
 
 export const generateStaticParams = generateStaticParamsFor("mdxPath");
