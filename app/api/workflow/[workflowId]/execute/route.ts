@@ -18,7 +18,6 @@ import { workflowExecutions, workflows } from "@/lib/db/schema";
 import { executeWorkflow } from "@/lib/workflow-executor.workflow";
 import type { WorkflowEdge, WorkflowNode } from "@/lib/workflow-store";
 
-// biome-ignore lint/nursery/useMaxParams: Background execution requires all workflow context
 async function executeWorkflowBackground(
   executionId: string,
   workflowId: string,

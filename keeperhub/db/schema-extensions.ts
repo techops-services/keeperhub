@@ -16,6 +16,8 @@ import {
   index,
   integer,
   pgTable,
+  primaryKey,
+  serial,
   text,
   timestamp,
   unique,
@@ -166,3 +168,75 @@ export const supportedTokens = pgTable(
 // Type exports for Supported Tokens table
 export type SupportedToken = typeof supportedTokens.$inferSelect;
 export type NewSupportedToken = typeof supportedTokens.$inferInsert;
+
+/**
+ * Wallet Locks table
+ *
+ * Tracks which execution currently holds the lock for a wallet+chain combination.
+ * PostgreSQL advisory locks don't persist lock holder info, so we track it here.
+ *
+ * Used by NonceManager to:
+ * - Prevent concurrent workflows from conflicting on nonce assignment
+ * - Detect and recover from stale locks (crash recovery)
+ *
+ * NOTE: The actual locking is done via pg_advisory_lock(), this table only tracks metadata.
+ */
+export const walletLocks = pgTable(
+  "wallet_locks",
+  {
+    walletAddress: text("wallet_address").notNull(),
+    chainId: integer("chain_id").notNull(),
+    lockedBy: text("locked_by"), // execution ID that holds the lock (null = unlocked)
+    lockedAt: timestamp("locked_at", { withTimezone: true }),
+  },
+  (table) => [primaryKey({ columns: [table.walletAddress, table.chainId] })]
+);
+
+// Type exports for Wallet Locks table
+export type WalletLock = typeof walletLocks.$inferSelect;
+export type NewWalletLock = typeof walletLocks.$inferInsert;
+
+/**
+ * Pending Transactions table
+ *
+ * Tracks pending blockchain transactions for validation and recovery.
+ * Used by NonceManager to:
+ * - Reconcile pending txs with chain state at workflow start
+ * - Detect stuck transactions that may need gas bumping
+ * - Provide observability into transaction state
+ *
+ * Status lifecycle: pending -> confirmed | dropped | replaced
+ */
+export const pendingTransactions = pgTable(
+  "pending_transactions",
+  {
+    id: serial("id").primaryKey(),
+    walletAddress: text("wallet_address").notNull(),
+    chainId: integer("chain_id").notNull(),
+    nonce: integer("nonce").notNull(),
+    txHash: text("tx_hash").notNull(),
+    executionId: text("execution_id").notNull(),
+    workflowId: text("workflow_id"),
+    gasPrice: text("gas_price"), // for stuck tx analysis
+    submittedAt: timestamp("submitted_at", { withTimezone: true }).defaultNow(),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    status: text("status").default("pending"), // pending, confirmed, dropped, replaced
+  },
+  (table) => [
+    unique("pending_tx_wallet_chain_nonce").on(
+      table.walletAddress,
+      table.chainId,
+      table.nonce
+    ),
+    index("idx_pending_tx_status").on(
+      table.walletAddress,
+      table.chainId,
+      table.status
+    ),
+    index("idx_pending_tx_execution").on(table.executionId),
+  ]
+);
+
+// Type exports for Pending Transactions table
+export type PendingTransaction = typeof pendingTransactions.$inferSelect;
+export type NewPendingTransaction = typeof pendingTransactions.$inferInsert;

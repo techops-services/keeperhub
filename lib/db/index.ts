@@ -11,12 +11,14 @@ import {
   integrations,
   // start custom keeperhub code //
   organizationApiKeys,
+  pendingTransactions,
   // end keeperhub code //
   sessions,
   userRpcPreferences,
   userRpcPreferencesRelations,
   users,
   verifications,
+  walletLocks,
   workflowExecutionLogs,
   workflowExecutions,
   workflowExecutionsRelations,
@@ -40,6 +42,8 @@ const schema = {
   apiKeys,
   // start custom keeperhub code //
   organizationApiKeys,
+  pendingTransactions,
+  walletLocks,
   // end keeperhub code //
   integrations,
   chains,

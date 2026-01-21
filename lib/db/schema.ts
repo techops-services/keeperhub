@@ -223,7 +223,6 @@ export const workflowExecutionLogs = pgTable("workflow_execution_logs", {
 
 // KeeperHub: Para Wallets, Organization API Keys, and Organization Tokens (imported from KeeperHub schema extensions)
 // Note: Using relative path instead of @/ alias for drizzle-kit compatibility
-// biome-ignore lint/performance/noBarrelFile: Intentional re-export for schema extensions
 export {
   type NewOrganizationApiKey,
   type NewOrganizationToken,
@@ -234,9 +233,13 @@ export {
   organizationApiKeys,
   organizationTokens,
   type ParaWallet,
+  type PendingTransaction,
   paraWallets,
+  pendingTransactions,
   type SupportedToken,
   supportedTokens,
+  type WalletLock,
+  walletLocks,
 } from "../../keeperhub/db/schema-extensions";
 
 // API Keys table for webhook authentication
@@ -312,6 +315,8 @@ export const chains = pgTable(
     defaultFallbackWss: text("default_fallback_wss"),
     isTestnet: boolean("is_testnet").default(false),
     isEnabled: boolean("is_enabled").default(true), // Can disable chains
+    // KEEP-1240: Chain-specific gas configuration
+    gasConfig: jsonb("gas_config").default({}),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },

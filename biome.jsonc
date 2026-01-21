@@ -12,7 +12,25 @@
       "!app/api/ai-gateway",
       "!lib/ai-gateway",
       "!components/workflow/config/action-grid.tsx",
-      "!lib/rpc/index.ts"
+      "!lib/rpc/index.ts",
+      "!drizzle/meta"
     ]
+  },
+  "linter": {
+    "rules": {
+      "performance": {
+        // Barrel files are a standard pattern for module exports
+        "noBarrelFile": "off"
+      },
+      "suspicious": {
+        // Bitwise operators are legitimate for hashing/masking
+        "noBitwiseOperators": "off"
+      },
+      "nursery": {
+        // These are experimental rules that add friction without clear benefit
+        "useMaxParams": "off",
+        "noIncrementDecrement": "off"
+      }
+    }
   }
 }

@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+// Unmock db to use real database for integration tests
+vi.unmock("@/lib/db");
+
 import { db } from "@/lib/db";
 import {
   organizationApiKeys,
