@@ -48,6 +48,9 @@ import { ActionConfig } from "../workflow/config/action-config";
 import { ActionGrid } from "../workflow/config/action-grid";
 import { TriggerConfig } from "../workflow/config/trigger-config";
 import { generateNodeCode } from "../workflow/utils/code-generators";
+// start custom keeperhub code //
+import { VigilTabContent } from "../workflow/vigil-tab-content";
+// end keeperhub code //
 import { WorkflowRuns } from "../workflow/workflow-runs";
 import type { OverlayComponentProps } from "./types";
 
@@ -272,12 +275,15 @@ export function ConfigurationOverlay({ overlayId }: ConfigurationOverlayProps) {
   const getTabTitle = () => {
     if (!selectedNode) {
       // For workflow view, validate the tab
+      // start custom keeperhub code //
       const validTab =
         activeTab === "properties" ||
         activeTab === "code" ||
-        (activeTab === "runs" && isOwner)
+        (activeTab === "runs" && isOwner) ||
+        (activeTab === "vigil" && isOwner)
           ? activeTab
           : "properties";
+      // end keeperhub code //
       switch (validTab) {
         case "properties":
           return "Workflow";
@@ -285,6 +291,10 @@ export function ConfigurationOverlay({ overlayId }: ConfigurationOverlayProps) {
           return "Code";
         case "runs":
           return "Runs";
+        // start custom keeperhub code //
+        case "vigil":
+          return "Vigil";
+        // end keeperhub code //
         default:
           return "Workflow";
       }
@@ -296,6 +306,10 @@ export function ConfigurationOverlay({ overlayId }: ConfigurationOverlayProps) {
         return "Code";
       case "runs":
         return "Runs";
+      // start custom keeperhub code //
+      case "vigil":
+        return "Vigil";
+      // end keeperhub code //
       default:
         return "Properties";
     }
@@ -427,13 +441,16 @@ export function ConfigurationOverlay({ overlayId }: ConfigurationOverlayProps) {
 
   // If no node is selected, show workflow-level configuration
   if (!selectedNode) {
-    // For workflow view, only properties, code, and runs (if owner) are valid tabs
+    // start custom keeperhub code //
+    // For workflow view, only properties, code, runs, and vigil (if owner) are valid tabs
     const validWorkflowTab =
       activeTab === "properties" ||
       activeTab === "code" ||
-      (activeTab === "runs" && isOwner)
+      (activeTab === "runs" && isOwner) ||
+      (activeTab === "vigil" && isOwner)
         ? activeTab
         : "properties";
+    // end keeperhub code //
 
     return (
       <div className="flex h-full max-h-[80vh] flex-col">
@@ -794,6 +811,12 @@ export function ConfigurationOverlay({ overlayId }: ConfigurationOverlayProps) {
             </div>
           </div>
         )}
+
+        {activeTab === "vigil" && isOwner && (
+          <div className="flex h-full flex-col">
+            <VigilTabContent />
+          </div>
+        )}
       </div>
 
       {/* Bottom tab navigation */}
@@ -832,6 +855,20 @@ export function ConfigurationOverlay({ overlayId }: ConfigurationOverlayProps) {
           >
             <Play className="size-5" />
             Runs
+          </button>
+        )}
+        {isOwner && (
+          <button
+            className={`flex flex-1 flex-col items-center gap-1 py-3 font-medium text-xs transition-colors ${
+              activeTab === "vigil"
+                ? "text-foreground"
+                : "text-muted-foreground"
+            }`}
+            onClick={() => setActiveTab("vigil")}
+            type="button"
+          >
+            <Eye className="size-5" />
+            Vigil
           </button>
         )}
       </div>

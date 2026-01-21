@@ -1080,6 +1080,24 @@ function ToolbarActions({
 
   return (
     <>
+      {/* start custom keeperhub code */}
+      {/* Vigil - Mobile Vertical */}
+      <ButtonGroup className="flex lg:hidden" orientation="vertical">
+        <Button
+          className="border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
+          onClick={() => {
+            state.setActiveTab("vigil");
+            state.setSelectedNodeId(null);
+          }}
+          size="icon"
+          title="Vigil Analysis"
+          variant="secondary"
+        >
+          Vigil
+        </Button>
+      </ButtonGroup>
+      {/* end keeperhub code */}
+
       {/* Add Step - Mobile Vertical */}
       <ButtonGroup className="flex lg:hidden" orientation="vertical">
         <Button
@@ -1118,6 +1136,24 @@ function ToolbarActions({
           </Button>
         )}
       </ButtonGroup>
+
+      {/* start custom keeperhub code */}
+      {/* Vigil - Desktop Horizontal */}
+      <ButtonGroup className="hidden lg:flex" orientation="horizontal">
+        <Button
+          className="border hover:bg-black/5 disabled:opacity-100 dark:hover:bg-white/5 disabled:[&>svg]:text-muted-foreground"
+          onClick={() => {
+            state.setActiveTab("vigil");
+            state.setSelectedNodeId(null);
+          }}
+          size="icon"
+          title="Vigil Analysis"
+          variant="secondary"
+        >
+          Vigil
+        </Button>
+      </ButtonGroup>
+      {/* end keeperhub code */}
 
       {/* Add Step - Desktop Horizontal */}
       <ButtonGroup className="hidden lg:flex" orientation="horizontal">

@@ -1,11 +1,12 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { start } from "workflow/api";
+// start custom keeperhub code //
+import { createWorkflowJob } from "@/keeperhub/lib/k8s-job-creator";
+// end keeperhub code //
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { validateWorkflowIntegrations } from "@/lib/db/integrations";
 import { workflowExecutions, workflows } from "@/lib/db/schema";
-import { executeWorkflow } from "@/lib/workflow-executor.workflow";
 import type { WorkflowEdge, WorkflowNode } from "@/lib/workflow-store";
 
 // biome-ignore lint/nursery/useMaxParams: Background execution requires all workflow context
@@ -17,36 +18,32 @@ async function executeWorkflowBackground(
   input: Record<string, unknown>
 ) {
   try {
-    console.log("[Workflow Execute] Starting execution:", executionId);
+  // start custom keeperhub code //
+    console.log(
+      "[Workflow Execute] Creating K8s Job for execution:",
+      executionId
+    );
 
-    // SECURITY: We pass only the workflowId as a reference
-    // Steps will fetch credentials internally using fetchWorkflowCredentials(workflowId)
-    // This prevents credentials from being logged in Vercel's observability
-    console.log("[Workflow Execute] Calling executeWorkflow with:", {
-      nodeCount: nodes.length,
-      edgeCount: edges.length,
-      hasExecutionId: !!executionId,
+    // Create K8s Job to execute the workflow
+    // This replaces the Vercel workflow/api start() call which doesn't work in self-hosted K8s
+    const job = await createWorkflowJob({
       workflowId,
+      executionId,
+      input,
+      // No scheduleId for manual executions
     });
 
-    // Use start() from workflow/api to properly execute the workflow
-    start(executeWorkflow, [
-      {
-        nodes,
-        edges,
-        triggerInput: input,
-        executionId,
-        workflowId, // Pass workflow ID so steps can fetch credentials
-      },
-    ]);
-
-    console.log("[Workflow Execute] Workflow started successfully");
+    console.log(
+      "[Workflow Execute] K8s Job created successfully:",
+      job.metadata?.name
+    );
   } catch (error) {
-    console.error("[Workflow Execute] Error during execution:", error);
+    console.error("[Workflow Execute] Error creating K8s Job:", error);
     console.error(
       "[Workflow Execute] Error stack:",
       error instanceof Error ? error.stack : "N/A"
     );
+  // end keeperhub code //
 
     // Update execution record with error
     await db
@@ -180,7 +177,9 @@ export async function POST(
       console.log("[API] Created execution:", executionId);
     }
 
+    // start custom keeperhub code //
     // Execute the workflow in the background (don't await)
+    // This creates a K8s Job instead of using Vercel's workflow/api start()
     executeWorkflowBackground(
       executionId,
       workflowId,
@@ -188,6 +187,7 @@ export async function POST(
       workflow.edges as WorkflowEdge[],
       input
     );
+    // end keeperhub code //
 
     // Return immediately with the execution ID
     return NextResponse.json({

@@ -58,6 +58,9 @@ import { ActionGrid } from "./config/action-grid";
 
 import { TriggerConfig } from "./config/trigger-config";
 import { generateNodeCode } from "./utils/code-generators";
+// start custom keeperhub code //
+import { VigilTabContent } from "./vigil-tab-content";
+// end keeperhub code //
 import { WorkflowRuns } from "./workflow-runs";
 
 // Regex constants
@@ -227,6 +230,9 @@ export const PanelInner = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useAtom(propertiesPanelActiveTabAtom);
   const refreshRunsRef = useRef<(() => Promise<void>) | null>(null);
+  // start custom keeperhub code //
+  const refreshVigilRef = useRef<(() => Promise<void>) | null>(null);
+  // end keeperhub code //
   const autoSelectAbortControllersRef = useRef<Record<string, AbortController>>(
     {}
   );
@@ -527,6 +533,19 @@ export const PanelInner = () => {
     }
   };
 
+  // start custom keeperhub code //
+  const handleRefreshVigil = async () => {
+    try {
+      if (refreshVigilRef.current) {
+        await refreshVigilRef.current();
+      }
+    } catch (error) {
+      console.error("Failed to refresh Vigil:", error);
+      toast.error("Failed to refresh Vigil");
+    }
+  };
+  // end keeperhub code //
+
   // If multiple items are selected, show multi-selection properties
   if (hasMultipleSelections) {
     return (
@@ -637,6 +656,16 @@ export const PanelInner = () => {
                 Runs
               </TabsTrigger>
             )}
+            {/* start custom keeperhub code */}
+            {isOwner && (
+              <TabsTrigger
+                className="bg-transparent text-muted-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                value="vigil"
+              >
+                Vigil
+              </TabsTrigger>
+            )}
+            {/* end keeperhub code */}
           </TabsList>
           <TabsContent
             className="flex flex-col overflow-hidden"
@@ -732,6 +761,31 @@ export const PanelInner = () => {
               </div>
             </TabsContent>
           )}
+          {/* start custom keeperhub code */}
+          {isOwner && (
+            <TabsContent
+              className="flex flex-col overflow-hidden"
+              value="vigil"
+            >
+              {/* Actions in content header */}
+              <div className="flex shrink-0 items-center justify-between border-b px-4 py-2">
+                <div className="font-medium text-sm">Vigil Analysis</div>
+                <Button
+                  className="text-muted-foreground"
+                  onClick={handleRefreshVigil}
+                  size="sm"
+                  variant="ghost"
+                >
+                  <RefreshCw className="mr-2 size-4" />
+                  Refresh
+                </Button>
+              </div>
+              <div className="flex-1 space-y-4 overflow-y-auto p-4">
+                <VigilTabContent onRefreshRef={refreshVigilRef} />
+              </div>
+            </TabsContent>
+          )}
+          {/* end keeperhub code */}
           <TabsContent
             className="flex flex-col overflow-hidden data-[state=inactive]:hidden"
             forceMount

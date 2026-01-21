@@ -149,6 +149,28 @@ async function createWorkflowJob(
                   name: "INTEGRATION_ENCRYPTION_KEY",
                   value: process.env.INTEGRATION_ENCRYPTION_KEY || "",
                 },
+                // start custom keeperhub code //
+                {
+                  name: "VIGIL_API_URL",
+                  value: process.env.VIGIL_API_URL || "",
+                },
+                {
+                  name: "VIGIL_API_KEY",
+                  value: process.env.VIGIL_API_KEY || "",
+                },
+                {
+                  name: "VIGIL_API_MODEL",
+                  value: process.env.VIGIL_API_MODEL || "",
+                },
+                {
+                  name: "SENDGRID_API_KEY",
+                  value: process.env.SENDGRID_API_KEY || "",
+                },
+                {
+                  name: "FROM_ADDRESS",
+                  value: process.env.FROM_ADDRESS || "",
+                },
+                // end keeperhub code //
               ],
               resources: {
                 requests: {

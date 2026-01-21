@@ -533,6 +533,9 @@ export const workflowApi = {
         lastSuccessfulNodeId: string | null;
         lastSuccessfulNodeName: string | null;
         executionTrace: string[] | null;
+        // start custom keeperhub code //
+        vigilAnalysis?: unknown | null;
+        // end keeperhub code //
       }>
     >(`/api/workflows/${id}/executions`),
 

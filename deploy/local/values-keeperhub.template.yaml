@@ -77,6 +77,23 @@ env:
   AI_MODEL:
     type: kv
     value: "gpt-4o"
+  # Vigil AI Analysis Configuration
+  VIGIL_API_URL:
+    type: kv
+    value: "https://api.openai.com/v1/chat/completions"
+  VIGIL_API_KEY:
+    type: kv
+    value: "PLACEHOLDER_VIGIL_API_KEY"
+  VIGIL_API_MODEL:
+    type: kv
+    value: "gpt-5-mini-2025-08-07"
+  # SendGrid Configuration
+  SENDGRID_API_KEY:
+    type: kv
+    value: "PLACEHOLDER_SENDGRID_API_KEY"
+  FROM_ADDRESS:
+    type: kv
+    value: "PLACEHOLDER_FROM_ADDRESS"
   # Para Wallet Configuration
   PARA_API_KEY:
     type: kv
@@ -100,6 +117,16 @@ env:
   NEXT_PUBLIC_API_URL:
     type: kv
     value: "https://workflow.keeperhub.local"
+  # K8s Job creation settings (for manual workflow execution)
+  RUNNER_IMAGE:
+    type: kv
+    value: "keeperhub-runner:latest"
+  K8S_NAMESPACE:
+    type: kv
+    value: "local"
+  IMAGE_PULL_POLICY:
+    type: kv
+    value: "Never"
 
 livenessProbe:
   initialDelaySeconds: 120

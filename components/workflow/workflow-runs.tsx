@@ -22,6 +22,9 @@ import {
 } from "@/lib/output-display-configs";
 import { cn } from "@/lib/utils";
 import { getRelativeTime } from "@/lib/utils/time";
+// start custom keeperhub code //
+import type { VigilAnalysis } from "@/lib/vigil-schema";
+// end keeperhub code //
 import {
   currentWorkflowIdAtom,
   executionLogsAtom,
@@ -60,6 +63,9 @@ type WorkflowExecution = {
   lastSuccessfulNodeId: string | null;
   lastSuccessfulNodeName: string | null;
   executionTrace: string[] | null;
+  // start custom keeperhub code //
+  vigilAnalysis?: VigilAnalysis | null;
+  // end keeperhub code //
 };
 
 type WorkflowRunsProps = {

@@ -103,6 +103,61 @@ export async function logWorkflowCompleteDb(
       currentNodeName: null,
     })
     .where(eq(workflowExecutions.id, params.executionId));
+
+  // start custom keeperhub code //
+  // Trigger Vigil analysis for failed executions
+  if (params.status === "error") {
+    // Run analysis asynchronously without blocking the main flow
+    (async () => {
+      try {
+        // Dynamic import to avoid circular dependencies and ensure server-only
+        const { analyzeWorkflowFailure } = await import("./vigil-service");
+        const execution = await db.query.workflowExecutions.findFirst({
+          where: eq(workflowExecutions.id, params.executionId),
+        });
+
+        if (!execution) {
+          return;
+        }
+
+        // Fetch execution logs
+        const logs = await db.query.workflowExecutionLogs.findMany({
+          where: eq(workflowExecutionLogs.executionId, params.executionId),
+        });
+
+        const analysis = await analyzeWorkflowFailure({
+          executionId: params.executionId,
+          workflowId: execution.workflowId,
+          status: execution.status,
+          error: execution.error,
+          input: execution.input as Record<string, unknown> | null,
+          output: execution.output,
+          executionLogs: logs.map((log) => ({
+            nodeId: log.nodeId,
+            nodeName: log.nodeName,
+            nodeType: log.nodeType,
+            status: log.status,
+            error: log.error,
+            input: log.input,
+            output: log.output,
+          })),
+          startedAt: execution.startedAt,
+          completedAt: execution.completedAt,
+          duration: execution.duration,
+        });
+
+        if (analysis) {
+          await db
+            .update(workflowExecutions)
+            .set({ vigilAnalysis: analysis })
+            .where(eq(workflowExecutions.id, params.executionId));
+        }
+      } catch (error) {
+        console.error("[VIGIL] Failed to analyze workflow failure:", error);
+      }
+    })();
+  }
+  // end keeperhub code //
 }
 
 // ============================================================================

@@ -28,6 +28,9 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { validateWorkflowIntegrations } from "../lib/db/integrations";
 import {
+  // start custom keeperhub code //
+  workflowExecutionLogs,
+  // end keeperhub code //
   workflowExecutions,
   workflowSchedules,
   workflows,
@@ -85,9 +88,16 @@ if (!connectionString) {
   throw new Error("DATABASE_URL environment variable is required");
 }
 const queryClient = postgres(connectionString);
+// start custom keeperhub code //
 const db = drizzle(queryClient, {
-  schema: { workflows, workflowExecutions, workflowSchedules },
+  schema: {
+    workflows,
+    workflowExecutions,
+    workflowExecutionLogs,
+    workflowSchedules,
+  },
 });
+// end keeperhub code //
 
 /**
  * Update execution status in database
@@ -285,6 +295,70 @@ async function main(): Promise<void> {
         output: result.outputs,
       });
 
+      // Trigger Vigil analysis for failed execution
+      // Await with timeout to ensure it completes before process exits in K8s Jobs
+      try {
+        const analysisPromise = (async () => {
+          const { analyzeWorkflowFailure } = await import(
+            "../lib/vigil-service"
+          );
+          const execution = await db.query.workflowExecutions.findFirst({
+            where: eq(workflowExecutions.id, executionId),
+          });
+
+          if (!execution) {
+            return;
+          }
+
+          // Fetch execution logs
+          const logs = await db.query.workflowExecutionLogs.findMany({
+            where: eq(workflowExecutionLogs.executionId, executionId),
+          });
+
+          const analysis = await analyzeWorkflowFailure({
+            executionId,
+            workflowId: execution.workflowId,
+            status: execution.status,
+            error: execution.error,
+            input: execution.input as Record<string, unknown> | null,
+            output: execution.output,
+            executionLogs: logs.map((log) => ({
+              nodeId: log.nodeId,
+              nodeName: log.nodeName,
+              nodeType: log.nodeType,
+              status: log.status,
+              error: log.error,
+              input: log.input,
+              output: log.output,
+            })),
+            startedAt: execution.startedAt,
+            completedAt: execution.completedAt,
+            duration: execution.duration,
+          });
+
+          if (analysis) {
+            await db
+              .update(workflowExecutions)
+              .set({ vigilAnalysis: analysis })
+              .where(eq(workflowExecutions.id, executionId));
+          }
+        })();
+
+        // Wait for analysis with 30 second timeout
+        await Promise.race([
+          analysisPromise,
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Analysis timeout")), 30_000)
+          ),
+        ]);
+      } catch (analysisError) {
+        // Log error but don't fail the workflow execution
+        console.error(
+          "[VIGIL] Failed to analyze workflow failure:",
+          analysisError
+        );
+      }
+
       // Update schedule status if this was a scheduled execution
       if (scheduleId) {
         await updateScheduleStatus(scheduleId, "error", errorMessage);
@@ -305,6 +379,70 @@ async function main(): Promise<void> {
       await updateExecutionStatus(executionId, "error", {
         error: errorMessage,
       });
+
+      // Trigger Vigil analysis for failed execution
+      // Await with timeout to ensure it completes before process exits in K8s Jobs
+      try {
+        const analysisPromise = (async () => {
+          const { analyzeWorkflowFailure } = await import(
+            "../lib/vigil-service"
+          );
+          const execution = await db.query.workflowExecutions.findFirst({
+            where: eq(workflowExecutions.id, executionId),
+          });
+
+          if (!execution) {
+            return;
+          }
+
+          // Fetch execution logs
+          const logs = await db.query.workflowExecutionLogs.findMany({
+            where: eq(workflowExecutionLogs.executionId, executionId),
+          });
+
+          const analysis = await analyzeWorkflowFailure({
+            executionId,
+            workflowId: execution.workflowId,
+            status: execution.status,
+            error: execution.error,
+            input: execution.input as Record<string, unknown> | null,
+            output: execution.output,
+            executionLogs: logs.map((log) => ({
+              nodeId: log.nodeId,
+              nodeName: log.nodeName,
+              nodeType: log.nodeType,
+              status: log.status,
+              error: log.error,
+              input: log.input,
+              output: log.output,
+            })),
+            startedAt: execution.startedAt,
+            completedAt: execution.completedAt,
+            duration: execution.duration,
+          });
+
+          if (analysis) {
+            await db
+              .update(workflowExecutions)
+              .set({ vigilAnalysis: analysis })
+              .where(eq(workflowExecutions.id, executionId));
+          }
+        })();
+
+        // Wait for analysis with 30 second timeout
+        await Promise.race([
+          analysisPromise,
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Analysis timeout")), 30_000)
+          ),
+        ]);
+      } catch (analysisError) {
+        // Log error but don't fail the workflow execution
+        console.error(
+          "[VIGIL] Failed to analyze workflow failure:",
+          analysisError
+        );
+      }
 
       // Update schedule status if this was a scheduled execution
       if (scheduleId) {

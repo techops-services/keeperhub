@@ -137,6 +137,10 @@ export const workflowExecutions = pgTable("workflow_executions", {
   lastSuccessfulNodeId: text("last_successful_node_id"),
   lastSuccessfulNodeName: text("last_successful_node_name"),
   executionTrace: jsonb("execution_trace").$type<string[]>(),
+  // start custom keeperhub code //
+  // biome-ignore lint/suspicious/noExplicitAny: JSONB type - structure validated at application level
+  vigilAnalysis: jsonb("vigil_analysis").$type<any>(),
+  // end keeperhub code //
 });
 
 // Workflow execution logs to track individual node executions

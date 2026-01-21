@@ -345,6 +345,14 @@ function processTemplates(
 export async function executeWorkflow(input: WorkflowExecutionInput) {
   "use workflow";
 
+  // start custom keeperhub code //
+  console.log("[Workflow Executor] ===== EXECUTE WORKFLOW CALLED =====", {
+    executionId: input.executionId,
+    workflowId: input.workflowId,
+    nodeCount: input.nodes.length,
+    edgeCount: input.edges.length,
+  });
+  // end keeperhub code //
   console.log("[Workflow Executor] Starting workflow execution");
 
   const { nodes, edges, triggerInput = {}, executionId, workflowId } = input;

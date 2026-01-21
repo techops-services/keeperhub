@@ -1,9 +1,17 @@
-import { and, eq } from "drizzle-orm";
+// start custom keeperhub code //
+import { and, eq, inArray } from "drizzle-orm";
+// end keeperhub code //
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { validateWorkflowIntegrations } from "@/lib/db/integrations";
-import { workflows } from "@/lib/db/schema";
+// start custom keeperhub code //
+import {
+  workflowExecutionLogs,
+  workflowExecutions,
+  workflows,
+} from "@/lib/db/schema";
+// end keeperhub code //
 import { syncWorkflowSchedule } from "@/lib/schedule-service";
 
 // Helper to strip sensitive data from nodes for public viewing
@@ -250,11 +258,38 @@ export async function DELETE(
       );
     }
 
+    // start custom keeperhub code //
+    // Get all execution IDs for this workflow
+    const executions = await db.query.workflowExecutions.findMany({
+      where: eq(workflowExecutions.workflowId, workflowId),
+      columns: { id: true },
+    });
+    const executionIds = executions.map((e) => e.id);
+
+    // Delete logs first (if there are any executions)
+    if (executionIds.length > 0) {
+      await db
+        .delete(workflowExecutionLogs)
+        .where(inArray(workflowExecutionLogs.executionId, executionIds));
+
+      // Then delete the executions
+      await db
+        .delete(workflowExecutions)
+        .where(eq(workflowExecutions.workflowId, workflowId));
+    }
+    // end keeperhub code //
+
     await db.delete(workflows).where(eq(workflows.id, workflowId));
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Failed to delete workflow:", error);
+    // start custom keeperhub code //
+    console.error("Delete error details:", {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    // end keeperhub code //
     return NextResponse.json(
       {
         error:
