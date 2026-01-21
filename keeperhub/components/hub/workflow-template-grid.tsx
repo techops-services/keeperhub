@@ -88,10 +88,10 @@ export function WorkflowTemplateGrid({
           <Card className="flex flex-col overflow-hidden" key={workflow.id}>
             <div className="-mt-6 flex aspect-video w-full items-center justify-center overflow-hidden bg-slate-100 dark:bg-slate-900">
               <WorkflowMiniMap
-                nodes={workflow.nodes}
                 edges={workflow.edges}
-                width={280}
                 height={160}
+                nodes={workflow.nodes}
+                width={280}
               />
             </div>
             <CardHeader>

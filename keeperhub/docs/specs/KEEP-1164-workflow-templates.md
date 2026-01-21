@@ -7,19 +7,18 @@ Add a curated templates system for workflows created and managed by the KeeperHu
 ## User Flow
 
 1. User visits Hub page
-2. Templates section displays curated workflows with images, descriptions, categories
+2. Templates section displays curated workflows with descriptions and categories
 3. User clicks "Use Template"
 4. Existing duplicate flow creates a private copy in their organization
 5. User configures their own integrations and customizes the workflow
 
 ## Database Changes
 
-Add 4 fields to the `workflows` table in `lib/db/schema.ts`:
+Add 3 fields to the `workflows` table in `lib/db/schema.ts`:
 
 ```typescript
 // start custom keeperhub code //
 featured: boolean("featured").default(false).notNull(),
-displayImage: text("display_image"),
 category: text("category"),
 featuredOrder: integer("featured_order").default(0),
 // end keeperhub code //
@@ -28,7 +27,6 @@ featuredOrder: integer("featured_order").default(0),
 | Field | Type | Description |
 |-------|------|-------------|
 | `featured` | boolean | Flag that marks workflow as a featured template |
-| `displayImage` | text | Optional. URL to template thumbnail/preview image |
 | `category` | text | Optional. Category for grouping (e.g., "Web3", "Notifications") |
 | `featuredOrder` | integer | Sort priority (higher = appears first) |
 
@@ -49,7 +47,6 @@ Note: `description` already exists on the workflow table.
 {
   workflowId: string;          // Required - workflow to promote
   featured?: boolean;          // Default: true (set false to demote)
-  displayImage?: string;       // Optional. Image URL
   category?: string;           // Optional. Category name
   featuredOrder?: number;      // Sort priority
 }
@@ -63,7 +60,6 @@ Note: `description` already exists on the workflow table.
     id: string;
     name: string;
     featured: boolean;
-    displayImage: string | null;
     category: string | null;
     featuredOrder: number;
   }
@@ -77,7 +73,6 @@ curl -X POST https://app.keeperhub.com/api/hub/featured \
   -H "X-Service-Key: $HUB_SERVICE_API_KEY" \
   -d '{
     "workflowId": "abc123",
-    "displayImage": "https://...",
     "category": "Web3",
     "featuredOrder": 10
   }'
@@ -125,7 +120,6 @@ The hub service endpoint restricts which workflow fields can be modified. Only f
 ```typescript
 const ALLOWED_FEATURED_FIELDS = [
   'featured',
-  'displayImage',
   'category',
   'featuredOrder',
 ] as const;
@@ -151,7 +145,6 @@ const ALLOWED_FEATURED_FIELDS = [
 {
   // Existing fields...
   featured: boolean;
-  displayImage: string | null;
   category: string | null;
   featuredOrder: number;
 }
@@ -165,7 +158,7 @@ Location: `app/hub/page.tsx` and `keeperhub/components/hub/workflow-template-gri
 
 1. Fetch featured workflows via `/api/workflows/public?featured=true`
 2. Display featured section with:
-   - Display image (if available, fallback to placeholder)
+   - Workflow mini-map diagram
    - Name and description
    - Category badge (if set)
 3. Sort by `featuredOrder` (already handled by API)
@@ -174,7 +167,7 @@ Location: `app/hub/page.tsx` and `keeperhub/components/hub/workflow-template-gri
 ### Template Card Component
 
 Create or update card to display:
-- Display image (aspect ratio ~16:9 or 4:3, optional)
+- Workflow mini-map diagram (auto-generated from nodes/edges)
 - Template name
 - Description (line-clamp-2)
 - Category badge (optional)

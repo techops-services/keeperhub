@@ -29,7 +29,6 @@ export type SavedWorkflow = WorkflowData & {
   isOwner?: boolean;
   // start custom KeeperHub code
   featured?: boolean;
-  displayImage?: string | null;
   category?: string | null;
   featuredOrder?: number;
   // end custom KeeperHub code

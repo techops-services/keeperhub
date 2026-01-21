@@ -1,24 +1,21 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
 import {
   Bot,
+  Box,
   Clock,
   Code,
   GitBranch,
-  Globe,
   Hash,
   Mail,
   Play,
-  Send,
   User,
-  Webhook,
   Zap,
-  Box,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-import type { WorkflowEdge, WorkflowNode } from "@/lib/workflow-store";
+import type { CSSProperties, ReactNode } from "react";
 import { DiscordIcon } from "@/keeperhub/plugins/discord/icon";
-import { WebhookIcon } from "@/keeperhub/plugins/webhook/icon";
 import { Web3Icon } from "@/keeperhub/plugins/web3/icon";
+import { WebhookIcon } from "@/keeperhub/plugins/webhook/icon";
+import type { WorkflowEdge, WorkflowNode } from "@/lib/workflow-store";
 
 type WorkflowMiniMapProps = {
   nodes: WorkflowNode[];
@@ -46,10 +43,10 @@ function calculateBounds(nodes: WorkflowNode[]): Bounds {
     return { minX: 0, minY: 0, maxX: 100, maxY: 100, width: 100, height: 100 };
   }
 
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
 
   for (const node of nodes) {
     const x = node.position?.x ?? 0;
@@ -70,59 +67,50 @@ function calculateBounds(nodes: WorkflowNode[]): Bounds {
   };
 }
 
-type IconComponent =
+type NodeIconType =
   | LucideIcon
-  | (({ className, style }: { className?: string; style?: CSSProperties }) => ReactNode);
+  | (({
+      className,
+      style,
+    }: {
+      className?: string;
+      style?: CSSProperties;
+    }) => ReactNode);
 
-function getNodeIcon(node: WorkflowNode): IconComponent {
-  const isTrigger = node.type === "trigger" || node.data?.type === "trigger";
-
-  if (isTrigger) {
-    const triggerType = node.data?.config?.triggerType as string | undefined;
-    switch (triggerType) {
-      case "Schedule":
-        return Clock;
-      case "Webhook":
-        return Zap;
-      case "Manual":
-      default:
-        return Play;
-    }
+function getTriggerIcon(triggerType: string | undefined): NodeIconType {
+  switch (triggerType) {
+    case "Schedule":
+      return Clock;
+    case "Webhook":
+      return Zap;
+    default:
+      return Play;
   }
+}
 
-  // Action nodes - check actionType
-  const actionType = node.data?.config?.actionType as string | undefined;
-  if (!actionType) return Box;
-
-  // Check for slug format first (e.g., "web3/check-balance")
-  if (actionType.includes("/")) {
-    const integrationType = actionType.split("/")[0];
-    switch (integrationType) {
-      case "web3":
-        return Web3Icon;
-      case "discord":
-        return DiscordIcon;
-      case "slack":
-        return Hash;
-      case "sendgrid":
-        return Mail;
-      case "resend":
-        return Mail;
-      case "webhook":
-        return WebhookIcon;
-      case "ai-gateway":
-        return Bot;
-      case "clerk":
-        return User;
-      default:
-        return Box;
-    }
+function getActionIconBySlug(integrationType: string): NodeIconType {
+  switch (integrationType) {
+    case "web3":
+      return Web3Icon;
+    case "discord":
+      return DiscordIcon;
+    case "slack":
+      return Hash;
+    case "sendgrid":
+    case "resend":
+      return Mail;
+    case "webhook":
+      return WebhookIcon;
+    case "ai-gateway":
+      return Bot;
+    case "clerk":
+      return User;
+    default:
+      return Box;
   }
+}
 
-  // Check for label format (e.g., "Check Balance", "Send Slack Message")
-  const lowerActionType = actionType.toLowerCase();
-
-  // Web3 actions
+function getActionIconByLabel(lowerActionType: string): NodeIconType {
   if (
     lowerActionType.includes("balance") ||
     lowerActionType.includes("transfer") ||
@@ -130,36 +118,49 @@ function getNodeIcon(node: WorkflowNode): IconComponent {
   ) {
     return Web3Icon;
   }
-
-  // Messaging
   if (lowerActionType.includes("slack")) {
     return Hash;
   }
   if (lowerActionType.includes("discord")) {
     return DiscordIcon;
   }
-
-  // Email
-  if (lowerActionType.includes("email") || lowerActionType.includes("sendgrid")) {
+  if (
+    lowerActionType.includes("email") ||
+    lowerActionType.includes("sendgrid")
+  ) {
     return Mail;
   }
-
-  // Webhook
   if (lowerActionType.includes("webhook")) {
     return WebhookIcon;
   }
-
-  // HTTP
   if (lowerActionType.includes("http") || lowerActionType.includes("request")) {
     return Code;
   }
-
-  // Condition
   if (lowerActionType === "condition") {
     return GitBranch;
   }
-
   return Box;
+}
+
+function getNodeIcon(node: WorkflowNode): NodeIconType {
+  const isTrigger = node.type === "trigger" || node.data?.type === "trigger";
+
+  if (isTrigger) {
+    const triggerType = node.data?.config?.triggerType as string | undefined;
+    return getTriggerIcon(triggerType);
+  }
+
+  const actionType = node.data?.config?.actionType as string | undefined;
+  if (!actionType) {
+    return Box;
+  }
+
+  if (actionType.includes("/")) {
+    const integrationType = actionType.split("/")[0];
+    return getActionIconBySlug(integrationType);
+  }
+
+  return getActionIconByLabel(actionType.toLowerCase());
 }
 
 function MiniNode({
@@ -177,34 +178,29 @@ function MiniNode({
 }) {
   const x = ((node.position?.x ?? 0) - bounds.minX) * scale + offsetX;
   const y = ((node.position?.y ?? 0) - bounds.minY) * scale + offsetY;
-  const width = NODE_WIDTH * scale;
-  const height = NODE_HEIGHT * scale;
-  const IconComponent = getNodeIcon(node);
+  const nodeWidth = NODE_WIDTH * scale;
+  const nodeHeight = NODE_HEIGHT * scale;
+  const Icon = getNodeIcon(node);
 
   // Calculate icon size (50% of node size)
-  const iconSize = Math.min(width, height) * 0.5;
+  const iconSize = Math.min(nodeWidth, nodeHeight) * 0.5;
 
   return (
     <g>
       {/* Node background */}
       <rect
+        className="fill-slate-400"
+        height={nodeHeight}
+        rx={nodeWidth * 0.15}
+        ry={nodeHeight * 0.15}
+        width={nodeWidth}
         x={x}
         y={y}
-        width={width}
-        height={height}
-        rx={width * 0.15}
-        ry={height * 0.15}
-        className="fill-slate-400"
       />
       {/* Icon using foreignObject */}
-      <foreignObject
-        x={x}
-        y={y}
-        width={width}
-        height={height}
-      >
+      <foreignObject height={nodeHeight} width={nodeWidth} x={x} y={y}>
         <div className="flex h-full w-full items-center justify-center">
-          <IconComponent
+          <Icon
             className="text-slate-100"
             style={{ width: iconSize, height: iconSize }}
           />
@@ -232,7 +228,7 @@ function MiniEdge({
   const sourceNode = nodes.find((n) => n.id === edge.source);
   const targetNode = nodes.find((n) => n.id === edge.target);
 
-  if (!sourceNode || !targetNode) {
+  if (!(sourceNode && targetNode)) {
     return null;
   }
 
@@ -256,8 +252,8 @@ function MiniEdge({
 
   return (
     <path
-      d={`M ${sourceX} ${sourceY} C ${midX} ${sourceY}, ${midX} ${targetY}, ${targetX} ${targetY}`}
       className="fill-none stroke-slate-300"
+      d={`M ${sourceX} ${sourceY} C ${midX} ${sourceY}, ${midX} ${targetY}, ${targetX} ${targetY}`}
       strokeWidth={2}
     />
   );
@@ -274,18 +270,20 @@ export function WorkflowMiniMap({
     // Empty state - show placeholder
     return (
       <svg
-        viewBox={`0 0 ${width} ${height}`}
+        aria-label="Empty workflow diagram"
         className={`${className}`}
-        width={width}
         height={height}
+        role="img"
+        viewBox={`0 0 ${width} ${height}`}
+        width={width}
       >
         <rect
-          x={width / 2 - 30}
-          y={height / 2 - 15}
-          width={60}
+          className="fill-slate-300"
           height={30}
           rx={6}
-          className="fill-slate-300"
+          width={60}
+          x={width / 2 - 30}
+          y={height / 2 - 15}
         />
       </svg>
     );
@@ -308,37 +306,39 @@ export function WorkflowMiniMap({
 
   return (
     <svg
-      viewBox={`0 0 ${width} ${height}`}
+      aria-label="Workflow diagram"
       className={`${className}`}
-      width="100%"
       height="100%"
       preserveAspectRatio="xMidYMid meet"
+      role="img"
+      viewBox={`0 0 ${width} ${height}`}
+      width="100%"
     >
       {/* Dotted background pattern */}
       <defs>
         <pattern
+          height="10"
           id="dots"
+          patternUnits="userSpaceOnUse"
+          width="10"
           x="0"
           y="0"
-          width="10"
-          height="10"
-          patternUnits="userSpaceOnUse"
         >
-          <circle cx="1" cy="1" r="0.5" className="fill-slate-600/30" />
+          <circle className="fill-slate-600/30" cx="1" cy="1" r="0.5" />
         </pattern>
       </defs>
-      <rect x="0" y="0" width="100%" height="100%" fill="url(#dots)" />
+      <rect fill="url(#dots)" height="100%" width="100%" x="0" y="0" />
 
       {/* Render edges first (behind nodes) */}
       {edges.map((edge) => (
         <MiniEdge
-          key={edge.id}
-          edge={edge}
-          nodes={nodes}
           bounds={bounds}
-          scale={scale}
+          edge={edge}
+          key={edge.id}
+          nodes={nodes}
           offsetX={offsetX}
           offsetY={offsetY}
+          scale={scale}
         />
       ))}
       {/* Render nodes */}
@@ -346,12 +346,12 @@ export function WorkflowMiniMap({
         .filter((node) => node.type !== "add")
         .map((node) => (
           <MiniNode
+            bounds={bounds}
             key={node.id}
             node={node}
-            bounds={bounds}
-            scale={scale}
             offsetX={offsetX}
             offsetY={offsetY}
+            scale={scale}
           />
         ))}
     </svg>

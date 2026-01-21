@@ -35,7 +35,7 @@ export default function HubPage() {
   // end custom KeeperHub code
 
   return (
-    <div className="pointer-events-auto fixed inset-0 overflow-y-auto bg-background [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+    <div className="pointer-events-auto fixed inset-0 overflow-y-auto bg-background [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <div className="container mx-auto px-4 py-4 pt-28 pb-12">
         {/* start custom KeeperHub code */}
         {isLoading ? (

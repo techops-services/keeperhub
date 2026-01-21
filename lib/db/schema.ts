@@ -125,7 +125,6 @@ export const workflows = pgTable("workflows", {
   }),
   isAnonymous: boolean("is_anonymous").default(false).notNull(),
   featured: boolean("featured").default(false).notNull(),
-  displayImage: text("display_image"),
   category: text("category"),
   featuredOrder: integer("featured_order").default(0),
   // end keeperhub code //
