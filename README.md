@@ -240,6 +240,7 @@ docker run --rm --network host \
 - **Slack**: Send Slack Message
 - **Discord**: Send Discord Message
 - **Email**: Send Email
+- **Telegram**: Send Telegram Message
 - **Web3**: Check Balance, Check Token Balance, Transfer Funds, Transfer Token, Read Contract, Write Contract
 - **Webhook**: Send Webhook
 <!-- PLUGINS:END -->
