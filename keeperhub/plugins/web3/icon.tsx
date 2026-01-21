@@ -1,4 +1,10 @@
-export function Web3Icon({ className }: { className?: string }) {
+export function Web3Icon({
+  className,
+  style,
+}: {
+  className?: string;
+  style?: React.CSSProperties;
+}) {
   return (
     <svg
       className={className}
@@ -8,6 +14,7 @@ export function Web3Icon({ className }: { className?: string }) {
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth="1.25"
+      style={style}
       viewBox="0 0 24 24"
       width="148"
       xmlns="http://www.w3.org/2000/svg"

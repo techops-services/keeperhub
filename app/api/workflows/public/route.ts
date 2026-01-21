@@ -1,16 +1,28 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { workflows } from "@/lib/db/schema";
 
 // start custom KeeperHub code
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const isFeaturedRequest = searchParams.get("featured") === "true";
+
     const publicWorkflows = await db
       .select()
       .from(workflows)
-      .where(eq(workflows.visibility, "public"))
-      .orderBy(desc(workflows.updatedAt));
+      .where(
+        and(
+          eq(workflows.visibility, "public"),
+          eq(workflows.featured, isFeaturedRequest)
+        )
+      )
+      .orderBy(
+        ...(isFeaturedRequest
+          ? [desc(workflows.featuredOrder), desc(workflows.updatedAt)]
+          : [desc(workflows.updatedAt)])
+      );
 
     const mappedWorkflows = publicWorkflows.map((workflow) => ({
       ...workflow,
