@@ -602,9 +602,15 @@ function abiLooksLikeProxy(abi: string): boolean {
 
     // Filter to only constructor and fallback/receive functions
     const relevantItems = parsedAbi.filter((item) => {
-      if (item.type === "constructor") return true;
-      if (item.type === "fallback") return true;
-      if (item.type === "receive") return true;
+      if (item.type === "constructor") {
+        return true;
+      }
+      if (item.type === "fallback") {
+        return true;
+      }
+      if (item.type === "receive") {
+        return true;
+      }
       return false;
     });
 
@@ -779,6 +785,193 @@ async function handleRegularProxy(
 }
 
 /**
+ * Try RPC detection when ABI fetch fails
+ */
+async function tryRpcDetectionOnAbiFailure(
+  contractAddress: string,
+  baseUrl: string,
+  chainId: number,
+  error: unknown
+): Promise<{
+  abi: string;
+  isProxy: boolean;
+  implementationAddress?: string;
+  proxyAddress?: string;
+  warning?: string;
+} | null> {
+  console.log(
+    "[Etherscan] ABI fetch failed, trying RPC-based proxy detection..."
+  );
+  try {
+    const rpcResult = await detectProxyViaRpc(contractAddress, chainId);
+    if (rpcResult.isProxy && rpcResult.implementationAddress) {
+      const implementationAbi = await fetchAbiFromAddress(
+        baseUrl,
+        chainId,
+        rpcResult.implementationAddress
+      );
+      return {
+        abi: implementationAbi,
+        isProxy: true,
+        implementationAddress: rpcResult.implementationAddress,
+        proxyAddress: contractAddress,
+        warning: "Proxy detected via RPC.",
+      };
+    }
+  } catch (rpcError) {
+    console.warn(
+      "[Etherscan] RPC proxy detection also failed:",
+      rpcError instanceof Error ? rpcError.message : "Unknown error"
+    );
+  }
+  throw error;
+}
+
+/**
+ * Try RPC detection when ABI looks like a proxy
+ */
+async function tryRpcDetectionOnProxyPattern(
+  contractAddress: string,
+  baseUrl: string,
+  chainId: number,
+  abi: string
+): Promise<{
+  abi: string;
+  isProxy: boolean;
+  implementationAddress?: string;
+  proxyAddress?: string;
+  proxyAbi?: string;
+  warning?: string;
+} | null> {
+  if (!abiLooksLikeProxy(abi)) {
+    return null;
+  }
+
+  console.log(
+    "[Etherscan] ABI pattern suggests proxy, trying RPC detection..."
+  );
+  try {
+    const rpcResult = await detectProxyViaRpc(contractAddress, chainId);
+    if (rpcResult.isProxy && rpcResult.implementationAddress) {
+      const implementationAbi = await fetchAbiFromAddress(
+        baseUrl,
+        chainId,
+        rpcResult.implementationAddress
+      );
+      const proxyAbi = await fetchProxyAbi(
+        baseUrl,
+        chainId,
+        contractAddress,
+        {}
+      );
+      return {
+        abi: implementationAbi,
+        isProxy: true,
+        implementationAddress: rpcResult.implementationAddress,
+        proxyAddress: contractAddress,
+        proxyAbi,
+        warning: "Proxy detected via RPC.",
+      };
+    }
+  } catch (rpcError) {
+    console.warn(
+      "[Etherscan] RPC proxy detection failed:",
+      rpcError instanceof Error ? rpcError.message : "Unknown error"
+    );
+  }
+  return null;
+}
+
+/**
+ * Handle case when Etherscan source code fetch fails
+ */
+async function handleSourceCodeFetchFailure(
+  contractAddress: string,
+  baseUrl: string,
+  chainId: number
+): Promise<{
+  abi: string;
+  isProxy: boolean;
+  implementationAddress?: string;
+  proxyAddress?: string;
+  proxyAbi?: string;
+  warning?: string;
+}> {
+  let abi: string;
+  try {
+    abi = await fetchAbiFromAddress(baseUrl, chainId, contractAddress);
+  } catch (error) {
+    const rpcResult = await tryRpcDetectionOnAbiFailure(
+      contractAddress,
+      baseUrl,
+      chainId,
+      error
+    );
+    if (rpcResult) {
+      return rpcResult;
+    }
+    throw error;
+  }
+
+  const rpcResult = await tryRpcDetectionOnProxyPattern(
+    contractAddress,
+    baseUrl,
+    chainId,
+    abi
+  );
+  if (rpcResult) {
+    return rpcResult;
+  }
+
+  return { abi, isProxy: false };
+}
+
+/**
+ * Handle case when Etherscan didn't detect proxy but we should check ABI pattern
+ */
+async function handleNoProxyDetected(
+  contractAddress: string,
+  baseUrl: string,
+  chainId: number
+): Promise<{
+  abi: string;
+  isProxy: boolean;
+  implementationAddress?: string;
+  proxyAddress?: string;
+  proxyAbi?: string;
+  warning?: string;
+}> {
+  console.log("[Etherscan] Etherscan didn't detect proxy, fetching ABI...");
+  let abi: string;
+  try {
+    abi = await fetchAbiFromAddress(baseUrl, chainId, contractAddress);
+  } catch (error) {
+    const rpcResult = await tryRpcDetectionOnAbiFailure(
+      contractAddress,
+      baseUrl,
+      chainId,
+      error
+    );
+    if (rpcResult) {
+      return rpcResult;
+    }
+    throw error;
+  }
+
+  const rpcResult = await tryRpcDetectionOnProxyPattern(
+    contractAddress,
+    baseUrl,
+    chainId,
+    abi
+  );
+  if (rpcResult) {
+    return rpcResult;
+  }
+
+  return { abi, isProxy: false };
+}
+
+/**
  * Handle Etherscan-based explorer with proxy detection
  */
 async function handleEtherscanExplorer(
@@ -810,83 +1003,11 @@ async function handleEtherscanExplorer(
       "[Etherscan] Failed to fetch source code:",
       sourceCodeResult.error
     );
-
-    // Try to fetch ABI first
-    let abi: string;
-    try {
-      abi = await fetchAbiFromAddress(baseUrl, chainId, contractAddress);
-    } catch (error) {
-      // If ABI fetch also fails, try RPC detection as fallback
-      console.log(
-        "[Etherscan] ABI fetch failed, trying RPC-based proxy detection..."
-      );
-      try {
-        const rpcResult = await detectProxyViaRpc(contractAddress, chainId);
-        if (rpcResult.isProxy && rpcResult.implementationAddress) {
-          // Fetch implementation ABI
-          const implementationAbi = await fetchAbiFromAddress(
-            baseUrl,
-            chainId,
-            rpcResult.implementationAddress
-          );
-          return {
-            abi: implementationAbi,
-            isProxy: true,
-            implementationAddress: rpcResult.implementationAddress,
-            proxyAddress: contractAddress,
-            warning:
-              "Proxy contract automatically detected - using implementation ABI.",
-          };
-        }
-      } catch (rpcError) {
-        console.warn(
-          "[Etherscan] RPC proxy detection also failed:",
-          rpcError instanceof Error ? rpcError.message : "Unknown error"
-        );
-      }
-      // If everything fails, rethrow the original error
-      throw error;
-    }
-
-    // Check if the fetched ABI looks like a proxy
-    if (abiLooksLikeProxy(abi)) {
-      console.log(
-        "[Etherscan] ABI pattern suggests proxy, trying RPC detection..."
-      );
-      try {
-        const rpcResult = await detectProxyViaRpc(contractAddress, chainId);
-        if (rpcResult.isProxy && rpcResult.implementationAddress) {
-          // Fetch implementation ABI
-          const implementationAbi = await fetchAbiFromAddress(
-            baseUrl,
-            chainId,
-            rpcResult.implementationAddress
-          );
-          const proxyAbi = await fetchProxyAbi(
-            baseUrl,
-            chainId,
-            contractAddress,
-            {}
-          );
-          return {
-            abi: implementationAbi,
-            isProxy: true,
-            implementationAddress: rpcResult.implementationAddress,
-            proxyAddress: contractAddress,
-            proxyAbi,
-            warning:
-              "Proxy contract automatically detected - using implementation ABI.",
-          };
-        }
-      } catch (rpcError) {
-        console.warn(
-          "[Etherscan] RPC proxy detection failed:",
-          rpcError instanceof Error ? rpcError.message : "Unknown error"
-        );
-      }
-    }
-
-    return { abi, isProxy: false };
+    return await handleSourceCodeFetchFailure(
+      contractAddress,
+      baseUrl,
+      chainId
+    );
   }
 
   if (sourceCodeResult.isDiamond) {
@@ -908,80 +1029,7 @@ async function handleEtherscanExplorer(
   }
 
   // Etherscan didn't detect a proxy, but check if ABI looks like one
-  console.log("[Etherscan] Etherscan didn't detect proxy, fetching ABI...");
-  let abi: string;
-  try {
-    abi = await fetchAbiFromAddress(baseUrl, chainId, contractAddress);
-  } catch (error) {
-    // If ABI fetch fails, try RPC detection
-    console.log(
-      "[Etherscan] ABI fetch failed, trying RPC-based proxy detection..."
-    );
-    try {
-      const rpcResult = await detectProxyViaRpc(contractAddress, chainId);
-      if (rpcResult.isProxy && rpcResult.implementationAddress) {
-        // Fetch implementation ABI
-        const implementationAbi = await fetchAbiFromAddress(
-          baseUrl,
-          chainId,
-          rpcResult.implementationAddress
-        );
-        return {
-          abi: implementationAbi,
-          isProxy: true,
-          implementationAddress: rpcResult.implementationAddress,
-          proxyAddress: contractAddress,
-          warning: "Proxy detected via RPC.",
-        };
-      }
-    } catch (rpcError) {
-      console.warn(
-        "[Etherscan] RPC proxy detection also failed:",
-        rpcError instanceof Error ? rpcError.message : "Unknown error"
-      );
-    }
-    throw error;
-  }
-
-  // Check if ABI looks like a proxy
-  if (abiLooksLikeProxy(abi)) {
-    console.log(
-      "[Etherscan] ABI pattern suggests proxy, trying RPC detection..."
-    );
-    try {
-      const rpcResult = await detectProxyViaRpc(contractAddress, chainId);
-      if (rpcResult.isProxy && rpcResult.implementationAddress) {
-        // Fetch implementation ABI
-        const implementationAbi = await fetchAbiFromAddress(
-          baseUrl,
-          chainId,
-          rpcResult.implementationAddress
-        );
-        const proxyAbi = await fetchProxyAbi(
-          baseUrl,
-          chainId,
-          contractAddress,
-          {}
-        );
-        return {
-          abi: implementationAbi,
-          isProxy: true,
-          implementationAddress: rpcResult.implementationAddress,
-          proxyAddress: contractAddress,
-          proxyAbi,
-          warning: "Proxy detected via RPC.",
-        };
-      }
-    } catch (rpcError) {
-      console.warn(
-        "[Etherscan] RPC proxy detection failed:",
-        rpcError instanceof Error ? rpcError.message : "Unknown error"
-      );
-    }
-  }
-
-  // Not a proxy
-  return { abi, isProxy: false };
+  return await handleNoProxyDetected(contractAddress, baseUrl, chainId);
 }
 
 /**
