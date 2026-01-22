@@ -189,7 +189,7 @@ jobs:
 
       - name: Deploy LocalStack
         run: |
-          envsubst < deploy/pr-environment/localstack.template.yaml | kubectl apply -f -
+          envsubst '$PR_NUMBER' < deploy/pr-environment/localstack.template.yaml | kubectl apply -f -
 
       - name: Wait for LocalStack to be ready
         run: |

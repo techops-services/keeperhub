@@ -117,17 +117,17 @@ spec:
               max_attempts=30
               attempt=0
 
-              while [ $$attempt -lt $$max_attempts ]; do
+              while [ $attempt -lt $max_attempts ]; do
                 if curl -sf http://localstack:4566/_localstack/health > /dev/null 2>&1; then
                   echo "LocalStack is ready!"
                   break
                 fi
-                echo "Attempt $$((attempt + 1))/$$max_attempts: LocalStack not ready yet..."
+                echo "Attempt $((attempt + 1))/$max_attempts: LocalStack not ready yet..."
                 sleep 2
-                attempt=$$((attempt + 1))
+                attempt=$((attempt + 1))
               done
 
-              if [ $$attempt -eq $$max_attempts ]; then
+              if [ $attempt -eq $max_attempts ]; then
                 echo "LocalStack failed to become ready"
                 exit 1
               fi
