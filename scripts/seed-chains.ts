@@ -78,9 +78,9 @@ const DEFAULT_CHAINS: NewChain[] = [
     isEnabled: getChainConfigValue("eth-mainnet", "isEnabled", true),
   },
   {
-    chainId: getChainConfigValue("sepolia", "chainId", 11_155_111),
+    chainId: getChainConfigValue("eth-sepolia", "chainId", 11_155_111),
     name: "Sepolia Testnet",
-    symbol: getChainConfigValue("sepolia", "symbol", "ETH"),
+    symbol: getChainConfigValue("eth-sepolia", "symbol", "ETH"),
     chainType: "evm",
     defaultPrimaryRpc: getRpcUrlByChainId(11_155_111, "primary"),
     defaultFallbackRpc: getRpcUrlByChainId(11_155_111, "fallback"),
@@ -94,8 +94,8 @@ const DEFAULT_CHAINS: NewChain[] = [
       jsonKey: CHAIN_CONFIG[11_155_111].jsonKey,
       type: "fallback",
     }),
-    isTestnet: getChainConfigValue("sepolia", "isTestnet", true),
-    isEnabled: getChainConfigValue("sepolia", "isEnabled", true),
+    isTestnet: getChainConfigValue("eth-sepolia", "isTestnet", true),
+    isEnabled: getChainConfigValue("eth-sepolia", "isEnabled", true),
   },
   {
     chainId: getChainConfigValue("base-mainnet", "chainId", 8453),
@@ -118,9 +118,9 @@ const DEFAULT_CHAINS: NewChain[] = [
     isEnabled: getChainConfigValue("base-mainnet", "isEnabled", true),
   },
   {
-    chainId: getChainConfigValue("base-sepolia", "chainId", 84_532),
+    chainId: getChainConfigValue("base-testnet", "chainId", 84_532),
     name: "Base Sepolia",
-    symbol: getChainConfigValue("base-sepolia", "symbol", "BASE"),
+    symbol: getChainConfigValue("base-testnet", "symbol", "BASE"),
     chainType: "evm",
     defaultPrimaryRpc: getRpcUrlByChainId(84_532, "primary"),
     defaultFallbackRpc: getRpcUrlByChainId(84_532, "fallback"),
@@ -134,8 +134,8 @@ const DEFAULT_CHAINS: NewChain[] = [
       jsonKey: CHAIN_CONFIG[84_532].jsonKey,
       type: "fallback",
     }),
-    isTestnet: getChainConfigValue("base-sepolia", "isTestnet", true),
-    isEnabled: getChainConfigValue("base-sepolia", "isEnabled", true),
+    isTestnet: getChainConfigValue("base-testnet", "isTestnet", true),
+    isEnabled: getChainConfigValue("base-testnet", "isEnabled", true),
   },
   {
     chainId: getChainConfigValue("tempo-testnet", "chainId", 42_429),
@@ -199,9 +199,9 @@ const DEFAULT_CHAINS: NewChain[] = [
     isEnabled: getChainConfigValue("solana-mainnet", "isEnabled", true),
   },
   {
-    chainId: getChainConfigValue("solana-devnet", "chainId", 103),
+    chainId: getChainConfigValue("solana-testnet", "chainId", 103),
     name: "Solana Devnet",
-    symbol: getChainConfigValue("solana-devnet", "symbol", "SOL"),
+    symbol: getChainConfigValue("solana-testnet", "symbol", "SOL"),
     chainType: "solana",
     defaultPrimaryRpc: getRpcUrlByChainId(103, "primary"),
     defaultFallbackRpc: getRpcUrlByChainId(103, "fallback"),
@@ -215,8 +215,8 @@ const DEFAULT_CHAINS: NewChain[] = [
       jsonKey: CHAIN_CONFIG[103].jsonKey,
       type: "fallback",
     }),
-    isTestnet: getChainConfigValue("solana-devnet", "isTestnet", true),
-    isEnabled: getChainConfigValue("solana-devnet", "isEnabled", true),
+    isTestnet: getChainConfigValue("solana-testnet", "isTestnet", true),
+    isEnabled: getChainConfigValue("solana-testnet", "isEnabled", true),
   },
 ];
 
@@ -332,6 +332,8 @@ async function seedChains() {
 
     if (existing.length > 0) {
       // Update existing chain with new values (except id and timestamps)
+      // Note: Use ?? null to ensure undefined values are explicitly set to null,
+      // otherwise Drizzle skips undefined fields in UPDATE statements
       await db
         .update(chains)
         .set({
@@ -339,9 +341,9 @@ async function seedChains() {
           symbol: chain.symbol,
           chainType: chain.chainType,
           defaultPrimaryRpc: chain.defaultPrimaryRpc,
-          defaultFallbackRpc: chain.defaultFallbackRpc,
-          defaultPrimaryWss: chain.defaultPrimaryWss,
-          defaultFallbackWss: chain.defaultFallbackWss,
+          defaultFallbackRpc: chain.defaultFallbackRpc ?? null,
+          defaultPrimaryWss: chain.defaultPrimaryWss ?? null,
+          defaultFallbackWss: chain.defaultFallbackWss ?? null,
           isTestnet: chain.isTestnet,
           isEnabled: chain.isEnabled,
           updatedAt: new Date(),

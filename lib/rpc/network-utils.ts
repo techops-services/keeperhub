@@ -32,12 +32,14 @@ export function getChainIdFromNetwork(network: string | number): number {
     ethereum: SUPPORTED_CHAIN_IDS.MAINNET,
     // Sepolia Testnet
     sepolia: SUPPORTED_CHAIN_IDS.SEPOLIA,
+    "eth-sepolia": SUPPORTED_CHAIN_IDS.SEPOLIA,
     "sepolia-testnet": SUPPORTED_CHAIN_IDS.SEPOLIA,
     // Base Mainnet
     base: SUPPORTED_CHAIN_IDS.BASE,
     "base-mainnet": SUPPORTED_CHAIN_IDS.BASE,
     // Base Sepolia
     "base-sepolia": SUPPORTED_CHAIN_IDS.BASE_SEPOLIA,
+    "base-testnet": SUPPORTED_CHAIN_IDS.BASE_SEPOLIA,
     // Tempo
     "tempo-testnet": SUPPORTED_CHAIN_IDS.TEMPO_TESTNET,
     tempo: SUPPORTED_CHAIN_IDS.TEMPO_MAINNET,
@@ -46,6 +48,7 @@ export function getChainIdFromNetwork(network: string | number): number {
     solana: SUPPORTED_CHAIN_IDS.SOLANA_MAINNET,
     "solana-mainnet": SUPPORTED_CHAIN_IDS.SOLANA_MAINNET,
     "solana-devnet": SUPPORTED_CHAIN_IDS.SOLANA_DEVNET,
+    "solana-testnet": SUPPORTED_CHAIN_IDS.SOLANA_DEVNET,
   };
 
   const chainId = networkMap[network.toLowerCase()];
