@@ -2,22 +2,39 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Regex patterns for testing
 const FAILED_LOCK_REGEX = /Failed to acquire nonce lock/;
-const ADVISORY_LOCK_REGEX = /pg_try_advisory_lock\((\d+)\)/;
 
 // Mock server-only
 vi.mock("server-only", () => ({}));
 
 // Use vi.hoisted() to define mocks before vi.mock hoisting
-const { mockExecute, mockSelect, mockInsert, mockUpdate } = vi.hoisted(() => ({
-  mockExecute: vi.fn(),
+const {
+  mockSelect,
+  mockInsert,
+  mockUpdate,
+  mockPostgresQuery,
+  mockPostgresEnd,
+} = vi.hoisted(() => ({
   mockSelect: vi.fn(),
   mockInsert: vi.fn(),
   mockUpdate: vi.fn(),
+  mockPostgresQuery: vi.fn(),
+  mockPostgresEnd: vi.fn(),
 }));
+
+// Mock postgres module for dedicated lock connections
+vi.mock("postgres", () => {
+  // Create a mock connection that's callable as tagged template
+  const createMockConnection = () => {
+    const queryFn = (strings: TemplateStringsArray, ...values: unknown[]) =>
+      mockPostgresQuery(strings, ...values);
+    queryFn.end = mockPostgresEnd;
+    return queryFn;
+  };
+  return { default: vi.fn(() => createMockConnection()) };
+});
 
 vi.mock("@/lib/db", () => ({
   db: {
-    execute: mockExecute,
     select: mockSelect,
     insert: mockInsert,
     update: mockUpdate,
@@ -78,7 +95,10 @@ describe("NonceManager", () => {
     resetNonceManager();
 
     // Default mock implementations
-    mockExecute.mockResolvedValue([{ acquired: true }]);
+    // Mock postgres query for advisory lock - returns acquired: true by default
+    mockPostgresQuery.mockResolvedValue([{ acquired: true }]);
+    mockPostgresEnd.mockResolvedValue(undefined);
+
     mockSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
@@ -169,13 +189,14 @@ describe("NonceManager", () => {
         )
       ).rejects.toThrow("RPC error");
 
-      // Should have called execute twice (acquire lock, then release on error)
-      expect(mockExecute).toHaveBeenCalledTimes(2);
+      // Should have acquired lock, then closed connection on error
+      expect(mockPostgresQuery).toHaveBeenCalled();
+      expect(mockPostgresEnd).toHaveBeenCalled();
     });
 
     it("should throw if lock cannot be acquired after max retries", async () => {
       // Make lock acquisition always fail
-      mockExecute.mockResolvedValue([{ acquired: false }]);
+      mockPostgresQuery.mockResolvedValue([{ acquired: false }]);
       mockSelect.mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -199,6 +220,9 @@ describe("NonceManager", () => {
           provider as unknown as import("ethers").Provider
         )
       ).rejects.toThrow(FAILED_LOCK_REGEX);
+
+      // Should have closed the connection after failing
+      expect(mockPostgresEnd).toHaveBeenCalled();
     });
   });
 
@@ -303,7 +327,7 @@ describe("NonceManager", () => {
 
       // Clear mocks to track endSession calls
       vi.clearAllMocks();
-      mockExecute.mockResolvedValue([{ released: true }]);
+      mockPostgresEnd.mockResolvedValue(undefined);
       mockUpdate.mockReturnValue({
         set: vi.fn().mockReturnValue({
           where: vi.fn().mockResolvedValue(undefined),
@@ -312,23 +336,23 @@ describe("NonceManager", () => {
 
       await manager.endSession(session);
 
-      // Should update wallet_locks and release advisory lock
+      // Should update wallet_locks and close dedicated connection
       expect(mockUpdate).toHaveBeenCalled();
-      expect(mockExecute).toHaveBeenCalled();
+      expect(mockPostgresEnd).toHaveBeenCalled();
     });
   });
 
   describe("stale lock detection", () => {
-    it("should detect and release stale locks", async () => {
+    it("should detect and clear stale lock metadata", async () => {
       // First attempt fails, lock exists and is stale
       let attemptCount = 0;
-      mockExecute.mockImplementation(() => {
+      mockPostgresQuery.mockImplementation(() => {
         attemptCount += 1;
         if (attemptCount === 1) {
           // First attempt: lock not acquired
           return Promise.resolve([{ acquired: false }]);
         }
-        // After stale lock released: lock acquired
+        // After stale lock cleared: lock acquired
         return Promise.resolve([{ acquired: true }]);
       });
 
@@ -358,8 +382,10 @@ describe("NonceManager", () => {
       );
 
       expect(session).toBeDefined();
-      // Should have tried to acquire, detected stale, released, then acquired
-      expect(mockExecute.mock.calls.length).toBeGreaterThanOrEqual(2);
+      // Should have tried to acquire, detected stale, cleared metadata, then acquired
+      expect(mockPostgresQuery.mock.calls.length).toBeGreaterThanOrEqual(2);
+      // Should have cleared the stale lock metadata
+      expect(mockUpdate).toHaveBeenCalled();
     });
   });
 
@@ -532,7 +558,7 @@ describe("NonceManager", () => {
       await manager.endSession(session1);
 
       // Reset mock call history
-      mockExecute.mockClear();
+      mockPostgresQuery.mockClear();
 
       await manager.startSession(
         "0x1234567890123456789012345678901234567890",
@@ -541,26 +567,14 @@ describe("NonceManager", () => {
         provider as unknown as import("ethers").Provider
       );
 
-      // Both calls should use the same lock ID
-      const firstCall = mockExecute.mock.calls[0];
-      expect(firstCall).toBeDefined();
+      // Both calls should use the same lock ID (same wallet/chain)
+      expect(mockPostgresQuery).toHaveBeenCalled();
     });
 
     it("should generate different lock IDs for different chains", async () => {
       const manager1 = new NonceManager();
       const manager2 = new NonceManager();
       const provider = createMockProvider();
-
-      // Track the SQL calls
-      const lockIds: number[] = [];
-      mockExecute.mockImplementation((sql) => {
-        // Extract lock ID from SQL call
-        const match = String(sql).match(ADVISORY_LOCK_REGEX);
-        if (match) {
-          lockIds.push(Number.parseInt(match[1], 10));
-        }
-        return Promise.resolve([{ acquired: true }]);
-      });
 
       await manager1.startSession(
         "0x1234567890123456789012345678901234567890",
@@ -576,8 +590,8 @@ describe("NonceManager", () => {
         provider as unknown as import("ethers").Provider
       );
 
-      // Different chains should get different execution paths at minimum
-      expect(mockExecute).toHaveBeenCalled();
+      // Different chains should both acquire locks
+      expect(mockPostgresQuery).toHaveBeenCalled();
     });
   });
 });
