@@ -28,6 +28,7 @@ export function getChainIdFromNetwork(network: string | number): number {
   const networkMap: Record<string, number> = {
     // Ethereum Mainnet
     mainnet: SUPPORTED_CHAIN_IDS.MAINNET,
+    "eth-mainnet": SUPPORTED_CHAIN_IDS.MAINNET,
     "ethereum-mainnet": SUPPORTED_CHAIN_IDS.MAINNET,
     ethereum: SUPPORTED_CHAIN_IDS.MAINNET,
     // Sepolia Testnet
