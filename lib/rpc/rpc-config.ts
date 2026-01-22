@@ -56,7 +56,7 @@ export const CHAIN_CONFIG: Record<number, ChainConfigEntry> = {
   },
   // Sepolia Testnet
   11155111: {
-    jsonKey: "sepolia",
+    jsonKey: "eth-sepolia",
     envKey: "CHAIN_SEPOLIA_PRIMARY_RPC",
     fallbackEnvKey: "CHAIN_SEPOLIA_FALLBACK_RPC",
     publicDefault: PUBLIC_RPCS.SEPOLIA,
@@ -70,7 +70,7 @@ export const CHAIN_CONFIG: Record<number, ChainConfigEntry> = {
   },
   // Base Sepolia
   84532: {
-    jsonKey: "base-sepolia",
+    jsonKey: "base-testnet",
     envKey: "CHAIN_BASE_SEPOLIA_PRIMARY_RPC",
     fallbackEnvKey: "CHAIN_BASE_SEPOLIA_FALLBACK_RPC",
     publicDefault: PUBLIC_RPCS.BASE_SEPOLIA,
@@ -98,7 +98,7 @@ export const CHAIN_CONFIG: Record<number, ChainConfigEntry> = {
   },
   // Solana Devnet
   103: {
-    jsonKey: "solana-devnet",
+    jsonKey: "solana-testnet",
     envKey: "CHAIN_SOLANA_DEVNET_PRIMARY_RPC",
     fallbackEnvKey: "CHAIN_SOLANA_DEVNET_FALLBACK_RPC",
     publicDefault: PUBLIC_RPCS.SOLANA_DEVNET,
