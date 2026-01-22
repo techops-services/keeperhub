@@ -220,11 +220,11 @@ const DEFAULT_CHAINS: NewChain[] = [
   },
 ];
 
-// Explorer configurations for each chain (KEEP-1154)
-const EXPLORER_CONFIGS: NewExplorerConfig[] = [
+// Explorer configuration template for each chain (KEEP-1154)
+// Note: chainIds are resolved dynamically from DEFAULT_CHAINS to ensure consistency
+const EXPLORER_CONFIG_TEMPLATES: Record<number, Omit<NewExplorerConfig, "chainId">> = {
   // Ethereum Mainnet - Etherscan
-  {
-    chainId: 1,
+  1: {
     chainType: "evm",
     explorerUrl: "https://etherscan.io",
     explorerApiType: "etherscan",
@@ -234,8 +234,7 @@ const EXPLORER_CONFIGS: NewExplorerConfig[] = [
     explorerContractPath: "/address/{address}#code",
   },
   // Sepolia Testnet - Etherscan (uses unified V2 API with chainid param)
-  {
-    chainId: 11_155_111,
+  11_155_111: {
     chainType: "evm",
     explorerUrl: "https://sepolia.etherscan.io",
     explorerApiType: "etherscan",
@@ -245,8 +244,7 @@ const EXPLORER_CONFIGS: NewExplorerConfig[] = [
     explorerContractPath: "/address/{address}#code",
   },
   // Base - Etherscan (Basescan)
-  {
-    chainId: 8453,
+  8453: {
     chainType: "evm",
     explorerUrl: "https://basescan.org",
     explorerApiType: "etherscan",
@@ -256,8 +254,7 @@ const EXPLORER_CONFIGS: NewExplorerConfig[] = [
     explorerContractPath: "/address/{address}#code",
   },
   // Base Sepolia - Etherscan
-  {
-    chainId: 84_532,
+  84_532: {
     chainType: "evm",
     explorerUrl: "https://sepolia.basescan.org",
     explorerApiType: "etherscan",
@@ -267,8 +264,7 @@ const EXPLORER_CONFIGS: NewExplorerConfig[] = [
     explorerContractPath: "/address/{address}#code",
   },
   // Tempo Testnet - Blockscout
-  {
-    chainId: 42_429,
+  42_429: {
     chainType: "evm",
     explorerUrl: "https://explorer.testnet.tempo.xyz",
     explorerApiType: "blockscout",
@@ -278,8 +274,7 @@ const EXPLORER_CONFIGS: NewExplorerConfig[] = [
     explorerContractPath: "/address/{address}?tab=contract",
   },
   // Tempo Mainnet - Blockscout
-  {
-    chainId: 42_420,
+  42_420: {
     chainType: "evm",
     explorerUrl: "https://explorer.tempo.xyz",
     explorerApiType: "blockscout",
@@ -289,8 +284,7 @@ const EXPLORER_CONFIGS: NewExplorerConfig[] = [
     explorerContractPath: "/address/{address}?tab=contract",
   },
   // Solana Mainnet - Solscan
-  {
-    chainId: 101,
+  101: {
     chainType: "solana",
     explorerUrl: "https://solscan.io",
     explorerApiType: "solscan",
@@ -300,8 +294,7 @@ const EXPLORER_CONFIGS: NewExplorerConfig[] = [
     explorerContractPath: "/account/{address}#anchorProgramIDL",
   },
   // Solana Devnet - Solscan
-  {
-    chainId: 103,
+  103: {
     chainType: "solana",
     explorerUrl: "https://solscan.io/?cluster=devnet",
     explorerApiType: "solscan",
@@ -310,7 +303,7 @@ const EXPLORER_CONFIGS: NewExplorerConfig[] = [
     explorerAddressPath: "/account/{address}",
     explorerContractPath: "/account/{address}#anchorProgramIDL",
   },
-];
+};
 
 async function seedChains() {
   const connectionString =
@@ -356,6 +349,38 @@ async function seedChains() {
     await db.insert(chains).values(chain);
     console.log(`  + ${chain.name} (${chain.chainId}) inserted`);
   }
+
+  // Build EXPLORER_CONFIGS dynamically using resolved chainIds from DEFAULT_CHAINS
+  // This ensures chainId consistency between chains and explorer configs
+  // We map each chain to its explorer config using the CHAIN_CONFIG to find the default chainId
+  const chainToDefaultIdMap: Record<string, number> = {
+    "Ethereum Mainnet": 1,
+    "Sepolia Testnet": 11_155_111,
+    "Base": 8453,
+    "Base Sepolia": 84_532,
+    "Tempo Testnet": 42_429,
+    "Tempo": 42_420,
+    "Solana": 101,
+    "Solana Devnet": 103,
+  };
+
+  const EXPLORER_CONFIGS: NewExplorerConfig[] = DEFAULT_CHAINS.map((chain) => {
+    // Look up the default chainId using the chain name
+    const defaultChainId = chainToDefaultIdMap[chain.name];
+
+    if (!defaultChainId || !EXPLORER_CONFIG_TEMPLATES[defaultChainId]) {
+      console.warn(
+        `  ! No explorer config template for chain ${chain.name} (${chain.chainId}), skipping`
+      );
+      return null;
+    }
+
+    const template = EXPLORER_CONFIG_TEMPLATES[defaultChainId];
+    return {
+      chainId: chain.chainId, // Use the resolved chainId from the chain
+      ...template,
+    };
+  }).filter((config): config is NewExplorerConfig => config !== null);
 
   console.log(`\nSeeding ${EXPLORER_CONFIGS.length} explorer configs...`);
 

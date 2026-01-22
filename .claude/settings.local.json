@@ -4,5 +4,6 @@
     "mcp-obsidian",
     "chrome-devtools",
     "memory"
-  ]
+  ],
+  "enableAllProjectMcpServers": true
 }
