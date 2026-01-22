@@ -17,6 +17,7 @@ This document provides a comprehensive testing guide for new testers to fully te
 7. [Phase 5: Hub Marketplace Testing](#phase-5-hub-marketplace-testing)
 8. [Test Completion Checklist](#test-completion-checklist)
 9. [Troubleshooting](#troubleshooting)
+10. [Bonus Tests: ERC20 Token Operations](#bonus-tests-erc20-token-operations)
 
 ---
 
@@ -26,11 +27,17 @@ This document provides a comprehensive testing guide for new testers to fully te
 
 All testing will be performed on the **Sepolia** testnet (Chain ID: 11155111).
 
-### Test Contract
+### Test Contracts
 
-The test contract for event monitoring is deployed at:
+**SimpleStorage Contract** (for Read/Write testing):
 - **Address**: `0x069d34E130ccA7D435351FB30c0e97F2Ce6B42Ad`
 - **Etherscan**: https://sepolia.etherscan.io/address/0x069d34E130ccA7D435351FB30c0e97F2Ce6B42Ad#code
+
+### Secret Values
+
+All secret values for testing are stored in 1Password:
+- **Search for**: "KeeperHub Test 2026"
+- **Contains**: CloudFlare headers, Discord webhook, Slack bot token
 
 ### What Testers Need Before Starting
 
@@ -38,15 +45,17 @@ The test contract for event monitoring is deployed at:
 |------|--------|-------|
 | KeeperHub account | Self-registration | Create during testing |
 | Sepolia ETH | Request from Admin | Provide your KH wallet address |
-| Discord webhook URL | Provided by Admin | For notification testing |
-| Slack webhook URL | Provided by Admin | For notification testing |
+| Modheader extension | Chrome/Firefox store | Required for app access |
+| 1Password access | "KeeperHub Test 2026" | CloudFlare, Discord, Slack secrets |
 | Safe multisig on Sepolia | Create in Safe app | For Event trigger testing |
 
 ### Tools Required
 
 1. **Web browser** (Chrome/Firefox recommended)
-2. **MetaMask** or similar wallet (for Safe multisig testing)
-3. **Safe app access**: https://app.safe.global
+2. **Modheader browser extension** (required for access)
+3. **MetaMask** or similar wallet (for Safe multisig testing)
+4. **Safe app access**: https://app.safe.global
+5. **Terminal/CLI** (for curl commands)
 
 ---
 
@@ -54,13 +63,37 @@ The test contract for event monitoring is deployed at:
 
 ### Test Environment URL
 
-Access KeeperHub at the URL provided by your administrator.
+**KeeperHub Test URL**: https://workflows.keeperhub.com/
+
+### Modheader Extension Setup (Required)
+
+You must configure the Modheader browser extension to access KeeperHub.
+
+**Installation**:
+1. Install Modheader extension from your browser's extension store:
+   - Chrome: https://chrome.google.com/webstore/detail/modheader
+   - Firefox: https://addons.mozilla.org/en-US/firefox/addon/modheader/
+
+**Configuration**:
+1. Open Modheader extension
+2. Add the following **Request Headers** (get values from 1Password "KeeperHub Test 2026"):
+   - `X-Auth-Email`: [value from 1Password]
+   - `X-Auth-Key`: [value from 1Password]
+3. Add **Request domain filter**:
+   - Filter: `workflows.keeperhub.com`
+4. Ensure the profile is enabled (toggle on)
+
+**Verification**:
+1. Navigate to https://workflows.keeperhub.com/
+2. If configured correctly, you should see the KeeperHub login/signup page
+3. If you see an access denied error, verify your Modheader configuration
 
 ### Browser Preparation
 
 1. Clear browser cache if you have tested before
 2. Disable any ad blockers for the KeeperHub domain
 3. Enable JavaScript and cookies
+4. Verify Modheader extension is active
 
 ---
 
@@ -71,7 +104,7 @@ Access KeeperHub at the URL provided by your administrator.
 **Objective**: Verify new user signup flow and default organization creation.
 
 **Steps**:
-1. Navigate to the KeeperHub application URL
+1. Navigate to https://workflows.keeperhub.com/
 2. Click "Sign Up" or "Get Started"
 3. Enter your email address
 4. Complete the authentication flow (email verification or OAuth)
@@ -109,13 +142,13 @@ Connections are required for workflow nodes to function. Configure each connecti
 
 **Objective**: Set up Discord webhook for notifications.
 
-**Prerequisites**: Obtain Discord webhook URL from Admin.
+**Prerequisites**: Get Discord webhook URL from 1Password "KeeperHub Test 2026"
 
 **Steps**:
 1. Navigate to Settings > Connections (or Integrations)
 2. Find Discord integration
 3. Click "Add" or "Configure"
-4. Enter the webhook URL provided by Admin
+4. Enter the webhook URL from 1Password
 5. Save the connection
 6. Optionally test the connection if a test button is available
 
@@ -124,26 +157,26 @@ Connections are required for workflow nodes to function. Configure each connecti
 - [ ] Connection appears in your connections list
 - [ ] Connection shows as "Active" or "Connected"
 
-**Admin-Provided Webhook URL**: `_____________________`
+**Note**: Discord channel is `#keeperhub-test`. All testers should already be invited to this channel.
 
-### Test 2.2: Slack Connection (Optional)
+### Test 2.2: Slack Connection
 
-**Objective**: Set up Slack webhook for notifications.
+**Objective**: Set up Slack bot for notifications.
 
-**Prerequisites**: Obtain Slack webhook URL from Admin.
+**Prerequisites**: Get Slack bot token from 1Password "KeeperHub Test 2026"
 
 **Steps**:
 1. Navigate to Settings > Connections
 2. Find Slack integration
 3. Click "Add" or "Configure"
-4. Enter the bot token or webhook URL provided by Admin
+4. Enter the bot token from 1Password
 5. Save the connection
 
 **Expected Results**:
 - [ ] Slack connection saved successfully
 - [ ] Connection appears in your connections list
 
-**Admin-Provided Webhook URL**: `_____________________`
+**Note**: Slack channel is `#keeperhub-test`. All testers should already be invited to this channel.
 
 ### Test 2.3: Email (SendGrid) Connection
 
@@ -190,16 +223,9 @@ Connections are required for workflow nodes to function. Configure each connecti
 
 **Steps**:
 1. Copy your KeeperHub wallet address from Test 3.1
-2. Contact your Admin via the designated channel
-3. Provide your wallet address
-4. Request Sepolia ETH for testing
-5. Wait for Admin confirmation
-
-**Message Template**:
-```
-Hi, I need Sepolia ETH for KeeperHub testing.
-My wallet address: [YOUR_ADDRESS]
-```
+2. Contact your Admin via the designated channel (Slack/Discord)
+3. Provide your wallet address and request Sepolia ETH
+4. Wait for Admin confirmation
 
 **Expected Results**:
 - [ ] Admin confirms ETH sent
@@ -241,6 +267,10 @@ My wallet address: [YOUR_ADDRESS]
 
 This phase tests all workflow node types by building 4 reference workflows. Each workflow tests different trigger types and action combinations.
 
+### Important: Schedule and Event Workflows
+
+Schedule and Event trigger workflows start in **disabled** mode by default. After creating these workflows, you must **enable** them in KeeperHub for them to execute automatically.
+
 ### Understanding Node Types
 
 **Trigger Nodes** (Required - starts every workflow):
@@ -273,6 +303,7 @@ This phase tests all workflow node types by building 4 reference workflows. Each
 - Schedule trigger (cron)
 - Check Balance action (Web3)
 - Condition node (branching logic)
+- Webhook node (external HTTP request)
 - Send Email action (SendGrid)
 - Send Discord Message action
 - Variable references between nodes
@@ -284,6 +315,7 @@ This phase tests all workflow node types by building 4 reference workflows. Each
 | Trigger | Schedule | Cron: `*/5 * * * *` (every 5 minutes) |
 | Check Balance | Web3 Action | Address: Your wallet, Network: Sepolia |
 | Condition | Logic | `balance < 0.1` |
+| Webhook | HTTP Request | POST to webhook.site |
 | Send Email | SendGrid | Alert email with balance info |
 | Send Discord | Discord | Alert message with balance info |
 
@@ -315,8 +347,21 @@ This phase tests all workflow node types by building 4 reference workflows. Each
      - Condition: `{{@action-1:Check Balance.balance}} < 0.1`
    - Label: "Low Balance Condition"
 
-5. **Add Email Notification (True Branch)**
+5. **Add Webhook Node**
+   - Go to https://webhook.site/ and get your unique URL
    - Click "+" on the condition true output
+   - Select: Webhook > HTTP Request
+   - Configure:
+     - Method: POST
+     - URL: Your unique webhook.site URL
+     - Headers: `Content-Type: application/json`
+     - Body: `{"alert": "low_balance", "balance": "{{@action-1:Check Balance.balance}}"}`
+   - Label: "Webhook Alert"
+
+   **Your webhook.site URL**: `_____________________`
+
+6. **Add Email Notification (True Branch)**
+   - Click "+" after Webhook node
    - Select: SendGrid > Send Email
    - Configure:
      - To: Your email address
@@ -324,20 +369,20 @@ This phase tests all workflow node types by building 4 reference workflows. Each
      - Body: "Your wallet balance is {{@action-1:Check Balance.balance}} ETH"
    - Label: "Send Email"
 
-6. **Add Discord Notification (True Branch)**
+7. **Add Discord Notification (True Branch)**
    - Connect another output from condition
    - Select: Discord > Send Message
    - Configure:
      - Message: "Alert: Wallet balance is low! Current: {{@action-1:Check Balance.balance}} ETH"
    - Label: "Send Discord"
 
-7. **Connect Edges**
-   - Trigger → Check Balance
-   - Check Balance → Condition
-   - Condition → Send Email
-   - Condition → Send Discord
+8. **Connect Edges**
+   - Trigger -> Check Balance
+   - Check Balance -> Condition
+   - Condition -> Webhook -> Send Email
+   - Condition -> Send Discord
 
-8. **Save Workflow**
+9. **Save Workflow**
 
 #### Testing Procedure
 
@@ -351,8 +396,12 @@ This phase tests all workflow node types by building 4 reference workflows. Each
    - If balance < 0.1: notifications should send
    - If balance >= 0.1: workflow should stop at condition
 
-3. **Test Scheduled Execution** (Optional)
-   - Enable the workflow
+3. **Verify Webhook**
+   - Go to your webhook.site URL
+   - Verify the POST request was received with balance data
+
+4. **Enable and Test Scheduled Execution**
+   - **Enable the workflow** (toggle to enabled state)
    - Wait for scheduled trigger (5 minutes)
    - Verify execution log shows automatic run
 
@@ -361,17 +410,22 @@ This phase tests all workflow node types by building 4 reference workflows. Each
 - [ ] Manual execution completes
 - [ ] Balance retrieved correctly
 - [ ] Condition evaluates properly
+- [ ] Webhook receives POST request
 - [ ] Notifications sent (if condition met)
+- [ ] Scheduled execution works when enabled
 
 ---
 
 ### Workflow 2: Wallet ETH Filler (Transfer Test)
 
-**Trigger Type**: Schedule
+**Trigger Type**: Manual
 **Purpose**: Test ETH transfer functionality by sending to yourself.
 
 #### What This Workflow Tests
 
+- Manual trigger
+- Check Balance action (Web3)
+- Condition node
 - Transfer ETH action (Web3)
 - Self-transfer (recipient = your address)
 - Transaction confirmation
@@ -385,7 +439,7 @@ For testing purposes, **set the recipient address as your own wallet address**. 
 
 | Node | Type | Configuration |
 |------|------|---------------|
-| Trigger | Schedule | Cron: `*/15 * * * *` (every 15 minutes) |
+| Trigger | Manual | User-initiated |
 | Check Balance | Web3 Action | Check your wallet balance |
 | Condition | Logic | `balance < 0.1` |
 | Send Notification | Discord | Pre-transfer alert |
@@ -397,8 +451,9 @@ For testing purposes, **set the recipient address as your own wallet address**. 
    - Name: "ETH Filler Test - [Your Name]"
    - Description: "Tests ETH transfer to self"
 
-2. **Add Schedule Trigger**
-   - Cron: `*/15 * * * *`
+2. **Add Manual Trigger**
+   - Select trigger type: "Manual"
+   - Description: "Manually triggered for testing"
 
 3. **Add Check Balance Node**
    - Address: Your wallet address
@@ -418,7 +473,7 @@ For testing purposes, **set the recipient address as your own wallet address**. 
    - **Integration**: Your Web3 connection
 
 7. **Connect Nodes**
-   - Trigger → Check Balance → Condition → (Notification + Transfer in parallel)
+   - Trigger -> Check Balance -> Condition -> (Notification + Transfer in parallel)
 
 8. **Save Workflow**
 
@@ -429,7 +484,7 @@ For testing purposes, **set the recipient address as your own wallet address**. 
    - Ensure you have > 0.02 ETH (0.01 transfer + gas)
 
 2. **Execute Workflow**
-   - Run workflow manually
+   - Click "Run" or "Execute" button
    - Monitor Transfer ETH node execution
    - Note transaction hash if displayed
 
@@ -438,6 +493,7 @@ For testing purposes, **set the recipient address as your own wallet address**. 
    - Check Etherscan for transaction: https://sepolia.etherscan.io/address/[YOUR_ADDRESS]
 
 **Expected Results**:
+- [ ] Manual trigger executes workflow
 - [ ] Transfer executes successfully
 - [ ] Transaction visible on Etherscan
 - [ ] Balance reflects gas fee deduction
@@ -445,72 +501,129 @@ For testing purposes, **set the recipient address as your own wallet address**. 
 
 ---
 
-### Workflow 3: Monthly Salary Distribution (Multiple Transfers)
+### Workflow 3: Smart Contract Read/Write Tester
 
-**Trigger Type**: Schedule
-**Purpose**: Test parallel transfer execution and workflow branching.
+**Trigger Type**: Manual
+**Purpose**: Test smart contract Read and Write functionality with conditional logic.
 
 #### What This Workflow Tests
 
-- Parallel node execution
-- Multiple Transfer ETH actions
-- Node-to-node data flow
-- Aggregated notifications
+- Read Contract action (Web3)
+- Write Contract action (Web3)
+- Condition node with contract data
+- Sequential read-write-read flow
+- Discord notifications with contract data
+
+#### Test Contract: SimpleStorage
+
+The SimpleStorage contract provides simple read/write functions for testing:
+
+| Function | Type | Description |
+|----------|------|-------------|
+| `retrieve()` | Read | Returns the stored favorite number |
+| `store(uint256)` | Write | Stores a new favorite number |
+| `nameToFavoriteNumber(string)` | Read | Returns favorite number for a name |
+| `addPerson(string, uint256)` | Write | Adds a person with name and number |
+
+**Contract Address**: `0x069d34E130ccA7D435351FB30c0e97F2Ce6B42Ad`
 
 #### Configuration Details
 
-This workflow simulates distributing funds to multiple recipients. For testing, **all recipient addresses will be your own wallet**.
-
 | Node | Type | Configuration |
 |------|------|---------------|
-| Trigger | Schedule | Monthly: `0 0 1 * *` |
-| Transfer 1-5 | Web3 Transfers | 0.001 ETH each to self |
-| Notification | Discord | Summary message |
+| Trigger | Manual | User-initiated |
+| Read Current Value | Web3 Read | Call `retrieve()` |
+| Condition | Logic | Check if value needs update |
+| Write New Value | Web3 Write | Call `store(uint256)` |
+| Read Updated Value | Web3 Read | Verify with `retrieve()` |
+| Notification | Discord | Report results |
 
 #### Step-by-Step Build Instructions
 
 1. **Create New Workflow**
-   - Name: "Salary Distribution Test - [Your Name]"
-   - Description: "Tests multiple parallel transfers"
+   - Name: "Contract Read/Write Test - [Your Name]"
+   - Description: "Tests smart contract interactions"
 
-2. **Add Schedule Trigger**
-   - Cron: `0 0 1 * *` (1st of each month at midnight)
-   - For testing, we'll execute manually
+2. **Add Manual Trigger**
+   - Select trigger type: "Manual"
 
-3. **Add 5 Transfer Nodes (All to Self)**
+3. **Add Read Contract Node (Initial Read)**
+   - Select: Web3 > Read Contract
+   - Configure:
+     - Contract Address: `0x069d34E130ccA7D435351FB30c0e97F2Ce6B42Ad`
+     - Network: Sepolia (11155111)
+     - Function: `retrieve`
+     - ABI: (Auto-fetch or paste contract ABI)
+   - Label: "Read Current Value"
 
-   For each transfer (1-5):
-   - Select: Web3 > Transfer Funds
-   - To Address: YOUR WALLET ADDRESS
-   - Amount: `0.001` ETH
-   - Network: Sepolia
-   - Label: "Transfer to Contractor [1-5]"
+4. **Add Condition Node**
+   - Configure:
+     - Condition: `{{@read-current:Read Current Value.result}} < 1000`
+   - Label: "Check If Update Needed"
+   - Description: "Triggers write if current value is less than 1000"
 
-4. **Connect Trigger to All Transfers**
-   - Trigger connects to all 5 transfer nodes (parallel execution)
+5. **Add Write Contract Node (True Branch)**
+   - Select: Web3 > Write Contract
+   - Configure:
+     - Contract Address: `0x069d34E130ccA7D435351FB30c0e97F2Ce6B42Ad`
+     - Network: Sepolia (11155111)
+     - Function: `store`
+     - Parameters: `1234` (or any number you want to store)
+     - ABI: (Auto-fetch or paste contract ABI)
+   - Label: "Store New Value"
 
-5. **Add Discord Summary Node**
-   - Connect all 5 transfers to this node
-   - Message: "Distribution Test Complete! 5 transfers of 0.001 ETH each processed."
+6. **Add Read Contract Node (Verification Read)**
+   - Select: Web3 > Read Contract
+   - Configure:
+     - Contract Address: `0x069d34E130ccA7D435351FB30c0e97F2Ce6B42Ad`
+     - Network: Sepolia (11155111)
+     - Function: `retrieve`
+   - Label: "Verify Updated Value"
 
-6. **Save Workflow**
+7. **Add Discord Notification**
+   - Message:
+   ```
+   Contract Read/Write Test Complete!
+
+   Initial Value: {{@read-current:Read Current Value.result}}
+   New Value Stored: 1234
+   Verified Value: {{@verify:Verify Updated Value.result}}
+
+   Contract: 0x069d34E130ccA7D435351FB30c0e97F2Ce6B42Ad
+   ```
+
+8. **Connect Nodes**
+   - Trigger -> Read Current Value -> Condition
+   - Condition (true) -> Store New Value -> Verify Updated Value -> Discord Notification
+   - Condition (false) -> Discord Notification (with "no update needed" message)
+
+9. **Save Workflow**
 
 #### Testing Procedure
 
-1. **Pre-Test Balance**: `_____ ETH`
+1. **Execute Workflow**
+   - Click "Run" or "Execute"
+   - Watch execution flow through each node
 
-2. **Execute Workflow**
-   - Run manually
-   - Observe parallel execution of transfers
+2. **Verify Read Operations**
+   - Initial read should return the current stored value
+   - Verification read should show your newly stored value
 
-3. **Post-Test Balance**: `_____ ETH`
-   - Should be reduced by ~0.005 ETH + gas fees
+3. **Verify Write Operation**
+   - Check Etherscan for the transaction
+   - Verify the `store` function was called with your value
+
+4. **Verify on Etherscan**
+   - Go to: https://sepolia.etherscan.io/address/0x069d34E130ccA7D435351FB30c0e97F2Ce6B42Ad#readContract
+   - Call `retrieve()` to confirm your value is stored
 
 **Expected Results**:
-- [ ] All 5 transfers execute
-- [ ] Parallel execution visible in logs
-- [ ] Summary notification sent
-- [ ] 5 transactions visible on Etherscan
+- [ ] Read Contract returns current value
+- [ ] Condition evaluates correctly
+- [ ] Write Contract executes transaction
+- [ ] Transaction visible on Etherscan
+- [ ] Verification read shows updated value
+- [ ] Discord notification received with all values
 
 ---
 
@@ -597,9 +710,12 @@ Before building this workflow, you must create a Safe multisig on Sepolia.
    ```
 
 5. **Connect Nodes**
-   - Event Trigger → Event Filter → Discord Notification
+   - Event Trigger -> Event Filter -> Discord Notification
 
-6. **Save and Enable Workflow**
+6. **Save Workflow**
+
+7. **Enable Workflow**
+   - **Important**: Event workflows start disabled. Toggle to **enabled** state.
 
 #### Testing Procedure
 
@@ -628,6 +744,7 @@ Before building this workflow, you must create a Safe multisig on Sepolia.
    - Verify event captured
 
 **Expected Results**:
+- [ ] Workflow enabled successfully
 - [ ] Workflow listens for events
 - [ ] AddedOwner event detected
 - [ ] Event details captured correctly
@@ -636,46 +753,54 @@ Before building this workflow, you must create a Safe multisig on Sepolia.
 
 ---
 
-### Additional Trigger Tests
+### Additional Trigger Test: Webhook Trigger
 
-#### Test 4.5: Manual Trigger
+#### Test: Webhook Trigger with CloudFlare Auth
 
-**Objective**: Verify manual workflow execution.
-
-**Steps**:
-1. Create a simple workflow with Manual trigger
-2. Add a Discord notification: "Manual trigger test executed"
-3. Save workflow
-4. Click "Run" or "Execute"
-5. Verify execution and notification
-
-**Expected Results**:
-- [ ] Manual trigger available as option
-- [ ] Workflow executes on button click
-- [ ] Notification received
-
-#### Test 4.6: Webhook Trigger
-
-**Objective**: Test HTTP webhook-triggered workflows.
+**Objective**: Test HTTP webhook-triggered workflows with authentication headers.
 
 **Steps**:
-1. Create workflow with Webhook trigger
-2. Note the generated webhook URL
-3. Add Discord notification with payload data: `{{trigger.body}}`
-4. Save and enable workflow
-5. Send POST request to webhook URL:
+
+1. **Create Workflow with Webhook Trigger**
+   - Create new workflow
+   - Name: "Webhook Test - [Your Name]"
+   - Select trigger type: "Webhook"
+   - Note the generated webhook URL
+
+2. **Add Discord Notification**
+   - Message: `Webhook received! Payload: {{trigger.body}}`
+
+3. **Save and Enable Workflow**
+
+4. **Get CloudFlare Headers**
+   - Open 1Password and search for "KeeperHub Test 2026"
+   - Copy the `X-Auth-Email` and `X-Auth-Key` values
+
+5. **Test with curl Command**
+
+   Open your terminal and run:
    ```bash
-   curl -X POST [WEBHOOK_URL] \
+   curl -X POST [YOUR_WEBHOOK_URL] \
      -H "Content-Type: application/json" \
-     -d '{"test": "data", "message": "Webhook test"}'
+     -H "X-Auth-Email: [VALUE_FROM_1PASSWORD]" \
+     -H "X-Auth-Key: [VALUE_FROM_1PASSWORD]" \
+     -d '{"test": "data", "message": "Webhook trigger test", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}'
    ```
-6. Verify execution
+
+   Replace:
+   - `[YOUR_WEBHOOK_URL]` with your generated webhook URL
+   - `[VALUE_FROM_1PASSWORD]` with actual values from 1Password
+
+6. **Verify Execution**
+   - Check KeeperHub for workflow execution
+   - Verify Discord notification received with payload data
 
 **Expected Results**:
 - [ ] Webhook URL generated
-- [ ] POST request triggers workflow
+- [ ] curl command executes successfully
+- [ ] Workflow triggered by POST request
 - [ ] Payload data accessible in workflow
-- [ ] Notification includes payload content
+- [ ] Discord notification includes payload content
 
 ---
 
@@ -702,10 +827,9 @@ The Hub is KeeperHub's workflow marketplace where users can find and use pre-bui
 **Objective**: Test workflow template duplication.
 
 **Steps**:
-1. Find one of the 4 reference workflows:
+1. Find one of the reference workflows:
    - Wallet ETH Balance Watcher
    - Wallet ETH Filler
-   - Monthly Salary Distribution
    - Safe Multisig Watcher
 
 2. Click "Use Template" button
@@ -750,7 +874,7 @@ The Hub is KeeperHub's workflow marketplace where users can find and use pre-bui
 
 ### Phase 2: Connections
 - [ ] Discord connection configured
-- [ ] Slack connection configured (if applicable)
+- [ ] Slack connection configured
 - [ ] Email/SendGrid connection configured
 - [ ] All connections show as active
 
@@ -761,12 +885,11 @@ The Hub is KeeperHub's workflow marketplace where users can find and use pre-bui
 - [ ] Web3 connection verified
 
 ### Phase 4: Workflows
-- [ ] Workflow 1 (Balance Watcher) - Schedule + Check Balance + Condition + Notifications
-- [ ] Workflow 2 (ETH Filler) - Transfer ETH self-test
-- [ ] Workflow 3 (Salary Distribution) - Parallel transfers
+- [ ] Workflow 1 (Balance Watcher) - Schedule + Check Balance + Condition + Webhook + Notifications
+- [ ] Workflow 2 (ETH Filler) - Manual + Transfer ETH self-test
+- [ ] Workflow 3 (Contract Read/Write) - Read + Write + Condition + Verify
 - [ ] Workflow 4 (Multisig Watcher) - Event trigger with Safe
-- [ ] Manual trigger tested
-- [ ] Webhook trigger tested
+- [ ] Webhook trigger tested with curl
 
 ### Phase 5: Hub
 - [ ] Hub accessible
@@ -782,12 +905,15 @@ The Hub is KeeperHub's workflow marketplace where users can find and use pre-bui
 
 | Issue | Possible Cause | Solution |
 |-------|---------------|----------|
+| Cannot access KeeperHub | Modheader not configured | Check Modheader headers and domain filter |
 | Wallet creation fails | Email not verified | Complete email verification |
 | Balance shows 0 | Network mismatch | Ensure Sepolia selected |
 | Transfer fails | Insufficient funds | Request more ETH from Admin |
-| Discord notification not received | Invalid webhook URL | Verify URL with Admin |
-| Event not detected | Workflow not enabled | Toggle workflow to enabled |
-| Webhook not triggering | Wrong HTTP method | Use POST request |
+| Discord notification not received | Invalid webhook URL | Verify URL in 1Password |
+| Event not detected | Workflow not enabled | Toggle workflow to enabled state |
+| Webhook not triggering | Missing auth headers | Include CloudFlare headers in curl |
+| Schedule not running | Workflow disabled | Enable the workflow |
+| Contract read fails | Wrong network | Ensure Sepolia network selected |
 
 ### Getting Help
 
@@ -801,41 +927,87 @@ The Hub is KeeperHub's workflow marketplace where users can find and use pre-bui
 
 ---
 
-## Reference Information
+## Bonus Tests: ERC20 Token Operations
 
-### Test Contract Details
+These bonus tests require test ERC20 tokens on Sepolia. Complete these after finishing the main test phases.
 
-- **Address**: `0x069d34E130ccA7D435351FB30c0e97F2Ce6B42Ad`
-- **Network**: Sepolia (Chain ID: 11155111)
-- **Etherscan**: https://sepolia.etherscan.io/address/0x069d34E130ccA7D435351FB30c0e97F2Ce6B42Ad#code
+### Acquiring Test ERC20 Tokens
 
-### Network Information
+To test token operations, you need test ERC20 tokens on Sepolia. Options:
 
-| Network | Chain ID | Explorer |
-|---------|----------|----------|
-| Sepolia | 11155111 | https://sepolia.etherscan.io |
+1. **Sepolia USDC/USDT Faucets**
+   - Search for "Sepolia USDC faucet" or "Sepolia test tokens"
+   - Some DeFi testnet apps provide test tokens
 
-### Cron Expression Reference
+2. **Request from Admin**
+   - Ask Admin if they can send test ERC20 tokens to your wallet
 
-| Expression | Meaning |
-|------------|---------|
-| `*/5 * * * *` | Every 5 minutes |
-| `*/15 * * * *` | Every 15 minutes |
-| `0 0 * * *` | Daily at midnight |
-| `0 0 1 * *` | Monthly on 1st at midnight |
+3. **Bridge from Other Testnets**
+   - Some bridge protocols support testnet token transfers
 
-### Variable Reference Syntax
+**Your Test Token Details**:
+- Token Address: `0x_____________________`
+- Token Symbol: `_____`
+- Amount Received: `_____`
 
-Reference previous node outputs using:
-```
-{{@node-id:Node Label.fieldName}}
-```
+### Bonus Test 1: Check Token Balance
 
-Example:
-```
-{{@action-1:Check Balance.balance}}
-{{@trigger:Event Listener.eventName}}
-```
+**Objective**: Test the Check Token Balance (ERC20) node.
+
+**Steps**:
+1. Create a new workflow or modify an existing one
+2. Add a "Check Token Balance" node (Web3)
+3. Configure:
+   - Token Address: Your test token contract address
+   - Wallet Address: Your KeeperHub wallet address
+   - Network: Sepolia
+4. Add a Discord notification with the balance
+5. Execute the workflow
+
+**Expected Results**:
+- [ ] Token balance retrieved correctly
+- [ ] Balance shows in correct decimal format
+- [ ] Notification displays token amount
+
+### Bonus Test 2: Transfer Token (ERC20)
+
+**Objective**: Test the Transfer Token (ERC20) node.
+
+**Steps**:
+1. Create a new workflow
+2. Add Manual trigger
+3. Add "Check Token Balance" node to verify you have tokens
+4. Add "Transfer Token" node:
+   - **To Address**: YOUR OWN WALLET ADDRESS (self-transfer)
+   - **Amount**: Small amount (e.g., 1 token)
+   - **Token Address**: Your test token contract
+   - **Network**: Sepolia
+5. Add Discord notification with transfer details
+6. Execute the workflow
+
+**Expected Results**:
+- [ ] Token transfer executes successfully
+- [ ] Transaction visible on Etherscan
+- [ ] Gas fee deducted from ETH balance
+- [ ] Token balance unchanged (self-transfer minus fees)
+- [ ] Notification received
+
+### Bonus Test 3: Token Balance Monitoring Workflow
+
+**Objective**: Create a complete token monitoring workflow.
+
+**Steps**:
+1. Create workflow: "Token Monitor - [Your Name]"
+2. Add Schedule trigger (every 10 minutes)
+3. Add Check Token Balance node
+4. Add Condition: `balance < 100` (adjust threshold as needed)
+5. Add Discord notification for low balance alert
+6. Enable workflow and verify scheduled execution
+
+**Expected Results**:
+- [ ] Workflow monitors token balance on schedule
+- [ ] Condition evaluates token balance correctly
+- [ ] Notifications sent when below threshold
 
 ---
 
@@ -844,3 +1016,4 @@ Example:
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2026-01-22 | TechOps | Initial version |
+| 1.1 | 2026-01-22 | TechOps | Added Modheader setup, webhook testing, contract R/W workflow, bonus ERC20 tests |
