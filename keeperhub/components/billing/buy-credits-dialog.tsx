@@ -7,7 +7,7 @@ import {
   useAccount,
   useConnect,
   useDisconnect,
-  useSendTransaction,
+  useWriteContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { hashOrgId } from "@/keeperhub/lib/billing/contracts";
+import { CREDITS_ABI, hashOrgId } from "@/keeperhub/lib/billing/contracts";
 import { api } from "@/lib/api-client";
 
 const CREDITS_CONTRACT = process.env.NEXT_PUBLIC_CREDITS_CONTRACT_ADDRESS || "";
@@ -54,10 +54,14 @@ export function BuyCreditsDialog({
   const { address, isConnected } = useAccount();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
-  const { sendTransaction, isPending: isSendingTx } = useSendTransaction();
+  const {
+    writeContract,
+    data: writeData,
+    isPending: isSendingTx,
+  } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed } =
     useWaitForTransactionReceipt({
-      hash: txHash as `0x${string}` | undefined,
+      hash: (writeData || txHash) as `0x${string}` | undefined,
     });
 
   // Auto-calculate when dialog opens with pre-selected package
@@ -144,11 +148,13 @@ export function BuyCreditsDialog({
 
       const orgIdHash = hashOrgId(organizationId);
 
-      sendTransaction(
+      writeContract(
         {
-          to: CREDITS_CONTRACT as `0x${string}`,
+          address: CREDITS_CONTRACT as `0x${string}`,
+          abi: CREDITS_ABI,
+          functionName: "depositETH",
+          args: [orgIdHash as `0x${string}`],
           value: parseEther(ethAmount),
-          data: `0xd8b4cb51${orgIdHash.slice(2)}`, // depositETH(bytes32)
         },
         {
           onSuccess: (hash) => {
@@ -171,12 +177,17 @@ export function BuyCreditsDialog({
 
   // Confirm deposit after transaction is mined
   const confirmDeposit = async () => {
-    if (!txHash) {
+    const hash = writeData || txHash;
+    if (!hash) {
       return;
     }
 
     try {
-      const result = await api.billing.confirmDeposit(txHash, organizationId);
+      const result = await api.billing.confirmDeposit(
+        hash,
+        organizationId,
+        estimatedCredits || 0
+      );
 
       toast.success(`${result.credits} credits added to your account`);
 

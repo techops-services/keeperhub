@@ -61,10 +61,6 @@ export default function BillingPage() {
     router.push(`/billing/checkout?amount=${usdAmount}`);
   };
 
-  const handleBuyCreditsClick = () => {
-    router.push("/billing/checkout?amount=25");
-  };
-
   return (
     <div className="container pointer-events-auto mx-auto max-w-7xl space-y-8 p-6">
       {/* Header */}
@@ -77,20 +73,14 @@ export default function BillingPage() {
 
       {/* Current Balance */}
       <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="mb-1 text-muted-foreground text-sm">
-              Current Balance
-            </p>
-            <p className="font-bold text-5xl">
-              {balance?.creditBalance?.toLocaleString() ?? 0}
-            </p>
-            <p className="mt-2 text-muted-foreground text-sm">credits</p>
-          </div>
-          <Button className="gap-2" onClick={handleBuyCreditsClick} size="lg">
-            <Sparkles className="size-4" />
-            Buy Credits
-          </Button>
+        <div>
+          <p className="mb-1 text-muted-foreground text-sm">
+            Current Balance
+          </p>
+          <p className="font-bold text-5xl">
+            {balance?.creditBalance?.toLocaleString() ?? 0}
+          </p>
+          <p className="mt-2 text-muted-foreground text-sm">credits</p>
         </div>
       </Card>
 

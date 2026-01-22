@@ -9,13 +9,13 @@ import {
   useAccount,
   useConnect,
   useReadContract,
-  useSendTransaction,
+  useWriteContract,
   useSwitchChain,
   useWaitForTransactionReceipt,
 } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { hashOrgId } from "@/keeperhub/lib/billing/contracts";
+import { CREDITS_ABI, hashOrgId } from "@/keeperhub/lib/billing/contracts";
 import { useActiveMember } from "@/keeperhub/lib/hooks/use-organization";
 import { api } from "@/lib/api-client";
 
@@ -117,9 +117,9 @@ export default function CheckoutPage() {
   const { address, isConnected, chain } = useAccount();
   const { connect, connectors } = useConnect();
   const { switchChain } = useSwitchChain();
-  const { sendTransaction } = useSendTransaction();
+  const { writeContract, data: writeData } = useWriteContract();
   const { isSuccess: isConfirmed } = useWaitForTransactionReceipt({
-    hash: txHash as `0x${string}` | undefined,
+    hash: (writeData || txHash) as `0x${string}` | undefined,
   });
 
   const SEPOLIA_CHAIN_ID = 11_155_111;
@@ -127,12 +127,14 @@ export default function CheckoutPage() {
 
   // Confirm deposit after transaction is mined
   useEffect(() => {
-    if (isConfirmed && txHash && organizationId) {
+    const hash = writeData || txHash;
+    if (isConfirmed && hash && organizationId) {
       const confirmDeposit = async () => {
         try {
           const result = await api.billing.confirmDeposit(
-            txHash,
-            organizationId
+            hash,
+            organizationId,
+            estimatedCredits || 0
           );
           toast.success(`${result.credits} credits added!`);
           router.push("/billing");
@@ -143,7 +145,7 @@ export default function CheckoutPage() {
       };
       confirmDeposit();
     }
-  }, [isConfirmed, txHash, organizationId]);
+  }, [isConfirmed, writeData, txHash, organizationId, estimatedCredits]);
 
   const handleConnect = () => {
     const injectedConnector = connectors.find((c) => c.type === "injected");
@@ -174,11 +176,13 @@ export default function CheckoutPage() {
       setIsPurchasing(true);
       const orgIdHash = hashOrgId(organizationId);
 
-      sendTransaction(
+      writeContract(
         {
-          to: CREDITS_CONTRACT as `0x${string}`,
+          address: CREDITS_CONTRACT as `0x${string}`,
+          abi: CREDITS_ABI,
+          functionName: "depositETH",
+          args: [orgIdHash as `0x${string}`],
           value: parseEther(ethAmount),
-          data: `0xd8b4cb51${orgIdHash.slice(2)}`,
           chainId: SEPOLIA_CHAIN_ID,
         },
         {

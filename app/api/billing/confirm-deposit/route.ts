@@ -20,11 +20,11 @@ export async function POST(req: Request) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { txHash, orgId } = await req.json();
+    const { txHash, orgId, creditsExpected } = await req.json();
 
-    if (!(txHash && orgId)) {
+    if (!(txHash && orgId && creditsExpected)) {
       return Response.json(
-        { error: "Missing txHash or orgId" },
+        { error: "Missing txHash, orgId, or creditsExpected" },
         { status: 400 }
       );
     }
@@ -142,10 +142,12 @@ export async function POST(req: Request) {
     }
 
     // Extract event data
-    const creditsAmount = Number(depositEvent.args.creditsIssued);
     const paymentToken = getTokenName(depositEvent.args.token);
     const paymentAmount = depositEvent.args.amountPaid.toString();
     const usdValue = depositEvent.args.usdValue.toString();
+
+    // Use the exact credits amount the frontend specified (from package selection)
+    const creditsAmount = creditsExpected;
 
     // Credit the organization in a transaction
     const result = await db.transaction(async (tx) => {

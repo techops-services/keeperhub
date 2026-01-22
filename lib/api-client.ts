@@ -728,14 +728,14 @@ export type BillingBalance = {
 // Billing API
 export const billingApi = {
   // Confirm a deposit transaction from the blockchain
-  confirmDeposit: (txHash: string, orgId: string) =>
+  confirmDeposit: (txHash: string, orgId: string, creditsExpected: number) =>
     apiCall<{
       success: boolean;
       credits: number;
       newBalance: number;
     }>("/api/billing/confirm-deposit", {
       method: "POST",
-      body: JSON.stringify({ txHash, orgId }),
+      body: JSON.stringify({ txHash, orgId, creditsExpected }),
     }),
 
   // Get credit balance and tier info

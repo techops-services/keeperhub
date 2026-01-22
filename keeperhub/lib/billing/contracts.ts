@@ -1,4 +1,5 @@
 import { ethers } from "ethers";
+import { parseAbi } from "viem";
 
 // Contract addresses from deployment
 export const CONTRACTS = {
@@ -17,19 +18,21 @@ export const CHAIN_CONFIG = {
 };
 
 // Minimal ABIs for event parsing and reading
-export const CREDITS_ABI = [
+export const CREDITS_ABI = parseAbi([
   "event CreditsDeposited(address indexed sender, bytes32 indexed orgId, address token, uint256 amountPaid, uint256 usdValue, uint256 creditsIssued)",
   "function getEthPrice() view returns (uint256)",
   "function calculateCredits(uint256 usdAmount) view returns (uint256)",
   "function usdToEth(uint256 usdAmount) view returns (uint256)",
-] as const;
+  "function depositETH(bytes32 orgId) payable",
+  "function depositStable(bytes32 orgId, address token, uint256 amount)",
+]);
 
-export const TIERS_ABI = [
+export const TIERS_ABI = parseAbi([
   "event TierMinted(address indexed recipient, bytes32 indexed orgId, uint8 tier, bool isLifetime, uint256 tokenId, uint256 expiresAt)",
   "event TierRenewed(bytes32 indexed orgId, uint256 tokenId, uint256 newExpiresAt)",
   "function checkAccess(bytes32 orgId) view returns (uint8 tier, bool valid, uint256 expiresAt)",
   "function tierPricing(uint8 tier) view returns (uint256 annualPrice, uint256 lifetimePrice)",
-] as const;
+]);
 
 // Get provider instance
 export function getProvider() {
