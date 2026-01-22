@@ -113,6 +113,11 @@ function redactObject(obj: any, depth = 0): any {
     return obj;
   }
 
+  // Handle BigInt by converting to string for JSON serialization
+  if (typeof obj === "bigint") {
+    return obj.toString();
+  }
+
   if (typeof obj === "string") {
     return obj;
   }
