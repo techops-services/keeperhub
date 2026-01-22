@@ -1,9 +1,12 @@
 {
+  "permissions": {
+    "allow": ["Bash(pnpm check:*)", "Bash(pnpm install)"]
+  },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "terraform",
     "mcp-obsidian",
     "chrome-devtools",
     "memory"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }

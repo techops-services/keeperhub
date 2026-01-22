@@ -222,7 +222,10 @@ const DEFAULT_CHAINS: NewChain[] = [
 
 // Explorer configuration template for each chain (KEEP-1154)
 // Note: chainIds are resolved dynamically from DEFAULT_CHAINS to ensure consistency
-const EXPLORER_CONFIG_TEMPLATES: Record<number, Omit<NewExplorerConfig, "chainId">> = {
+const EXPLORER_CONFIG_TEMPLATES: Record<
+  number,
+  Omit<NewExplorerConfig, "chainId">
+> = {
   // Ethereum Mainnet - Etherscan
   1: {
     chainType: "evm",
@@ -234,7 +237,7 @@ const EXPLORER_CONFIG_TEMPLATES: Record<number, Omit<NewExplorerConfig, "chainId
     explorerContractPath: "/address/{address}#code",
   },
   // Sepolia Testnet - Etherscan (uses unified V2 API with chainid param)
-  11_155_111: {
+  11155111: {
     chainType: "evm",
     explorerUrl: "https://sepolia.etherscan.io",
     explorerApiType: "etherscan",
@@ -254,7 +257,7 @@ const EXPLORER_CONFIG_TEMPLATES: Record<number, Omit<NewExplorerConfig, "chainId
     explorerContractPath: "/address/{address}#code",
   },
   // Base Sepolia - Etherscan
-  84_532: {
+  84532: {
     chainType: "evm",
     explorerUrl: "https://sepolia.basescan.org",
     explorerApiType: "etherscan",
@@ -264,7 +267,7 @@ const EXPLORER_CONFIG_TEMPLATES: Record<number, Omit<NewExplorerConfig, "chainId
     explorerContractPath: "/address/{address}#code",
   },
   // Tempo Testnet - Blockscout
-  42_429: {
+  42429: {
     chainType: "evm",
     explorerUrl: "https://explorer.testnet.tempo.xyz",
     explorerApiType: "blockscout",
@@ -274,7 +277,7 @@ const EXPLORER_CONFIG_TEMPLATES: Record<number, Omit<NewExplorerConfig, "chainId
     explorerContractPath: "/address/{address}?tab=contract",
   },
   // Tempo Mainnet - Blockscout
-  42_420: {
+  42420: {
     chainType: "evm",
     explorerUrl: "https://explorer.tempo.xyz",
     explorerApiType: "blockscout",
@@ -356,11 +359,11 @@ async function seedChains() {
   const chainToDefaultIdMap: Record<string, number> = {
     "Ethereum Mainnet": 1,
     "Sepolia Testnet": 11_155_111,
-    "Base": 8453,
+    Base: 8453,
     "Base Sepolia": 84_532,
     "Tempo Testnet": 42_429,
-    "Tempo": 42_420,
-    "Solana": 101,
+    Tempo: 42_420,
+    Solana: 101,
     "Solana Devnet": 103,
   };
 
@@ -368,7 +371,7 @@ async function seedChains() {
     // Look up the default chainId using the chain name
     const defaultChainId = chainToDefaultIdMap[chain.name];
 
-    if (!defaultChainId || !EXPLORER_CONFIG_TEMPLATES[defaultChainId]) {
+    if (!(defaultChainId && EXPLORER_CONFIG_TEMPLATES[defaultChainId])) {
       console.warn(
         `  ! No explorer config template for chain ${chain.name} (${chain.chainId}), skipping`
       );
