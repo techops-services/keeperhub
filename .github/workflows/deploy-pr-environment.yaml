@@ -33,6 +33,7 @@ jobs:
       CLUSTER_NAME: maker-staging
       NAMESPACE: pr-${{ github.event.pull_request.number }}
       AWS_ECR_NAME: keeperhub-staging
+      PG_VERSION: "16"
 
     steps:
       - name: Checkout code
@@ -171,6 +172,7 @@ jobs:
       - name: Deploy PostgreSQL cluster
         env:
           DB_PASSWORD: ${{ steps.db-password.outputs.password }}
+          PG_VERSION: ${{ env.PG_VERSION }}
         run: |
           envsubst < deploy/pr-environment/postgres-cluster.template.yaml | kubectl apply -f -
 

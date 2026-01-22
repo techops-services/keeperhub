@@ -118,7 +118,7 @@ spec:
               attempt=0
 
               while [ $attempt -lt $max_attempts ]; do
-                if wget -q --spider http://localstack:4566/_localstack/health; then
+                if curl -sf http://localstack:4566/_localstack/health > /dev/null 2>&1; then
                   echo "LocalStack is ready!"
                   break
                 fi
