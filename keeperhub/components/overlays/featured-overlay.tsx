@@ -1,9 +1,12 @@
 "use client";
 
+import { Eye, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Eye, Loader2 } from "lucide-react";
+import { Overlay } from "@/components/overlays/overlay";
+import { useOverlay } from "@/components/overlays/overlay-provider";
+import type { OverlayComponentProps } from "@/components/overlays/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,12 +17,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Overlay } from "@/components/overlays/overlay";
-import { useOverlay } from "@/components/overlays/overlay-provider";
-import type { OverlayComponentProps } from "@/components/overlays/types";
+import { WorkflowMiniMap } from "@/keeperhub/components/hub/workflow-mini-map";
 import { api, type SavedWorkflow } from "@/lib/api-client";
 import { authClient, useSession } from "@/lib/auth-client";
-import { WorkflowMiniMap } from "@/keeperhub/components/hub/workflow-mini-map";
 
 type FeaturedOverlayProps = OverlayComponentProps;
 
@@ -90,17 +90,17 @@ export function FeaturedOverlay({ overlayId }: FeaturedOverlayProps) {
       overlayId={overlayId}
       title="Workflow Templates"
     >
-      {isLoading ? (
+      {isLoading && (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="size-8 animate-spin text-muted-foreground" />
         </div>
-      ) : workflows.length === 0 ? (
+      )}
+      {!isLoading && workflows.length === 0 && (
         <div className="py-8 text-center">
-          <p className="text-muted-foreground">
-            No templates available yet.
-          </p>
+          <p className="text-muted-foreground">No templates available yet.</p>
         </div>
-      ) : (
+      )}
+      {!isLoading && workflows.length > 0 && (
         <div className="grid grid-cols-4 gap-4">
           {workflows.map((workflow) => {
             const isDuplicating = duplicatingIds.has(workflow.id);

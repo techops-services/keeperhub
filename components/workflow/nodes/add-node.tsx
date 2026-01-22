@@ -2,9 +2,9 @@
 
 import type { NodeProps } from "@xyflow/react";
 import { LayoutTemplate, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
 // start custom keeperhub code //
 import { useOverlay } from "@/components/overlays/overlay-provider";
+import { Button } from "@/components/ui/button";
 import { FeaturedOverlay } from "@/keeperhub/components/overlays/featured-overlay";
 // end keeperhub code //
 import { getAppName, getCustomLogo } from "@/lib/extension-registry";
@@ -63,7 +63,11 @@ export function AddNode({ data }: NodeProps & { data?: AddNodeData }) {
       </div>
       {/* start custom keeperhub code */}
       <div className="flex gap-3">
-        <Button className="gap-2 shadow-lg" onClick={data.onClick} size="default">
+        <Button
+          className="gap-2 shadow-lg"
+          onClick={data.onClick}
+          size="default"
+        >
           <Plus className="size-4" />
           Start building
         </Button>

@@ -17,8 +17,8 @@ import {
 } from "@/lib/integrations-store";
 import type { IntegrationType } from "@/lib/types/integration";
 import {
-  currentWorkflowIdAtom,
   currentWorkflowDescriptionAtom,
+  currentWorkflowIdAtom,
   currentWorkflowNameAtom,
   currentWorkflowVisibilityAtom,
   edgesAtom,
@@ -118,7 +118,9 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   const setEdges = useSetAtom(edgesAtom);
   const setCurrentWorkflowId = useSetAtom(currentWorkflowIdAtom);
   const setCurrentWorkflowName = useSetAtom(currentWorkflowNameAtom);
-  const setCurrentWorkflowDescription = useSetAtom(currentWorkflowDescriptionAtom);
+  const setCurrentWorkflowDescription = useSetAtom(
+    currentWorkflowDescriptionAtom
+  );
   const updateNodeData = useSetAtom(updateNodeDataAtom);
   const setHasUnsavedChanges = useSetAtom(hasUnsavedChangesAtom);
   const [workflowNotFound, setWorkflowNotFound] = useAtom(workflowNotFoundAtom);
@@ -385,6 +387,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
     setIsWorkflowEnabled, // keeperhub custom field //
     setHasUnsavedChanges,
     setWorkflowNotFound,
+    setCurrentWorkflowDescription,
   ]);
 
   // Track if we've already auto-fixed integrations for this workflow+version
