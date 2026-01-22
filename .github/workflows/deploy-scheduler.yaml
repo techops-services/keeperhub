@@ -14,37 +14,27 @@ on:
       - 'plugins/**'
       - 'keeperhub/**'
       - '.github/workflows/deploy-scheduler.yaml'
-  workflow_run:
-    workflows: ["deploy-keeperhub"]
-    types:
-      - completed
-    branches:
-      - staging
-      - prod
   workflow_dispatch:
 
 name: deploy-scheduler
 
 jobs:
   deploy-scheduler:
-    # Skip if triggered by workflow_run and the workflow failed
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
-    environment: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'prod') || github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}
+    environment: ${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}
     runs-on: ubuntu-latest
     env:
-      ENV_NAME: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'prod') || github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}
-      HELM_FILE: deploy/scheduler/${{ (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'prod') || github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}/values.yaml
-      REGION: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'prod') || github.ref == 'refs/heads/prod' && 'us-east-1' || 'us-east-2' }}
-      CLUSTER_NAME: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'prod') || github.ref == 'refs/heads/prod' && 'maker-prod' || 'maker-staging' }}
+      ENV_NAME: ${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}
+      HELM_FILE: deploy/scheduler/${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}/values.yaml
+      REGION: ${{ github.ref == 'refs/heads/prod' && 'us-east-1' || 'us-east-2' }}
+      CLUSTER_NAME: ${{ github.ref == 'refs/heads/prod' && 'maker-prod' || 'maker-staging' }}
       NAMESPACE: keeperhub
       SERVICE_NAME: keeperhub-scheduler
-      AWS_ECR_NAME: keeperhub-${{ (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'prod') || github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}
+      AWS_ECR_NAME: keeperhub-${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref }}
           fetch-depth: 0
 
       - name: Detect changed paths
