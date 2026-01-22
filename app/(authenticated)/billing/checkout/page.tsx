@@ -4,7 +4,7 @@ import { ArrowLeft, Check } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { formatEther, parseEther } from "viem";
+import { formatEther, formatUnits, parseEther } from "viem";
 import {
   useAccount,
   useConnect,
@@ -15,11 +15,30 @@ import {
 } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { CREDITS_ABI, hashOrgId } from "@/keeperhub/lib/billing/contracts";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  CREDITS_ABI,
+  ERC20_ABI,
+  getStablecoinAddress,
+  hashOrgId,
+  SUPPORTED_TOKENS,
+  usdToTokenAmount,
+} from "@/keeperhub/lib/billing/contracts";
 import { useActiveMember } from "@/keeperhub/lib/hooks/use-organization";
 import { api } from "@/lib/api-client";
 
 const CREDITS_CONTRACT = process.env.NEXT_PUBLIC_CREDITS_CONTRACT_ADDRESS || "";
+
+type PaymentMethod = "eth" | "stablecoin";
+type StablecoinSymbol = "USDC" | "USDT" | "USDS";
 
 export default function CheckoutPage() {
   const searchParams = useSearchParams();
@@ -28,10 +47,14 @@ export default function CheckoutPage() {
   const activeMember = useActiveMember();
   const organizationId = activeMember?.member?.organizationId;
 
-  const [txHash, setTxHash] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("eth");
+  const [selectedToken, setSelectedToken] = useState<StablecoinSymbol>("USDC");
+  const [depositTxHash, setDepositTxHash] = useState<string | null>(null);
   const [isPurchasing, setIsPurchasing] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
 
   const usdInCents = Math.floor(Number.parseFloat(usdAmount) * 1_000_000);
+  const isStablecoinPayment = paymentMethod === "stablecoin";
 
   // Log contract address for debugging
   useEffect(() => {
@@ -94,6 +117,60 @@ export default function CheckoutPage() {
   const isCalculating = isLoadingEth || isLoadingCredits;
   const hasError = ethError || creditsError;
 
+  // Wallet hooks
+  const { address, isConnected, chain } = useAccount();
+  const { connect, connectors } = useConnect();
+  const { switchChain } = useSwitchChain();
+  const { writeContract } = useWriteContract();
+
+  // Only watch for deposit transaction confirmation, not approval
+  const { isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash: depositTxHash as `0x${string}` | undefined,
+    query: {
+      enabled: !!depositTxHash,
+    },
+  });
+
+  const SEPOLIA_CHAIN_ID = 11_155_111;
+  const isOnSepoliaNetwork = chain?.id === SEPOLIA_CHAIN_ID;
+
+  // Stablecoin logic
+  const selectedTokenInfo = SUPPORTED_TOKENS.find((t) => t.symbol === selectedToken);
+  const stablecoinAddress = isStablecoinPayment
+    ? getStablecoinAddress(selectedToken)
+    : undefined;
+  const tokenAmount = selectedTokenInfo
+    ? usdToTokenAmount(Number.parseFloat(usdAmount), selectedTokenInfo.decimals)
+    : BigInt(0);
+
+  // Check token allowance
+  const { data: allowanceData, refetch: refetchAllowance } = useReadContract({
+    address: stablecoinAddress,
+    abi: ERC20_ABI,
+    functionName: "allowance",
+    args: address && stablecoinAddress ? [address, CREDITS_CONTRACT as `0x${string}`] : undefined,
+    query: {
+      enabled: !!(address && stablecoinAddress && isStablecoinPayment),
+    },
+  });
+
+  const currentAllowance = allowanceData ? (allowanceData as bigint) : BigInt(0);
+  const needsApproval = isStablecoinPayment && currentAllowance < tokenAmount;
+
+  // Check token balance
+  const { data: balanceData } = useReadContract({
+    address: stablecoinAddress,
+    abi: ERC20_ABI,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!(address && stablecoinAddress && isStablecoinPayment),
+    },
+  });
+
+  const tokenBalance = balanceData ? (balanceData as bigint) : BigInt(0);
+  const hasInsufficientBalance = isStablecoinPayment && tokenBalance < tokenAmount;
+
   // Log errors for debugging
   useEffect(() => {
     if (ethError) {
@@ -114,25 +191,13 @@ export default function CheckoutPage() {
     }
   }, [ethError, creditsError]);
 
-  const { address, isConnected, chain } = useAccount();
-  const { connect, connectors } = useConnect();
-  const { switchChain } = useSwitchChain();
-  const { writeContract, data: writeData } = useWriteContract();
-  const { isSuccess: isConfirmed } = useWaitForTransactionReceipt({
-    hash: (writeData || txHash) as `0x${string}` | undefined,
-  });
-
-  const SEPOLIA_CHAIN_ID = 11_155_111;
-  const isOnSepoliaNetwork = chain?.id === SEPOLIA_CHAIN_ID;
-
   // Confirm deposit after transaction is mined
   useEffect(() => {
-    const hash = writeData || txHash;
-    if (isConfirmed && hash && organizationId) {
+    if (isConfirmed && depositTxHash && organizationId) {
       const confirmDeposit = async () => {
         try {
           const result = await api.billing.confirmDeposit(
-            hash,
+            depositTxHash,
             organizationId,
             estimatedCredits || 0
           );
@@ -145,7 +210,7 @@ export default function CheckoutPage() {
       };
       confirmDeposit();
     }
-  }, [isConfirmed, writeData, txHash, organizationId, estimatedCredits]);
+  }, [isConfirmed, depositTxHash, organizationId, estimatedCredits, router]);
 
   const handleConnect = () => {
     const injectedConnector = connectors.find((c) => c.type === "injected");
@@ -163,8 +228,48 @@ export default function CheckoutPage() {
     }
   };
 
+  const handleApprove = async () => {
+    if (!(address && stablecoinAddress && organizationId)) return;
+
+    // Check if user is on the correct network
+    if (!isOnSepoliaNetwork) {
+      toast.error("Please switch to Sepolia network first");
+      return;
+    }
+
+    try {
+      setIsApproving(true);
+
+      writeContract(
+        {
+          address: stablecoinAddress,
+          abi: ERC20_ABI,
+          functionName: "approve",
+          args: [CREDITS_CONTRACT as `0x${string}`, tokenAmount],
+          chainId: SEPOLIA_CHAIN_ID,
+        },
+        {
+          onSuccess: () => {
+            toast.success("Approval successful! You can now complete the purchase.");
+            refetchAllowance();
+            setIsApproving(false);
+          },
+          onError: (error) => {
+            console.error("Approval failed:", error);
+            toast.error(`Approval failed: ${error.message}`);
+            setIsApproving(false);
+          },
+        }
+      );
+    } catch (error) {
+      console.error("Failed to approve:", error);
+      toast.error("Failed to approve token spending");
+      setIsApproving(false);
+    }
+  };
+
   const handlePurchase = async () => {
-    if (!(address && ethAmount && organizationId)) return;
+    if (!organizationId) return;
 
     // Check if user is on the correct network
     if (!isOnSepoliaNetwork) {
@@ -176,27 +281,56 @@ export default function CheckoutPage() {
       setIsPurchasing(true);
       const orgIdHash = hashOrgId(organizationId);
 
-      writeContract(
-        {
-          address: CREDITS_CONTRACT as `0x${string}`,
-          abi: CREDITS_ABI,
-          functionName: "depositETH",
-          args: [orgIdHash as `0x${string}`],
-          value: parseEther(ethAmount),
-          chainId: SEPOLIA_CHAIN_ID,
-        },
-        {
-          onSuccess: (hash) => {
-            setTxHash(hash);
-            toast.success("Transaction sent! Waiting for confirmation...");
+      if (isStablecoinPayment) {
+        // Stablecoin payment
+        if (!(address && stablecoinAddress)) return;
+
+        writeContract(
+          {
+            address: CREDITS_CONTRACT as `0x${string}`,
+            abi: CREDITS_ABI,
+            functionName: "depositStable",
+            args: [orgIdHash as `0x${string}`, stablecoinAddress, tokenAmount],
+            chainId: SEPOLIA_CHAIN_ID,
           },
-          onError: (error) => {
-            console.error("Transaction failed:", error);
-            toast.error(`Transaction failed: ${error.message}`);
-            setIsPurchasing(false);
+          {
+            onSuccess: (hash) => {
+              setDepositTxHash(hash);
+              toast.success("Transaction sent! Waiting for confirmation...");
+            },
+            onError: (error) => {
+              console.error("Transaction failed:", error);
+              toast.error(`Transaction failed: ${error.message}`);
+              setIsPurchasing(false);
+            },
+          }
+        );
+      } else {
+        // ETH payment
+        if (!(address && ethAmount)) return;
+
+        writeContract(
+          {
+            address: CREDITS_CONTRACT as `0x${string}`,
+            abi: CREDITS_ABI,
+            functionName: "depositETH",
+            args: [orgIdHash as `0x${string}`],
+            value: parseEther(ethAmount),
+            chainId: SEPOLIA_CHAIN_ID,
           },
-        }
-      );
+          {
+            onSuccess: (hash) => {
+              setDepositTxHash(hash);
+              toast.success("Transaction sent! Waiting for confirmation...");
+            },
+            onError: (error) => {
+              console.error("Transaction failed:", error);
+              toast.error(`Transaction failed: ${error.message}`);
+              setIsPurchasing(false);
+            },
+          }
+        );
+      }
     } catch (error) {
       console.error("Failed to send transaction:", error);
       toast.error("Failed to send transaction");
@@ -269,7 +403,7 @@ export default function CheckoutPage() {
     );
   }
 
-  if (txHash) {
+  if (depositTxHash) {
     return (
       <div className="container pointer-events-auto mx-auto max-w-2xl space-y-8 p-6">
         <div className="space-y-6 py-12 text-center">
@@ -295,7 +429,7 @@ export default function CheckoutPage() {
                   process.env.NEXT_PUBLIC_CHAIN_ID === "1"
                     ? "https://etherscan.io"
                     : "https://sepolia.etherscan.io"
-                }/tx/${txHash}`}
+                }/tx/${depositTxHash}`}
                 rel="noopener noreferrer"
                 target="_blank"
               >
@@ -324,6 +458,61 @@ export default function CheckoutPage() {
 
       <Card className="space-y-6 p-8">
         <div className="space-y-4">
+          <h2 className="font-semibold text-xl">Payment Method</h2>
+
+          <RadioGroup
+            onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}
+            value={paymentMethod}
+          >
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem id="eth" value="eth" />
+              <Label className="cursor-pointer" htmlFor="eth">
+                Ethereum (ETH)
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem id="stablecoin" value="stablecoin" />
+              <Label className="cursor-pointer" htmlFor="stablecoin">
+                Stablecoin (USDC, USDT, USDS)
+              </Label>
+            </div>
+          </RadioGroup>
+
+          {isStablecoinPayment && (
+            <div className="space-y-2">
+              <Label htmlFor="token">Select Token</Label>
+              <Select
+                onValueChange={(value) => setSelectedToken(value as StablecoinSymbol)}
+                value={selectedToken}
+              >
+                <SelectTrigger id="token">
+                  <SelectValue placeholder="Select a token" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SUPPORTED_TOKENS.map((token) => (
+                    <SelectItem
+                      disabled={
+                        token.disabledOnSepolia &&
+                        SEPOLIA_CHAIN_ID === 11_155_111
+                      }
+                      key={token.symbol}
+                      value={token.symbol}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span>{token.icon}</span>
+                        <span>
+                          {token.symbol} - {token.name}
+                        </span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-4">
           <h2 className="font-semibold text-xl">Order Summary</h2>
 
           <div className="space-y-3 text-sm">
@@ -338,8 +527,14 @@ export default function CheckoutPage() {
               </span>
             </div>
             <div className="flex justify-between border-t pt-3 font-semibold text-base">
-              <span>Total (ETH)</span>
-              <span className="font-mono">{ethAmount} ETH</span>
+              <span>
+                Total ({isStablecoinPayment ? selectedToken : "ETH"})
+              </span>
+              <span className="font-mono">
+                {isStablecoinPayment
+                  ? `${formatUnits(tokenAmount, selectedTokenInfo?.decimals || 6)} ${selectedToken}`
+                  : `${ethAmount} ETH`}
+              </span>
             </div>
           </div>
         </div>
@@ -350,15 +545,49 @@ export default function CheckoutPage() {
               <Check className="size-4 text-green-500" />
               Connected: {address?.slice(0, 6)}...{address?.slice(-4)}
             </div>
+
+            {hasInsufficientBalance && (
+              <div className="rounded-md bg-red-500/10 p-3 text-red-600 text-sm dark:text-red-400">
+                ⚠️ Insufficient {selectedToken} balance. You need{" "}
+                {formatUnits(tokenAmount, selectedTokenInfo?.decimals || 6)}{" "}
+                {selectedToken} but only have{" "}
+                {formatUnits(tokenBalance, selectedTokenInfo?.decimals || 6)}{" "}
+                {selectedToken}.
+              </div>
+            )}
+
             {isOnSepoliaNetwork ? (
-              <Button
-                className="w-full"
-                disabled={isPurchasing}
-                onClick={handlePurchase}
-                size="lg"
-              >
-                {isPurchasing ? "Confirming..." : "Purchase Credits"}
-              </Button>
+              <div className="space-y-3">
+                {isStablecoinPayment && needsApproval && (
+                  <Button
+                    className="w-full"
+                    disabled={isApproving || hasInsufficientBalance}
+                    onClick={handleApprove}
+                    size="lg"
+                    variant="outline"
+                  >
+                    {isApproving ? "Approving..." : `Approve ${selectedToken}`}
+                  </Button>
+                )}
+                <Button
+                  className="w-full"
+                  disabled={
+                    isPurchasing ||
+                    hasInsufficientBalance ||
+                    (isStablecoinPayment && needsApproval)
+                  }
+                  onClick={handlePurchase}
+                  size="lg"
+                >
+                  {isPurchasing ? "Confirming..." : "Purchase Credits"}
+                </Button>
+                {isStablecoinPayment && needsApproval && (
+                  <p className="text-center text-muted-foreground text-xs">
+                    You need to approve {selectedToken} spending before you can
+                    purchase
+                  </p>
+                )}
+              </div>
             ) : (
               <div className="space-y-3">
                 <div className="rounded-md bg-yellow-500/10 p-3 text-sm text-yellow-600 dark:text-yellow-400">

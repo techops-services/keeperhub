@@ -11,11 +11,64 @@ export const CONTRACTS = {
     "0x65EffaE281b3566635c1da5F77801Db0b8b50774",
 };
 
+// Stablecoin addresses by network
+export const STABLECOINS = {
+  mainnet: {
+    USDC: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    USDT: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+    USDS: "0xdC035D45d973E3EC169d2276DDab16f1e407384F",
+  },
+  sepolia: {
+    USDC: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+    USDT: "0x7169D38820dfd117C3FA1f22a697dBA58d90BA06",
+    USDS: "0x0000000000000000000000000000000000000000", // Not available on Sepolia
+  },
+} as const;
+
+// Supported tokens with metadata
+export const SUPPORTED_TOKENS = [
+  {
+    symbol: "USDC",
+    name: "USD Coin",
+    decimals: 6,
+    icon: "💵",
+  },
+  {
+    symbol: "USDT",
+    name: "Tether USD",
+    decimals: 6,
+    icon: "💲",
+  },
+  {
+    symbol: "USDS",
+    name: "Sky Dollar",
+    decimals: 18,
+    icon: "💰",
+    disabledOnSepolia: true,
+  },
+] as const;
+
 // Chain configuration
 export const CHAIN_CONFIG = {
   chainId: Number.parseInt(process.env.NEXT_PUBLIC_CHAIN_ID || "11155111", 10),
   rpcUrl: process.env.ETH_RPC_URL || "",
 };
+
+// Get stablecoin address for current network
+export function getStablecoinAddress(symbol: "USDC" | "USDT" | "USDS"): `0x${string}` {
+  const isMainnet = CHAIN_CONFIG.chainId === 1;
+  const network = isMainnet ? "mainnet" : "sepolia";
+  return STABLECOINS[network][symbol] as `0x${string}`;
+}
+
+// Convert USD amount to token amount based on token decimals
+export function usdToTokenAmount(usdAmount: number, decimals: number): bigint {
+  // USD amount is in dollars (e.g., 25 = $25)
+  // Token amount needs to be in token's smallest unit
+  // For 6 decimals (USDC/USDT): $25 = 25_000_000 (25 * 10^6)
+  // For 18 decimals (USDS): $25 = 25_000_000_000_000_000_000 (25 * 10^18)
+  return BigInt(Math.floor(usdAmount * Math.pow(10, decimals)));
+}
 
 // Minimal ABIs for event parsing and reading
 export const CREDITS_ABI = parseAbi([
@@ -32,6 +85,15 @@ export const TIERS_ABI = parseAbi([
   "event TierRenewed(bytes32 indexed orgId, uint256 tokenId, uint256 newExpiresAt)",
   "function checkAccess(bytes32 orgId) view returns (uint8 tier, bool valid, uint256 expiresAt)",
   "function tierPricing(uint8 tier) view returns (uint256 annualPrice, uint256 lifetimePrice)",
+]);
+
+// ERC20 ABI for token operations
+export const ERC20_ABI = parseAbi([
+  "function balanceOf(address owner) view returns (uint256)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function decimals() view returns (uint8)",
+  "function symbol() view returns (string)",
 ]);
 
 // Get provider instance
