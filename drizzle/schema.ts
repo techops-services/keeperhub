@@ -330,31 +330,28 @@ export const userRpcPreferences = pgTable(
 export const chains = pgTable(
   "chains",
   {
-    id: text().primaryKey().notNull(),
+    id: text("id").primaryKey().notNull(),
     chainId: integer("chain_id").notNull(),
-    name: text().notNull(),
-    symbol: text().notNull(),
+    name: text("name").notNull(),
+    symbol: text("symbol").notNull(),
+    chainType: text("chain_type").default("evm").notNull(),
     defaultPrimaryRpc: text("default_primary_rpc").notNull(),
     defaultFallbackRpc: text("default_fallback_rpc"),
+    defaultPrimaryWss: text("default_primary_wss"),
+    defaultFallbackWss: text("default_fallback_wss"),
     isTestnet: boolean("is_testnet").default(false),
     isEnabled: boolean("is_enabled").default(true),
+    // KEEP-1240: Chain-specific gas configuration
+    gasConfig: jsonb("gas_config").default({}),
     createdAt: timestamp("created_at", { mode: "string" })
       .defaultNow()
       .notNull(),
     updatedAt: timestamp("updated_at", { mode: "string" })
       .defaultNow()
       .notNull(),
-    defaultPrimaryWss: text("default_primary_wss"),
-    defaultFallbackWss: text("default_fallback_wss"),
-    chainType: text("chain_type").default("evm").notNull(),
-    // KEEP-1240: Chain-specific gas configuration
-    gasConfig: jsonb("gas_config").default({}),
   },
   (table) => [
-    index("idx_chains_chain_id").using(
-      "btree",
-      table.chainId.asc().nullsLast().op("int4_ops")
-    ),
+    index("idx_chains_chain_id").on(table.chainId),
     unique("chains_chain_id_unique").on(table.chainId),
   ]
 );
@@ -362,7 +359,7 @@ export const chains = pgTable(
 export const explorerConfigs = pgTable(
   "explorer_configs",
   {
-    id: text().primaryKey().notNull(),
+    id: text("id").primaryKey().notNull(),
     chainId: integer("chain_id").notNull(),
     chainType: text("chain_type").default("evm").notNull(),
     explorerUrl: text("explorer_url"),
@@ -381,15 +378,12 @@ export const explorerConfigs = pgTable(
       .notNull(),
   },
   (table) => [
-    index("idx_explorer_configs_chain_id").using(
-      "btree",
-      table.chainId.asc().nullsLast().op("int4_ops")
-    ),
+    index("idx_explorer_configs_chain_id").on(table.chainId),
     foreignKey({
       columns: [table.chainId],
       foreignColumns: [chains.chainId],
-      name: "explorer_configs_chain_id_fkey",
+      name: "explorer_configs_chain_id_chains_chain_id_fk",
     }).onDelete("cascade"),
-    unique("explorer_configs_chain_id_key").on(table.chainId),
+    unique("explorer_configs_chain_id_unique").on(table.chainId),
   ]
 );

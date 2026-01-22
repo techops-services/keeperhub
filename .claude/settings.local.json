@@ -1,4 +1,21 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(pnpm check:*)",
+      "Bash(pnpm install)",
+      "Bash(git push:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh run list:*)",
+      "Bash(aws-vault exec maker-main -- kubectl get pods:*)",
+      "Bash(aws-vault exec maker-main -- kubectl logs:*)",
+      "Bash(aws-vault exec maker-main -- kubectl describe pod:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(aws-vault exec maker-main -- kubectl get:*)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "terraform",
     "mcp-obsidian",

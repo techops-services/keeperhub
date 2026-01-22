@@ -11,8 +11,9 @@ RUN npm install -g pnpm
 COPY package.json pnpm-lock.yaml* ./
 COPY .npmrc* ./
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install dependencies with cache mount for faster rebuilds
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
 
 # Stage 2: Source (dependencies + source files, no build)
 FROM node:25-alpine AS source
@@ -64,8 +65,9 @@ RUN npm install -g pnpm
 # Copy scheduler-specific package.json with minimal dependencies
 COPY scheduler/package.json ./
 
-# Install only scheduler dependencies (production only)
-RUN pnpm install --prod
+# Install only scheduler dependencies (production only) with cache mount
+RUN --mount=type=cache,id=pnpm-scheduler,target=/root/.local/share/pnpm/store \
+    pnpm install --prod
 
 # Stage 2.7b: Scheduler stage (for schedule dispatcher and job spawner)
 FROM node:25-alpine AS scheduler

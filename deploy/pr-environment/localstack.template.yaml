@@ -1,5 +1,20 @@
 # LocalStack for SQS in PR environment
 # Variables to be replaced: ${PR_NUMBER}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: localstack-init
+  namespace: pr-${PR_NUMBER}
+data:
+  init-sqs.sh: |
+    #!/bin/bash
+    echo "Creating SQS queue..."
+    awslocal sqs create-queue \
+      --queue-name keeperhub-workflow-queue \
+      --attributes VisibilityTimeout=300
+    echo "SQS queue created successfully"
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -39,6 +54,9 @@ spec:
               value: "test"
             - name: AWS_DEFAULT_REGION
               value: "us-east-1"
+          volumeMounts:
+            - name: init-scripts
+              mountPath: /etc/localstack/init/ready.d
           resources:
             requests:
               memory: "256Mi"
@@ -68,6 +86,11 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 5
             failureThreshold: 3
+      volumes:
+        - name: init-scripts
+          configMap:
+            name: localstack-init
+            defaultMode: 0755
 
 ---
 apiVersion: v1
@@ -88,69 +111,3 @@ spec:
       name: edge
   type: ClusterIP
 
----
-# Init job to create SQS queue
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: create-sqs-queue
-  namespace: pr-${PR_NUMBER}
-  labels:
-    app: localstack-init
-    pr: pr-${PR_NUMBER}
-spec:
-  template:
-    metadata:
-      labels:
-        app: localstack-init
-        pr: pr-${PR_NUMBER}
-    spec:
-      restartPolicy: OnFailure
-      containers:
-        - name: aws-cli
-          image: amazon/aws-cli:latest
-          command:
-            - /bin/sh
-            - -c
-            - |
-              echo "Waiting for LocalStack to be ready..."
-              max_attempts=30
-              attempt=0
-
-              while [ $attempt -lt $max_attempts ]; do
-                if curl -sf http://localstack:4566/_localstack/health > /dev/null 2>&1; then
-                  echo "LocalStack is ready!"
-                  break
-                fi
-                echo "Attempt $((attempt + 1))/$max_attempts: LocalStack not ready yet..."
-                sleep 2
-                attempt=$((attempt + 1))
-              done
-
-              if [ $attempt -eq $max_attempts ]; then
-                echo "LocalStack failed to become ready"
-                exit 1
-              fi
-
-              echo "Creating SQS queue..."
-              aws --endpoint-url=http://localstack:4566 sqs create-queue \
-                --queue-name keeperhub-workflow-queue \
-                --region us-east-1 \
-                --attributes VisibilityTimeout=300
-
-              echo "SQS queue created successfully"
-          env:
-            - name: AWS_ACCESS_KEY_ID
-              value: "test"
-            - name: AWS_SECRET_ACCESS_KEY
-              value: "test"
-            - name: AWS_DEFAULT_REGION
-              value: "us-east-1"
-          resources:
-            requests:
-              memory: "64Mi"
-              cpu: "10m"
-            limits:
-              memory: "128Mi"
-              cpu: "100m"
-  backoffLimit: 5
