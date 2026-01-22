@@ -13,6 +13,7 @@ import "dotenv/config";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { getDatabaseUrl } from "../lib/db/connection-utils";
 import {
   chains,
   explorerConfigs,
@@ -309,8 +310,7 @@ const EXPLORER_CONFIG_TEMPLATES: Record<
 };
 
 async function seedChains() {
-  const connectionString =
-    process.env.DATABASE_URL || "postgres://localhost:5432/workflow";
+  const connectionString = getDatabaseUrl();
 
   console.log("Connecting to database...");
   const client = postgres(connectionString, { max: 1 });
