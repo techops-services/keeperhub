@@ -126,13 +126,16 @@ Confirm your ETH balance displays correctly in the wallet section. Stablecoin ba
 
 **Flow**: Schedule (5 min) -> Check Balance -> Condition (< 0.1 ETH) -> Webhook + Discord
 
-#### Setup
+#### Setup these node types
+
+**Note**: When referencing node values (e.g., balance from Check Balance), do not paste values manually. Type `@` to open the reference popup and select the node output you want to use.
 
 1. Create workflow: "Balance Watcher - [Your Name]"
 2. **Trigger**: Schedule, cron `*/5 * * * *`
 3. **Check Balance**: Your wallet address, Sepolia network
 4. **Condition**: `{{@action-1:Check Balance.balance}} < 0.1`
-5. **Webhook** (on true branch):
+   - Note: Condition node has a single exit point. To handle multiple outcomes, create additional Condition nodes (e.g., one for `< 0.5` and another for `> 0.5`)
+5. **Webhook**:
    - Get unique URL from https://webhook.site/
    - Method: POST, Body: `{"balance": "{{@action-1:Check Balance.balance}}"}`
 6. **Discord**: "Low balance alert: {{@action-1:Check Balance.balance}} ETH"
@@ -152,7 +155,9 @@ Confirm your ETH balance displays correctly in the wallet section. Stablecoin ba
 
 **Flow**: Manual -> Check Balance -> Transfer ETH (to self) -> Discord
 
-#### Setup
+#### Setup these node types
+
+**Note**: When referencing node values, type `@` to open the reference popup instead of pasting values manually.
 
 1. Create workflow: "ETH Transfer - [Your Name]"
 2. **Trigger**: Manual
@@ -178,28 +183,35 @@ Confirm your ETH balance displays correctly in the wallet section. Stablecoin ba
 
 **Flow**: Webhook -> Read Contract -> Condition -> Write Contract -> Read (verify) -> Discord
 
-#### Setup
+#### Setup these node types
+
+**Note**: When referencing node values, type `@` to open the reference popup instead of pasting values manually.
+
+**Important**: Give each Read Contract node a descriptive label (e.g., "Initial Read", "Verify Read") since multiple Read Contract nodes can be confusing when referencing values.
 
 1. Create workflow: "Contract Test - [Your Name]"
 2. **Trigger**: Webhook (note the generated URL)
-3. **Read Contract** (initial):
+3. **Read Contract** (label: "Initial Read"):
    - Address: `0x069d34E130ccA7D435351FB30c0e97F2Ce6B42Ad`
    - Function: `retrieve`
    - Network: Sepolia
-4. **Condition**: `{{@read:Read Contract.result}} < 1000`
-5. **Write Contract** (on true):
+4. **Condition**: `{{@read:Initial Read.result}} < 1000`
+5. **Write Contract**:
    - Function: `store`
    - Parameters: `1234`
-6. **Read Contract** (verify): Same config as step 3
-7. **Discord**: "Contract updated. Old: {{@read:Read Contract.result}}, New: {{@verify:Verify.result}}"
+6. **Read Contract** (label: "Verify Read"): Same config as step 3
+7. **Discord**: "Contract updated. Old: {{@read:Initial Read.result}}, New: {{@verify:Verify Read.result}}"
 
 #### Test
 
-Trigger with curl (get header values from 1Password):
+**Create User API Token**: Navigate to **Settings > API Tokens** and create a **User** API token (not Organisation). Copy the token for use in the curl command below.
+
+Trigger with curl (get CF header values from 1Password):
 
 ```bash
 curl -X POST [YOUR_WEBHOOK_URL] \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
   -H "CF-Access-Client-Id: [FROM_1PASSWORD]" \
   -H "CF-Access-Client-Secret: [FROM_1PASSWORD]" \
   -d '{"action": "test_contract"}'
@@ -215,25 +227,24 @@ Verify:
 
 ### Workflow 4: Contract Event Watcher (Event Trigger)
 
-**Tests**: Event trigger, blockchain event detection, event filtering
+**Tests**: Event trigger, blockchain event detection
 
-**Flow**: Event Listener -> Condition (filter events) -> Discord
+**Flow**: Event Trigger -> Discord
 
-This workflow monitors the SimpleStorage contract for `FavoriteNumberUpdated` and `NewPersonAdded` events.
+This workflow monitors the SimpleStorage contract for `FavoriteNumberUpdated` events.
 
-#### Setup
+**Note**: Each workflow can only listen to one specific event. To monitor multiple events (e.g., both `FavoriteNumberUpdated` and `NewPersonAdded`), create separate workflows for each event.
+
+#### Setup these node types
+
+**Note**: When referencing node values, type `@` to open the reference popup instead of pasting values manually.
 
 1. Create workflow: "Contract Events - [Your Name]"
 2. **Trigger**: Event
    - Address: `0x069d34E130ccA7D435351FB30c0e97F2Ce6B42Ad`
    - Network: Sepolia
-   - Event: `*` (all events)
-3. **Condition**:
-   ```
-   {{@trigger:Event Listener.eventName}} == "FavoriteNumberUpdated" ||
-   {{@trigger:Event Listener.eventName}} == "NewPersonAdded"
-   ```
-4. **Discord**:
+   - Event: `FavoriteNumberUpdated`
+3. **Discord**:
    ```
    Contract Event Detected!
    Event: {{@trigger:Event Listener.eventName}}
@@ -247,7 +258,7 @@ This workflow monitors the SimpleStorage contract for `FavoriteNumberUpdated` an
 3. Verify event detected in workflow logs
 4. Confirm Discord notification received
 
-Alternative: Call `addPerson("TestUser", 42)` via Etherscan to emit `NewPersonAdded`
+**Optional**: Create a second workflow to monitor `NewPersonAdded` events, then test by calling `addPerson("TestUser", 42)` via Etherscan.
 
 ---
 
@@ -294,20 +305,26 @@ Monitor Safe multisig ownership changes on Sepolia.
 
 **Prerequisites**: Create a Safe at https://app.safe.global on Sepolia network.
 
-**Workflow Setup**:
+**Note**: Each workflow can only listen to one specific event. To monitor multiple Safe events, create separate workflows for each event type.
+
+**Workflow Setup** (create one workflow per event):
+
+**Workflow A - AddedOwner**:
 1. **Trigger**: Event
    - Address: Your Safe contract address
    - Network: Sepolia
-   - Event: `*`
-2. **Condition**:
-   ```
-   {{@trigger:Event Listener.eventName}} == "AddedOwner" ||
-   {{@trigger:Event Listener.eventName}} == "RemovedOwner" ||
-   {{@trigger:Event Listener.eventName}} == "ChangedThreshold"
-   ```
-3. **Discord**: Alert with event name and transaction hash
+   - Event: `AddedOwner`
+2. **Discord**: "Owner Added! Tx: {{@trigger:Event Listener.transactionHash}}"
 
-**Test**: Enable workflow, then add/remove an owner in your Safe. Verify event detection.
+**Workflow B - RemovedOwner**:
+1. **Trigger**: Event (same address/network, Event: `RemovedOwner`)
+2. **Discord**: "Owner Removed! Tx: {{@trigger:Event Listener.transactionHash}}"
+
+**Workflow C - ChangedThreshold**:
+1. **Trigger**: Event (same address/network, Event: `ChangedThreshold`)
+2. **Discord**: "Threshold Changed! Tx: {{@trigger:Event Listener.transactionHash}}"
+
+**Test**: Enable workflows, then add/remove an owner in your Safe. Verify event detection.
 
 ---
 
