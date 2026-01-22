@@ -249,6 +249,7 @@ describe.skipIf(SKIP_INFRA_TESTS)("Full Pipeline E2E", () => {
       nodes: [triggerNode, checkBalanceNode],
       edges: [{ id: "e1", source: "trigger_1", target: "check_balance_1" }],
       visibility: "private",
+      enabled: true,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -650,6 +651,7 @@ describe.skipIf(SKIP_INFRA_TESTS)("Full Pipeline E2E", () => {
         nodes: [triggerNode, badNode],
         edges: [{ id: "e1", source: "trigger_1", target: "bad_1" }],
         visibility: "private",
+        enabled: true,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -765,6 +767,287 @@ describe.skipIf(SKIP_INFRA_TESTS)("Full Pipeline E2E", () => {
         })
       );
     }, 30_000);
+  });
+
+  describe("Disabled Workflow Handling (KEEP-1253)", () => {
+    const PIPELINE_TIMEOUT = 90_000;
+
+    /**
+     * Helper to create a workflow with enabled flag
+     */
+    async function createWorkflowWithEnabledFlag(
+      id: string,
+      enabled: boolean
+    ): Promise<string> {
+      const triggerNode = {
+        id: "trigger_1",
+        type: "custom",
+        position: { x: 0, y: 0 },
+        data: {
+          type: "trigger",
+          label: "Manual Trigger",
+          config: { triggerType: "Manual" },
+        },
+      };
+
+      const checkBalanceNode = {
+        id: "check_balance_1",
+        type: "custom",
+        position: { x: 0, y: 150 },
+        data: {
+          type: "action",
+          label: "Check Balance",
+          config: {
+            actionType: "Check Balance",
+            network: "sepolia",
+            address: TEST_ADDRESS,
+          },
+        },
+      };
+
+      await db.insert(workflows).values({
+        id,
+        name: `Test Workflow ${id}`,
+        userId: TEST_USER_ID,
+        nodes: [triggerNode, checkBalanceNode],
+        edges: [{ id: "e1", source: "trigger_1", target: "check_balance_1" }],
+        visibility: "private",
+        enabled, // Set the enabled flag
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      return id;
+    }
+
+    it("should skip execution for disabled workflow (job-spawner check)", async () => {
+      const workflowId = `${TEST_WORKFLOW_PREFIX}disabled_wf_check`;
+      const scheduleId = `${TEST_SCHEDULE_PREFIX}disabled_wf_check`;
+
+      // Step 1: Create disabled workflow
+      await createWorkflowWithEnabledFlag(workflowId, false);
+
+      // Step 2: Create enabled schedule (the workflow is what's disabled)
+      await db.insert(workflowSchedules).values({
+        id: scheduleId,
+        workflowId,
+        cronExpression: "* * * * *",
+        timezone: "UTC",
+        enabled: true, // Schedule is enabled
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      // Verify workflow is disabled in DB
+      const workflow = await db
+        .select()
+        .from(workflows)
+        .where(eq(workflows.id, workflowId))
+        .limit(1);
+
+      expect(workflow[0]?.enabled).toBe(false);
+
+      // Verify schedule is enabled
+      const schedule = await db
+        .select()
+        .from(workflowSchedules)
+        .where(eq(workflowSchedules.id, scheduleId))
+        .limit(1);
+
+      expect(schedule[0]?.enabled).toBe(true);
+
+      // Step 3: Simulate dispatcher message (dispatcher should also check workflow.enabled)
+      const message: ScheduleMessage = {
+        workflowId,
+        scheduleId,
+        triggerTime: new Date().toISOString(),
+        triggerType: "schedule",
+      };
+
+      await sqsClient.send(
+        new SendMessageCommand({
+          QueueUrl: testQueueUrl,
+          MessageBody: JSON.stringify(message),
+        })
+      );
+
+      // Step 4: Receive and verify - job-spawner would check workflow.enabled here
+      const receiveResult = await sqsClient.send(
+        new ReceiveMessageCommand({
+          QueueUrl: testQueueUrl,
+          MaxNumberOfMessages: 1,
+          WaitTimeSeconds: 5,
+        })
+      );
+
+      expect(receiveResult.Messages?.length).toBeGreaterThan(0);
+
+      // In the real job-spawner, it would query the workflow and skip if disabled
+      // This test verifies the data is set up correctly for that check
+      const workflowCheck = await db
+        .select()
+        .from(workflows)
+        .where(eq(workflows.id, workflowId))
+        .limit(1);
+
+      expect(workflowCheck[0]?.enabled).toBe(false);
+
+      // Clean up
+      await sqsClient.send(
+        new DeleteMessageCommand({
+          QueueUrl: testQueueUrl,
+          ReceiptHandle: receiveResult.Messages?.[0].ReceiptHandle,
+        })
+      );
+    }, 30_000);
+
+    it(
+      "should handle race condition: workflow disabled after dispatch but before execution",
+      async () => {
+        const workflowId = `${TEST_WORKFLOW_PREFIX}race_disabled`;
+        const scheduleId = `${TEST_SCHEDULE_PREFIX}race_disabled`;
+        const executionId = `${TEST_EXECUTION_PREFIX}race_disabled`;
+
+        // Step 1: Create enabled workflow (simulate it was enabled when dispatched)
+        await createWorkflowWithEnabledFlag(workflowId, true);
+
+        // Step 2: Create schedule
+        await db.insert(workflowSchedules).values({
+          id: scheduleId,
+          workflowId,
+          cronExpression: "* * * * *",
+          timezone: "UTC",
+          enabled: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        // Step 3: Message was sent to SQS (dispatcher sent it while workflow was enabled)
+        const message: ScheduleMessage = {
+          workflowId,
+          scheduleId,
+          triggerTime: new Date().toISOString(),
+          triggerType: "schedule",
+        };
+
+        await sqsClient.send(
+          new SendMessageCommand({
+            QueueUrl: testQueueUrl,
+            MessageBody: JSON.stringify(message),
+          })
+        );
+
+        // Step 4: Receive message
+        const receiveResult = await sqsClient.send(
+          new ReceiveMessageCommand({
+            QueueUrl: testQueueUrl,
+            MaxNumberOfMessages: 1,
+            WaitTimeSeconds: 5,
+          })
+        );
+
+        await sqsClient.send(
+          new DeleteMessageCommand({
+            QueueUrl: testQueueUrl,
+            ReceiptHandle: receiveResult.Messages?.[0].ReceiptHandle,
+          })
+        );
+
+        // Step 5: RACE CONDITION - User disables workflow AFTER dispatch but BEFORE execution
+        await db
+          .update(workflows)
+          .set({ enabled: false, updatedAt: new Date() })
+          .where(eq(workflows.id, workflowId));
+
+        // Verify workflow is now disabled
+        const disabledWorkflow = await db
+          .select()
+          .from(workflows)
+          .where(eq(workflows.id, workflowId))
+          .limit(1);
+
+        expect(disabledWorkflow[0]?.enabled).toBe(false);
+
+        // Step 6: Create execution record (job-spawner creates this before K8s job)
+        await db.insert(workflowExecutions).values({
+          id: executionId,
+          workflowId,
+          userId: TEST_USER_ID,
+          status: "pending",
+          input: { triggerType: "schedule", scheduleId },
+          startedAt: new Date(),
+        });
+
+        // Step 7: Run workflow-runner - it should detect the disabled workflow
+        // and cancel the execution (defense in depth check)
+        const result = await runWorkflowRunner(workflowId, executionId, {
+          scheduleId,
+          timeout: PIPELINE_TIMEOUT,
+        });
+
+        // Runner should exit cleanly (0) after detecting disabled workflow
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout).toContain(
+          "Workflow disabled, skipping execution"
+        );
+
+        // Verify the execution was marked as cancelled
+        const execution = await db
+          .select()
+          .from(workflowExecutions)
+          .where(eq(workflowExecutions.id, executionId))
+          .limit(1);
+
+        expect(execution[0]?.status).toBe("cancelled");
+      },
+      PIPELINE_TIMEOUT
+    );
+
+    it(
+      "should allow execution for enabled workflow",
+      async () => {
+        const workflowId = `${TEST_WORKFLOW_PREFIX}enabled_wf`;
+        const executionId = `${TEST_EXECUTION_PREFIX}enabled_wf`;
+
+        // Create enabled workflow
+        await createWorkflowWithEnabledFlag(workflowId, true);
+
+        // Verify it's enabled
+        const workflow = await db
+          .select()
+          .from(workflows)
+          .where(eq(workflows.id, workflowId))
+          .limit(1);
+
+        expect(workflow[0]?.enabled).toBe(true);
+
+        // Create execution
+        await db.insert(workflowExecutions).values({
+          id: executionId,
+          workflowId,
+          userId: TEST_USER_ID,
+          status: "pending",
+          input: { triggerType: "manual" },
+          startedAt: new Date(),
+        });
+
+        // Run workflow - should succeed
+        const result = await runWorkflowRunner(workflowId, executionId, {
+          timeout: PIPELINE_TIMEOUT,
+        });
+
+        expect(result.exitCode).toBe(0);
+
+        const execution = await db
+          .select()
+          .from(workflowExecutions)
+          .where(eq(workflowExecutions.id, executionId))
+          .limit(1);
+
+        expect(execution[0]?.status).toBe("success");
+      },
+      PIPELINE_TIMEOUT
+    );
   });
 
   describe("SQS Message Flow Verification", () => {

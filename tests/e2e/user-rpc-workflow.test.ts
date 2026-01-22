@@ -244,6 +244,7 @@ describe.skipIf(SKIP_INFRA_TESTS)(
         nodes: [triggerNode, checkBalanceNode],
         edges,
         visibility: "private",
+        enabled: true,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -620,6 +621,7 @@ describe.skipIf(SKIP_INFRA_TESTS)(
               { id: "e1", source: "trigger_1", target: "check_balance_1" },
             ],
             visibility: "private",
+            enabled: true,
             createdAt: new Date(),
             updatedAt: new Date(),
           });
@@ -709,6 +711,7 @@ describe.skipIf(SKIP_INFRA_TESTS)(
             { id: "e2", source: "check_balance_1", target: "check_balance_2" },
           ],
           visibility: "private",
+          enabled: true,
           createdAt: new Date(),
           updatedAt: new Date(),
         });

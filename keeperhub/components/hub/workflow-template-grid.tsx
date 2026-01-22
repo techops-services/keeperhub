@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,12 +15,17 @@ import {
 } from "@/components/ui/card";
 import { api, type SavedWorkflow } from "@/lib/api-client";
 import { authClient, useSession } from "@/lib/auth-client";
+import { WorkflowMiniMap } from "./workflow-mini-map";
 
 type WorkflowTemplateGridProps = {
   workflows: SavedWorkflow[];
+  isFeatured?: boolean;
 };
 
-export function WorkflowTemplateGrid({ workflows }: WorkflowTemplateGridProps) {
+export function WorkflowTemplateGrid({
+  workflows,
+  isFeatured = false,
+}: WorkflowTemplateGridProps) {
   const router = useRouter();
   const { data: session } = useSession();
   const [duplicatingIds, setDuplicatingIds] = useState<Set<string>>(new Set());
@@ -60,7 +66,9 @@ export function WorkflowTemplateGrid({ workflows }: WorkflowTemplateGridProps) {
     return (
       <div className="">
         <p className="text-muted-foreground">
-          No public workflows available yet.
+          {isFeatured
+            ? "No featured workflows available yet."
+            : "No public workflows available yet."}
         </p>
       </div>
     );
@@ -75,25 +83,31 @@ export function WorkflowTemplateGrid({ workflows }: WorkflowTemplateGridProps) {
     >
       {workflows.map((workflow) => {
         const isDuplicating = duplicatingIds.has(workflow.id);
-        const nodeCount = Array.isArray(workflow.nodes)
-          ? workflow.nodes.length
-          : 0;
 
         return (
-          <Card className="flex flex-col" key={workflow.id}>
+          <Card className="flex flex-col overflow-hidden" key={workflow.id}>
+            <div className="-mt-6 flex aspect-video w-full items-center justify-center overflow-hidden bg-slate-100 dark:bg-slate-900">
+              <WorkflowMiniMap
+                edges={workflow.edges}
+                height={160}
+                nodes={workflow.nodes}
+                width={280}
+              />
+            </div>
             <CardHeader>
-              <CardTitle className="line-clamp-2">{workflow.name}</CardTitle>
+              <div className="flex items-start justify-between gap-2">
+                <CardTitle className="line-clamp-2">{workflow.name}</CardTitle>
+                {isFeatured && workflow.category && (
+                  <Badge variant="secondary">{workflow.category}</Badge>
+                )}
+              </div>
               {workflow.description && (
                 <CardDescription className="line-clamp-2">
                   {workflow.description}
                 </CardDescription>
               )}
             </CardHeader>
-            <CardContent className="flex-1">
-              <div className="text-muted-foreground text-sm">
-                {nodeCount} {nodeCount === 1 ? "node" : "nodes"}
-              </div>
-            </CardContent>
+            <CardContent className="flex-1" />
             <CardFooter>
               <Button
                 className="w-full"

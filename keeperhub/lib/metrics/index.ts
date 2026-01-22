@@ -30,7 +30,6 @@
  */
 
 // Re-export collectors (only non-Node.js specific ones)
-// biome-ignore lint/performance/noBarrelFile: Intentional barrel file for metrics API
 export {
   consoleMetricsCollector,
   createPrefixedConsoleCollector,

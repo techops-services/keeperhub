@@ -79,6 +79,7 @@ describe("RPC Preferences API Routes", () => {
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),
     isTestnet: false,
+    gasConfig: {},
   };
 
   const mockPreference = {

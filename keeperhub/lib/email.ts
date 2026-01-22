@@ -88,12 +88,15 @@ export async function sendInvitationEmail(
   const { inviteeEmail, inviterName, organizationName, role, inviteLink } =
     data;
 
+  const baseUrl = inviteLink.split("/accept-invite")[0];
+  const logoUrl = `${baseUrl}/keeperhub_logo.png`;
+
   const subject = `You've been invited to join ${organizationName} on KeeperHub`;
 
   const text = `
 Hi there,
 
-${inviterName} has invited you to join ${organizationName} as a ${role} on KeeperHub.
+${inviterName} has invited you to join ${organizationName} organization as a ${role} on KeeperHub.
 
 Click the link below to accept the invitation and create your account:
 
@@ -116,13 +119,13 @@ KeeperHub - Blockchain Workflow Automation
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
-    <h1 style="color: #ffffff; margin: 0; font-size: 24px;">KeeperHub</h1>
+    <img src="${logoUrl}" alt="KeeperHub" style="max-width: 200px; height: auto;" />
   </div>
 
   <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e5e5; border-top: none; border-radius: 0 0 12px 12px;">
     <h2 style="color: #1a1a2e; margin-top: 0;">You're Invited!</h2>
 
-    <p><strong>${inviterName}</strong> has invited you to join <strong>${organizationName}</strong> as a <strong>${role}</strong> on KeeperHub.</p>
+    <p><strong>${inviterName}</strong> has invited you to join <strong>${organizationName}</strong> organization as a <strong>${role}</strong> on KeeperHub.</p>
 
     <div style="text-align: center; margin: 30px 0;">
       <a href="${inviteLink}" style="display: inline-block; background: #3b82f6; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">Accept Invitation</a>

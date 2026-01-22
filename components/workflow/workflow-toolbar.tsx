@@ -601,41 +601,70 @@ function useWorkflowHandlers({
     }
   };
 
+  /**
+   * Get workflow validation issues (broken refs, missing fields, missing integrations).
+   * Returns null if no issues found.
+   */
+  const getWorkflowIssues = () => {
+    const brokenRefs = getBrokenTemplateReferences(nodes);
+    const missingFields = getMissingRequiredFields(nodes);
+    const missingIntegrations = getMissingIntegrations(nodes, userIntegrations);
+
+    if (
+      brokenRefs.length > 0 ||
+      missingFields.length > 0 ||
+      missingIntegrations.length > 0
+    ) {
+      return {
+        brokenReferences: brokenRefs,
+        missingRequiredFields: missingFields,
+        missingIntegrations,
+      };
+    }
+    return null;
+  };
+
+  /**
+   * Validate workflow and show issues overlay if problems found.
+   * @param onProceed - Callback to run if user clicks proceed (or validation passes)
+   * @param actionLabel - Label for the proceed button (default: "Run Anyway")
+   * @returns true if validation passed, false if issues overlay was shown
+   */
+  const validateAndProceed = (
+    onProceed: () => void | Promise<void>,
+    actionLabel?: string
+  ): boolean => {
+    const issues = getWorkflowIssues();
+
+    if (issues) {
+      openOverlay(WorkflowIssuesOverlay, {
+        issues,
+        onGoToStep: handleGoToStep,
+        onRunAnyway: onProceed,
+        actionLabel,
+      });
+      return false;
+    }
+
+    return true;
+  };
+
   const handleExecute = async () => {
     // Guard against concurrent executions
     if (isExecuting) {
       return;
     }
 
-    // Collect all workflow issues at once
-    const brokenRefs = getBrokenTemplateReferences(nodes);
-    const missingFields = getMissingRequiredFields(nodes);
-    const missingIntegrations = getMissingIntegrations(nodes, userIntegrations);
-
-    // If there are any issues, show the workflow issues overlay
-    if (
-      brokenRefs.length > 0 ||
-      missingFields.length > 0 ||
-      missingIntegrations.length > 0
-    ) {
-      openOverlay(WorkflowIssuesOverlay, {
-        issues: {
-          brokenReferences: brokenRefs,
-          missingRequiredFields: missingFields,
-          missingIntegrations,
-        },
-        onGoToStep: handleGoToStep,
-        onRunAnyway: executeWorkflow,
-      });
-      return;
+    if (validateAndProceed(executeWorkflow)) {
+      await executeWorkflow();
     }
-
-    await executeWorkflow();
   };
 
   return {
     handleSave,
     handleExecute,
+    validateAndProceed,
+    handleGoToStep,
   };
 }
 
@@ -770,22 +799,24 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     session,
   } = state;
 
-  const { handleSave, handleExecute } = useWorkflowHandlers({
-    currentWorkflowId,
-    nodes,
-    edges,
-    updateNodeData,
-    isExecuting,
-    setIsExecuting,
-    setIsSaving,
-    setHasUnsavedChanges,
-    setActiveTab,
-    setNodes,
-    setEdges,
-    setSelectedNodeId,
-    setSelectedExecutionId,
-    userIntegrations,
-  });
+  const { handleSave, handleExecute, validateAndProceed } = useWorkflowHandlers(
+    {
+      currentWorkflowId,
+      nodes,
+      edges,
+      updateNodeData,
+      isExecuting,
+      setIsExecuting,
+      setIsSaving,
+      setHasUnsavedChanges,
+      setActiveTab,
+      setNodes,
+      setEdges,
+      setSelectedNodeId,
+      setSelectedExecutionId,
+      userIntegrations,
+    }
+  );
 
   // Listen for execute trigger from keyboard shortcut
   useEffect(() => {
@@ -930,20 +961,39 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
   };
 
   // start custom keeperhub code //
-  const handleToggleEnabled = async (newEnabled: boolean) => {
+  const updateWorkflowEnabled = async (enabled: boolean) => {
     if (!currentWorkflowId) {
       return;
     }
 
     try {
       await api.workflow.update(currentWorkflowId, {
-        enabled: newEnabled,
+        enabled,
       });
-      state.setIsEnabled(newEnabled);
-      toast.success(newEnabled ? "Workflow enabled" : "Workflow disabled");
+      state.setIsEnabled(enabled);
+      toast.success(enabled ? "Workflow enabled" : "Workflow disabled");
     } catch (error) {
       console.error("Failed to update enabled state:", error);
       toast.error("Failed to update workflow state. Please try again.");
+    }
+  };
+
+  const handleToggleEnabled = async (newEnabled: boolean) => {
+    if (!currentWorkflowId) {
+      return;
+    }
+
+    // When disabling, update directly without validation
+    if (!newEnabled) {
+      await updateWorkflowEnabled(false);
+      return;
+    }
+
+    // When enabling, validate first
+    if (
+      validateAndProceed(() => updateWorkflowEnabled(true), "Enable Anyway")
+    ) {
+      await updateWorkflowEnabled(true);
     }
   };
   // end custom keeperhub code //
@@ -1103,6 +1153,13 @@ function ToolbarActions({
     state.setActiveTab("properties");
   };
 
+  const triggerType = state.nodes.find((node) => node?.data?.type === "trigger")
+    ?.data?.config?.triggerType;
+
+  const shouldDisplayEnableWorkflowSwitch =
+    triggerType === WorkflowTriggerEnum.EVENT ||
+    triggerType === WorkflowTriggerEnum.SCHEDULE;
+
   return (
     <>
       {/* Add Step - Mobile Vertical */}
@@ -1242,6 +1299,27 @@ function ToolbarActions({
 
       {/* Visibility Toggle */}
       <VisibilityButton actions={actions} state={state} />
+
+      {/* start custom keeperhub code // */}
+      {shouldDisplayEnableWorkflowSwitch && (
+        <>
+          {/* Enable Workflow Switch - Desktop Horizontal */}
+          <div className="hidden items-center gap-2 lg:flex">
+            <label
+              className="font-medium text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              htmlFor="enable-workflow-switch"
+            >
+              {state.isEnabled ? "Deactivate" : "Activate"} workflow
+            </label>
+            <Switch
+              checked={state.isEnabled}
+              id="enable-workflow-switch"
+              onCheckedChange={actions.handleToggleEnabled}
+            />
+          </div>
+        </>
+      )}
+      {/* end custom keeperhub code // */}
 
       <RunButtonGroup actions={actions} state={state} />
     </>

@@ -2,11 +2,25 @@ import "server-only";
 
 import { and, eq, inArray } from "drizzle-orm";
 import { ethers } from "ethers";
-import { initializeParaSigner } from "@/keeperhub/lib/para/wallet-helpers";
+import {
+  getOrganizationWalletAddress,
+  initializeParaSigner,
+} from "@/keeperhub/lib/para/wallet-helpers";
+import { getGasStrategy } from "@/keeperhub/lib/web3/gas-strategy";
+import { getNonceManager } from "@/keeperhub/lib/web3/nonce-manager";
+import {
+  type TransactionContext,
+  withNonceSession,
+} from "@/keeperhub/lib/web3/transaction-manager";
 import { getOrganizationIdFromExecution } from "@/keeperhub/lib/workflow-helpers";
 import { ERC20_ABI } from "@/lib/contracts";
 import { db } from "@/lib/db";
-import { supportedTokens, workflowExecutions } from "@/lib/db/schema";
+import {
+  explorerConfigs,
+  supportedTokens,
+  workflowExecutions,
+} from "@/lib/db/schema";
+import { getTransactionUrl } from "@/lib/explorer";
 import { getChainIdFromNetwork, resolveRpcConfig } from "@/lib/rpc";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
@@ -15,6 +29,7 @@ type TransferTokenResult =
   | {
       success: true;
       transactionHash: string;
+      transactionLink: string;
       amount: string;
       symbol: string;
       recipient: string;
@@ -225,105 +240,204 @@ async function stepHandler(
     };
   }
 
-  // Initialize Para signer
-  let signer: Awaited<ReturnType<typeof initializeParaSigner>>;
-  let signerAddress: string;
+  // Get wallet address for nonce management
+  let walletAddress: string;
   try {
-    console.log(
-      "[Transfer Token] Initializing Para signer for organization:",
-      organizationId
-    );
-    signer = await initializeParaSigner(organizationId, rpcUrl);
-    signerAddress = await signer.getAddress();
-    console.log(
-      "[Transfer Token] Signer initialized successfully:",
-      signerAddress
-    );
+    walletAddress = await getOrganizationWalletAddress(organizationId);
   } catch (error) {
-    console.error(
-      "[Transfer Token] Failed to initialize organization wallet:",
-      error
-    );
+    console.error("[Transfer Token] Failed to get wallet address:", error);
     return {
       success: false,
-      error: `Failed to initialize organization wallet: ${getErrorMessage(error)}`,
+      error: `Failed to get wallet address: ${getErrorMessage(error)}`,
     };
   }
 
-  // Create contract instance with signer
-  const contract = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
-
+  // Get workflow ID for transaction tracking
+  let workflowId: string | undefined;
   try {
-    // Get token decimals and symbol
-    const [decimals, symbol] = await Promise.all([
-      contract.decimals() as Promise<bigint>,
-      contract.symbol() as Promise<string>,
-    ]);
+    const execution = await db
+      .select({ workflowId: workflowExecutions.workflowId })
+      .from(workflowExecutions)
+      .where(eq(workflowExecutions.id, _context.executionId))
+      .then((rows) => rows[0]);
+    workflowId = execution?.workflowId ?? undefined;
+  } catch {
+    // Non-critical - workflowId is optional for tracking
+  }
 
-    const decimalsNum = Number(decimals);
-    console.log("[Transfer Token] Token info:", {
-      symbol,
-      decimals: decimalsNum,
-    });
+  // Build transaction context
+  const txContext: TransactionContext = {
+    organizationId,
+    executionId: _context.executionId,
+    workflowId,
+    chainId,
+    rpcUrl,
+  };
 
-    // Convert amount to raw units
-    let amountRaw: bigint;
+  // Execute transaction with nonce management and gas strategy
+  return withNonceSession(txContext, walletAddress, async (session) => {
+    const nonceManager = getNonceManager();
+    const gasStrategy = getGasStrategy();
+
+    // Initialize Para signer
+    let signer: Awaited<ReturnType<typeof initializeParaSigner>>;
+    let signerAddress: string;
     try {
-      amountRaw = ethers.parseUnits(amount, decimalsNum);
+      console.log(
+        "[Transfer Token] Initializing Para signer for organization:",
+        organizationId
+      );
+      signer = await initializeParaSigner(organizationId, rpcUrl);
+      signerAddress = await signer.getAddress();
+      console.log(
+        "[Transfer Token] Signer initialized successfully:",
+        signerAddress
+      );
     } catch (error) {
+      console.error(
+        "[Transfer Token] Failed to initialize organization wallet:",
+        error
+      );
       return {
         success: false,
-        error: `Invalid amount format: ${getErrorMessage(error)}`,
+        error: `Failed to initialize organization wallet: ${getErrorMessage(error)}`,
       };
     }
 
-    // Check balance before transfer
-    const balance = (await contract.balanceOf(signerAddress)) as bigint;
-    if (balance < amountRaw) {
-      const balanceFormatted = ethers.formatUnits(balance, decimalsNum);
+    // Create contract instance with signer
+    const contract = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
+
+    try {
+      // Get token decimals and symbol
+      const [decimals, symbol] = await Promise.all([
+        contract.decimals() as Promise<bigint>,
+        contract.symbol() as Promise<string>,
+      ]);
+
+      const decimalsNum = Number(decimals);
+      console.log("[Transfer Token] Token info:", {
+        symbol,
+        decimals: decimalsNum,
+      });
+
+      // Convert amount to raw units
+      let amountRaw: bigint;
+      try {
+        amountRaw = ethers.parseUnits(amount, decimalsNum);
+      } catch (error) {
+        return {
+          success: false,
+          error: `Invalid amount format: ${getErrorMessage(error)}`,
+        };
+      }
+
+      // Check balance before transfer
+      const balance = (await contract.balanceOf(signerAddress)) as bigint;
+      if (balance < amountRaw) {
+        const balanceFormatted = ethers.formatUnits(balance, decimalsNum);
+        return {
+          success: false,
+          error: `Insufficient ${symbol} balance. Have: ${balanceFormatted}, Need: ${amount}`,
+        };
+      }
+
+      console.log("[Transfer Token] Executing transfer:", {
+        from: signerAddress,
+        to: recipientAddress,
+        amount,
+        amountRaw: amountRaw.toString(),
+        symbol,
+      });
+
+      // Get nonce from session
+      const nonce = nonceManager.getNextNonce(session);
+
+      // Estimate gas for the transfer
+      const estimatedGas = await contract.transfer.estimateGas(
+        recipientAddress,
+        amountRaw
+      );
+
+      // Get gas configuration from strategy
+      const provider = signer.provider;
+      if (!provider) {
+        throw new Error("Signer has no provider");
+      }
+
+      const gasConfig = await gasStrategy.getGasConfig(
+        provider,
+        txContext.triggerType ?? "manual",
+        estimatedGas,
+        chainId
+      );
+
+      console.log("[Transfer Token] Gas config:", {
+        estimatedGas: estimatedGas.toString(),
+        gasLimit: gasConfig.gasLimit.toString(),
+        maxFeePerGas: `${ethers.formatUnits(gasConfig.maxFeePerGas, "gwei")} gwei`,
+        maxPriorityFeePerGas: `${ethers.formatUnits(gasConfig.maxPriorityFeePerGas, "gwei")} gwei`,
+      });
+
+      // Execute transfer with managed nonce and gas config
+      const tx = await contract.transfer(recipientAddress, amountRaw, {
+        nonce,
+        gasLimit: gasConfig.gasLimit,
+        maxFeePerGas: gasConfig.maxFeePerGas,
+        maxPriorityFeePerGas: gasConfig.maxPriorityFeePerGas,
+      });
+
+      // Record pending transaction
+      await nonceManager.recordTransaction(
+        session,
+        nonce,
+        tx.hash,
+        workflowId,
+        gasConfig.maxFeePerGas.toString()
+      );
+
+      // Wait for transaction to be mined
+      const receipt = await tx.wait();
+
+      if (!receipt) {
+        return {
+          success: false,
+          error: "Transaction sent but receipt not available",
+        };
+      }
+
+      // Mark transaction as confirmed
+      await nonceManager.confirmTransaction(tx.hash);
+
+      console.log("[Transfer Token] Transaction confirmed:", {
+        hash: receipt.hash,
+        gasUsed: receipt.gasUsed.toString(),
+        effectiveGasPrice: `${ethers.formatUnits(receipt.gasPrice, "gwei")} gwei`,
+      });
+
+      // Fetch explorer config for transaction link
+      const explorerConfig = await db.query.explorerConfigs.findFirst({
+        where: eq(explorerConfigs.chainId, chainId),
+      });
+      const transactionLink = explorerConfig
+        ? getTransactionUrl(explorerConfig, receipt.hash)
+        : "";
+
+      return {
+        success: true,
+        transactionHash: receipt.hash,
+        transactionLink,
+        amount,
+        symbol,
+        recipient: recipientAddress,
+      };
+    } catch (error) {
+      console.error("[Transfer Token] Transaction failed:", error);
       return {
         success: false,
-        error: `Insufficient ${symbol} balance. Have: ${balanceFormatted}, Need: ${amount}`,
+        error: `Token transfer failed: ${getErrorMessage(error)}`,
       };
     }
-
-    console.log("[Transfer Token] Executing transfer:", {
-      from: signerAddress,
-      to: recipientAddress,
-      amount,
-      amountRaw: amountRaw.toString(),
-      symbol,
-    });
-
-    // Execute transfer
-    const tx = await contract.transfer(recipientAddress, amountRaw);
-
-    // Wait for transaction to be mined
-    const receipt = await tx.wait();
-
-    if (!receipt) {
-      return {
-        success: false,
-        error: "Transaction sent but receipt not available",
-      };
-    }
-
-    console.log("[Transfer Token] Transaction confirmed:", receipt.hash);
-
-    return {
-      success: true,
-      transactionHash: receipt.hash,
-      amount,
-      symbol,
-      recipient: recipientAddress,
-    };
-  } catch (error) {
-    console.error("[Transfer Token] Transaction failed:", error);
-    return {
-      success: false,
-      error: `Token transfer failed: ${getErrorMessage(error)}`,
-    };
-  }
+  });
 }
 
 /**

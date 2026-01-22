@@ -3,16 +3,31 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
 import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
-import { initializeParaSigner } from "@/keeperhub/lib/para/wallet-helpers";
+import {
+  getOrganizationWalletAddress,
+  initializeParaSigner,
+} from "@/keeperhub/lib/para/wallet-helpers";
+import { getGasStrategy } from "@/keeperhub/lib/web3/gas-strategy";
+import { getNonceManager } from "@/keeperhub/lib/web3/nonce-manager";
+import {
+  type TransactionContext,
+  withNonceSession,
+} from "@/keeperhub/lib/web3/transaction-manager";
 import { getOrganizationIdFromExecution } from "@/keeperhub/lib/workflow-helpers";
 import { db } from "@/lib/db";
-import { workflowExecutions } from "@/lib/db/schema";
+import { explorerConfigs, workflowExecutions } from "@/lib/db/schema";
+import { getTransactionUrl } from "@/lib/explorer";
 import { getChainIdFromNetwork, resolveRpcConfig } from "@/lib/rpc";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
 
 type WriteContractResult =
-  | { success: true; transactionHash: string; result?: unknown }
+  | {
+      success: true;
+      transactionHash: string;
+      transactionLink: string;
+      result?: unknown;
+    }
   | { success: false; error: string };
 
 export type WriteContractCoreInput = {
@@ -169,65 +184,163 @@ async function stepHandler(
     };
   }
 
-  // Initialize Para signer
-  let signer: Awaited<ReturnType<typeof initializeParaSigner>> | null = null;
+  // Get wallet address for nonce management
+  let walletAddress: string;
   try {
-    signer = await initializeParaSigner(organizationId, rpcUrl);
+    walletAddress = await getOrganizationWalletAddress(organizationId);
   } catch (error) {
-    console.error(
-      "[Write Contract] Failed to initialize organization wallet:",
-      error
-    );
+    console.error("[Write Contract] Failed to get wallet address:", error);
     return {
       success: false,
-      error: `Failed to initialize organization wallet: ${getErrorMessage(error)}`,
+      error: `Failed to get wallet address: ${getErrorMessage(error)}`,
     };
   }
 
-  // Create contract instance with signer
-  let contract: ethers.Contract;
+  // Get workflow ID for transaction tracking
+  let workflowId: string | undefined;
   try {
-    contract = new ethers.Contract(contractAddress, parsedAbi, signer);
-  } catch (error) {
-    console.error(
-      "[Write Contract] Failed to create contract instance:",
-      error
-    );
-    return {
-      success: false,
-      error: `Failed to create contract instance: ${getErrorMessage(error)}`,
-    };
+    const execution = await db
+      .select({ workflowId: workflowExecutions.workflowId })
+      .from(workflowExecutions)
+      .where(eq(workflowExecutions.id, _context.executionId))
+      .then((rows) => rows[0]);
+    workflowId = execution?.workflowId ?? undefined;
+  } catch {
+    // Non-critical - workflowId is optional for tracking
   }
 
-  // Call the contract function
-  try {
-    // Check if function exists
-    if (typeof contract[abiFunction] !== "function") {
+  // Build transaction context
+  const txContext: TransactionContext = {
+    organizationId,
+    executionId: _context.executionId,
+    workflowId,
+    chainId,
+    rpcUrl,
+  };
+
+  // Execute transaction with nonce management and gas strategy
+  return withNonceSession(txContext, walletAddress, async (session) => {
+    const nonceManager = getNonceManager();
+    const gasStrategy = getGasStrategy();
+
+    // Initialize Para signer
+    let signer: Awaited<ReturnType<typeof initializeParaSigner>>;
+    try {
+      signer = await initializeParaSigner(organizationId, rpcUrl);
+    } catch (error) {
+      console.error(
+        "[Write Contract] Failed to initialize organization wallet:",
+        error
+      );
       return {
         success: false,
-        error: `Function '${abiFunction}' not found in contract ABI`,
+        error: `Failed to initialize organization wallet: ${getErrorMessage(error)}`,
       };
     }
 
-    const tx = await contract[abiFunction](...args);
+    // Create contract instance with signer
+    let contract: ethers.Contract;
+    try {
+      contract = new ethers.Contract(contractAddress, parsedAbi, signer);
+    } catch (error) {
+      console.error(
+        "[Write Contract] Failed to create contract instance:",
+        error
+      );
+      return {
+        success: false,
+        error: `Failed to create contract instance: ${getErrorMessage(error)}`,
+      };
+    }
 
-    // Wait for transaction to be mined
-    const receipt = await tx.wait();
+    // Call the contract function
+    try {
+      // Check if function exists
+      if (typeof contract[abiFunction] !== "function") {
+        return {
+          success: false,
+          error: `Function '${abiFunction}' not found in contract ABI`,
+        };
+      }
 
-    console.log("[Write Contract] Transaction confirmed:", receipt.hash);
+      // Get nonce from session
+      const nonce = nonceManager.getNextNonce(session);
 
-    return {
-      success: true,
-      transactionHash: receipt.hash,
-      result: undefined,
-    };
-  } catch (error) {
-    console.error("[Write Contract] Function call failed:", error);
-    return {
-      success: false,
-      error: `Contract call failed: ${getErrorMessage(error)}`,
-    };
-  }
+      // Estimate gas for the contract call
+      const estimatedGas = await contract[abiFunction].estimateGas(...args);
+
+      // Get gas configuration from strategy
+      const provider = signer.provider;
+      if (!provider) {
+        throw new Error("Signer has no provider");
+      }
+
+      const gasConfig = await gasStrategy.getGasConfig(
+        provider,
+        txContext.triggerType ?? "manual",
+        estimatedGas,
+        chainId
+      );
+
+      console.log("[Write Contract] Gas config:", {
+        function: abiFunction,
+        estimatedGas: estimatedGas.toString(),
+        gasLimit: gasConfig.gasLimit.toString(),
+        maxFeePerGas: `${ethers.formatUnits(gasConfig.maxFeePerGas, "gwei")} gwei`,
+        maxPriorityFeePerGas: `${ethers.formatUnits(gasConfig.maxPriorityFeePerGas, "gwei")} gwei`,
+      });
+
+      // Execute contract call with managed nonce and gas config
+      const tx = await contract[abiFunction](...args, {
+        nonce,
+        gasLimit: gasConfig.gasLimit,
+        maxFeePerGas: gasConfig.maxFeePerGas,
+        maxPriorityFeePerGas: gasConfig.maxPriorityFeePerGas,
+      });
+
+      // Record pending transaction
+      await nonceManager.recordTransaction(
+        session,
+        nonce,
+        tx.hash,
+        workflowId,
+        gasConfig.maxFeePerGas.toString()
+      );
+
+      // Wait for transaction to be mined
+      const receipt = await tx.wait();
+
+      // Mark transaction as confirmed
+      await nonceManager.confirmTransaction(tx.hash);
+
+      console.log("[Write Contract] Transaction confirmed:", {
+        hash: receipt.hash,
+        gasUsed: receipt.gasUsed.toString(),
+        effectiveGasPrice: `${ethers.formatUnits(receipt.gasPrice, "gwei")} gwei`,
+      });
+
+      // Fetch explorer config for transaction link
+      const explorerConfig = await db.query.explorerConfigs.findFirst({
+        where: eq(explorerConfigs.chainId, chainId),
+      });
+      const transactionLink = explorerConfig
+        ? getTransactionUrl(explorerConfig, receipt.hash)
+        : "";
+
+      return {
+        success: true,
+        transactionHash: receipt.hash,
+        transactionLink,
+        result: undefined,
+      };
+    } catch (error) {
+      console.error("[Write Contract] Function call failed:", error);
+      return {
+        success: false,
+        error: `Contract call failed: ${getErrorMessage(error)}`,
+      };
+    }
+  });
 }
 
 /**

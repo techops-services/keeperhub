@@ -3,16 +3,26 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
 import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
-import { initializeParaSigner } from "@/keeperhub/lib/para/wallet-helpers";
+import {
+  getOrganizationWalletAddress,
+  initializeParaSigner,
+} from "@/keeperhub/lib/para/wallet-helpers";
+import { getGasStrategy } from "@/keeperhub/lib/web3/gas-strategy";
+import { getNonceManager } from "@/keeperhub/lib/web3/nonce-manager";
+import {
+  type TransactionContext,
+  withNonceSession,
+} from "@/keeperhub/lib/web3/transaction-manager";
 import { getOrganizationIdFromExecution } from "@/keeperhub/lib/workflow-helpers";
 import { db } from "@/lib/db";
-import { workflowExecutions } from "@/lib/db/schema";
+import { explorerConfigs, workflowExecutions } from "@/lib/db/schema";
+import { getTransactionUrl } from "@/lib/explorer";
 import { getChainIdFromNetwork, resolveRpcConfig } from "@/lib/rpc";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
 
 type TransferFundsResult =
-  | { success: true; transactionHash: string }
+  | { success: true; transactionHash: string; transactionLink: string }
   | { success: false; error: string };
 
 export type TransferFundsCoreInput = {
@@ -131,59 +141,163 @@ async function stepHandler(
     };
   }
 
-  let signer: Awaited<ReturnType<typeof initializeParaSigner>> | null = null;
+  // Get wallet address for nonce management
+  let walletAddress: string;
   try {
-    console.log(
-      "[Transfer Funds] Initializing Para signer for organization:",
-      organizationId
-    );
-    signer = await initializeParaSigner(organizationId, rpcUrl);
-    const signerAddress = await signer.getAddress();
-    console.log(
-      "[Transfer Funds] Signer initialized successfully:",
-      signerAddress
-    );
+    walletAddress = await getOrganizationWalletAddress(organizationId);
   } catch (error) {
-    console.error(
-      "[Transfer Funds] Failed to initialize organization wallet:",
-      error
-    );
+    console.error("[Transfer Funds] Failed to get wallet address:", error);
     return {
       success: false,
-      error: `Failed to initialize organization wallet: ${getErrorMessage(error)}`,
+      error: `Failed to get wallet address: ${getErrorMessage(error)}`,
     };
   }
 
-  // Send transaction
+  // Get workflow ID for transaction tracking
+  let workflowId: string | undefined;
   try {
-    const tx = await signer.sendTransaction({
-      to: recipientAddress,
-      value: amountInWei,
-    });
+    const execution = await db
+      .select({ workflowId: workflowExecutions.workflowId })
+      .from(workflowExecutions)
+      .where(eq(workflowExecutions.id, _context.executionId))
+      .then((rows) => rows[0]);
+    workflowId = execution?.workflowId ?? undefined;
+  } catch {
+    // Non-critical - workflowId is optional for tracking
+  }
 
-    // Wait for transaction to be mined
-    const receipt = await tx.wait();
+  // Build transaction context
+  const txContext: TransactionContext = {
+    organizationId,
+    executionId: _context.executionId,
+    workflowId,
+    chainId,
+    rpcUrl,
+  };
 
-    if (!receipt) {
+  // Execute transaction with nonce management and gas strategy
+  return withNonceSession(txContext, walletAddress, async (session) => {
+    const nonceManager = getNonceManager();
+    const gasStrategy = getGasStrategy();
+
+    let signer: Awaited<ReturnType<typeof initializeParaSigner>>;
+    try {
+      console.log(
+        "[Transfer Funds] Initializing Para signer for organization:",
+        organizationId
+      );
+      signer = await initializeParaSigner(organizationId, rpcUrl);
+      const signerAddress = await signer.getAddress();
+      console.log(
+        "[Transfer Funds] Signer initialized successfully:",
+        signerAddress
+      );
+    } catch (error) {
+      console.error(
+        "[Transfer Funds] Failed to initialize organization wallet:",
+        error
+      );
       return {
         success: false,
-        error: "Transaction sent but receipt not available",
+        error: `Failed to initialize organization wallet: ${getErrorMessage(error)}`,
       };
     }
 
-    console.log("[Transfer Funds] Transaction confirmed:", receipt.hash);
+    // Get nonce from session
+    const nonce = nonceManager.getNextNonce(session);
 
-    return {
-      success: true,
-      transactionHash: receipt.hash,
-    };
-  } catch (error) {
-    console.error("[Transfer Funds] Transaction failed:", error);
-    return {
-      success: false,
-      error: `Transaction failed: ${getErrorMessage(error)}`,
-    };
-  }
+    // Send transaction with managed nonce and gas strategy
+    try {
+      const provider = signer.provider;
+      if (!provider) {
+        throw new Error("Signer has no provider");
+      }
+
+      // Build base transaction
+      const baseTx = {
+        to: recipientAddress,
+        value: amountInWei,
+      };
+
+      // Estimate gas
+      const estimatedGas = await provider.estimateGas({
+        ...baseTx,
+        from: walletAddress,
+      });
+
+      // Get gas configuration from strategy
+      const gasConfig = await gasStrategy.getGasConfig(
+        provider,
+        txContext.triggerType ?? "manual",
+        estimatedGas,
+        chainId
+      );
+
+      console.log("[Transfer Funds] Gas config:", {
+        estimatedGas: estimatedGas.toString(),
+        gasLimit: gasConfig.gasLimit.toString(),
+        maxFeePerGas: `${ethers.formatUnits(gasConfig.maxFeePerGas, "gwei")} gwei`,
+        maxPriorityFeePerGas: `${ethers.formatUnits(gasConfig.maxPriorityFeePerGas, "gwei")} gwei`,
+      });
+
+      // Send transaction with nonce and gas config
+      const tx = await signer.sendTransaction({
+        ...baseTx,
+        nonce,
+        gasLimit: gasConfig.gasLimit,
+        maxFeePerGas: gasConfig.maxFeePerGas,
+        maxPriorityFeePerGas: gasConfig.maxPriorityFeePerGas,
+      });
+
+      // Record pending transaction
+      await nonceManager.recordTransaction(
+        session,
+        nonce,
+        tx.hash,
+        workflowId,
+        gasConfig.maxFeePerGas.toString()
+      );
+
+      // Wait for transaction to be mined
+      const receipt = await tx.wait();
+
+      if (!receipt) {
+        return {
+          success: false,
+          error: "Transaction sent but receipt not available",
+        };
+      }
+
+      // Mark transaction as confirmed
+      await nonceManager.confirmTransaction(tx.hash);
+
+      console.log("[Transfer Funds] Transaction confirmed:", {
+        hash: receipt.hash,
+        gasUsed: receipt.gasUsed.toString(),
+        effectiveGasPrice: `${ethers.formatUnits(receipt.gasPrice, "gwei")} gwei`,
+      });
+
+      // Fetch explorer config for transaction link
+      const explorerConfig = await db.query.explorerConfigs.findFirst({
+        where: eq(explorerConfigs.chainId, chainId),
+      });
+      const transactionLink = explorerConfig
+        ? getTransactionUrl(explorerConfig, receipt.hash)
+        : "";
+
+      return {
+        success: true,
+        transactionHash: receipt.hash,
+        transactionLink,
+      };
+    } catch (error) {
+      console.error("[Transfer Funds] Transaction failed:", error);
+      return {
+        success: false,
+        error: `Transaction failed: ${getErrorMessage(error)}`,
+      };
+    }
+  });
 }
 
 /**

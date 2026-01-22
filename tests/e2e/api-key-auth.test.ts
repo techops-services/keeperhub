@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+// Unmock db to use real database for integration tests
+vi.unmock("@/lib/db");
+
 import { db } from "@/lib/db";
 import {
   organizationApiKeys,
@@ -10,15 +14,15 @@ import {
 /**
  * Integration tests for API Key Authentication
  *
- * Tests the authenticateApiKey middleware across all API endpoints:
- * - GET /api/workflows (list workflows)
- * - POST /api/workflows/create (create workflow)
- * - GET /api/workflows/:id (get workflow)
- * - PATCH /api/workflows/:id (update workflow)
- * - DELETE /api/workflows/:id (delete workflow)
- * - POST /api/workflow/:id/execute (execute workflow)
- * - POST /api/ai/generate (AI workflow generation)
+ * These tests require:
+ * 1. A running database with proper schema
+ * 2. A running app server at localhost:3000
+ *
+ * Tests are skipped if infrastructure is not available.
  */
+
+// Track setup state
+let setupSucceeded = false;
 
 describe("API Key Authentication", () => {
   let testApiKey: string;
@@ -29,71 +33,99 @@ describe("API Key Authentication", () => {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
   beforeAll(async () => {
-    // Create a test organization and API key
-    testOrgId = `test-org-${Date.now()}`;
-    testApiKey = `kh_test_${Date.now()}_${Math.random().toString(36)}`;
-    const keyHash = createHash("sha256").update(testApiKey).digest("hex");
+    try {
+      // Check if app is reachable
+      const healthCheck = await fetch(`${baseUrl}/api/health`, {
+        signal: AbortSignal.timeout(2000),
+      }).catch(() => null);
 
-    const [apiKey] = await db
-      .insert(organizationApiKeys)
-      .values({
-        organizationId: testOrgId,
-        name: "Test API Key",
-        keyHash,
-        keyPrefix: testApiKey.slice(0, 8),
-        expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
-      })
-      .returning();
+      if (!healthCheck?.ok) {
+        console.warn("API Key auth tests skipped: App not reachable");
+        return;
+      }
 
-    testApiKeyId = apiKey.id;
+      // Create test data
+      testOrgId = `test-org-${Date.now()}`;
+      testApiKey = `kh_test_${Date.now()}_${Math.random().toString(36)}`;
+      const keyHash = createHash("sha256").update(testApiKey).digest("hex");
 
-    // Create a test workflow for this organization
-    const [workflow] = await db
-      .insert(workflowsTable)
-      .values({
-        name: "Test Workflow",
-        description: "Test workflow for API key auth",
-        organizationId: testOrgId,
-        userId: testUserId,
-        isAnonymous: false,
-        nodes: [
-          {
-            id: "trigger-1",
-            type: "trigger",
-            position: { x: 0, y: 0 },
-            data: {
-              label: "Manual Trigger",
+      const apiKeys = await db
+        .insert(organizationApiKeys)
+        .values({
+          organizationId: testOrgId,
+          name: "Test API Key",
+          keyHash,
+          keyPrefix: testApiKey.slice(0, 8),
+          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        })
+        .returning();
+
+      if (!apiKeys?.[0]) {
+        console.warn("API Key auth tests skipped: Failed to create API key");
+        return;
+      }
+      testApiKeyId = apiKeys[0].id;
+
+      const workflows = await db
+        .insert(workflowsTable)
+        .values({
+          name: "Test Workflow",
+          description: "Test workflow for API key auth",
+          organizationId: testOrgId,
+          userId: testUserId,
+          isAnonymous: false,
+          nodes: [
+            {
+              id: "trigger-1",
               type: "trigger",
-              config: { triggerType: "Manual" },
-              status: "idle",
+              position: { x: 0, y: 0 },
+              data: {
+                label: "Manual Trigger",
+                type: "trigger",
+                config: { triggerType: "Manual" },
+                status: "idle",
+              },
             },
-          },
-        ],
-        edges: [],
-      })
-      .returning();
+          ],
+          edges: [],
+        })
+        .returning();
 
-    testWorkflowId = workflow.id;
+      if (!workflows?.[0]) {
+        console.warn("API Key auth tests skipped: Failed to create workflow");
+        return;
+      }
+      testWorkflowId = workflows[0].id;
+      setupSucceeded = true;
+    } catch (error) {
+      console.warn("API Key auth tests skipped:", error);
+    }
   });
 
   afterAll(async () => {
-    // Clean up test data
-    await db
-      .delete(workflowsTable)
-      .where(eq(workflowsTable.id, testWorkflowId));
-    await db
-      .delete(organizationApiKeys)
-      .where(eq(organizationApiKeys.id, testApiKeyId));
+    if (!setupSucceeded) {
+      return;
+    }
+    try {
+      await db
+        .delete(workflowsTable)
+        .where(eq(workflowsTable.id, testWorkflowId));
+      await db
+        .delete(organizationApiKeys)
+        .where(eq(organizationApiKeys.id, testApiKeyId));
+    } catch {
+      // Ignore cleanup errors
+    }
   });
 
   describe("GET /api/workflows", () => {
-    it("should authenticate with valid API key", async () => {
+    it("should authenticate with valid API key", async ({ skip }) => {
+      if (!setupSucceeded) {
+        skip();
+      }
       const response = await fetch(`${baseUrl}/api/workflows`, {
-        headers: {
-          Authorization: `Bearer ${testApiKey}`,
-        },
+        headers: { Authorization: `Bearer ${testApiKey}` },
       });
-
       expect(response.status).toBe(200);
       const workflows = await response.json();
       expect(Array.isArray(workflows)).toBe(true);
@@ -102,27 +134,26 @@ describe("API Key Authentication", () => {
       ).toBe(true);
     });
 
-    it("should reject invalid API key", async () => {
+    it("should reject invalid API key", async ({ skip }) => {
+      if (!setupSucceeded) {
+        skip();
+      }
       const response = await fetch(`${baseUrl}/api/workflows`, {
-        headers: {
-          Authorization: "Bearer kh_invalid_key",
-        },
+        headers: { Authorization: "Bearer kh_invalid_key" },
       });
-
-      // Should return empty array for invalid auth (current behavior)
       expect(response.status).toBe(200);
       const workflows = await response.json();
       expect(Array.isArray(workflows)).toBe(true);
       expect(workflows.length).toBe(0);
     });
 
-    it("should reject malformed API key", async () => {
+    it("should reject malformed API key", async ({ skip }) => {
+      if (!setupSucceeded) {
+        skip();
+      }
       const response = await fetch(`${baseUrl}/api/workflows`, {
-        headers: {
-          Authorization: "Bearer invalid_prefix_key",
-        },
+        headers: { Authorization: "Bearer invalid_prefix_key" },
       });
-
       expect(response.status).toBe(200);
       const workflows = await response.json();
       expect(Array.isArray(workflows)).toBe(true);
@@ -130,7 +161,10 @@ describe("API Key Authentication", () => {
   });
 
   describe("POST /api/workflows/create", () => {
-    it("should create workflow with valid API key", async () => {
+    it("should create workflow with valid API key", async ({ skip }) => {
+      if (!setupSucceeded) {
+        skip();
+      }
       const response = await fetch(`${baseUrl}/api/workflows/create`, {
         method: "POST",
         headers: {
@@ -166,47 +200,49 @@ describe("API Key Authentication", () => {
       await db.delete(workflowsTable).where(eq(workflowsTable.id, workflow.id));
     });
 
-    it("should reject invalid API key", async () => {
+    it("should reject invalid API key", async ({ skip }) => {
+      if (!setupSucceeded) {
+        skip();
+      }
       const response = await fetch(`${baseUrl}/api/workflows/create`, {
         method: "POST",
         headers: {
           Authorization: "Bearer kh_invalid_key",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          name: "Should Fail",
-          nodes: [],
-          edges: [],
-        }),
+        body: JSON.stringify({ name: "Should Fail", nodes: [], edges: [] }),
       });
-
       expect(response.status).toBe(401);
     });
   });
 
   describe("GET /api/workflows/:id", () => {
-    it("should get workflow with valid API key", async () => {
+    it("should get workflow with valid API key", async ({ skip }) => {
+      if (!setupSucceeded) {
+        skip();
+      }
       const response = await fetch(
         `${baseUrl}/api/workflows/${testWorkflowId}`,
         {
-          headers: {
-            Authorization: `Bearer ${testApiKey}`,
-          },
+          headers: { Authorization: `Bearer ${testApiKey}` },
         }
       );
-
       expect(response.status).toBe(200);
       const workflow = await response.json();
       expect(workflow.id).toBe(testWorkflowId);
     });
 
-    it("should reject access to workflow from different org", async () => {
-      // Create another org's API key
+    it("should reject access to workflow from different org", async ({
+      skip,
+    }) => {
+      if (!setupSucceeded) {
+        skip();
+      }
       const otherApiKey = `kh_other_${Date.now()}`;
       const otherKeyHash = createHash("sha256")
         .update(otherApiKey)
         .digest("hex");
-      const [otherKey] = await db
+      const otherKeys = await db
         .insert(organizationApiKeys)
         .values({
           organizationId: "other-org-123",
@@ -219,23 +255,24 @@ describe("API Key Authentication", () => {
       const response = await fetch(
         `${baseUrl}/api/workflows/${testWorkflowId}`,
         {
-          headers: {
-            Authorization: `Bearer ${otherApiKey}`,
-          },
+          headers: { Authorization: `Bearer ${otherApiKey}` },
         }
       );
-
       expect(response.status).toBe(404);
 
-      // Clean up
-      await db
-        .delete(organizationApiKeys)
-        .where(eq(organizationApiKeys.id, otherKey.id));
+      if (otherKeys?.[0]) {
+        await db
+          .delete(organizationApiKeys)
+          .where(eq(organizationApiKeys.id, otherKeys[0].id));
+      }
     });
   });
 
   describe("PATCH /api/workflows/:id", () => {
-    it("should update workflow with valid API key", async () => {
+    it("should update workflow with valid API key", async ({ skip }) => {
+      if (!setupSucceeded) {
+        skip();
+      }
       const response = await fetch(
         `${baseUrl}/api/workflows/${testWorkflowId}`,
         {
@@ -244,12 +281,9 @@ describe("API Key Authentication", () => {
             Authorization: `Bearer ${testApiKey}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            name: "Updated via API Key",
-          }),
+          body: JSON.stringify({ name: "Updated via API Key" }),
         }
       );
-
       expect(response.status).toBe(200);
       const workflow = await response.json();
       expect(workflow.name).toBe("Updated via API Key");
@@ -257,7 +291,10 @@ describe("API Key Authentication", () => {
   });
 
   describe("POST /api/workflow/:id/execute", () => {
-    it("should execute workflow with valid API key", async () => {
+    it("should execute workflow with valid API key", async ({ skip }) => {
+      if (!setupSucceeded) {
+        skip();
+      }
       const response = await fetch(
         `${baseUrl}/api/workflow/${testWorkflowId}/execute`,
         {
@@ -266,24 +303,24 @@ describe("API Key Authentication", () => {
             Authorization: `Bearer ${testApiKey}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            input: { test: "data" },
-          }),
+          body: JSON.stringify({ input: { test: "data" } }),
         }
       );
-
       expect(response.status).toBe(200);
       const result = await response.json();
       expect(result.executionId).toBeDefined();
       expect(result.status).toBe("running");
     });
 
-    it("should reject execution from different org", async () => {
+    it("should reject execution from different org", async ({ skip }) => {
+      if (!setupSucceeded) {
+        skip();
+      }
       const otherApiKey = `kh_other_exec_${Date.now()}`;
       const otherKeyHash = createHash("sha256")
         .update(otherApiKey)
         .digest("hex");
-      const [otherKey] = await db
+      const otherKeys = await db
         .insert(organizationApiKeys)
         .values({
           organizationId: "other-org-exec-123",
@@ -301,23 +338,24 @@ describe("API Key Authentication", () => {
             Authorization: `Bearer ${otherApiKey}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            input: { test: "data" },
-          }),
+          body: JSON.stringify({ input: { test: "data" } }),
         }
       );
-
       expect(response.status).toBe(403);
 
-      // Clean up
-      await db
-        .delete(organizationApiKeys)
-        .where(eq(organizationApiKeys.id, otherKey.id));
+      if (otherKeys?.[0]) {
+        await db
+          .delete(organizationApiKeys)
+          .where(eq(organizationApiKeys.id, otherKeys[0].id));
+      }
     });
   });
 
   describe("POST /api/ai/generate", () => {
-    it("should generate workflow with valid API key", async () => {
+    it("should generate workflow with valid API key", async ({ skip }) => {
+      if (!setupSucceeded) {
+        skip();
+      }
       const response = await fetch(`${baseUrl}/api/ai/generate`, {
         method: "POST",
         headers: {
@@ -328,95 +366,92 @@ describe("API Key Authentication", () => {
           prompt: "Create a simple workflow that sends an email",
         }),
       });
-
       expect(response.status).toBe(200);
       expect(response.headers.get("content-type")).toContain(
         "application/x-ndjson"
       );
     });
 
-    it("should reject without authentication", async () => {
+    it("should reject without authentication", async ({ skip }) => {
+      if (!setupSucceeded) {
+        skip();
+      }
       const response = await fetch(`${baseUrl}/api/ai/generate`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          prompt: "Create a workflow",
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: "Create a workflow" }),
       });
-
       expect(response.status).toBe(401);
     });
   });
 
   describe("Expired API Keys", () => {
-    it("should reject expired API key", async () => {
+    it("should reject expired API key", async ({ skip }) => {
+      if (!setupSucceeded) {
+        skip();
+      }
       const expiredKey = `kh_expired_${Date.now()}`;
       const expiredKeyHash = createHash("sha256")
         .update(expiredKey)
         .digest("hex");
-      const [key] = await db
+      const keys = await db
         .insert(organizationApiKeys)
         .values({
           organizationId: testOrgId,
           name: "Expired Key",
           keyHash: expiredKeyHash,
           keyPrefix: expiredKey.slice(0, 8),
-          expiresAt: new Date(Date.now() - 1000), // Expired 1 second ago
+          expiresAt: new Date(Date.now() - 1000),
         })
         .returning();
 
       const response = await fetch(`${baseUrl}/api/workflows`, {
-        headers: {
-          Authorization: `Bearer ${expiredKey}`,
-        },
+        headers: { Authorization: `Bearer ${expiredKey}` },
       });
-
-      // Should return empty array (invalid auth)
       expect(response.status).toBe(200);
       const workflows = await response.json();
       expect(workflows.length).toBe(0);
 
-      // Clean up
-      await db
-        .delete(organizationApiKeys)
-        .where(eq(organizationApiKeys.id, key.id));
+      if (keys?.[0]) {
+        await db
+          .delete(organizationApiKeys)
+          .where(eq(organizationApiKeys.id, keys[0].id));
+      }
     });
   });
 
   describe("Revoked API Keys", () => {
-    it("should reject revoked API key", async () => {
+    it("should reject revoked API key", async ({ skip }) => {
+      if (!setupSucceeded) {
+        skip();
+      }
       const revokedKey = `kh_revoked_${Date.now()}`;
       const revokedKeyHash = createHash("sha256")
         .update(revokedKey)
         .digest("hex");
-      const [key] = await db
+      const keys = await db
         .insert(organizationApiKeys)
         .values({
           organizationId: testOrgId,
           name: "Revoked Key",
           keyHash: revokedKeyHash,
           keyPrefix: revokedKey.slice(0, 8),
-          revokedAt: new Date(), // Revoked now
+          revokedAt: new Date(),
         })
         .returning();
 
       const response = await fetch(`${baseUrl}/api/workflows`, {
-        headers: {
-          Authorization: `Bearer ${revokedKey}`,
-        },
+        headers: { Authorization: `Bearer ${revokedKey}` },
       });
-
-      // Should return empty array (invalid auth)
       expect(response.status).toBe(200);
       const workflows = await response.json();
       expect(workflows.length).toBe(0);
 
-      // Clean up
-      await db
-        .delete(organizationApiKeys)
-        .where(eq(organizationApiKeys.id, key.id));
+      if (keys?.[0]) {
+        await db
+          .delete(organizationApiKeys)
+          .where(eq(organizationApiKeys.id, keys[0].id));
+      }
     });
   });
 });

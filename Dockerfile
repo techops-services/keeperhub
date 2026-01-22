@@ -53,13 +53,27 @@ COPY --from=source /app/tsconfig.json ./tsconfig.json
 # Run migrations only: docker run --env DATABASE_URL=xxx keeperhub-migrator pnpm db:migrate
 # Run seed only: docker run --env DATABASE_URL=xxx keeperhub-migrator pnpm db:seed
 
-# Stage 2.7: Scheduler stage (for schedule dispatcher and job spawner)
+# Stage 2.7a: Scheduler Dependencies (minimal deps for scheduler scripts)
+FROM node:25-alpine AS scheduler-deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Copy scheduler-specific package.json with minimal dependencies
+COPY scheduler/package.json ./
+
+# Install only scheduler dependencies (production only)
+RUN pnpm install --prod
+
+# Stage 2.7b: Scheduler stage (for schedule dispatcher and job spawner)
 FROM node:25-alpine AS scheduler
 WORKDIR /app
-RUN npm install -g pnpm tsx
+RUN npm install -g tsx
 
-# Copy dependencies and scheduler files
-COPY --from=deps /app/node_modules ./node_modules
+# Copy ONLY scheduler dependencies (not full node_modules - saves ~1.7GB)
+COPY --from=scheduler-deps /app/node_modules ./node_modules
 COPY --from=source /app/scripts ./scripts
 COPY --from=source /app/lib ./lib
 COPY --from=source /app/keeperhub ./keeperhub

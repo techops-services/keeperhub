@@ -142,6 +142,24 @@ function isUrl(str: string): boolean {
   }
 }
 
+// Helper to extract explorer link from step output
+// Returns transactionLink for tx steps, addressLink for balance steps
+function getExplorerLink(output: unknown): string | null {
+  if (typeof output !== "object" || output === null) {
+    return null;
+  }
+  const out = output as Record<string, unknown>;
+  // Transaction link for transfer/write-contract steps
+  if (typeof out.transactionLink === "string" && out.transactionLink) {
+    return out.transactionLink;
+  }
+  // Address link for check-balance steps
+  if (typeof out.addressLink === "string" && out.addressLink) {
+    return out.addressLink;
+  }
+  return null;
+}
+
 // Component to render JSON with clickable links
 function JsonWithLinks({ data }: { data: unknown }) {
   // Use regex to find and replace URLs in the JSON string
@@ -462,6 +480,8 @@ function ExecutionLogEntry({
   isFirst: boolean;
   isLast: boolean;
 }) {
+  const explorerLink = getExplorerLink(log.output);
+
   return (
     <div className="relative flex gap-3" key={log.id}>
       {/* Timeline connector */}
@@ -501,6 +521,31 @@ function ExecutionLogEntry({
                 <span className="truncate font-medium text-sm transition-colors group-hover:text-foreground">
                   {log.nodeName || log.nodeType}
                 </span>
+                {explorerLink && (
+                  <>
+                    <button
+                      className="text-muted-foreground hover:text-foreground"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        await navigator.clipboard.writeText(explorerLink);
+                      }}
+                      title="Copy link"
+                      type="button"
+                    >
+                      <Copy className="h-3 w-3" />
+                    </button>
+                    <a
+                      className="text-muted-foreground hover:text-foreground"
+                      href={explorerLink}
+                      onClick={(e) => e.stopPropagation()}
+                      rel="noopener noreferrer"
+                      target="_blank"
+                      title="View on explorer"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </>
+                )}
               </div>
             </div>
 
