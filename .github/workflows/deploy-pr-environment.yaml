@@ -34,6 +34,7 @@ jobs:
       CLUSTER_NAME: maker-staging
       NAMESPACE: pr-${{ github.event.pull_request.number }}
       AWS_ECR_NAME: keeperhub-staging
+      PG_VERSION: "16"
 
     steps:
       - name: Checkout code
@@ -50,7 +51,7 @@ jobs:
 
       - name: Login to AWS ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -100,7 +101,7 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
-          target: app
+          target: runner
           push: true
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:app-${{ steps.vars.outputs.sha_short }}
@@ -172,6 +173,7 @@ jobs:
       - name: Deploy PostgreSQL cluster
         env:
           DB_PASSWORD: ${{ steps.db-password.outputs.password }}
+          PG_VERSION: ${{ env.PG_VERSION }}
         run: |
           envsubst < deploy/pr-environment/postgres-cluster.template.yaml | kubectl apply -f -
 
@@ -209,15 +211,15 @@ jobs:
           DB_PASSWORD: ${{ steps.db-password.outputs.password }}
           SERVICE_ACCOUNT_ROLE_ARN: ${{ vars.KEEPERHUB_STAGING_SERVICE_ACCOUNT_ROLE_ARN }}
         run: |
-          envsubst < deploy/pr-environment/values.template.yaml > /tmp/values-pr-${{ env.PR_NUMBER }}.yaml
+          envsubst < deploy/pr-environment/values.template.yaml > ${{ github.workspace }}/values-pr-${{ env.PR_NUMBER }}.yaml
           echo "Generated Helm values:"
-          cat /tmp/values-pr-${{ env.PR_NUMBER }}.yaml
+          cat ${{ github.workspace }}/values-pr-${{ env.PR_NUMBER }}.yaml
 
       - name: Deploy Keeperhub application with Helm
         uses: bitovi/github-actions-deploy-eks-helm@v1.2.10
         with:
           cluster-name: ${{ env.CLUSTER_NAME }}
-          config-files: /tmp/values-pr-${{ env.PR_NUMBER }}.yaml
+          config-files: ${{ github.workspace }}/values-pr-${{ env.PR_NUMBER }}.yaml
           chart-path: techops-services/common
           namespace: ${{ env.NAMESPACE }}
           timeout: 10m0s

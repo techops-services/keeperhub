@@ -22,7 +22,7 @@ spec:
     spec:
       containers:
         - name: localstack
-          image: localstack/localstack:3.0
+          image: localstack/localstack:latest
           ports:
             - containerPort: 4566
               name: edge
@@ -41,23 +41,33 @@ spec:
               value: "us-east-1"
           resources:
             requests:
-              memory: "128Mi"
-              cpu: "50m"
-            limits:
               memory: "256Mi"
-              cpu: "200m"
-          livenessProbe:
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          startupProbe:
             httpGet:
               path: /_localstack/health
               port: 4566
             initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /_localstack/health
+              port: 4566
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /_localstack/health
               port: 4566
-            initialDelaySeconds: 5
             periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 3
 
 ---
 apiVersion: v1
@@ -108,7 +118,7 @@ spec:
               attempt=0
 
               while [ $attempt -lt $max_attempts ]; do
-                if wget -q --spider http://localstack:4566/_localstack/health; then
+                if curl -sf http://localstack:4566/_localstack/health > /dev/null 2>&1; then
                   echo "LocalStack is ready!"
                   break
                 fi

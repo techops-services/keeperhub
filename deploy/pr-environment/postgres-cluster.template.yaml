@@ -1,5 +1,5 @@
 # PostgreSQL Cluster using CloudNativePG for PR environment
-# Variables to be replaced: ${PR_NUMBER}, ${DB_PASSWORD}
+# Variables to be replaced: ${PR_NUMBER}, ${DB_PASSWORD}, ${PG_VERSION}
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -7,6 +7,9 @@ metadata:
   namespace: pr-${PR_NUMBER}
 spec:
   instances: 1
+
+  # PostgreSQL version
+  imageName: ghcr.io/cloudnative-pg/postgresql:${PG_VERSION}
 
   # Bootstrap configuration
   bootstrap:
