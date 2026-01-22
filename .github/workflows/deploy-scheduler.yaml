@@ -97,8 +97,8 @@ jobs:
             ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:scheduler-latest
           cache-from: |
             type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-app
-            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:scheduler-latest
-          cache-to: type=inline
+            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-scheduler
+          cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-scheduler,mode=max
 
       - name: Build, tag, and push workflow-runner image to ECR
         id: build-workflow-runner
@@ -114,7 +114,8 @@ jobs:
             ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:workflow-runner-latest
           cache-from: |
             type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-app
-          cache-to: type=inline
+            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-workflow-runner
+          cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-workflow-runner,mode=max
 
       # Re-tag existing images when builds are skipped (creates new tag pointing to -latest)
       - name: Re-tag scheduler image if build skipped
