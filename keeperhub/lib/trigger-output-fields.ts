@@ -63,12 +63,13 @@ export function getEventTriggerOutputFields(
     ];
 
     // Add each event parameter as an output field
+    // Args are deserialized: uint/int types are BigInt, bool is boolean, strings/addresses are strings
     for (const input of event.inputs) {
       const paramName = input.name || "unnamed";
       const indexed = input.indexed ? " (indexed)" : "";
       outputFields.push({
         field: `args.${paramName}`,
-        description: `Event parameter: ${input.type}${indexed}`,
+        description: `Event parameter: ${input.type}${indexed} (deserialized: ${input.type.includes("uint") || input.type.includes("int") ? "BigInt" : input.type === "bool" ? "boolean" : "string"})`,
       });
     }
 
