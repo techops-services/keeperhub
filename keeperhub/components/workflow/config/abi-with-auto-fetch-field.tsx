@@ -324,8 +324,6 @@ export function AbiWithAutoFetchField({
       }
 
       setError(null);
-      const fetchKey = `${contractAddress.toLowerCase()}-${network}`;
-      lastFetchedRef.current = fetchKey;
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Failed to fetch ABI";
@@ -407,59 +405,6 @@ export function AbiWithAutoFetchField({
     }
   };
 
-  // Auto-fetch ABI when contract address and network are valid
-  useEffect(() => {
-    // Clear any pending timeout
-    if (fetchTimeoutRef.current) {
-      clearTimeout(fetchTimeoutRef.current);
-    }
-
-    // Don't auto-fetch if:
-    // - Manual mode is enabled
-    // - Already loading
-    // - Invalid address or missing network
-    // - Already fetched for this combination
-    if (
-      useManualAbi ||
-      isLoading ||
-      !isValidAddress ||
-      !network ||
-      lastFetchedRef.current === `${contractAddress.toLowerCase()}-${network}`
-    ) {
-      return;
-    }
-
-    // Debounce the fetch to avoid too many requests while typing
-    fetchTimeoutRef.current = setTimeout(() => {
-      handleFetchAbi(true);
-    }, 500);
-
-    return () => {
-      if (fetchTimeoutRef.current) {
-        clearTimeout(fetchTimeoutRef.current);
-      }
-    };
-  }, [
-    contractAddress,
-    network,
-    isValidAddress,
-    useManualAbi,
-    isLoading,
-    handleFetchAbi,
-  ]);
-
-  // Reset last fetched ref when contract address or network changes significantly
-  useEffect(() => {
-    const currentKey = `${contractAddress.toLowerCase()}-${network}`;
-    if (
-      lastFetchedRef.current &&
-      lastFetchedRef.current !== currentKey &&
-      value
-    ) {
-      lastFetchedRef.current = "";
-    }
-  }, [contractAddress, network, value]);
-
   const handleManualToggle = (checked: boolean) => {
     setUseManualAbi(checked);
     setError(null);
@@ -472,7 +417,7 @@ export function AbiWithAutoFetchField({
           disabled={
             disabled || isLoading || !isValidAddress || !network || useManualAbi
           }
-          onClick={handleButtonClick}
+          onClick={handleFetchAbi}
           size="sm"
           type="button"
           variant="outline"
