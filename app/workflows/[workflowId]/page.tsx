@@ -18,6 +18,7 @@ import {
 import type { IntegrationType } from "@/lib/types/integration";
 import {
   currentWorkflowIdAtom,
+  currentWorkflowDescriptionAtom,
   currentWorkflowNameAtom,
   currentWorkflowVisibilityAtom,
   edgesAtom,
@@ -117,6 +118,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   const setEdges = useSetAtom(edgesAtom);
   const setCurrentWorkflowId = useSetAtom(currentWorkflowIdAtom);
   const setCurrentWorkflowName = useSetAtom(currentWorkflowNameAtom);
+  const setCurrentWorkflowDescription = useSetAtom(currentWorkflowDescriptionAtom);
   const updateNodeData = useSetAtom(updateNodeDataAtom);
   const setHasUnsavedChanges = useSetAtom(hasUnsavedChangesAtom);
   const [workflowNotFound, setWorkflowNotFound] = useAtom(workflowNotFoundAtom);
@@ -360,6 +362,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
       setEdges(workflow.edges);
       setCurrentWorkflowId(workflow.id);
       setCurrentWorkflowName(workflow.name);
+      setCurrentWorkflowDescription(workflow.description || "");
       setCurrentWorkflowVisibility(
         (workflow.visibility as WorkflowVisibility) ?? "private"
       );
