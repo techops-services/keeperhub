@@ -289,6 +289,14 @@ export const auth = betterAuth({
     user: {
       create: {
         after: async (user) => {
+          // Skip organization creation for anonymous users
+          // Anonymous users have name "Anonymous" and temp- prefixed emails
+          const isAnonymous =
+            user.name === "Anonymous" || user.email?.startsWith("temp-");
+          if (isAnonymous) {
+            return;
+          }
+
           // Generate unique slug from user name/email
           const baseName = user.name || user.email?.split("@")[0] || "User";
           const slug = `${baseName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${nanoid(6)}`;

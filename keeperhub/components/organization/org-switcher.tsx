@@ -29,8 +29,14 @@ export function OrgSwitcher() {
   const [open, setOpen] = useState(false);
   const [manageModalOpen, setManageModalOpen] = useState(false);
 
-  // Don't show anything if user is not logged in
-  if (!session?.user) {
+  // Don't show anything if user is not logged in or is anonymous
+  // Anonymous users have name "Anonymous" and temp- prefixed emails
+  const isAnonymous =
+    !session?.user ||
+    session.user.name === "Anonymous" ||
+    session.user.email?.startsWith("temp-");
+
+  if (isAnonymous) {
     return null;
   }
 
