@@ -1,0 +1,8 @@
+{
+  "enabledMcpjsonServers": [
+    "terraform",
+    "mcp-obsidian",
+    "chrome-devtools",
+    "memory"
+  ]
+}
