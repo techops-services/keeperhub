@@ -197,6 +197,10 @@ env:
     type: parameterStore
     name: scheduler-service-api-key
     parameter_name: /eks/maker-staging/keeperhub-scheduler/keeperhub-api-key
+  HUB_SERVICE_API_KEY:
+    type: parameterStore
+    name: hub-service-api-key
+    parameter_name: /eks/maker-staging/keeperhub-hub/keeperhub-api-key
 
 externalSecrets:
   clusterSecretStoreName: maker-staging

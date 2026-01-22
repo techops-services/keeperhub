@@ -256,6 +256,7 @@ export function ManageOrgsModal({
   // Create organization state
   const [orgName, setOrgName] = useState("");
   const [orgSlug, setOrgSlug] = useState("");
+  const [orgSlugManuallyEdited, setOrgSlugManuallyEdited] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
 
   // Invite state
@@ -432,9 +433,14 @@ export function ManageOrgsModal({
 
   const handleOrgNameChange = (value: string) => {
     setOrgName(value);
-    if (!orgSlug) {
+    if (!orgSlugManuallyEdited) {
       setOrgSlug(value.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
     }
+  };
+
+  const handleOrgSlugChange = (value: string) => {
+    setOrgSlug(value);
+    setOrgSlugManuallyEdited(true);
   };
 
   const handleCreateOrg = async () => {
@@ -460,6 +466,7 @@ export function ManageOrgsModal({
         toast.success(`Organization "${orgName}" created`);
         setOrgName("");
         setOrgSlug("");
+        setOrgSlugManuallyEdited(false);
         setShowCreateForm(false);
         router.refresh();
       }
@@ -711,7 +718,9 @@ export function ManageOrgsModal({
                           <Input
                             disabled={createLoading}
                             id="org-slug"
-                            onChange={(e) => setOrgSlug(e.target.value)}
+                            onChange={(e) =>
+                              handleOrgSlugChange(e.target.value)
+                            }
                             placeholder="acme-inc"
                             value={orgSlug}
                           />
@@ -724,6 +733,7 @@ export function ManageOrgsModal({
                               setShowCreateForm(false);
                               setOrgName("");
                               setOrgSlug("");
+                              setOrgSlugManuallyEdited(false);
                             }}
                             variant="outline"
                           >

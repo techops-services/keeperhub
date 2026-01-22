@@ -27,6 +27,11 @@ export type SavedWorkflow = WorkflowData & {
   createdAt: string;
   updatedAt: string;
   isOwner?: boolean;
+  // start custom KeeperHub code
+  featured?: boolean;
+  category?: string | null;
+  featuredOrder?: number;
+  // end custom KeeperHub code
 };
 
 // API error class
@@ -441,8 +446,11 @@ export const workflowApi = {
   // Get all workflows
   getAll: () => apiCall<SavedWorkflow[]>("/api/workflows"),
   // start custom KeeperHub code
-  // Get public workflows
+  // Get public workflows (non-featured)
   getPublic: () => apiCall<SavedWorkflow[]>("/api/workflows/public"),
+  // Get featured workflows
+  getFeatured: () =>
+    apiCall<SavedWorkflow[]>("/api/workflows/public?featured=true"),
   // end custom KeeperHub code
 
   // Get a specific workflow

@@ -104,6 +104,7 @@ export async function GET(request: Request) {
         isEnabled: chains.isEnabled,
         createdAt: chains.createdAt,
         updatedAt: chains.updatedAt,
+        gasConfig: chains.gasConfig,
       })
       .from(chains);
 

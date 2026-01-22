@@ -57,6 +57,7 @@ class HttpService {
       Authorization: `Bearer ${this.accessToken}`,
       "Content-Type": "application/json",
       "X-Internal-Token": KEEPERHUB_API_KEY,
+      "X-Service-Key": KEEPERHUB_API_KEY,
       ...extraHeaders,
     };
   }

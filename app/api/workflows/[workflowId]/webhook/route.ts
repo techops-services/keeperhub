@@ -78,7 +78,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
-// biome-ignore lint/nursery/useMaxParams: Background execution requires all workflow context
 async function executeWorkflowBackground(
   executionId: string,
   workflowId: string,

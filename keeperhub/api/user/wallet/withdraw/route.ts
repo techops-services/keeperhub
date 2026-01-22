@@ -3,7 +3,16 @@ import { ethers } from "ethers";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { apiError } from "@/keeperhub/lib/api-error";
-import { initializeParaSigner } from "@/keeperhub/lib/para/wallet-helpers";
+import {
+  getOrganizationWalletAddress,
+  initializeParaSigner,
+} from "@/keeperhub/lib/para/wallet-helpers";
+import { getGasStrategy } from "@/keeperhub/lib/web3/gas-strategy";
+import { getNonceManager } from "@/keeperhub/lib/web3/nonce-manager";
+import {
+  type TransactionContext,
+  withNonceSession,
+} from "@/keeperhub/lib/web3/transaction-manager";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { chains } from "@/lib/db/schema";
@@ -34,11 +43,19 @@ function handleTransferError(error: unknown) {
   return null;
 }
 
+type TransferOptions = {
+  nonce: number;
+  gasLimit: bigint;
+  maxFeePerGas: bigint;
+  maxPriorityFeePerGas: bigint;
+};
+
 async function executeERC20Transfer(
   signer: ethers.Signer,
   tokenAddress: string,
   amount: string,
-  recipient: string
+  recipient: string,
+  options: TransferOptions
 ): Promise<string> {
   const contract = new ethers.Contract(
     tokenAddress,
@@ -47,7 +64,12 @@ async function executeERC20Transfer(
   );
   const decimals = await contract.decimals();
   const amountWei = ethers.parseUnits(amount, decimals);
-  const tx = await contract.transfer(recipient, amountWei);
+  const tx = await contract.transfer(recipient, amountWei, {
+    nonce: options.nonce,
+    gasLimit: options.gasLimit,
+    maxFeePerGas: options.maxFeePerGas,
+    maxPriorityFeePerGas: options.maxPriorityFeePerGas,
+  });
   console.log(`[Withdraw] Transaction sent: ${tx.hash}`);
   const receipt = await tx.wait();
   return receipt.hash;
@@ -56,12 +78,17 @@ async function executeERC20Transfer(
 async function executeNativeTransfer(
   signer: ethers.Signer,
   amount: string,
-  recipient: string
+  recipient: string,
+  options: TransferOptions
 ): Promise<string> {
   const amountWei = ethers.parseEther(amount);
   const tx = await signer.sendTransaction({
     to: recipient,
     value: amountWei,
+    nonce: options.nonce,
+    gasLimit: options.gasLimit,
+    maxFeePerGas: options.maxFeePerGas,
+    maxPriorityFeePerGas: options.maxPriorityFeePerGas,
   });
   console.log(`[Withdraw] Transaction sent: ${tx.hash}`);
   const receipt = await tx.wait();
@@ -161,26 +188,127 @@ export async function POST(request: Request) {
     }
 
     const chain = chainResult[0];
+    const rpcUrl = chain.defaultPrimaryRpc;
 
-    // 4. Initialize Para signer
-    console.log(
-      `[Withdraw] Initializing signer for org ${organizationId} on chain ${chain.name}`
-    );
-    const signer = await initializeParaSigner(
+    // 4. Get wallet address for nonce management
+    const walletAddress = await getOrganizationWalletAddress(organizationId);
+
+    // Generate a unique execution ID for this API call
+    const executionId = `withdraw-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+
+    // Build transaction context
+    const txContext: TransactionContext = {
       organizationId,
-      chain.defaultPrimaryRpc
+      executionId,
+      chainId,
+      rpcUrl,
+      triggerType: "manual",
+    };
+
+    // Execute transaction with nonce management
+    const result = await withNonceSession(
+      txContext,
+      walletAddress,
+      async (session) => {
+        const nonceManager = getNonceManager();
+        const gasStrategy = getGasStrategy();
+
+        // Initialize Para signer
+        console.log(
+          `[Withdraw] Initializing signer for org ${organizationId} on chain ${chain.name}`
+        );
+        const signer = await initializeParaSigner(organizationId, rpcUrl);
+        const provider = signer.provider;
+
+        if (!provider) {
+          throw new Error("Signer has no provider");
+        }
+
+        // Get nonce from session
+        const nonce = nonceManager.getNextNonce(session);
+
+        // Estimate gas based on transfer type
+        let estimatedGas: bigint;
+        if (tokenAddress) {
+          const contract = new ethers.Contract(
+            tokenAddress,
+            ERC20_TRANSFER_ABI,
+            signer
+          );
+          const decimals = await contract.decimals();
+          const amountWei = ethers.parseUnits(amount, decimals);
+          estimatedGas = await contract.transfer.estimateGas(
+            recipient,
+            amountWei
+          );
+        } else {
+          const amountWei = ethers.parseEther(amount);
+          estimatedGas = await provider.estimateGas({
+            from: walletAddress,
+            to: recipient,
+            value: amountWei,
+          });
+        }
+
+        // Get gas configuration from strategy
+        const gasConfig = await gasStrategy.getGasConfig(
+          provider,
+          "manual",
+          estimatedGas,
+          chainId
+        );
+
+        console.log("[Withdraw] Gas config:", {
+          estimatedGas: estimatedGas.toString(),
+          gasLimit: gasConfig.gasLimit.toString(),
+          maxFeePerGas: `${ethers.formatUnits(gasConfig.maxFeePerGas, "gwei")} gwei`,
+          maxPriorityFeePerGas:
+            ethers.formatUnits(gasConfig.maxPriorityFeePerGas, "gwei") +
+            " gwei",
+        });
+
+        const transferOptions: TransferOptions = {
+          nonce,
+          gasLimit: gasConfig.gasLimit,
+          maxFeePerGas: gasConfig.maxFeePerGas,
+          maxPriorityFeePerGas: gasConfig.maxPriorityFeePerGas,
+        };
+
+        // Execute transfer
+        const txHash = tokenAddress
+          ? await executeERC20Transfer(
+              signer,
+              tokenAddress,
+              amount,
+              recipient,
+              transferOptions
+            )
+          : await executeNativeTransfer(
+              signer,
+              amount,
+              recipient,
+              transferOptions
+            );
+
+        // Record and confirm transaction
+        await nonceManager.recordTransaction(
+          session,
+          nonce,
+          txHash,
+          undefined,
+          gasConfig.maxFeePerGas.toString()
+        );
+        await nonceManager.confirmTransaction(txHash);
+
+        console.log(`[Withdraw] Transaction confirmed: ${txHash}`);
+
+        return { txHash };
+      }
     );
-
-    // 5. Execute transfer
-    const txHash = tokenAddress
-      ? await executeERC20Transfer(signer, tokenAddress, amount, recipient)
-      : await executeNativeTransfer(signer, amount, recipient);
-
-    console.log(`[Withdraw] Transaction confirmed: ${txHash}`);
 
     return NextResponse.json({
       success: true,
-      txHash,
+      txHash: result.txHash,
       chainId,
       tokenAddress: tokenAddress || null,
       amount,

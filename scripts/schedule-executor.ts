@@ -150,6 +150,12 @@ async function processScheduledWorkflow(
     return;
   }
 
+  // Verify workflow is enabled (double-check in case it was disabled after dispatch)
+  if (!workflow.enabled) {
+    console.log(`[Executor] Workflow disabled, skipping: ${workflowId}`);
+    return;
+  }
+
   // Verify schedule exists and is enabled
   const schedule = await db.query.workflowSchedules.findFirst({
     where: eq(workflowSchedules.id, scheduleId),

@@ -291,20 +291,6 @@ Prometheus metrics are prefixed with `keeperhub_` and use snake_case:
 | `plugin.action.errors` | `keeperhub_plugin_action_errors_total` | counter |
 | `api.errors.total` | `keeperhub_api_errors_total` | counter |
 
-### Default Node.js Metrics
-
-When Prometheus collector is enabled, default Node.js metrics are also collected:
-- `keeperhub_nodejs_heap_size_total_bytes`
-- `keeperhub_nodejs_heap_size_used_bytes`
-- `keeperhub_nodejs_external_memory_bytes`
-- `keeperhub_nodejs_active_handles_total`
-- `keeperhub_nodejs_active_requests_total`
-- `keeperhub_nodejs_eventloop_lag_seconds`
-- `keeperhub_process_cpu_*`
-- `keeperhub_process_resident_memory_bytes`
-
----
-
 ## Structured Log Format (Console Collector)
 
 When using console collector, metrics are emitted as structured JSON (CloudWatch/Datadog compatible):
