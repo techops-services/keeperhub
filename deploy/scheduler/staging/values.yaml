@@ -79,6 +79,10 @@ env:
     type: parameterStore
     name: integration-encryption-key
     parameter_name: /eks/maker-staging/keeperhub/integration-encryption-key
+  SENDGRID_API_KEY:
+    type: parameterStore
+    name: sendgrid-api-key
+    parameter_name: /eks/maker-staging/keeper-app/sendgrid-api-key
 
 externalSecrets:
   clusterSecretStoreName: maker-staging
