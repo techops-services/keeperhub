@@ -67,9 +67,17 @@ export function getEventTriggerOutputFields(
     for (const input of event.inputs) {
       const paramName = input.name || "unnamed";
       const indexed = input.indexed ? " (indexed)" : "";
+      let deserializedType: string;
+      if (input.type.includes("uint") || input.type.includes("int")) {
+        deserializedType = "BigInt";
+      } else if (input.type === "bool") {
+        deserializedType = "boolean";
+      } else {
+        deserializedType = "string";
+      }
       outputFields.push({
         field: `args.${paramName}`,
-        description: `Event parameter: ${input.type}${indexed} (deserialized: ${input.type.includes("uint") || input.type.includes("int") ? "BigInt" : input.type === "bool" ? "boolean" : "string"})`,
+        description: `Event parameter: ${input.type}${indexed} (deserialized: ${deserializedType})`,
       });
     }
 

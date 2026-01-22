@@ -9,6 +9,9 @@ const {
 } = require("../config/environment.js");
 const Redis = require("ioredis");
 
+// Regex pattern for matching fixed-size arrays (e.g., uint256[5])
+const FIXED_ARRAY_PATTERN = /^(.+)\[(\d+)\]$/;
+
 class EvmChain extends AbstractChain {
   /**
    * Creates a new EvmChain
@@ -166,10 +169,9 @@ class EvmChain extends AbstractChain {
     }
 
     // Handle fixed-size arrays (e.g., uint256[5])
-    const fixedArrayMatch = type.match(/^(.+)\[(\d+)\]$/);
+    const fixedArrayMatch = type.match(FIXED_ARRAY_PATTERN);
     if (fixedArrayMatch) {
       const baseType = fixedArrayMatch[1];
-      const size = Number.parseInt(fixedArrayMatch[2], 10);
       if (Array.isArray(value)) {
         return {
           value: value.map(
@@ -210,12 +212,14 @@ class EvmChain extends AbstractChain {
         components.forEach((component, index) => {
           const fieldName = component.name || `field${index}`;
           // Try to get value by name first, then by index
-          const fieldValue =
-            value[fieldName] !== undefined
-              ? value[fieldName]
-              : Array.isArray(value)
-                ? value[index]
-                : Object.values(value)[index];
+          let fieldValue;
+          if (value[fieldName] !== undefined) {
+            fieldValue = value[fieldName];
+          } else if (Array.isArray(value)) {
+            fieldValue = value[index];
+          } else {
+            fieldValue = Object.values(value)[index];
+          }
           tupleValue[fieldName] = this.serializeArg(
             fieldValue,
             component.type,
