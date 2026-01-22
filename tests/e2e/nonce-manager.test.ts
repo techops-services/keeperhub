@@ -48,6 +48,9 @@ const TEST_WALLET = "0x1234567890AbCdEf1234567890AbCdEf12345678";
 const TEST_WALLET_NORMALIZED = TEST_WALLET.toLowerCase();
 const TEST_CHAIN_ID = 11_155_111; // Sepolia
 
+// Regex patterns for assertions (at top level for performance)
+const FAILED_LOCK_REGEX = /Failed to acquire nonce lock/;
+
 // Mock provider that returns controlled nonce values
 function createMockProvider(transactionCount: number) {
   return {
@@ -671,5 +674,169 @@ describe.skipIf(shouldSkip)("Nonce Manager E2E", () => {
 
       await manager.endSession(session);
     }, 15_000);
+  });
+
+  describe("Dedicated Connection Lock Cleanup", () => {
+    it("should release advisory lock when dedicated connection is closed (crash simulation)", async () => {
+      const manager1 = new NonceManager();
+      const provider = createMockProvider(5);
+
+      // Start first session
+      const { session: session1 } = await manager1.startSession(
+        TEST_WALLET,
+        TEST_CHAIN_ID,
+        `${testExecutionId}_crash`,
+        provider as any
+      );
+
+      // Verify lock is held
+      const locksBefore = await db
+        .select()
+        .from(walletLocks)
+        .where(
+          and(
+            eq(walletLocks.walletAddress, TEST_WALLET_NORMALIZED),
+            eq(walletLocks.chainId, TEST_CHAIN_ID)
+          )
+        );
+      expect(locksBefore[0]?.lockedBy).toBe(`${testExecutionId}_crash`);
+
+      // Simulate crash: close the dedicated connection directly without calling endSession
+      // This simulates what happens when a process crashes - the connection dies
+      if (session1._lockConnection) {
+        await session1._lockConnection.end();
+        session1._lockConnection = undefined;
+      }
+
+      // Clear the lock metadata (simulating what would happen after stale detection)
+      await db
+        .update(walletLocks)
+        .set({ lockedBy: null, lockedAt: null })
+        .where(
+          and(
+            eq(walletLocks.walletAddress, TEST_WALLET_NORMALIZED),
+            eq(walletLocks.chainId, TEST_CHAIN_ID)
+          )
+        );
+
+      // Now a new session should be able to acquire the lock immediately
+      const manager2 = new NonceManager({
+        maxLockRetries: 3, // Low retries since it should work immediately
+        lockRetryDelayMs: 50,
+      });
+
+      const { session: session2 } = await manager2.startSession(
+        TEST_WALLET,
+        TEST_CHAIN_ID,
+        `${testExecutionId}_recovery`,
+        provider as any
+      );
+
+      // Should have acquired lock successfully
+      expect(session2.executionId).toBe(`${testExecutionId}_recovery`);
+
+      // Verify new lock holder in database
+      const locksAfter = await db
+        .select()
+        .from(walletLocks)
+        .where(
+          and(
+            eq(walletLocks.walletAddress, TEST_WALLET_NORMALIZED),
+            eq(walletLocks.chainId, TEST_CHAIN_ID)
+          )
+        );
+      expect(locksAfter[0]?.lockedBy).toBe(`${testExecutionId}_recovery`);
+
+      await manager2.endSession(session2);
+    }, 15_000);
+
+    it("should block concurrent sessions on same wallet/chain until lock is released", async () => {
+      const manager1 = new NonceManager();
+      const manager2 = new NonceManager({
+        maxLockRetries: 5,
+        lockRetryDelayMs: 100,
+      });
+      const provider = createMockProvider(5);
+
+      // Start first session
+      const { session: session1 } = await manager1.startSession(
+        TEST_WALLET,
+        TEST_CHAIN_ID,
+        `${testExecutionId}_holder`,
+        provider as any
+      );
+
+      // Try to start second session - should block until first releases
+      const session2Promise = manager2.startSession(
+        TEST_WALLET,
+        TEST_CHAIN_ID,
+        `${testExecutionId}_waiter`,
+        provider as any
+      );
+
+      // Wait a bit to let second session start retrying
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      // Release first session
+      await manager1.endSession(session1);
+
+      // Second session should now succeed
+      const { session: session2 } = await session2Promise;
+      expect(session2.executionId).toBe(`${testExecutionId}_waiter`);
+
+      await manager2.endSession(session2);
+    }, 15_000);
+
+    it("should fail to acquire lock if holder never releases within timeout", async () => {
+      const manager1 = new NonceManager();
+      const manager2 = new NonceManager({
+        maxLockRetries: 3, // Very low
+        lockRetryDelayMs: 50,
+        lockTimeoutMs: 60_000, // But timeout is 60s, so stale detection won't help
+      });
+      const provider = createMockProvider(5);
+
+      // Start first session and hold the lock
+      const { session: session1 } = await manager1.startSession(
+        TEST_WALLET,
+        TEST_CHAIN_ID,
+        `${testExecutionId}_blocker`,
+        provider as any
+      );
+
+      // Second session should fail after retries (lock is not stale)
+      await expect(
+        manager2.startSession(
+          TEST_WALLET,
+          TEST_CHAIN_ID,
+          `${testExecutionId}_blocked`,
+          provider as any
+        )
+      ).rejects.toThrow(FAILED_LOCK_REGEX);
+
+      // Cleanup
+      await manager1.endSession(session1);
+    }, 15_000);
+
+    it("should have _lockConnection on session object", async () => {
+      const manager = new NonceManager();
+      const provider = createMockProvider(5);
+
+      const { session } = await manager.startSession(
+        TEST_WALLET,
+        TEST_CHAIN_ID,
+        testExecutionId,
+        provider as any
+      );
+
+      // Session should have a dedicated lock connection
+      expect(session._lockConnection).toBeDefined();
+      expect(typeof session._lockConnection?.end).toBe("function");
+
+      await manager.endSession(session);
+
+      // After ending, _lockConnection should be undefined
+      expect(session._lockConnection).toBeUndefined();
+    });
   });
 });

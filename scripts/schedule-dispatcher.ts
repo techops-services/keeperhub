@@ -18,11 +18,11 @@ import { CronExpressionParser } from "cron-parser";
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { getDatabaseUrl } from "../lib/db/connection-utils";
 import { workflowSchedules, workflows } from "../lib/db/schema";
 
 // Database connection
-const connectionString =
-  process.env.DATABASE_URL || "postgres://localhost:5432/workflow";
+const connectionString = getDatabaseUrl();
 const queryClient = postgres(connectionString);
 const db = drizzle(queryClient, { schema: { workflowSchedules, workflows } });
 
