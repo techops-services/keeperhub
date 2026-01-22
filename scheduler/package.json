@@ -1,0 +1,14 @@
+{
+  "name": "keeperhub-scheduler",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal dependencies for scheduler scripts (schedule-dispatcher, job-spawner)",
+  "dependencies": {
+    "@aws-sdk/client-sqs": "^3.948.0",
+    "@kubernetes/client-node": "^1.4.0",
+    "cron-parser": "^5.4.0",
+    "drizzle-orm": "^0.44.7",
+    "nanoid": "^5.1.6",
+    "postgres": "^3.4.7"
+  }
+}
