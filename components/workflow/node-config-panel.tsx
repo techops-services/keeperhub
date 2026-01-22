@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { CodeEditor } from "@/components/ui/code-editor";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api-client";
 import { integrationsAtom } from "@/lib/integrations-store";
 import type { IntegrationType } from "@/lib/types/integration";
@@ -33,6 +34,7 @@ import { generateWorkflowCode } from "@/lib/workflow-codegen";
 import {
   clearNodeStatusesAtom,
   clearWorkflowAtom,
+  currentWorkflowDescriptionAtom,
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
   deleteEdgeAtom,
@@ -156,6 +158,9 @@ export const PanelInner = () => {
   const [currentWorkflowId] = useAtom(currentWorkflowIdAtom);
   const [currentWorkflowName, setCurrentWorkflowName] = useAtom(
     currentWorkflowNameAtom
+  );
+  const [currentWorkflowDescription, setCurrentWorkflowDescription] = useAtom(
+    currentWorkflowDescriptionAtom
   );
   const isOwner = useAtomValue(isWorkflowOwnerAtom);
   const updateNodeData = useSetAtom(updateNodeDataAtom);
@@ -513,6 +518,22 @@ export const PanelInner = () => {
     }
   };
 
+  const handleUpdateWorkflowDescription = async (newDescription: string) => {
+    setCurrentWorkflowDescription(newDescription);
+
+    // Save to database if workflow exists
+    if (currentWorkflowId) {
+      try {
+        await api.workflow.update(currentWorkflowId, {
+          description: newDescription,
+        });
+      } catch (error) {
+        console.error("Failed to update workflow description:", error);
+        toast.error("Failed to update workflow description");
+      }
+    }
+  };
+
   const handleRefreshRuns = async () => {
     setIsRefreshing(true);
     try {
@@ -652,6 +673,21 @@ export const PanelInner = () => {
                   id="workflow-name"
                   onChange={(e) => handleUpdateWorkspaceName(e.target.value)}
                   value={currentWorkflowName}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="ml-1" htmlFor="workflow-description">
+                  Description
+                </Label>
+                <Textarea
+                  disabled={!isOwner}
+                  id="workflow-description"
+                  onChange={(e) =>
+                    handleUpdateWorkflowDescription(e.target.value)
+                  }
+                  placeholder="Optional workflow description"
+                  rows={3}
+                  value={currentWorkflowDescription}
                 />
               </div>
               <div className="space-y-2">

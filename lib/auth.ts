@@ -289,8 +289,11 @@ export const auth = betterAuth({
     user: {
       create: {
         after: async (user) => {
-          // Skip organization creation for anonymous users (they have no email)
-          if (!user.email) {
+          // Skip organization creation for anonymous users
+          // Anonymous users have name "Anonymous" and temp- prefixed emails
+          const isAnonymous =
+            user.name === "Anonymous" || user.email?.startsWith("temp-");
+          if (isAnonymous) {
             return;
           }
 
