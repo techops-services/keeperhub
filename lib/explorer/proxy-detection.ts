@@ -39,7 +39,7 @@ const EIP1967_ADMIN_SLOT =
 
 /**
  * EIP-1822 storage slot for implementation address
- * keccak256("PROXIABLE") - 1
+ * keccak256("PROXIABLE")
  */
 const EIP1822_IMPLEMENTATION_SLOT =
   "0xc5f16f0fcc639fa48a6947836d9850f504798523bf8c9a3a87d5876cf622bcf7";
@@ -52,35 +52,53 @@ const EIP1167_PREFIX = "0x363d3d373d3d3d363d73";
 const EIP1167_SUFFIX = "0x5af43d82803e903d91602b57fd5bf3";
 
 /**
- * Check if a contract is an EIP-1967 proxy
+ * Extract address from storage value
+ * Storage values are 32 bytes, addresses are 20 bytes (last 40 hex chars)
  */
-async function checkEip1967Proxy(
+function extractAddressFromStorage(storageValue: string): string | null {
+  const hexValue = storageValue.startsWith("0x")
+    ? storageValue.slice(2)
+    : storageValue;
+
+  if (hexValue.length < 40) {
+    return null;
+  }
+
+  try {
+    const address = ethers.getAddress(`0x${hexValue.slice(-40)}`);
+    if (address && address !== ethers.ZeroAddress) {
+      return address;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+/**
+ * Check EIP-1967 proxy with admin slot detection
+ * Returns both implementation address and whether admin slot is set (OpenZeppelin pattern)
+ */
+async function checkEip1967WithAdmin(
   provider: ethers.Provider,
   contractAddress: string
-): Promise<string | null> {
+): Promise<{ implementation: string | null; hasAdmin: boolean }> {
   try {
-    const implementation = await provider.getStorage(
-      contractAddress,
-      EIP1967_IMPLEMENTATION_SLOT
-    );
+    // Fetch implementation and admin slots in parallel
+    const [implementationStorage, adminStorage] = await Promise.all([
+      provider.getStorage(contractAddress, EIP1967_IMPLEMENTATION_SLOT),
+      provider.getStorage(contractAddress, EIP1967_ADMIN_SLOT),
+    ]);
 
-    // Storage values are 32 bytes (64 hex chars + 0x = 66 chars)
-    // Addresses are 20 bytes (40 hex chars)
-    // Extract the last 40 hex characters (after removing 0x prefix)
-    const hexValue = implementation.startsWith("0x")
-      ? implementation.slice(2)
-      : implementation;
+    const implementation = extractAddressFromStorage(implementationStorage);
+    const admin = extractAddressFromStorage(adminStorage);
 
-    if (hexValue.length < 40) {
-      return null;
-    }
-
-    const address = ethers.getAddress(`0x${hexValue.slice(-40)}`);
-
-    // Check if it's a valid non-zero address
-    if (address && address !== ethers.ZeroAddress) {
-      console.log(`[Proxy Detection] EIP-1967 proxy detected: ${address}`);
-      return address;
+    if (implementation) {
+      const proxyType = admin ? "openzeppelin" : "eip1967";
+      console.log(
+        `[Proxy Detection] ${proxyType} proxy detected: ${implementation}`
+      );
+      return { implementation, hasAdmin: !!admin };
     }
   } catch (error) {
     console.log(
@@ -88,7 +106,7 @@ async function checkEip1967Proxy(
       error instanceof Error ? error.message : "Unknown error"
     );
   }
-  return null;
+  return { implementation: null, hasAdmin: false };
 }
 
 /**
@@ -104,20 +122,8 @@ async function checkEip1822Proxy(
       EIP1822_IMPLEMENTATION_SLOT
     );
 
-    // Storage values are 32 bytes (64 hex chars + 0x = 66 chars)
-    // Addresses are 20 bytes (40 hex chars)
-    const hexValue = implementation.startsWith("0x")
-      ? implementation.slice(2)
-      : implementation;
-
-    if (hexValue.length < 40) {
-      return null;
-    }
-
-    const address = ethers.getAddress(`0x${hexValue.slice(-40)}`);
-
-    // Check if it's a valid non-zero address
-    if (address && address !== ethers.ZeroAddress) {
+    const address = extractAddressFromStorage(implementation);
+    if (address) {
       console.log(`[Proxy Detection] EIP-1822 proxy detected: ${address}`);
       return address;
     }
@@ -131,48 +137,9 @@ async function checkEip1822Proxy(
 }
 
 /**
- * Check if a contract is an OpenZeppelin proxy
- * OpenZeppelin uses the same storage slot as EIP-1967
- */
-async function checkOpenZeppelinProxy(
-  provider: ethers.Provider,
-  contractAddress: string
-): Promise<string | null> {
-  // OpenZeppelin uses EIP-1967 storage slots, so we check the same slot
-  // but also verify there's an admin slot (OpenZeppelin specific)
-  try {
-    const implementation = await checkEip1967Proxy(provider, contractAddress);
-    if (implementation) {
-      // Check for admin slot (OpenZeppelin TransparentProxy pattern)
-      const admin = await provider.getStorage(
-        contractAddress,
-        EIP1967_ADMIN_SLOT
-      );
-      const adminHex = admin.startsWith("0x") ? admin.slice(2) : admin;
-      const adminAddress =
-        adminHex.length >= 40
-          ? ethers.getAddress(`0x${adminHex.slice(-40)}`)
-          : ethers.ZeroAddress;
-
-      if (adminAddress && adminAddress !== ethers.ZeroAddress) {
-        console.log(
-          `[Proxy Detection] OpenZeppelin proxy detected: ${implementation}`
-        );
-        return implementation;
-      }
-    }
-  } catch (error) {
-    console.log(
-      "[Proxy Detection] OpenZeppelin check failed:",
-      error instanceof Error ? error.message : "Unknown error"
-    );
-  }
-  return null;
-}
-
-/**
  * Check if a contract is a Gnosis Safe proxy
- * Gnosis Safe proxies use delegatecall to a master copy
+ * Gnosis Safe proxies use delegatecall to a master copy stored at slot 0
+ * Verifies by calling VERSION() on the master copy
  */
 async function checkGnosisSafeProxy(
   provider: ethers.Provider,
@@ -181,23 +148,34 @@ async function checkGnosisSafeProxy(
   try {
     // Gnosis Safe proxies store the master copy address at storage slot 0
     const masterCopy = await provider.getStorage(contractAddress, "0x0");
-    const masterHex = masterCopy.startsWith("0x")
-      ? masterCopy.slice(2)
-      : masterCopy;
-    if (masterHex.length < 40) {
+    const address = extractAddressFromStorage(masterCopy);
+
+    if (!address) {
       return null;
     }
-    const address = ethers.getAddress(`0x${masterHex.slice(-40)}`);
 
-    if (address && address !== ethers.ZeroAddress) {
-      // Verify it's actually a Safe by checking if the master copy has Safe-like bytecode
-      const code = await provider.getCode(address);
-      if (code && code.length > 2) {
-        // Safe contracts typically have substantial bytecode
-        // This is a heuristic check
-        console.log(`[Proxy Detection] Gnosis Safe proxy detected: ${address}`);
+    // Verify it's a Safe by calling VERSION() - all Safe contracts implement this
+    const safeInterface = new ethers.Interface([
+      "function VERSION() view returns (string)",
+    ]);
+
+    try {
+      const result = await provider.call({
+        to: address,
+        data: safeInterface.encodeFunctionData("VERSION"),
+      });
+
+      // If call succeeds and returns data, it's likely a Safe
+      if (result && result !== "0x") {
+        const version = safeInterface.decodeFunctionResult("VERSION", result);
+        console.log(
+          `[Proxy Detection] Gnosis Safe proxy detected: ${address} (version: ${version[0]})`
+        );
         return address;
       }
+    } catch {
+      // VERSION() call failed - not a Safe contract
+      return null;
     }
   } catch (error) {
     console.log(
@@ -246,7 +224,7 @@ async function checkEip1167Proxy(
 
 /**
  * Detect proxy contract via RPC calls
- * Checks multiple proxy standards in order of likelihood
+ * Checks multiple proxy standards with parallel execution where possible
  *
  * @param contractAddress - The contract address to check
  * @param chainId - The chain ID
@@ -271,28 +249,33 @@ export async function detectProxyViaRpc(
 
   const provider = new ethers.JsonRpcProvider(rpcConfig.primaryRpcUrl);
 
-  // Check proxy patterns in order of likelihood
-  // 1. EIP-1967 (most common)
-  const eip1967Impl = await checkEip1967Proxy(provider, contractAddress);
-  if (eip1967Impl) {
+  // Run common checks in parallel:
+  // - EIP-1967 with admin (covers both EIP-1967 and OpenZeppelin)
+  // - EIP-1167 (uses getCode, independent of storage checks)
+  const [eip1967Result, eip1167Impl] = await Promise.all([
+    checkEip1967WithAdmin(provider, contractAddress),
+    checkEip1167Proxy(provider, contractAddress),
+  ]);
+
+  // Check EIP-1967/OpenZeppelin result first (most common)
+  if (eip1967Result.implementation) {
     return {
       isProxy: true,
-      implementationAddress: eip1967Impl,
-      proxyType: "eip1967",
+      implementationAddress: eip1967Result.implementation,
+      proxyType: eip1967Result.hasAdmin ? "openzeppelin" : "eip1967",
     };
   }
 
-  // 2. OpenZeppelin (uses EIP-1967 slots but with admin)
-  const ozImpl = await checkOpenZeppelinProxy(provider, contractAddress);
-  if (ozImpl) {
+  // Check EIP-1167 result
+  if (eip1167Impl) {
     return {
       isProxy: true,
-      implementationAddress: ozImpl,
-      proxyType: "openzeppelin",
+      implementationAddress: eip1167Impl,
+      proxyType: "eip1167",
     };
   }
 
-  // 3. EIP-1822 (UUPS)
+  // Check EIP-1822 (UUPS) - less common, separate call
   const eip1822Impl = await checkEip1822Proxy(provider, contractAddress);
   if (eip1822Impl) {
     return {
@@ -302,17 +285,7 @@ export async function detectProxyViaRpc(
     };
   }
 
-  // 4. EIP-1167 (minimal proxy/clone)
-  const eip1167Impl = await checkEip1167Proxy(provider, contractAddress);
-  if (eip1167Impl) {
-    return {
-      isProxy: true,
-      implementationAddress: eip1167Impl,
-      proxyType: "eip1167",
-    };
-  }
-
-  // 5. Gnosis Safe (less common, more expensive check)
+  // Check Gnosis Safe (least common, requires contract call to verify)
   const gnosisImpl = await checkGnosisSafeProxy(provider, contractAddress);
   if (gnosisImpl) {
     return {
