@@ -4,9 +4,9 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { member, organization } from "@/lib/db/schema";
 
-interface UpdateOrganizationNameRequest {
+type UpdateOrganizationNameRequest = {
   name?: string;
-}
+};
 
 export async function PATCH(
   request: Request,

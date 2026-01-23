@@ -954,7 +954,7 @@ export function ManageOrgsModal({
                           </>
                         )}
                         {isManagedOrgActive && (
-                          <span className="rounded-full bg-green-100 min-w-11 px-2 py-0.5 text-green-700 text-xs">
+                          <span className="min-w-11 rounded-full bg-green-100 px-2 py-0.5 text-green-700 text-xs">
                             Active
                           </span>
                         )}
