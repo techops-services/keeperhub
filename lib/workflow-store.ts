@@ -43,6 +43,9 @@ export const isLoadingAtom = atom(false);
 export const isGeneratingAtom = atom(false);
 export const currentWorkflowIdAtom = atom<string | null>(null);
 export const currentWorkflowNameAtom = atom<string>("");
+// start custom keeperhub code //
+export const currentWorkflowDescriptionAtom = atom<string>("");
+// end keeperhub code //
 export const currentWorkflowVisibilityAtom =
   atom<WorkflowVisibility>("private");
 export const isWorkflowOwnerAtom = atom<boolean>(true); // Whether current user owns this workflow

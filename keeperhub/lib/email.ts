@@ -88,8 +88,8 @@ export async function sendInvitationEmail(
   const { inviteeEmail, inviterName, organizationName, role, inviteLink } =
     data;
 
-  const baseUrl = inviteLink.split("/accept-invite")[0];
-  const logoUrl = `${baseUrl}/keeperhub_logo.png`;
+  const logoUrl =
+    "https://raw.githubusercontent.com/techops-services/keeperhub/staging/public/keeperhub_logo.png";
 
   const subject = `You've been invited to join ${organizationName} on KeeperHub`;
 

@@ -1,18 +1,20 @@
+# Helm values template for PR environments
+# Variables to be replaced: ${PR_NUMBER}, ${ECR_REGISTRY}, ${IMAGE_TAG}, ${DB_PASSWORD}
+
 shared_env: &shared_env
   DATABASE_URL:
-    type: parameterStore
-    name: db-url
-    parameter_name: /eks/maker-prod/keeperhub/db-url
+    type: kv
+    value: "postgresql://keeperhub:${DB_PASSWORD}@keeperhub-pr-${PR_NUMBER}-db-rw.pr-${PR_NUMBER}.svc.cluster.local:5432/keeperhub"
   CHAIN_RPC_CONFIG:
     type: parameterStore
     name: chain-rpc-config
-    parameter_name: /eks/maker-prod/keeperhub/chain-rpc-config
+    parameter_name: /eks/maker-staging/keeperhub/chain-rpc-config
 
-replicaCount: 2
+replicaCount: 1
 
 service:
   enabled: true
-  name: keeperhub-prod
+  name: keeperhub-pr-${PR_NUMBER}
   port: 3000
   type: ClusterIP
   containerPort: 3000
@@ -23,7 +25,7 @@ service:
 ingress:
   enabled: true
   hosts:
-    - workflows.keeperhub.com
+    - app-pr-${PR_NUMBER}.keeperhub.com
   annotations:
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
@@ -36,7 +38,7 @@ httpBasicAuth:
   enabled: false
 
 image:
-  repository: ${ECR_REGISTRY}/keeperhub-prod
+  repository: ${ECR_REGISTRY}/keeperhub-staging
   tag: app-${IMAGE_TAG}
   pullPolicy: Always
 
@@ -44,7 +46,7 @@ deployment:
   enabled: true
   initContainers:
     - name: db-migration
-      image: "${ECR_REGISTRY}/keeperhub-prod:migrator-${IMAGE_TAG}"
+      image: "${ECR_REGISTRY}/keeperhub-staging:migrator-${IMAGE_TAG}"
       command:
         - /bin/sh
         - -c
@@ -61,7 +63,7 @@ serviceAccount:
   create: true
   annotations:
     eks.amazonaws.com/role-arn: ${SERVICE_ACCOUNT_ROLE_ARN}
-  name: keeperhub-prod
+  name: keeperhub-pr-${PR_NUMBER}
   rules:
     - apiGroups: ["batch"]
       resources: ["jobs"]
@@ -77,38 +79,32 @@ podAnnotations:
   reloader.stakater.com/auto: "true"
 
 serviceMonitors:
-  enabled: true
-  monitors:
-    - name: metrics
-      port: http
-      path: /api/metrics
-      interval: 30s
-      scrapeTimeout: 10s
+  enabled: false
 
 resources:
   limits:
-    memory: 2Gi
+    memory: 1Gi
   requests:
-    cpu: 100m
-    memory: 512Mi
+    cpu: 1m
+    memory: 256Mi
 
 env:
   <<: *shared_env
   LOG_LEVEL:
     type: kv
-    value: "info"
+    value: "debug"
   METRICS_COLLECTOR:
     type: kv
     value: "prometheus"
   NODE_OPTIONS:
     type: kv
-    value: "--enable-source-maps"
+    value: "--enable-source-maps --trace-warnings"
   HOSTNAME:
     type: kv
     value: "0.0.0.0"
   PARA_ENVIRONMENT:
     type: kv
-    value: "prod"
+    value: "beta"
   WORKFLOW_EMBEDDED_DATA_DIR:
     type: kv
     value: "/tmp/workflow-data"
@@ -117,92 +113,96 @@ env:
     value: "http://localhost:3000"
   BETTER_AUTH_URL:
     type: kv
-    value: "https://workflows.keeperhub.com"
+    value: "https://app-pr-${PR_NUMBER}.keeperhub.com"
   BETTER_AUTH_SECRET:
     type: parameterStore
     name: better-auth-secret
-    parameter_name: /eks/maker-prod/keeperhub/better-auth-secret
+    parameter_name: /eks/maker-staging/keeperhub/better-auth-secret
   OPENAI_API_KEY:
     type: parameterStore
     name: openai-api-key
-    parameter_name: /eks/maker-prod/keeperhub/openai-api-key
+    parameter_name: /eks/maker-staging/keeperhub/openai-api-key
   AI_MODEL:
     type: kv
-    value: "gpt-4o"
+    value: "gpt-4o-mini"
   PARA_API_KEY:
     type: parameterStore
     name: para-api-key
-    parameter_name: /eks/maker-prod/keeperhub/para-api-key
+    parameter_name: /eks/maker-staging/keeperhub/para-api-key
   WALLET_ENCRYPTION_KEY:
     type: parameterStore
     name: wallet-encryption-key
-    parameter_name: /eks/maker-prod/keeperhub/wallet-encryption-key
+    parameter_name: /eks/maker-staging/keeperhub/wallet-encryption-key
   INTEGRATION_ENCRYPTION_KEY:
     type: parameterStore
     name: integration-encryption-key
-    parameter_name: /eks/maker-prod/keeperhub/integration-encryption-key
+    parameter_name: /eks/maker-staging/keeperhub/integration-encryption-key
   ETHERSCAN_API_KEY:
     type: parameterStore
     name: etherscan-api-key
-    parameter_name: /eks/maker-prod/keeperhub/etherscan-api-key
+    parameter_name: /eks/maker-staging/keeper-app/etherscan-api-key
   SENDGRID_API_KEY:
     type: parameterStore
     name: sendgrid-api-key
-    parameter_name: /eks/maker-prod/keeperhub/sendgrid-api-key
+    parameter_name: /eks/maker-staging/keeper-app/sendgrid-api-key
   FROM_ADDRESS:
     type: kv
     value: "noreply@keeperhub.com"
-  # Sentry
   SENTRY_DSN:
     type: parameterStore
     name: sentry-dsn
-    parameter_name: /eks/maker-prod/keeperhub/sentry-dsn
+    parameter_name: /eks/maker-staging/keeperhub/sentry-dsn
   NEXT_PUBLIC_SENTRY_DSN:
     type: parameterStore
     name: next-public-sentry-dsn
-    parameter_name: /eks/maker-prod/keeperhub/next-public-sentry-dsn
+    parameter_name: /eks/maker-staging/keeperhub/next-public-sentry-dsn
   SENTRY_ORG:
     type: parameterStore
     name: sentry-org
-    parameter_name: /eks/maker-prod/keeperhub/sentry-org
+    parameter_name: /eks/maker-staging/keeperhub/sentry-org
   SENTRY_PROJECT:
     type: parameterStore
     name: sentry-project
-    parameter_name: /eks/maker-prod/keeperhub/sentry-project
+    parameter_name: /eks/maker-staging/keeperhub/sentry-project
   SENTRY_AUTH_TOKEN:
     type: parameterStore
     name: sentry-auth-token
-    parameter_name: /eks/maker-prod/keeperhub/sentry-auth-token
-  # Internal service API keys for service-to-service auth
-  MCP_SERVICE_API_KEY:
-    type: parameterStore
-    name: mcp-service-api-key
-    parameter_name: /eks/maker-prod/keeperhub-mcp/keeperhub-api-key
-  EVENTS_SERVICE_API_KEY:
-    type: parameterStore
-    name: events-service-api-key
-    parameter_name: /eks/maker-prod/keeperhub-events/keeperhub-api-key
-  SCHEDULER_SERVICE_API_KEY:
-    type: parameterStore
-    name: scheduler-service-api-key
-    parameter_name: /eks/maker-prod/keeperhub-scheduler/keeperhub-api-key
-  HUB_SERVICE_API_KEY:
-    type: parameterStore
-    name: hub-service-api-key
-    parameter_name: /eks/maker-prod/keeperhub-hub/keeperhub-api-key
+    parameter_name: /eks/maker-staging/keeperhub/sentry-auth-token
   FEEDBACK_SERVICE_URL:
     type: kv
     value: "http://keeperhub-feedback-common.keeperhub:3001/api/feedback"
   FEEDBACK_API_KEY:
     type: parameterStore
     name: feedback-api-key
-    parameter_name: /eks/maker-prod/keeperhub-feedback/feedback-api-key
+    parameter_name: /eks/maker-staging/keeperhub-feedback/feedback-api-key
+  MCP_SERVICE_API_KEY:
+    type: parameterStore
+    name: mcp-service-api-key
+    parameter_name: /eks/maker-staging/keeperhub-mcp/keeperhub-api-key
+  EVENTS_SERVICE_API_KEY:
+    type: parameterStore
+    name: events-service-api-key
+    parameter_name: /eks/maker-staging/keeperhub-events/keeperhub-api-key
+  SCHEDULER_SERVICE_API_KEY:
+    type: parameterStore
+    name: scheduler-service-api-key
+    parameter_name: /eks/maker-staging/keeperhub-scheduler/keeperhub-api-key
+  # PR-specific SQS configuration (using LocalStack)
+  AWS_REGION:
+    type: kv
+    value: "us-east-1"
+  AWS_ENDPOINT:
+    type: kv
+    value: "http://localstack.pr-${PR_NUMBER}.svc.cluster.local:4566"
+  SQS_QUEUE_URL:
+    type: kv
+    value: "http://localstack.pr-${PR_NUMBER}.svc.cluster.local:4566/000000000000/keeperhub-workflow-queue"
 
 externalSecrets:
-  clusterSecretStoreName: maker-prod
+  clusterSecretStoreName: maker-staging
 
 livenessProbe:
-  initialDelaySeconds: 10
+  initialDelaySeconds: 15
   periodSeconds: 30
   tcpSocket:
     port: 3000
@@ -217,21 +217,24 @@ cronjob:
   jobs:
     - name: schedule-dispatcher
       image:
-        repository: ${ECR_REGISTRY}/keeperhub-prod
+        repository: ${ECR_REGISTRY}/keeperhub-staging
         tag: scheduler-${IMAGE_TAG}
       env:
         AWS_REGION:
           type: kv
           value: "us-east-1"
+        AWS_ENDPOINT:
+          type: kv
+          value: "http://localstack.pr-${PR_NUMBER}.svc.cluster.local:4566"
         SQS_QUEUE_URL:
           type: kv
-          value: "https://sqs.us-east-1.amazonaws.com/${AWS_ACCOUNT_ID}/keeperhub-workflow-queue-prod"
+          value: "http://localstack.pr-${PR_NUMBER}.svc.cluster.local:4566/000000000000/keeperhub-workflow-queue"
         RUNNER_IMAGE:
           type: kv
-          value: "${ECR_REGISTRY}/keeperhub-prod:workflow-runner-${IMAGE_TAG}"
+          value: "${ECR_REGISTRY}/keeperhub-staging:workflow-runner-${IMAGE_TAG}"
         K8S_NAMESPACE:
           type: kv
-          value: "keeperhub"
+          value: "pr-${PR_NUMBER}"
         JOB_TTL_SECONDS:
           type: kv
           value: "3600"
@@ -239,24 +242,23 @@ cronjob:
           type: kv
           value: "300"
         DATABASE_URL:
-          type: parameterStore
-          name: db-url
-          parameter_name: /eks/maker-prod/keeperhub/db-url
+          type: kv
+          value: "postgresql://keeperhub:${DB_PASSWORD}@keeperhub-pr-${PR_NUMBER}-db-rw.pr-${PR_NUMBER}.svc.cluster.local:5432/keeperhub"
         CHAIN_RPC_CONFIG:
           type: parameterStore
           name: chain-rpc-config
-          parameter_name: /eks/maker-prod/keeperhub/chain-rpc-config
+          parameter_name: /eks/maker-staging/keeperhub/chain-rpc-config
         SCHEDULER_SERVICE_API_KEY:
           type: parameterStore
           name: scheduler-service-api-key
-          parameter_name: /eks/maker-prod/keeperhub-scheduler/keeperhub-api-key
+          parameter_name: /eks/maker-staging/keeperhub-scheduler/keeperhub-api-key
       schedule: "* * * * *"
       command: ["/bin/sh"]
       args:
         - "-c"
         - "echo $(date) - [Dispatcher] Starting && tsx scripts/schedule-dispatcher.ts && echo $(date) - [Dispatcher] Completed"
       serviceAccount:
-        name: "keeperhub-prod"
+        name: "keeperhub-pr-${PR_NUMBER}"
       resources:
         requests:
           memory: "128Mi"

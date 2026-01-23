@@ -1,0 +1,304 @@
+name: Deploy PR Environment
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    branches:
+      - staging
+      - production
+
+jobs:
+  check-label:
+    runs-on: ubuntu-latest
+    outputs:
+      should-deploy: ${{ steps.check.outputs.labeled }}
+    steps:
+      - name: Check for deploy-pr-environment label
+        id: check
+        run: |
+          if [[ "${{ contains(github.event.pull_request.labels.*.name, 'deploy-pr-environment') }}" == "true" ]]; then
+            echo "labeled=true" >> $GITHUB_OUTPUT
+          else
+            echo "labeled=false" >> $GITHUB_OUTPUT
+          fi
+
+  deploy:
+    needs: check-label
+    if: needs.check-label.outputs.should-deploy == 'true'
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      REGION: us-east-2
+      CLUSTER_NAME: maker-staging
+      NAMESPACE: pr-${{ github.event.pull_request.number }}
+      AWS_ECR_NAME: keeperhub-staging
+      PG_VERSION: "16"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.REGION }}
+
+      - name: Login to AWS ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract commit hash
+        id: vars
+        run: |
+          echo "sha_short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Check if images exist or need rebuild
+        id: check-images
+        run: |
+          ECR_REGISTRY="${{ steps.login-ecr.outputs.registry }}"
+          IMAGE_TAG="${{ steps.vars.outputs.sha_short }}"
+
+          # Check if app image exists
+          if aws ecr describe-images --repository-name ${{ env.AWS_ECR_NAME }} --image-ids imageTag=app-${IMAGE_TAG} --region ${{ env.REGION }} >/dev/null 2>&1; then
+            echo "app-exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "app-exists=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Check if migrator image exists
+          if aws ecr describe-images --repository-name ${{ env.AWS_ECR_NAME }} --image-ids imageTag=migrator-${IMAGE_TAG} --region ${{ env.REGION }} >/dev/null 2>&1; then
+            echo "migrator-exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "migrator-exists=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Check if scheduler image exists
+          if aws ecr describe-images --repository-name ${{ env.AWS_ECR_NAME }} --image-ids imageTag=scheduler-${IMAGE_TAG} --region ${{ env.REGION }} >/dev/null 2>&1; then
+            echo "scheduler-exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "scheduler-exists=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Check if workflow-runner image exists
+          if aws ecr describe-images --repository-name ${{ env.AWS_ECR_NAME }} --image-ids imageTag=workflow-runner-${IMAGE_TAG} --region ${{ env.REGION }} >/dev/null 2>&1; then
+            echo "workflow-runner-exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "workflow-runner-exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and push app image
+        if: steps.check-images.outputs.app-exists != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          target: runner
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:app-${{ steps.vars.outputs.sha_short }}
+          cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-app
+          cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-app,mode=max
+
+      - name: Build and push migrator image
+        if: steps.check-images.outputs.migrator-exists != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          target: migrator
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:migrator-${{ steps.vars.outputs.sha_short }}
+          cache-from: |
+            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-app
+            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-migrator
+          cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-migrator,mode=max
+
+      - name: Build and push scheduler image
+        if: steps.check-images.outputs.scheduler-exists != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          target: scheduler
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:scheduler-${{ steps.vars.outputs.sha_short }}
+          cache-from: |
+            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-app
+            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-scheduler
+          cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-scheduler,mode=max
+
+      - name: Build and push workflow-runner image
+        if: steps.check-images.outputs.workflow-runner-exists != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          target: workflow-runner
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:workflow-runner-${{ steps.vars.outputs.sha_short }}
+          cache-from: |
+            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-app
+            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-workflow-runner
+          cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-workflow-runner,mode=max
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.REGION }}
+
+      - name: Create namespace
+        run: |
+          kubectl create namespace ${{ env.NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+          kubectl label namespace ${{ env.NAMESPACE }} pr-number=${{ env.PR_NUMBER }} --overwrite
+
+      - name: Generate database password
+        id: db-password
+        run: |
+          # Check if secret already exists
+          if kubectl get secret keeperhub-pr-${{ env.PR_NUMBER }}-db-credentials -n ${{ env.NAMESPACE }} >/dev/null 2>&1; then
+            echo "Secret already exists, retrieving existing password"
+            DB_PASSWORD=$(kubectl get secret keeperhub-pr-${{ env.PR_NUMBER }}-db-credentials -n ${{ env.NAMESPACE }} -o jsonpath='{.data.password}' | base64 -d)
+          else
+            echo "Generating new password"
+            DB_PASSWORD=$(openssl rand -base64 32)
+          fi
+          echo "::add-mask::$DB_PASSWORD"
+          echo "password=$DB_PASSWORD" >> $GITHUB_OUTPUT
+
+      - name: Deploy PostgreSQL cluster
+        env:
+          DB_PASSWORD: ${{ steps.db-password.outputs.password }}
+          PG_VERSION: ${{ env.PG_VERSION }}
+        run: |
+          envsubst < deploy/pr-environment/postgres-cluster.template.yaml | kubectl apply -f -
+
+      - name: Wait for PostgreSQL to be ready
+        run: |
+          echo "Waiting for PostgreSQL cluster to be ready..."
+          kubectl wait --for=condition=ready cluster/keeperhub-pr-${{ env.PR_NUMBER }}-db \
+            -n ${{ env.NAMESPACE }} \
+            --timeout=10m || {
+            echo "PostgreSQL cluster failed to become ready. Checking status:"
+            kubectl describe cluster keeperhub-pr-${{ env.PR_NUMBER }}-db -n ${{ env.NAMESPACE }}
+            exit 1
+          }
+
+      - name: Deploy LocalStack
+        run: |
+          kubectl delete job create-sqs-queue -n ${{ env.NAMESPACE }} --ignore-not-found
+          envsubst '$PR_NUMBER' < deploy/pr-environment/localstack.template.yaml | kubectl apply -f -
+
+      - name: Wait for LocalStack to be ready
+        run: |
+          echo "Waiting for LocalStack to be ready..."
+          kubectl wait --for=condition=ready pod -l app=localstack,pr=pr-${{ env.PR_NUMBER }} \
+            -n ${{ env.NAMESPACE }} \
+            --timeout=5m || {
+            echo "LocalStack failed to become ready. Checking status:"
+            kubectl get pods -l app=localstack -n ${{ env.NAMESPACE }}
+            kubectl logs -l app=localstack -n ${{ env.NAMESPACE }} --tail=50
+            exit 1
+          }
+
+      - name: Prepare Helm values
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ steps.vars.outputs.sha_short }}
+          DB_PASSWORD: ${{ steps.db-password.outputs.password }}
+          SERVICE_ACCOUNT_ROLE_ARN: ${{ vars.KEEPERHUB_STAGING_SERVICE_ACCOUNT_ROLE_ARN }}
+        run: |
+          envsubst < deploy/pr-environment/values.template.yaml > ${{ github.workspace }}/values-pr-${{ env.PR_NUMBER }}.yaml
+          echo "Generated Helm values:"
+          cat ${{ github.workspace }}/values-pr-${{ env.PR_NUMBER }}.yaml
+
+      - name: Deploy Keeperhub application with Helm
+        uses: bitovi/github-actions-deploy-eks-helm@v1.2.10
+        with:
+          cluster-name: ${{ env.CLUSTER_NAME }}
+          config-files: ${{ github.workspace }}/values-pr-${{ env.PR_NUMBER }}.yaml
+          chart-path: techops-services/common
+          namespace: ${{ env.NAMESPACE }}
+          timeout: 10m0s
+          name: keeperhub-pr-${{ env.PR_NUMBER }}
+          chart-repository: https://techops-services.github.io/helm-charts
+          version: 0.2.1
+          atomic: true
+
+      - name: Get deployment status
+        if: always()
+        run: |
+          echo "=== Deployment Status ==="
+          kubectl get all -n ${{ env.NAMESPACE }}
+          echo ""
+          echo "=== Ingress ==="
+          kubectl get ingress -n ${{ env.NAMESPACE }}
+
+      - name: Comment on PR
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const namespace = 'pr-' + prNumber;
+            const url = `https://app-pr-${prNumber}.keeperhub.com`;
+
+            const comment = `## 🚀 PR Environment Deployed
+
+            Your PR environment has been successfully deployed!
+
+            **Environment Details:**
+            - 🌐 URL: [${url}](${url})
+            - 📦 Namespace: \`${namespace}\`
+            - 🏷️ Image Tag: \`${{ steps.vars.outputs.sha_short }}\`
+            - 🔢 Commit: \`${{ github.event.pull_request.head.sha }}\`
+
+            **Components:**
+            - ✅ Keeperhub Application
+            - ✅ PostgreSQL Database (isolated instance)
+            - ✅ LocalStack (SQS emulation)
+
+            The environment will be automatically cleaned up when this PR is closed or merged.
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: prNumber,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Comment on PR (failure)
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+
+            const comment = `## ❌ PR Environment Deployment Failed
+
+            The PR environment deployment encountered an error.
+
+            Please check the [workflow logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.
+
+            Common issues:
+            - Database initialization timeout
+            - Image build failures
+            - Resource constraints
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: prNumber,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });

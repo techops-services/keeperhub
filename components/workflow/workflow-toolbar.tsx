@@ -1201,28 +1201,6 @@ function ToolbarActions({
         )}
       </ButtonGroup>
 
-      {/* start custom keeperhub code // */}
-      {state.nodes?.find((node) => node?.data?.type === "trigger")?.data?.config
-        ?.triggerType === WorkflowTriggerEnum.EVENT && (
-        <>
-          {/* Enable Workflow Switch - Desktop Horizontal */}
-          <div className="hidden items-center gap-2 lg:flex">
-            <label
-              className="font-medium text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              htmlFor="enable-workflow-switch"
-            >
-              {state.isEnabled ? "Deactivate" : "Activate"} workflow
-            </label>
-            <Switch
-              checked={state.isEnabled}
-              id="enable-workflow-switch"
-              onCheckedChange={actions.handleToggleEnabled}
-            />
-          </div>
-        </>
-      )}
-      {/* end custom keeperhub code // */}
-
       {/* Add Step - Desktop Horizontal */}
       <ButtonGroup className="hidden lg:flex" orientation="horizontal">
         <Button

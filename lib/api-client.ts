@@ -482,6 +482,14 @@ export const workflowApi = {
       method: "POST",
     }),
 
+  // start custom keeperhub code //
+  claim: (id: string) =>
+    apiCall<SavedWorkflow>(`/api/workflows/${id}/claim`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
+  // end keeperhub code //
+
   // Get current workflow state
   getCurrent: () => apiCall<WorkflowData>("/api/workflows/current"),
 

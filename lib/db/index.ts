@@ -1,6 +1,7 @@
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { getDatabaseUrl } from "./connection-utils";
 import {
   accounts,
   apiKeys,
@@ -54,8 +55,7 @@ const schema = {
   userRpcPreferencesRelations,
 };
 
-const connectionString =
-  process.env.DATABASE_URL || "postgres://localhost:5432/workflow";
+const connectionString = getDatabaseUrl();
 
 // For migrations
 export const migrationClient = postgres(connectionString, { max: 1 });

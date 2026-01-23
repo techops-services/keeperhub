@@ -58,16 +58,26 @@ app.post("/workflow/:id/execute", async (req, res) => {
 
   const { id } = req.params;
 
+  logger.log(
+    `Executing workflow ${id} with payload: ${JSON.stringify(payload, null, 2)}`
+  );
+
   try {
+    // Wrap payload in { input: payload } format to match API expectations
+    // This allows the API to use body.input || {} consistently
+    const wrappedPayload = { input: payload };
+
     const response = await httpService.post(
       `${KEEPERHUB_API_URL}/api/workflow/${id}/execute`,
-      payload,
+      wrappedPayload,
       {
         "X-Internal-Execution": "true",
       }
     );
 
-    logger.log(`Workflow ${id} executed successfully - response: ${response}`);
+    logger.log(
+      `Workflow ${id} executed successfully - response: ${JSON.stringify(response, null, 2)}`
+    );
 
     return res.status(200).json(response);
   } catch (error) {

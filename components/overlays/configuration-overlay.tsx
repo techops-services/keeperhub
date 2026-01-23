@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { CodeEditor } from "@/components/ui/code-editor";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api-client";
 import { integrationsAtom } from "@/lib/integrations-store";
 import type { IntegrationType } from "@/lib/types/integration";
@@ -29,6 +30,7 @@ import { generateWorkflowCode } from "@/lib/workflow-codegen";
 import {
   clearNodeStatusesAtom,
   clearWorkflowAtom,
+  currentWorkflowDescriptionAtom,
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
   deleteEdgeAtom,
@@ -92,6 +94,9 @@ export function ConfigurationOverlay({ overlayId }: ConfigurationOverlayProps) {
   const [currentWorkflowId] = useAtom(currentWorkflowIdAtom);
   const [currentWorkflowName, setCurrentWorkflowName] = useAtom(
     currentWorkflowNameAtom
+  );
+  const [currentWorkflowDescription, setCurrentWorkflowDescription] = useAtom(
+    currentWorkflowDescriptionAtom
   );
   const isOwner = useAtomValue(isWorkflowOwnerAtom);
 
@@ -314,6 +319,21 @@ export function ConfigurationOverlay({ overlayId }: ConfigurationOverlayProps) {
     }
   };
 
+  // Handle updating workflow description
+  const handleUpdateWorkflowDescription = async (newDescription: string) => {
+    setCurrentWorkflowDescription(newDescription);
+
+    if (currentWorkflowId) {
+      try {
+        await api.workflow.update(currentWorkflowId, {
+          description: newDescription,
+        });
+      } catch (error) {
+        console.error("Failed to update workflow description:", error);
+      }
+    }
+  };
+
   // Handle clear workflow
   const handleClearWorkflow = () => {
     push(ConfirmOverlay, {
@@ -457,6 +477,19 @@ export function ConfigurationOverlay({ overlayId }: ConfigurationOverlayProps) {
                   disabled
                   id="workflow-id"
                   value={currentWorkflowId || "Not saved"}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="workflow-description">Description</Label>
+                <Textarea
+                  disabled={!isOwner}
+                  id="workflow-description"
+                  onChange={(e) =>
+                    handleUpdateWorkflowDescription(e.target.value)
+                  }
+                  placeholder="Optional workflow description"
+                  rows={3}
+                  value={currentWorkflowDescription}
                 />
               </div>
               {!isOwner && (

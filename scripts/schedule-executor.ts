@@ -24,6 +24,7 @@ import { CronExpressionParser } from "cron-parser";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { getDatabaseUrl } from "../lib/db/connection-utils";
 import {
   workflowExecutions,
   workflowSchedules,
@@ -32,8 +33,7 @@ import {
 import { generateId } from "../lib/utils/id";
 
 // Database connection
-const connectionString =
-  process.env.DATABASE_URL || "postgres://localhost:5432/workflow";
+const connectionString = getDatabaseUrl();
 const queryClient = postgres(connectionString);
 const db = drizzle(queryClient, {
   schema: { workflows, workflowExecutions, workflowSchedules },

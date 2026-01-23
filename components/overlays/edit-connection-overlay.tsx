@@ -218,7 +218,7 @@ export function EditConnectionOverlay({
     }
   };
 
-  const handleTest = async () => {
+  const _handleTest = async () => {
     const hasNewConfig = Object.values(config).some((v) => v && v.length > 0);
 
     try {
@@ -356,13 +356,16 @@ export function EditConnectionOverlay({
           onClick: handleDelete,
           disabled: saving || testing,
         },
-        {
-          label: "Test",
-          variant: "outline",
-          onClick: handleTest,
-          loading: testing,
-          disabled: saving,
-        },
+        // start custom keeperhub code //
+        // Test button hidden - unreliable functionality
+        // {
+        //   label: "Test",
+        //   variant: "outline",
+        //   onClick: handleTest,
+        //   loading: testing,
+        //   disabled: saving,
+        // },
+        // end keeperhub code //
         { label: "Update", onClick: handleSave, loading: saving },
       ]}
       overlayId={overlayId}
