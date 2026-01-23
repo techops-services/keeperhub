@@ -77,7 +77,7 @@ export function OrgSwitcher() {
                     }}
                   >
                     <Check
-                      className={`mr-2 h-4 w-4 ${
+                      className={`mr-1 h-4 w-4 ${
                         organization.id === org.id ? "opacity-100" : "opacity-0"
                       }`}
                     />
