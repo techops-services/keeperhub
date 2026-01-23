@@ -28,7 +28,7 @@ import {
 } from "./step-registry";
 import type { StepContext } from "./steps/step-handler";
 import { triggerStep } from "./steps/trigger";
-import { getErrorMessageAsync } from "./utils";
+import { deserializeEventTriggerData, getErrorMessageAsync } from "./utils";
 import type { WorkflowEdge, WorkflowNode } from "./workflow-store";
 
 // end keeperhub code //
@@ -486,7 +486,20 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
           }
         } else if (triggerInput && Object.keys(triggerInput).length > 0) {
           // Use provided trigger input
-          triggerData = { ...triggerData, ...triggerInput };
+          // start custom keeperhub code //
+          // For Event triggers, deserialize { value: string, type: string } objects
+          // back to appropriate types (BigInt for uint/int, boolean for bool, etc.)
+          if (triggerType === "Event") {
+            const deserialized = deserializeEventTriggerData(triggerInput);
+            triggerData = {
+              ...triggerData,
+              ...deserialized,
+            };
+          } else {
+            // For other trigger types, use as-is
+            triggerData = { ...triggerData, ...triggerInput };
+          }
+          // end custom keeperhub code //
         }
 
         // Build context for logging

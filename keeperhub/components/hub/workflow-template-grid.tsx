@@ -1,5 +1,6 @@
 "use client";
 
+import { Eye } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -108,14 +109,20 @@ export function WorkflowTemplateGrid({
               )}
             </CardHeader>
             <CardContent className="flex-1" />
-            <CardFooter>
+            <CardFooter className="gap-2">
               <Button
-                className="w-full"
+                className="flex-1"
                 disabled={isDuplicating}
                 onClick={() => handleDuplicate(workflow.id)}
                 variant="default"
               >
                 {isDuplicating ? "Duplicating..." : "Use Template"}
+              </Button>
+              <Button
+                onClick={() => router.push(`/workflows/${workflow.id}`)}
+                variant="outline"
+              >
+                <Eye className="size-4" />
               </Button>
             </CardFooter>
           </Card>

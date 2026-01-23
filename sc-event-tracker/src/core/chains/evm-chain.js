@@ -9,6 +9,9 @@ const {
 } = require("../config/environment.js");
 const Redis = require("ioredis");
 
+// Regex pattern for matching fixed-size arrays (e.g., uint256[5])
+const FIXED_ARRAY_PATTERN = /^(.+)\[(\d+)\]$/;
+
 class EvmChain extends AbstractChain {
   /**
    * Creates a new EvmChain
@@ -101,11 +104,149 @@ class EvmChain extends AbstractChain {
   }
 
   /**
+   * Serialize a primitive value to string
+   * @param {*} value - The primitive value
+   * @returns {string} String representation
+   */
+  serializePrimitive(value) {
+    // Convert BigInt to string
+    if (typeof value === "bigint") {
+      return value.toString();
+    }
+    // Convert numbers to string to preserve precision
+    if (typeof value === "number") {
+      return value.toString();
+    }
+    // Keep strings as-is
+    if (typeof value === "string") {
+      return value;
+    }
+    // Convert boolean to string
+    if (typeof value === "boolean") {
+      return value.toString();
+    }
+    // Convert addresses and other objects to string
+    if (value && typeof value === "object") {
+      // Try toString() method first
+      if (typeof value.toString === "function") {
+        return value.toString();
+      }
+      // For objects without toString, stringify (shouldn't happen for primitives)
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return String(value);
+      }
+    }
+    // Fallback
+    return String(value);
+  }
+
+  /**
+   * Serialize an argument value with its type information
+   * @param {*} value - The argument value
+   * @param {string} type - The ABI type (e.g., "uint256", "uint256[]", "tuple")
+   * @param {Array|null} components - For tuple types, the component definitions
+   * @returns {Object} Serialized argument: { value: <serialized>, type: string }
+   */
+  serializeArg(value, type, components) {
+    // Handle arrays (e.g., uint256[], address[])
+    if (type.endsWith("[]")) {
+      const baseType = type.slice(0, -2);
+      if (Array.isArray(value)) {
+        return {
+          value: value.map(
+            (item) => this.serializeArg(item, baseType, null).value
+          ),
+          type,
+        };
+      }
+      // Fallback if not array
+      return {
+        value: this.serializePrimitive(value),
+        type,
+      };
+    }
+
+    // Handle fixed-size arrays (e.g., uint256[5])
+    const fixedArrayMatch = type.match(FIXED_ARRAY_PATTERN);
+    if (fixedArrayMatch) {
+      const baseType = fixedArrayMatch[1];
+      if (Array.isArray(value)) {
+        return {
+          value: value.map(
+            (item) => this.serializeArg(item, baseType, null).value
+          ),
+          type,
+        };
+      }
+      // Fallback if not array
+      return {
+        value: this.serializePrimitive(value),
+        type,
+      };
+    }
+
+    // Handle tuples/structs
+    if (type === "tuple" && components && Array.isArray(components)) {
+      // Tuples can be arrays or objects in ethers
+      if (Array.isArray(value)) {
+        // Unnamed tuple - array format
+        const tupleValue = {};
+        components.forEach((component, index) => {
+          const fieldName = component.name || `field${index}`;
+          tupleValue[fieldName] = this.serializeArg(
+            value[index],
+            component.type,
+            component.components
+          );
+        });
+        return {
+          value: tupleValue,
+          type,
+        };
+      }
+      if (value && typeof value === "object") {
+        // Named tuple - object format (ethers sometimes returns as object)
+        const tupleValue = {};
+        components.forEach((component, index) => {
+          const fieldName = component.name || `field${index}`;
+          // Try to get value by name first, then by index
+          let fieldValue;
+          if (value[fieldName] !== undefined) {
+            fieldValue = value[fieldName];
+          } else if (Array.isArray(value)) {
+            fieldValue = value[index];
+          } else {
+            fieldValue = Object.values(value)[index];
+          }
+          tupleValue[fieldName] = this.serializeArg(
+            fieldValue,
+            component.type,
+            component.components
+          );
+        });
+        return {
+          value: tupleValue,
+          type,
+        };
+      }
+    }
+
+    // Handle primitive types
+    return {
+      value: this.serializePrimitive(value),
+      type,
+    };
+  }
+
+  /**
    * Extracts event arguments from a parsed log into an object.
+   * Each argument is serialized as { value: string, type: string } to preserve BigInt and large numbers.
    *
    * @param {*} parsedLog - The parsed log from ethers
    * @param {Array} rawEventsAbi - The raw events ABI array
-   * @returns {Object} An object containing the event arguments
+   * @returns {Object} An object containing the event arguments, each serialized as { value, type }
    */
   extractEventArgs(parsedLog, rawEventsAbi) {
     const args = {};
@@ -116,13 +257,23 @@ class EvmChain extends AbstractChain {
     const eventAbi = rawEventsAbi.find(
       (event) => event.name === parsedLog.name
     );
+
     if (eventAbi?.inputs) {
       eventAbi.inputs.forEach((input, index) => {
-        args[input.name || `arg${index}`] = parsedLog.args[index];
+        const argValue = parsedLog.args[index];
+        const argName = input.name || `arg${index}`;
+
+        // Recursively serialize based on type
+        args[argName] = this.serializeArg(
+          argValue,
+          input.type,
+          input.components
+        );
       });
     } else {
+      // Fallback when ABI inputs not available
       parsedLog.args.forEach((arg, index) => {
-        args[`arg${index}`] = arg;
+        args[`arg${index}`] = this.serializeArg(arg, "unknown", null);
       });
     }
     return args;
@@ -140,12 +291,22 @@ class EvmChain extends AbstractChain {
     return {
       eventName: parsedLog.name,
       args,
-      blockNumber: log.blockNumber,
-      transactionHash: log.transactionHash,
-      blockHash: log.blockHash,
-      address: log.address,
-      logIndex: log.index,
-      transactionIndex: log.transactionIndex,
+      // Serialize numeric fields that could be BigInt
+      blockNumber: {
+        value: this.serializePrimitive(log.blockNumber),
+        type: "uint256",
+      },
+      transactionHash: log.transactionHash, // Already a string
+      blockHash: log.blockHash, // Already a string
+      address: log.address, // Already a string
+      logIndex: {
+        value: this.serializePrimitive(log.index),
+        type: "uint256",
+      },
+      transactionIndex: {
+        value: this.serializePrimitive(log.transactionIndex),
+        type: "uint256",
+      },
     };
   }
 
