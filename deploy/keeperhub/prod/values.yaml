@@ -190,6 +190,13 @@ env:
     type: parameterStore
     name: hub-service-api-key
     parameter_name: /eks/maker-prod/keeperhub-hub/keeperhub-api-key
+  FEEDBACK_SERVICE_URL:
+    type: kv
+    value: "http://keeperhub-feedback-common.keeperhub:3001/api/feedback"
+  FEEDBACK_API_KEY:
+    type: parameterStore
+    name: feedback-api-key
+    parameter_name: /eks/maker-prod/keeperhub-feedback/feedback-api-key
 
 externalSecrets:
   clusterSecretStoreName: maker-prod
