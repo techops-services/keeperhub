@@ -265,9 +265,9 @@ export function AbiWithAutoFetchField({
       setProxyAbi(data.proxyAbi || null);
       setProxyWarning(data.warning || null);
 
-      const useProxy = Boolean(data.warning);
-      setUseProxyAbi(useProxy);
-      onChange(useProxy ? data.proxyAbi || data.abi : data.abi);
+      // Always use implementation ABI by default when proxy is detected
+      setUseProxyAbi(false);
+      onChange(data.abi);
     },
     [contractAddress, onChange]
   );
