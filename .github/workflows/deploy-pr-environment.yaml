@@ -189,7 +189,8 @@ jobs:
 
       - name: Deploy LocalStack
         run: |
-          envsubst < deploy/pr-environment/localstack.template.yaml | kubectl apply -f -
+          kubectl delete job create-sqs-queue -n ${{ env.NAMESPACE }} --ignore-not-found
+          envsubst '$PR_NUMBER' < deploy/pr-environment/localstack.template.yaml | kubectl apply -f -
 
       - name: Wait for LocalStack to be ready
         run: |
