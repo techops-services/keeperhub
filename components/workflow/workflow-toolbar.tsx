@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { nanoid } from "nanoid";
 // start custom KeeperHub code
-import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 // end custom KeeperHub code
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
