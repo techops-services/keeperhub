@@ -233,12 +233,6 @@ class EvmChain extends AbstractChain {
       }
     }
 
-    // Handle nested tuples in arrays (e.g., tuple[])
-    if (type.startsWith("tuple") && components) {
-      // This handles tuple[] or tuple[5] cases
-      return this.serializeArg(value, type, components);
-    }
-
     // Handle primitive types
     return {
       value: this.serializePrimitive(value),

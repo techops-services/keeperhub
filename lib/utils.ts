@@ -142,8 +142,6 @@ export async function getErrorMessageAsync(error: unknown): Promise<string> {
 
   return getErrorMessage(error);
 }
-// start custom keeperhub code //
-
 /**
  * Deserialize a value from { value: string, type: string } format back to appropriate type
  * - uint* and int* types → BigInt
@@ -304,5 +302,3 @@ export function deserializeEventTriggerData(
 
   return deserialized;
 }
-
-// end custom keeperhub code //
