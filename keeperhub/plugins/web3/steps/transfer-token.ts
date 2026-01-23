@@ -49,7 +49,7 @@ export type TransferTokenInput = StepInput & TransferTokenCoreInput;
 
 /**
  * Parse token config from input and return a single token address
- * For transfers, only the first token is used (checks supported first, then custom)
+ * Supports both new (single token) and legacy (array) formats
  */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Handles multiple token config formats for backwards compatibility
 async function parseTokenAddress(
@@ -68,7 +68,24 @@ async function parseTokenAddress(
   try {
     const parsed = JSON.parse(input.tokenConfig);
 
-    // First, check for supported tokens
+    // New format: single supported token ID
+    if (parsed.supportedTokenId) {
+      const tokens = await db
+        .select({ tokenAddress: supportedTokens.tokenAddress })
+        .from(supportedTokens)
+        .where(
+          and(
+            eq(supportedTokens.chainId, chainId),
+            eq(supportedTokens.id, parsed.supportedTokenId)
+          )
+        )
+        .limit(1);
+      if (tokens[0]?.tokenAddress) {
+        return tokens[0].tokenAddress;
+      }
+    }
+
+    // Legacy format: array of supported token IDs - use first
     if (
       Array.isArray(parsed.supportedTokenIds) &&
       parsed.supportedTokenIds.length > 0
@@ -88,7 +105,12 @@ async function parseTokenAddress(
       }
     }
 
-    // Then, check custom tokens (new format with symbol)
+    // New format: single custom token
+    if (parsed.customToken?.address) {
+      return parsed.customToken.address;
+    }
+
+    // Legacy format: array of custom tokens - use first
     if (Array.isArray(parsed.customTokens) && parsed.customTokens.length > 0) {
       return parsed.customTokens[0].address;
     }

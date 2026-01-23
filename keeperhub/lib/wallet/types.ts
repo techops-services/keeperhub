@@ -119,10 +119,10 @@ export type WalletData = {
 
 /**
  * Value structure stored in workflow node config for token selection.
- * Tracks both supported tokens (by ID) and custom tokens (by address + symbol).
+ * Stores a single token - either a supported token (by ID) or a custom token (by address + symbol).
  */
 export type TokenFieldValue = {
   mode: "supported" | "custom";
-  supportedTokenIds: string[];
-  customTokens: CustomToken[];
+  supportedTokenId?: string;
+  customToken?: CustomToken;
 };

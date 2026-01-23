@@ -80,13 +80,40 @@ const web3Plugin: IntegrationPlugin = {
           description: "Whether the balance check succeeded",
         },
         {
-          field: "balances",
-          description:
-            "Array of token balances (each with balance, symbol, decimals, etc.)",
+          field: "balance",
+          description: "Token balance object",
+        },
+        {
+          field: "balance.balance",
+          description: "The token balance amount (human-readable string)",
+        },
+        {
+          field: "balance.balanceRaw",
+          description: "The token balance in raw units (string)",
+        },
+        {
+          field: "balance.symbol",
+          description: "The token symbol (e.g., USDC)",
+        },
+        {
+          field: "balance.decimals",
+          description: "The token decimals",
+        },
+        {
+          field: "balance.name",
+          description: "The token name",
+        },
+        {
+          field: "balance.tokenAddress",
+          description: "The token contract address",
         },
         {
           field: "address",
           description: "The wallet address that was checked",
+        },
+        {
+          field: "addressLink",
+          description: "Explorer link to the wallet address",
         },
         {
           field: "error",
@@ -183,6 +210,10 @@ const web3Plugin: IntegrationPlugin = {
         {
           field: "transactionHash",
           description: "The transaction hash of the successful transfer",
+        },
+        {
+          field: "transactionLink",
+          description: "Explorer link to view the transaction",
         },
         {
           field: "amount",

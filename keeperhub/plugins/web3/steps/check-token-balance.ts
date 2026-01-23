@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { ethers } from "ethers";
 import type {
   CustomToken,
@@ -49,7 +49,7 @@ type TokenBalance = {
 type CheckTokenBalanceResult =
   | {
       success: true;
-      balances: TokenBalance[];
+      balance: TokenBalance;
       address: string;
       addressLink: string;
     }
@@ -66,96 +66,184 @@ export type CheckTokenBalanceCoreInput = {
 export type CheckTokenBalanceInput = StepInput & CheckTokenBalanceCoreInput;
 
 /**
+ * Extract mode from parsed config, defaulting to "supported"
+ */
+function extractMode(parsed: unknown): "supported" | "custom" {
+  if (typeof parsed !== "object" || parsed === null) {
+    return "supported";
+  }
+
+  const config = parsed as Record<string, unknown>;
+  return config.mode === "supported" || config.mode === "custom"
+    ? (config.mode as "supported" | "custom")
+    : "supported";
+}
+
+/**
+ * Extract supported token ID from parsed config
+ * Handles both new (single) and legacy (array) formats
+ */
+function extractSupportedTokenId(parsed: unknown): string | undefined {
+  if (typeof parsed !== "object" || parsed === null) {
+    return;
+  }
+
+  const config = parsed as Record<string, unknown>;
+
+  // New format: single token ID
+  if (typeof config.supportedTokenId === "string") {
+    return config.supportedTokenId;
+  }
+
+  // Legacy format: array - use first element
+  if (
+    Array.isArray(config.supportedTokenIds) &&
+    config.supportedTokenIds.length > 0
+  ) {
+    const firstId = config.supportedTokenIds[0];
+    return typeof firstId === "string" ? firstId : undefined;
+  }
+
+  return;
+}
+
+/**
+ * Extract custom token from parsed config
+ * Handles both new (single) and legacy (array/string) formats
+ */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Handles multiple legacy formats for backwards compatibility
+function extractCustomToken(parsed: unknown): CustomToken | undefined {
+  if (typeof parsed !== "object" || parsed === null) {
+    return;
+  }
+
+  const config = parsed as Record<string, unknown>;
+
+  // New format: single custom token object
+  if (
+    config.customToken &&
+    typeof config.customToken === "object" &&
+    config.customToken !== null
+  ) {
+    const token = config.customToken as Record<string, unknown>;
+    if (typeof token.address === "string" && typeof token.symbol === "string") {
+      return { address: token.address, symbol: token.symbol };
+    }
+  }
+
+  // Legacy format: array of custom tokens - use first element
+  if (Array.isArray(config.customTokens) && config.customTokens.length > 0) {
+    const firstToken = config.customTokens[0];
+    if (
+      firstToken &&
+      typeof firstToken === "object" &&
+      typeof firstToken.address === "string" &&
+      typeof firstToken.symbol === "string"
+    ) {
+      return {
+        address: firstToken.address,
+        symbol: firstToken.symbol,
+      };
+    }
+  }
+
+  // Legacy format: array of addresses - convert first address to token
+  if (
+    Array.isArray(config.customTokenAddresses) &&
+    config.customTokenAddresses.length > 0
+  ) {
+    const address = config.customTokenAddresses.find(
+      (a): a is string => typeof a === "string" && a.trim() !== ""
+    );
+    if (address) {
+      return { address, symbol: "???" };
+    }
+  }
+
+  // Legacy format: single address string
+  if (typeof config.customTokenAddress === "string") {
+    return { address: config.customTokenAddress, symbol: "???" };
+  }
+
+  return;
+}
+
+/**
  * Parse token config from input
+ * Supports both new (single token) and legacy (array) formats
  */
 function parseTokenConfig(input: CheckTokenBalanceInput): TokenFieldValue {
   // Legacy support: if tokenAddress is provided directly, use custom mode
   if (input.tokenAddress && !input.tokenConfig) {
     return {
       mode: "custom",
-      supportedTokenIds: [],
-      customTokens: [{ address: input.tokenAddress, symbol: "???" }],
+      customToken: { address: input.tokenAddress, symbol: "???" },
     };
   }
 
   if (!input.tokenConfig) {
     return {
       mode: "supported",
-      supportedTokenIds: [],
-      customTokens: [],
     };
   }
 
   try {
     const parsed = JSON.parse(input.tokenConfig);
 
-    // Parse custom tokens - support multiple formats for backwards compatibility
-    let customTokens: CustomToken[] = [];
-    if (Array.isArray(parsed.customTokens)) {
-      customTokens = parsed.customTokens;
-    } else if (Array.isArray(parsed.customTokenAddresses)) {
-      // Legacy: convert addresses to tokens
-      customTokens = parsed.customTokenAddresses
-        .filter((addr: string) => addr && addr.trim() !== "")
-        .map((address: string) => ({ address, symbol: "???" }));
-    } else if (parsed.customTokenAddress) {
-      // Legacy: single address
-      customTokens = [{ address: parsed.customTokenAddress, symbol: "???" }];
-    }
+    const supportedTokenId = extractSupportedTokenId(parsed);
+    const customToken = extractCustomToken(parsed);
+    const mode = extractMode(parsed);
 
     return {
-      mode: parsed.mode || "supported",
-      supportedTokenIds: Array.isArray(parsed.supportedTokenIds)
-        ? parsed.supportedTokenIds
-        : [],
-      customTokens,
+      mode,
+      supportedTokenId,
+      customToken,
     };
   } catch {
     // If parsing fails and it looks like an address, treat as custom
     if (input.tokenConfig.startsWith("0x")) {
       return {
         mode: "custom",
-        supportedTokenIds: [],
-        customTokens: [{ address: input.tokenConfig, symbol: "???" }],
+        customToken: { address: input.tokenConfig, symbol: "???" },
       };
     }
     return {
       mode: "supported",
-      supportedTokenIds: [],
-      customTokens: [],
     };
   }
 }
 
 /**
- * Get token addresses to check based on config
- * Returns ALL tokens (both supported and custom)
+ * Get token address to check based on config
+ * Returns a single token address (either supported or custom)
  */
-async function getTokenAddresses(
+async function getTokenAddress(
   config: TokenFieldValue,
   chainId: number
-): Promise<string[]> {
-  const addresses: string[] = [];
-
-  // Get supported token addresses from database
-  if (config.supportedTokenIds.length > 0) {
+): Promise<string | null> {
+  // Get supported token address from database
+  if (config.supportedTokenId) {
     const tokens = await db
       .select({ tokenAddress: supportedTokens.tokenAddress })
       .from(supportedTokens)
       .where(
         and(
           eq(supportedTokens.chainId, chainId),
-          inArray(supportedTokens.id, config.supportedTokenIds)
+          eq(supportedTokens.id, config.supportedTokenId)
         )
-      );
-    addresses.push(...tokens.map((t) => t.tokenAddress));
+      )
+      .limit(1);
+    if (tokens[0]?.tokenAddress) {
+      return tokens[0].tokenAddress;
+    }
   }
 
-  // Add custom token addresses
-  addresses.push(...config.customTokens.map((t) => t.address));
+  // Get custom token address
+  if (config.customToken?.address) {
+    return config.customToken.address;
+  }
 
-  // Return unique addresses
-  return [...new Set(addresses)];
+  return null;
 }
 
 /**
@@ -235,33 +323,28 @@ async function stepHandler(
     };
   }
 
-  // Get token addresses to check
-  const tokenAddresses = await getTokenAddresses(tokenConfig, chainId);
+  // Get token address to check
+  const tokenAddress = await getTokenAddress(tokenConfig, chainId);
 
-  if (tokenAddresses.length === 0) {
+  if (!tokenAddress) {
     return {
       success: false,
-      error: "No tokens selected to check",
+      error: "No token selected to check",
     };
   }
 
   console.log(
-    "[Check Token Balance] Checking balances for tokens:",
-    tokenAddresses
+    "[Check Token Balance] Checking balance for token:",
+    tokenAddress
   );
 
-  // Validate all token addresses
-  for (const tokenAddress of tokenAddresses) {
-    if (!ethers.isAddress(tokenAddress)) {
-      console.error(
-        "[Check Token Balance] Invalid token address:",
-        tokenAddress
-      );
-      return {
-        success: false,
-        error: `Invalid token address: ${tokenAddress}`,
-      };
-    }
+  // Validate token address
+  if (!ethers.isAddress(tokenAddress)) {
+    console.error("[Check Token Balance] Invalid token address:", tokenAddress);
+    return {
+      success: false,
+      error: `Invalid token address: ${tokenAddress}`,
+    };
   }
 
   // Resolve RPC config (with user preferences)
@@ -286,51 +369,18 @@ async function stepHandler(
     };
   }
 
-  // Check balances for all tokens
+  // Check balance for the token
   try {
     const provider = new ethers.JsonRpcProvider(rpcUrl);
-    const balances: TokenBalance[] = [];
 
-    // Fetch balances in parallel
-    const balancePromises = tokenAddresses.map(async (tokenAddress) => {
-      try {
-        return await fetchTokenBalance(provider, address, tokenAddress);
-      } catch (error) {
-        console.error(
-          `[Check Token Balance] Failed to fetch balance for ${tokenAddress}:`,
-          error
-        );
-        // Return null for failed tokens, we'll filter them out
-        return null;
-      }
+    // Fetch balance for the single token
+    const balance = await fetchTokenBalance(provider, address, tokenAddress);
+
+    console.log("[Check Token Balance] Token balance retrieved successfully:", {
+      address,
+      symbol: balance.symbol,
+      balance: balance.balance,
     });
-
-    const results = await Promise.all(balancePromises);
-
-    for (const result of results) {
-      if (result) {
-        balances.push(result);
-      }
-    }
-
-    if (balances.length === 0) {
-      return {
-        success: false,
-        error: "Failed to fetch any token balances",
-      };
-    }
-
-    console.log(
-      "[Check Token Balance] Token balances retrieved successfully:",
-      {
-        address,
-        tokenCount: balances.length,
-        balances: balances.map((b) => ({
-          symbol: b.symbol,
-          balance: b.balance,
-        })),
-      }
-    );
 
     // Fetch explorer config for address link
     const explorerConfig = await db.query.explorerConfigs.findFirst({
@@ -342,25 +392,25 @@ async function stepHandler(
 
     return {
       success: true,
-      balances,
+      balance,
       address,
       addressLink,
     };
   } catch (error) {
     console.error(
-      "[Check Token Balance] Failed to check token balances:",
+      "[Check Token Balance] Failed to check token balance:",
       error
     );
     return {
       success: false,
-      error: `Failed to check token balances: ${getErrorMessage(error)}`,
+      error: `Failed to check token balance: ${getErrorMessage(error)}`,
     };
   }
 }
 
 /**
  * Check Token Balance Step
- * Checks the ERC20 token balance(s) of an address
+ * Checks the ERC20 token balance of an address for a single token
  */
 // biome-ignore lint/suspicious/useAwait: "use step" directive requires async
 export async function checkTokenBalanceStep(
