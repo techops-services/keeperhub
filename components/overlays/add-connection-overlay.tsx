@@ -256,7 +256,7 @@ export function ConfigureConnectionOverlay({
 }: ConfigureConnectionOverlayProps) {
   const { push, closeAll } = useOverlay();
   const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState(false);
+  const [_testing, setTesting] = useState(false);
   const [_testResult, setTestResult] = useState<{
     status: "success" | "error";
     message: string;
@@ -331,7 +331,7 @@ export function ConfigureConnectionOverlay({
     }
   };
 
-  const handleTest = async () => {
+  const _handleTest = async () => {
     const hasConfig = Object.values(config).some((v) => v && v.length > 0);
     if (!hasConfig) {
       toast.error("Please enter credentials first");
@@ -444,13 +444,16 @@ export function ConfigureConnectionOverlay({
   return (
     <Overlay
       actions={[
-        {
-          label: "Test",
-          variant: "outline",
-          onClick: handleTest,
-          loading: testing,
-          disabled: saving,
-        },
+        // start custom keeperhub code //
+        // Test button hidden - unreliable functionality
+        // {
+        //   label: "Test",
+        //   variant: "outline",
+        //   onClick: handleTest,
+        //   loading: testing,
+        //   disabled: saving,
+        // },
+        // end keeperhub code //
         { label: "Create", onClick: handleSave, loading: saving },
       ]}
       overlayId={overlayId}

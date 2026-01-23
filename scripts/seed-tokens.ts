@@ -20,6 +20,7 @@ import { ethers } from "ethers";
 import postgres from "postgres";
 import { supportedTokens } from "../keeperhub/db/schema-extensions";
 import { ERC20_ABI } from "../lib/contracts";
+import { getDatabaseUrl } from "../lib/db/connection-utils";
 import { getRpcUrlByChainId } from "../lib/rpc/rpc-config";
 
 // Token logo URLs (using popular token list sources)
@@ -175,8 +176,7 @@ async function fetchTokenMetadata(
 }
 
 async function seedTokens() {
-  const connectionString =
-    process.env.DATABASE_URL || "postgres://localhost:5432/workflow";
+  const connectionString = getDatabaseUrl();
 
   console.log("Connecting to database...");
   const client = postgres(connectionString, { max: 1 });

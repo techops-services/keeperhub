@@ -31,7 +31,7 @@ export function IntegrationsManager({
   const { push } = useOverlay();
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [loading, setLoading] = useState(true);
-  const [testingId, setTestingId] = useState<string | null>(null);
+  const [_testingId, setTestingId] = useState<string | null>(null);
 
   const loadIntegrations = useCallback(async () => {
     try {
@@ -106,7 +106,7 @@ export function IntegrationsManager({
     });
   };
 
-  const handleTest = async (id: string) => {
+  const _handleTest = async (id: string) => {
     try {
       setTestingId(id);
       const result = await api.integration.testConnection(id);
@@ -177,7 +177,9 @@ export function IntegrationsManager({
               </span>
             </div>
             <div className="flex items-center gap-1">
-              <Button
+              {/* start custom keeperhub code */}
+              {/* Test button hidden - unreliable functionality */}
+              {/* <Button
                 className="h-7 px-2"
                 disabled={testingId === integration.id}
                 onClick={() => handleTest(integration.id)}
@@ -189,7 +191,8 @@ export function IntegrationsManager({
                 ) : (
                   <span className="text-xs">Test</span>
                 )}
-              </Button>
+              </Button> */}
+              {/* end keeperhub code */}
               <Button
                 className="size-7"
                 onClick={() => handleEdit(integration)}

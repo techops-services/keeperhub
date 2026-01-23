@@ -73,6 +73,10 @@ env:
     type: parameterStore
     name: integration-encryption-key
     parameter_name: /eks/maker-prod/keeperhub/integration-encryption-key
+  SENDGRID_API_KEY:
+    type: parameterStore
+    name: sendgrid-api-key
+    parameter_name: /eks/maker-prod/keeperhub/sendgrid-api-key
 
 externalSecrets:
   clusterSecretStoreName: maker-prod

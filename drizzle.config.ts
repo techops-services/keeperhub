@@ -1,5 +1,6 @@
 import { config } from "dotenv";
 import type { Config } from "drizzle-kit";
+import { getDatabaseUrl } from "./lib/db/connection-utils";
 
 config();
 
@@ -8,6 +9,6 @@ export default {
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL || "postgres://localhost:5432/workflow",
+    url: getDatabaseUrl(),
   },
 } satisfies Config;

@@ -1,8 +1,12 @@
 "use client";
 
 import type { NodeProps } from "@xyflow/react";
-import { Plus } from "lucide-react";
+import { LayoutTemplate, Plus } from "lucide-react";
+// start custom keeperhub code //
+import { useOverlay } from "@/components/overlays/overlay-provider";
 import { Button } from "@/components/ui/button";
+import { FeaturedOverlay } from "@/keeperhub/components/overlays/featured-overlay";
+// end keeperhub code //
 import { getAppName, getCustomLogo } from "@/lib/extension-registry";
 
 type AddNodeData = {
@@ -12,6 +16,13 @@ type AddNodeData = {
 export function AddNode({ data }: NodeProps & { data?: AddNodeData }) {
   const CustomLogo = getCustomLogo();
   const appName = getAppName();
+  // start custom keeperhub code //
+  const { open } = useOverlay();
+
+  const handleOpenFeatured = () => {
+    open(FeaturedOverlay, {}, { size: "full" });
+  };
+  // end keeperhub code //
 
   return (
     <div className="flex flex-col items-center justify-center gap-8 rounded-lg border border-border border-dashed bg-background/50 p-8 backdrop-blur-sm">
@@ -20,7 +31,7 @@ export function AddNode({ data }: NodeProps & { data?: AddNodeData }) {
           {CustomLogo && <CustomLogo className="size-10" />} {appName}
         </h1>
         <p className="text-muted-foreground">
-          Visual workflow automation platform
+          Blockchain automation
           {/* ,{" "}
           <a
             className="underline underline-offset-2 transition duration-200 ease-out hover:text-foreground"
@@ -50,10 +61,27 @@ export function AddNode({ data }: NodeProps & { data?: AddNodeData }) {
           </a> */}
         </p>
       </div>
-      <Button className="gap-2 shadow-lg" onClick={data.onClick} size="default">
-        <Plus className="size-4" />
-        Add a Step
-      </Button>
+      {/* start custom keeperhub code */}
+      <div className="flex gap-3">
+        <Button
+          className="gap-2 shadow-lg"
+          onClick={data.onClick}
+          size="default"
+        >
+          <Plus className="size-4" />
+          Start building
+        </Button>
+        <Button
+          className="gap-2 shadow-lg"
+          onClick={handleOpenFeatured}
+          size="default"
+          variant="outline"
+        >
+          <LayoutTemplate className="size-4" />
+          Explore Workflows
+        </Button>
+      </div>
+      {/* end keeperhub code */}
     </div>
   );
 }

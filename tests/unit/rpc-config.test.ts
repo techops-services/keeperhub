@@ -248,13 +248,13 @@ describe("RPC Config Resolution", () => {
   describe("all chain keys", () => {
     const chainKeys = [
       { json: "eth-mainnet", public: PUBLIC_RPCS.ETH_MAINNET },
-      { json: "sepolia", public: PUBLIC_RPCS.SEPOLIA },
+      { json: "eth-sepolia", public: PUBLIC_RPCS.SEPOLIA },
       { json: "base-mainnet", public: PUBLIC_RPCS.BASE_MAINNET },
-      { json: "base-sepolia", public: PUBLIC_RPCS.BASE_SEPOLIA },
+      { json: "base-testnet", public: PUBLIC_RPCS.BASE_SEPOLIA },
       { json: "tempo-testnet", public: PUBLIC_RPCS.TEMPO_TESTNET },
       { json: "tempo-mainnet", public: PUBLIC_RPCS.TEMPO_MAINNET },
       { json: "solana-mainnet", public: PUBLIC_RPCS.SOLANA_MAINNET },
-      { json: "solana-devnet", public: PUBLIC_RPCS.SOLANA_DEVNET },
+      { json: "solana-testnet", public: PUBLIC_RPCS.SOLANA_DEVNET },
     ];
 
     it.each(chainKeys)("should resolve $json from JSON config", ({
@@ -353,7 +353,7 @@ describe("RPC Config Resolution", () => {
           primaryRpcUrl: "https://eth.primary.com",
           fallbackRpcUrl: "https://eth.fallback.com",
         },
-        sepolia: {
+        "eth-sepolia": {
           primaryRpcUrl: "https://sepolia.primary.com",
           fallbackRpcUrl: "https://sepolia.fallback.com",
         },
@@ -361,7 +361,7 @@ describe("RPC Config Resolution", () => {
           primaryRpcUrl: "https://base.primary.com",
           fallbackRpcUrl: "https://base.fallback.com",
         },
-        "base-sepolia": {
+        "base-testnet": {
           primaryRpcUrl: "https://base-sep.primary.com",
           fallbackRpcUrl: "https://base-sep.fallback.com",
         },
@@ -377,7 +377,7 @@ describe("RPC Config Resolution", () => {
           primaryRpcUrl: "https://solana.primary.com",
           fallbackRpcUrl: "https://solana.fallback.com",
         },
-        "solana-devnet": {
+        "solana-testnet": {
           primaryRpcUrl: "https://solana-dev.primary.com",
           fallbackRpcUrl: "https://solana-dev.fallback.com",
         },
@@ -596,7 +596,7 @@ describe("RPC Config Resolution", () => {
           isEnabled: true,
           isTestnet: false,
         },
-        sepolia: {
+        "eth-sepolia": {
           chainId: 11_155_111,
           symbol: "ETH",
           primaryRpcUrl: "https://chain.techops.live/eth-sepolia",
@@ -633,11 +633,11 @@ describe("RPC Config Resolution", () => {
         "https://eth-mainnet.g.alchemy.com/v2/s_8VpY02izssHI4yW2uyC1XWkrMCdS7a"
       );
 
-      // Verify sepolia
+      // Verify eth-sepolia
       expect(
         getRpcUrl({
           rpcConfig: config,
-          jsonKey: "sepolia",
+          jsonKey: "eth-sepolia",
           envValue: undefined,
           publicDefault: PUBLIC_RPCS.SEPOLIA,
           type: "primary",
@@ -775,7 +775,7 @@ describe("RPC Config Resolution", () => {
           isEnabled: true,
           isTestnet: false,
         },
-        sepolia: {
+        "eth-sepolia": {
           chainId: 11_155_111,
           symbol: "ETH",
           primaryRpcUrl: "https://sepolia.example.com",
@@ -798,7 +798,7 @@ describe("RPC Config Resolution", () => {
       expect(
         getRpcUrl({
           rpcConfig: multiChainConfig,
-          jsonKey: "sepolia",
+          jsonKey: "eth-sepolia",
           envValue: undefined,
           publicDefault: PUBLIC_RPCS.SEPOLIA,
           type: "primary",
@@ -816,7 +816,7 @@ describe("RPC Config Resolution", () => {
       expect(
         getWssUrl({
           rpcConfig: multiChainConfig,
-          jsonKey: "sepolia",
+          jsonKey: "eth-sepolia",
           type: "primary",
         })
       ).toBe("wss://sepolia.example.com");
@@ -882,12 +882,12 @@ describe("RPC Config Resolution", () => {
 
     it("should return isTestnet from config when present", () => {
       const rpcConfig: RpcConfig = {
-        sepolia: {
+        "eth-sepolia": {
           isTestnet: true,
         },
       };
 
-      expect(getConfigValue(rpcConfig, "sepolia", "isTestnet", false)).toBe(
+      expect(getConfigValue(rpcConfig, "eth-sepolia", "isTestnet", false)).toBe(
         true
       );
     });

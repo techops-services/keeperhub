@@ -13,6 +13,7 @@ import "dotenv/config";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { getDatabaseUrl } from "../lib/db/connection-utils";
 import {
   chains,
   explorerConfigs,
@@ -78,9 +79,9 @@ const DEFAULT_CHAINS: NewChain[] = [
     isEnabled: getChainConfigValue("eth-mainnet", "isEnabled", true),
   },
   {
-    chainId: getChainConfigValue("sepolia", "chainId", 11_155_111),
+    chainId: getChainConfigValue("eth-sepolia", "chainId", 11_155_111),
     name: "Sepolia Testnet",
-    symbol: getChainConfigValue("sepolia", "symbol", "ETH"),
+    symbol: getChainConfigValue("eth-sepolia", "symbol", "ETH"),
     chainType: "evm",
     defaultPrimaryRpc: getRpcUrlByChainId(11_155_111, "primary"),
     defaultFallbackRpc: getRpcUrlByChainId(11_155_111, "fallback"),
@@ -94,8 +95,8 @@ const DEFAULT_CHAINS: NewChain[] = [
       jsonKey: CHAIN_CONFIG[11_155_111].jsonKey,
       type: "fallback",
     }),
-    isTestnet: getChainConfigValue("sepolia", "isTestnet", true),
-    isEnabled: getChainConfigValue("sepolia", "isEnabled", true),
+    isTestnet: getChainConfigValue("eth-sepolia", "isTestnet", true),
+    isEnabled: getChainConfigValue("eth-sepolia", "isEnabled", true),
   },
   {
     chainId: getChainConfigValue("base-mainnet", "chainId", 8453),
@@ -118,9 +119,9 @@ const DEFAULT_CHAINS: NewChain[] = [
     isEnabled: getChainConfigValue("base-mainnet", "isEnabled", true),
   },
   {
-    chainId: getChainConfigValue("base-sepolia", "chainId", 84_532),
+    chainId: getChainConfigValue("base-testnet", "chainId", 84_532),
     name: "Base Sepolia",
-    symbol: getChainConfigValue("base-sepolia", "symbol", "BASE"),
+    symbol: getChainConfigValue("base-testnet", "symbol", "BASE"),
     chainType: "evm",
     defaultPrimaryRpc: getRpcUrlByChainId(84_532, "primary"),
     defaultFallbackRpc: getRpcUrlByChainId(84_532, "fallback"),
@@ -134,8 +135,8 @@ const DEFAULT_CHAINS: NewChain[] = [
       jsonKey: CHAIN_CONFIG[84_532].jsonKey,
       type: "fallback",
     }),
-    isTestnet: getChainConfigValue("base-sepolia", "isTestnet", true),
-    isEnabled: getChainConfigValue("base-sepolia", "isEnabled", true),
+    isTestnet: getChainConfigValue("base-testnet", "isTestnet", true),
+    isEnabled: getChainConfigValue("base-testnet", "isEnabled", true),
   },
   {
     chainId: getChainConfigValue("tempo-testnet", "chainId", 42_429),
@@ -199,9 +200,9 @@ const DEFAULT_CHAINS: NewChain[] = [
     isEnabled: getChainConfigValue("solana-mainnet", "isEnabled", true),
   },
   {
-    chainId: getChainConfigValue("solana-devnet", "chainId", 103),
+    chainId: getChainConfigValue("solana-testnet", "chainId", 103),
     name: "Solana Devnet",
-    symbol: getChainConfigValue("solana-devnet", "symbol", "SOL"),
+    symbol: getChainConfigValue("solana-testnet", "symbol", "SOL"),
     chainType: "solana",
     defaultPrimaryRpc: getRpcUrlByChainId(103, "primary"),
     defaultFallbackRpc: getRpcUrlByChainId(103, "fallback"),
@@ -215,16 +216,19 @@ const DEFAULT_CHAINS: NewChain[] = [
       jsonKey: CHAIN_CONFIG[103].jsonKey,
       type: "fallback",
     }),
-    isTestnet: getChainConfigValue("solana-devnet", "isTestnet", true),
-    isEnabled: getChainConfigValue("solana-devnet", "isEnabled", true),
+    isTestnet: getChainConfigValue("solana-testnet", "isTestnet", true),
+    isEnabled: getChainConfigValue("solana-testnet", "isEnabled", true),
   },
 ];
 
-// Explorer configurations for each chain (KEEP-1154)
-const EXPLORER_CONFIGS: NewExplorerConfig[] = [
+// Explorer configuration template for each chain (KEEP-1154)
+// Note: chainIds are resolved dynamically from DEFAULT_CHAINS to ensure consistency
+const EXPLORER_CONFIG_TEMPLATES: Record<
+  number,
+  Omit<NewExplorerConfig, "chainId">
+> = {
   // Ethereum Mainnet - Etherscan
-  {
-    chainId: 1,
+  1: {
     chainType: "evm",
     explorerUrl: "https://etherscan.io",
     explorerApiType: "etherscan",
@@ -234,8 +238,7 @@ const EXPLORER_CONFIGS: NewExplorerConfig[] = [
     explorerContractPath: "/address/{address}#code",
   },
   // Sepolia Testnet - Etherscan (uses unified V2 API with chainid param)
-  {
-    chainId: 11_155_111,
+  11155111: {
     chainType: "evm",
     explorerUrl: "https://sepolia.etherscan.io",
     explorerApiType: "etherscan",
@@ -245,8 +248,7 @@ const EXPLORER_CONFIGS: NewExplorerConfig[] = [
     explorerContractPath: "/address/{address}#code",
   },
   // Base - Etherscan (Basescan)
-  {
-    chainId: 8453,
+  8453: {
     chainType: "evm",
     explorerUrl: "https://basescan.org",
     explorerApiType: "etherscan",
@@ -256,8 +258,7 @@ const EXPLORER_CONFIGS: NewExplorerConfig[] = [
     explorerContractPath: "/address/{address}#code",
   },
   // Base Sepolia - Etherscan
-  {
-    chainId: 84_532,
+  84532: {
     chainType: "evm",
     explorerUrl: "https://sepolia.basescan.org",
     explorerApiType: "etherscan",
@@ -267,8 +268,7 @@ const EXPLORER_CONFIGS: NewExplorerConfig[] = [
     explorerContractPath: "/address/{address}#code",
   },
   // Tempo Testnet - Blockscout
-  {
-    chainId: 42_429,
+  42429: {
     chainType: "evm",
     explorerUrl: "https://explorer.testnet.tempo.xyz",
     explorerApiType: "blockscout",
@@ -278,8 +278,7 @@ const EXPLORER_CONFIGS: NewExplorerConfig[] = [
     explorerContractPath: "/address/{address}?tab=contract",
   },
   // Tempo Mainnet - Blockscout
-  {
-    chainId: 42_420,
+  42420: {
     chainType: "evm",
     explorerUrl: "https://explorer.tempo.xyz",
     explorerApiType: "blockscout",
@@ -289,8 +288,7 @@ const EXPLORER_CONFIGS: NewExplorerConfig[] = [
     explorerContractPath: "/address/{address}?tab=contract",
   },
   // Solana Mainnet - Solscan
-  {
-    chainId: 101,
+  101: {
     chainType: "solana",
     explorerUrl: "https://solscan.io",
     explorerApiType: "solscan",
@@ -300,8 +298,7 @@ const EXPLORER_CONFIGS: NewExplorerConfig[] = [
     explorerContractPath: "/account/{address}#anchorProgramIDL",
   },
   // Solana Devnet - Solscan
-  {
-    chainId: 103,
+  103: {
     chainType: "solana",
     explorerUrl: "https://solscan.io/?cluster=devnet",
     explorerApiType: "solscan",
@@ -310,11 +307,10 @@ const EXPLORER_CONFIGS: NewExplorerConfig[] = [
     explorerAddressPath: "/account/{address}",
     explorerContractPath: "/account/{address}#anchorProgramIDL",
   },
-];
+};
 
 async function seedChains() {
-  const connectionString =
-    process.env.DATABASE_URL || "postgres://localhost:5432/workflow";
+  const connectionString = getDatabaseUrl();
 
   console.log("Connecting to database...");
   const client = postgres(connectionString, { max: 1 });
@@ -332,6 +328,8 @@ async function seedChains() {
 
     if (existing.length > 0) {
       // Update existing chain with new values (except id and timestamps)
+      // Note: Use ?? null to ensure undefined values are explicitly set to null,
+      // otherwise Drizzle skips undefined fields in UPDATE statements
       await db
         .update(chains)
         .set({
@@ -339,9 +337,9 @@ async function seedChains() {
           symbol: chain.symbol,
           chainType: chain.chainType,
           defaultPrimaryRpc: chain.defaultPrimaryRpc,
-          defaultFallbackRpc: chain.defaultFallbackRpc,
-          defaultPrimaryWss: chain.defaultPrimaryWss,
-          defaultFallbackWss: chain.defaultFallbackWss,
+          defaultFallbackRpc: chain.defaultFallbackRpc ?? null,
+          defaultPrimaryWss: chain.defaultPrimaryWss ?? null,
+          defaultFallbackWss: chain.defaultFallbackWss ?? null,
           isTestnet: chain.isTestnet,
           isEnabled: chain.isEnabled,
           updatedAt: new Date(),
@@ -355,6 +353,38 @@ async function seedChains() {
     console.log(`  + ${chain.name} (${chain.chainId}) inserted`);
   }
 
+  // Build EXPLORER_CONFIGS dynamically using resolved chainIds from DEFAULT_CHAINS
+  // This ensures chainId consistency between chains and explorer configs
+  // We map each chain to its explorer config using the CHAIN_CONFIG to find the default chainId
+  const chainToDefaultIdMap: Record<string, number> = {
+    "Ethereum Mainnet": 1,
+    "Sepolia Testnet": 11_155_111,
+    Base: 8453,
+    "Base Sepolia": 84_532,
+    "Tempo Testnet": 42_429,
+    Tempo: 42_420,
+    Solana: 101,
+    "Solana Devnet": 103,
+  };
+
+  const EXPLORER_CONFIGS: NewExplorerConfig[] = DEFAULT_CHAINS.map((chain) => {
+    // Look up the default chainId using the chain name
+    const defaultChainId = chainToDefaultIdMap[chain.name];
+
+    if (!(defaultChainId && EXPLORER_CONFIG_TEMPLATES[defaultChainId])) {
+      console.warn(
+        `  ! No explorer config template for chain ${chain.name} (${chain.chainId}), skipping`
+      );
+      return null;
+    }
+
+    const template = EXPLORER_CONFIG_TEMPLATES[defaultChainId];
+    return {
+      chainId: chain.chainId, // Use the resolved chainId from the chain
+      ...template,
+    };
+  }).filter((config): config is NewExplorerConfig => config !== null);
+
   console.log(`\nSeeding ${EXPLORER_CONFIGS.length} explorer configs...`);
 
   for (const config of EXPLORER_CONFIGS) {
@@ -366,8 +396,22 @@ async function seedChains() {
       .limit(1);
 
     if (existing.length > 0) {
+      // Update existing explorer config with new values (except id and timestamps)
+      await db
+        .update(explorerConfigs)
+        .set({
+          chainType: config.chainType,
+          explorerUrl: config.explorerUrl,
+          explorerApiType: config.explorerApiType,
+          explorerApiUrl: config.explorerApiUrl,
+          explorerTxPath: config.explorerTxPath,
+          explorerAddressPath: config.explorerAddressPath,
+          explorerContractPath: config.explorerContractPath,
+          updatedAt: new Date(),
+        })
+        .where(eq(explorerConfigs.chainId, config.chainId));
       console.log(
-        `  - Explorer config for chain ${config.chainId} already exists, skipping`
+        `  ~ Explorer config for chain ${config.chainId} (${config.explorerApiType}) updated`
       );
       continue;
     }
