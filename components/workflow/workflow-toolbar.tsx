@@ -1615,6 +1615,10 @@ export const WorkflowToolbar = ({
   const effectiveWorkflowId =
     workflowId ?? state.currentWorkflowId ?? undefined;
 
+  const pathname = usePathname();
+  const isWorkflowRoute =
+    pathname === "/workflows" || pathname.startsWith("/workflows/");
+
   // If persistent mode, use fixed positioning
   const containerClassName = persistent
     ? "pointer-events-auto fixed top-0 right-0 left-0 z-50 flex items-center justify-between border-b bg-background px-4 py-3"
@@ -1658,11 +1662,13 @@ export const WorkflowToolbar = ({
         {/* Right side: Actions + User Menu */}
         <div className={rightSectionClassName}>
           <div className={rightContentClassName}>
-            <ToolbarActions
-              actions={actions}
-              state={state}
-              workflowId={effectiveWorkflowId}
-            />
+            {isWorkflowRoute && (
+              <ToolbarActions
+                actions={actions}
+                state={state}
+                workflowId={effectiveWorkflowId}
+              />
+            )}
             <div className="flex items-center gap-2">
               {effectiveWorkflowId && !state.isOwner && (
                 <DuplicateButton
@@ -1710,11 +1716,13 @@ export const WorkflowToolbar = ({
 
       <div className="pointer-events-auto absolute top-4 right-4 z-10">
         <div className="flex flex-col-reverse items-end gap-2 lg:flex-row lg:items-center">
-          <ToolbarActions
-            actions={actions}
-            state={state}
-            workflowId={effectiveWorkflowId}
-          />
+          {isWorkflowRoute && (
+            <ToolbarActions
+              actions={actions}
+              state={state}
+              workflowId={effectiveWorkflowId}
+            />
+          )}
           <div className="flex items-center gap-2">
             {effectiveWorkflowId && !state.isOwner && (
               <DuplicateButton
