@@ -9,6 +9,12 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { NodeConfigPanel } from "@/components/workflow/node-config-panel";
 import { useIsMobile } from "@/hooks/use-mobile";
+// start custom keeperhub code //
+import {
+  getPendingClaim,
+  useClaimWorkflow,
+} from "@/keeperhub/lib/hooks/use-claim-workflow";
+// end keeperhub code //
 import { api } from "@/lib/api-client";
 import {
   integrationsAtom,
@@ -390,6 +396,10 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
     setCurrentWorkflowDescription,
   ]);
 
+  // start custom keeperhub code //
+  const { claimPending } = useClaimWorkflow(workflowId, loadExistingWorkflow);
+  // end keeperhub code //
+
   // Track if we've already auto-fixed integrations for this workflow+version
   const lastAutoFixRef = useRef<{ workflowId: string; version: number } | null>(
     null
@@ -397,6 +407,13 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
 
   useEffect(() => {
     const loadWorkflowData = async () => {
+      // start custom keeperhub code //
+      const pendingClaim = getPendingClaim();
+      if (pendingClaim?.workflowId === workflowId) {
+        return;
+      }
+      // end keeperhub code //
+
       const isGeneratingParam = searchParams?.get("generating") === "true";
       const storedPrompt = sessionStorage.getItem("ai-prompt");
       const storedWorkflowId = sessionStorage.getItem("generating-workflow-id");
@@ -676,7 +693,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   return (
     <div className="flex h-dvh w-full flex-col overflow-hidden">
       {/* Workflow not found overlay */}
-      {workflowNotFound && (
+      {workflowNotFound && !claimPending && (
         <div className="pointer-events-auto absolute inset-0 z-20 flex items-center justify-center">
           <div className="rounded-lg border bg-background p-8 text-center shadow-lg">
             <h1 className="mb-2 font-semibold text-2xl">Workflow Not Found</h1>

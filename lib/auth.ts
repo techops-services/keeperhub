@@ -156,22 +156,26 @@ const plugins = [
       // }
 
       // start custom keeperhub code //
-      // When anonymous user links account, DELETE their trial workflows
-      // (Anonymous workflows have no real utility in org context)
+      // When anonymous user links account, transfer ownership to the new user.
+      // Workflows stay as isAnonymous=true with no org - the client-side claim
+      // dialog will offer to move them into the user's organization.
       const fromUserId = data.anonymousUser.user.id;
+      const toUserId = data.newUser.user.id;
 
       try {
-        // Delete anonymous workflows (not migrated per requirements)
-        await db.delete(workflows).where(eq(workflows.userId, fromUserId));
-
-        // Delete workflow executions
         await db
-          .delete(workflowExecutions)
+          .update(workflows)
+          .set({ userId: toUserId })
+          .where(eq(workflows.userId, fromUserId));
+
+        await db
+          .update(workflowExecutions)
+          .set({ userId: toUserId })
           .where(eq(workflowExecutions.userId, fromUserId));
 
-        // Delete integrations
         await db
-          .delete(integrations)
+          .update(integrations)
+          .set({ userId: toUserId })
           .where(eq(integrations.userId, fromUserId));
       } catch (error) {
         console.error("[Anonymous Migration] Error:", error);

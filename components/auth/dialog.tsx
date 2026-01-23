@@ -15,12 +15,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
+// start custom keeperhub code //
+import { setPendingClaim } from "@/keeperhub/lib/hooks/use-claim-workflow";
+// end keeperhub code //
 import { refetchOrganizations } from "@/keeperhub/lib/refetch-organizations";
 import { authClient, signIn, signUp } from "@/lib/auth-client";
 import {
   getEnabledAuthProviders,
   getSingleProvider,
 } from "@/lib/auth-providers";
+
+// start custom keeperhub code //
+const WORKFLOW_PATH_REGEX = /^\/workflows\/([^/]+)$/;
+// end keeperhub code //
 
 type AuthDialogProps = {
   children?: ReactNode;
@@ -321,6 +328,29 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
     setError("");
   };
 
+  // start custom keeperhub code //
+  const getClaimContext = async () => {
+    const workflowMatch = window.location.pathname.match(WORKFLOW_PATH_REGEX);
+    if (!workflowMatch) {
+      return null;
+    }
+    const currentSession = await authClient.getSession();
+    const previousUserId = currentSession?.data?.user?.id;
+    if (!previousUserId) {
+      return null;
+    }
+    return { workflowId: workflowMatch[1], previousUserId };
+  };
+
+  const storeClaimIfNeeded = (
+    claimContext: { workflowId: string; previousUserId: string } | null
+  ) => {
+    if (claimContext) {
+      setPendingClaim(claimContext);
+    }
+  };
+  // end keeperhub code //
+
   const handleOpenChange = (newOpen: boolean) => {
     setOpen(newOpen);
     if (!newOpen) {
@@ -336,6 +366,10 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
   ) => {
     try {
       setLoadingProvider(provider);
+      // start custom keeperhub code //
+      const claimContext = await getClaimContext();
+      storeClaimIfNeeded(claimContext);
+      // end keeperhub code //
       await signIn.social({ provider, callbackURL: window.location.pathname });
     } catch {
       toast.error(`Failed to sign in with ${getProviderLabel(provider)}`);
@@ -348,12 +382,20 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
     setError("");
     setLoading(true);
 
+    // start custom keeperhub code //
+    const claimContext = await getClaimContext();
+    // end keeperhub code //
+
     try {
       const response = await signIn.email({ email, password });
       if (response.error) {
         setError(response.error.message || "Sign in failed");
         return;
       }
+
+      // start custom keeperhub code //
+      storeClaimIfNeeded(claimContext);
+      // end keeperhub code //
 
       await new Promise((resolve) => setTimeout(resolve, 300));
       await authClient.getSession();
@@ -373,6 +415,10 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
     setError("");
     setLoading(true);
 
+    // start custom keeperhub code //
+    const claimContext = await getClaimContext();
+    // end keeperhub code //
+
     try {
       const signUpResponse = await signUp.email({
         email,
@@ -391,6 +437,10 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
         setError(signInResponse.error.message || "Sign in failed");
         return;
       }
+
+      // start custom keeperhub code //
+      storeClaimIfNeeded(claimContext);
+      // end keeperhub code //
 
       await new Promise((resolve) => setTimeout(resolve, 300));
       await authClient.getSession();
