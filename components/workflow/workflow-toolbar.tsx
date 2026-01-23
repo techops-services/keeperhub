@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { nanoid } from "nanoid";
 // start custom KeeperHub code
-import { usePathname, useRouter } from "next/navigation";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 // end custom KeeperHub code
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -1496,6 +1496,9 @@ function WorkflowMenuComponent({
   // start custom KeeperHub code
   const pathname = usePathname();
   const isHubPage = pathname === "/hub";
+
+  // validate against route workflow id as the state can be out of date
+  const { workflowId: routeWorkflowId } = useParams();
   // end custom KeeperHub code
 
   return (
@@ -1586,7 +1589,7 @@ function WorkflowMenuComponent({
                     }
                   >
                     <span className="truncate">{workflow.name}</span>
-                    {workflow.id === state.currentWorkflowId && (
+                    {workflow.id === routeWorkflowId && (
                       <Check className="size-4 shrink-0" />
                     )}
                   </DropdownMenuItem>
