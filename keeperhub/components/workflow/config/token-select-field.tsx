@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Plus, X } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,7 @@ type TokenSelectFieldProps = {
  * Token Select Field
  *
  * Provides a toggle between:
- * - Supported Tokens: Multi-select dropdown of system-wide stablecoins
+ * - Supported Tokens: Single-select dropdown of system-wide stablecoins
  * - Custom Token: Text input for any ERC20 token address(es)
  *
  * The field stores a JSON object with the mode and selected values.
@@ -118,11 +118,9 @@ export function TokenSelectField({
 
   // Handle supported token selection
   const handleTokenSelect = (tokenId: string) => {
-    // Toggle: if already selected, remove; otherwise, add
+    // Single-select: if already selected, clear; otherwise, set to this token
     const currentIds = currentValue.supportedTokenIds;
-    const newIds = currentIds.includes(tokenId)
-      ? currentIds.filter((id) => id !== tokenId)
-      : [...currentIds, tokenId];
+    const newIds = currentIds.includes(tokenId) ? [] : [tokenId];
 
     const newValue: TokenFieldValue = {
       ...currentValue,
@@ -183,24 +181,7 @@ export function TokenSelectField({
     }
   };
 
-  // Remove a custom token
-  const handleRemoveCustomToken = (address: string) => {
-    const newTokens = currentValue.customTokens.filter(
-      (t) => t.address.toLowerCase() !== address.toLowerCase()
-    );
-    const newValue: TokenFieldValue = {
-      ...currentValue,
-      customTokens: newTokens,
-    };
-    onUpdateConfig(field.key, JSON.stringify(newValue));
-  };
-
   const isCustomMode = currentValue.mode === "custom";
-
-  // Check if we have any selected tokens
-  const hasSelectedTokens =
-    currentValue.supportedTokenIds.length > 0 ||
-    currentValue.customTokens.length > 0;
 
   // Render supported tokens section based on state
   const renderSupportedTokensSection = () => {
@@ -233,9 +214,13 @@ export function TokenSelectField({
       );
     }
     return (
-      <Select disabled={disabled} onValueChange={handleTokenSelect} value="">
+      <Select
+        disabled={disabled}
+        onValueChange={handleTokenSelect}
+        value={currentValue.supportedTokenIds[0] || ""}
+      >
         <SelectTrigger className="w-full">
-          <SelectValue placeholder="Select supported tokens..." />
+          <SelectValue placeholder="Select a token..." />
         </SelectTrigger>
         <SelectContent>
           {tokens.map((token) => {
@@ -287,7 +272,7 @@ export function TokenSelectField({
         </Select>
       </div>
 
-      {/* Supported Tokens Multi-Select */}
+      {/* Supported Tokens Single-Select */}
       {!isCustomMode && (
         <div className="space-y-2">{renderSupportedTokensSection()}</div>
       )}
@@ -336,50 +321,6 @@ export function TokenSelectField({
               Select a network first to add custom tokens
             </p>
           )}
-        </div>
-      )}
-
-      {/* All Selected Tokens - Always visible */}
-      {hasSelectedTokens && (
-        <div className="space-y-1">
-          <Label className="text-muted-foreground text-xs">
-            Selected Tokens
-          </Label>
-          <div className="flex flex-wrap gap-1">
-            {/* Supported token badges */}
-            {currentValue.supportedTokenIds.map((tokenId) => {
-              const token = tokens.find((t) => t.id === tokenId);
-              if (!token) {
-                return null;
-              }
-              return (
-                <button
-                  className="flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-blue-700 text-xs hover:bg-blue-500/20 dark:text-blue-400"
-                  disabled={disabled}
-                  key={`supported-${tokenId}`}
-                  onClick={() => handleTokenSelect(tokenId)}
-                  type="button"
-                >
-                  {token.symbol}
-                  <X className="h-3 w-3 text-muted-foreground" />
-                </button>
-              );
-            })}
-            {/* Imported (custom) token badges */}
-            {currentValue.customTokens.map((customToken) => (
-              <button
-                className="flex items-center gap-1 rounded-full bg-orange-500/10 px-2 py-0.5 text-orange-700 text-xs hover:bg-orange-500/20 dark:text-orange-400"
-                disabled={disabled}
-                key={`custom-${customToken.address}`}
-                onClick={() => handleRemoveCustomToken(customToken.address)}
-                type="button"
-              >
-                {customToken.symbol}{" "}
-                <span className="text-orange-500/70">(imported)</span>
-                <X className="h-3 w-3 text-muted-foreground" />
-              </button>
-            ))}
-          </div>
         </div>
       )}
     </div>
