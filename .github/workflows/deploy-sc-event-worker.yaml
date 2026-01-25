@@ -13,6 +13,7 @@ name: deploy-sc-event-worker
 
 jobs:
   build-and-deploy:
+    if: false  # DISABLED: service extracted to keeperhub-events repo
     environment: ${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}
     runs-on: ubuntu-latest
     env:

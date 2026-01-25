@@ -20,6 +20,7 @@ name: deploy-scheduler
 
 jobs:
   deploy-scheduler:
+    if: false  # DISABLED: service extracted to keeperhub-scheduler repo
     environment: ${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}
     runs-on: ubuntu-latest
     env:
