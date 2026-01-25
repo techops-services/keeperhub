@@ -21,23 +21,6 @@ import {
   SQSClient,
 } from "@aws-sdk/client-sqs";
 import { CronExpressionParser } from "cron-parser";
-import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
-import { getDatabaseUrl } from "../lib/db/connection-utils";
-import {
-  workflowExecutions,
-  workflowSchedules,
-  workflows,
-} from "../lib/db/schema";
-import { generateId } from "../lib/utils/id";
-
-// Database connection
-const connectionString = getDatabaseUrl();
-const queryClient = postgres(connectionString);
-const db = drizzle(queryClient, {
-  schema: { workflows, workflowExecutions, workflowSchedules },
-});
 
 // SQS client - only use custom endpoint/credentials for local development
 const sqsConfig: ConstructorParameters<typeof SQSClient>[0] = {
@@ -60,6 +43,7 @@ const QUEUE_URL =
   "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/keeperhub-workflow-queue";
 
 const KEEPERHUB_URL = process.env.KEEPERHUB_URL || "http://localhost:3000";
+const SERVICE_API_KEY = process.env.SCHEDULER_SERVICE_API_KEY || "";
 
 const VISIBILITY_TIMEOUT = 300; // 5 minutes
 const WAIT_TIME_SECONDS = 20; // Long polling
@@ -71,6 +55,111 @@ type ScheduleMessage = {
   triggerTime: string;
   triggerType: "schedule";
 };
+
+// Type definitions for API responses
+type Workflow = {
+  id: string;
+  enabled: boolean;
+  userId: string;
+  nodes: unknown;
+  edges: unknown;
+};
+
+type Schedule = {
+  id: string;
+  workflowId: string;
+  cronExpression: string;
+  timezone: string;
+  enabled: boolean;
+};
+
+// HTTP helper for authenticated requests
+async function apiRequest<T>(
+  path: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const response = await fetch(`${KEEPERHUB_URL}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      "X-Service-Key": SERVICE_API_KEY,
+      ...options.headers,
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`API ${options.method || "GET"} ${path} failed: ${response.status} ${text}`);
+  }
+
+  return response.json();
+}
+
+// Fetch workflow by ID
+async function fetchWorkflow(workflowId: string): Promise<Workflow | null> {
+  try {
+    const result = await apiRequest<{ workflow: Workflow }>(`/api/internal/workflows/${workflowId}`);
+    return result.workflow;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("404")) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+// Fetch schedule by ID
+async function fetchSchedule(scheduleId: string): Promise<Schedule | null> {
+  try {
+    const result = await apiRequest<{ schedule: Schedule }>(`/api/internal/schedules/${scheduleId}`);
+    return result.schedule;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("404")) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+// Create execution record
+async function createExecution(
+  workflowId: string,
+  userId: string,
+  input: Record<string, unknown>
+): Promise<string> {
+  const result = await apiRequest<{ executionId: string }>(
+    "/api/internal/executions",
+    {
+      method: "POST",
+      body: JSON.stringify({ workflowId, userId, input }),
+    }
+  );
+  return result.executionId;
+}
+
+// Update execution status
+async function updateExecution(
+  executionId: string,
+  status: "running" | "success" | "error",
+  error?: string
+): Promise<void> {
+  await apiRequest(`/api/internal/executions/${executionId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status, error }),
+  });
+}
+
+// Update schedule status after execution
+async function updateScheduleStatus(
+  scheduleId: string,
+  status: "success" | "error",
+  error?: string
+): Promise<void> {
+  await apiRequest(`/api/internal/schedules/${scheduleId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status, error }),
+  });
+}
 
 /**
  * Compute next run time for a cron expression
@@ -91,45 +180,6 @@ function computeNextRunTime(
 }
 
 /**
- * Update schedule after execution
- */
-async function updateScheduleStatus(
-  scheduleId: string,
-  status: "success" | "error",
-  error?: string
-): Promise<void> {
-  const schedule = await db.query.workflowSchedules.findFirst({
-    where: eq(workflowSchedules.id, scheduleId),
-  });
-
-  if (!schedule) {
-    return;
-  }
-
-  const nextRunAt = computeNextRunTime(
-    schedule.cronExpression,
-    schedule.timezone
-  );
-
-  const runCount =
-    status === "success"
-      ? String(Number(schedule.runCount || "0") + 1)
-      : schedule.runCount;
-
-  await db
-    .update(workflowSchedules)
-    .set({
-      lastRunAt: new Date(),
-      lastStatus: status,
-      lastError: status === "error" ? error : null,
-      nextRunAt,
-      runCount,
-      updatedAt: new Date(),
-    })
-    .where(eq(workflowSchedules.id, scheduleId));
-}
-
-/**
  * Process a single scheduled workflow message
  */
 async function processScheduledWorkflow(
@@ -140,9 +190,7 @@ async function processScheduledWorkflow(
   console.log(`[Executor] Processing workflow ${workflowId}`);
 
   // Get workflow
-  const workflow = await db.query.workflows.findFirst({
-    where: eq(workflows.id, workflowId),
-  });
+  const workflow = await fetchWorkflow(workflowId);
 
   if (!workflow) {
     console.error(`[Executor] Workflow not found: ${workflowId}`);
@@ -150,16 +198,13 @@ async function processScheduledWorkflow(
     return;
   }
 
-  // Verify workflow is enabled (double-check in case it was disabled after dispatch)
   if (!workflow.enabled) {
     console.log(`[Executor] Workflow disabled, skipping: ${workflowId}`);
     return;
   }
 
   // Verify schedule exists and is enabled
-  const schedule = await db.query.workflowSchedules.findFirst({
-    where: eq(workflowSchedules.id, scheduleId),
-  });
+  const schedule = await fetchSchedule(scheduleId);
 
   if (!schedule) {
     console.error(`[Executor] Schedule not found: ${scheduleId}`);
@@ -172,18 +217,15 @@ async function processScheduledWorkflow(
   }
 
   // Create execution record
-  const executionId = generateId();
-  await db.insert(workflowExecutions).values({
-    id: executionId,
+  const executionId = await createExecution(
     workflowId,
-    userId: workflow.userId,
-    status: "running",
-    input: {
+    workflow.userId,
+    {
       triggerType: "schedule",
       scheduleId,
       triggerTime,
-    },
-  });
+    }
+  );
 
   console.log(`[Executor] Created execution ${executionId}`);
 
@@ -222,14 +264,11 @@ async function processScheduledWorkflow(
     console.error(`[Executor] Execution failed for ${workflowId}:`, error);
 
     // Update execution record with error
-    await db
-      .update(workflowExecutions)
-      .set({
-        status: "error",
-        error: error instanceof Error ? error.message : "Unknown error",
-        completedAt: new Date(),
-      })
-      .where(eq(workflowExecutions.id, executionId));
+    await updateExecution(
+      executionId,
+      "error",
+      error instanceof Error ? error.message : "Unknown error"
+    );
 
     // Update schedule status
     await updateScheduleStatus(
@@ -322,13 +361,11 @@ async function listen(): Promise<void> {
 // Handle graceful shutdown
 process.on("SIGINT", async () => {
   console.log("\n[Executor] Shutting down...");
-  await queryClient.end();
   process.exit(0);
 });
 
 process.on("SIGTERM", async () => {
   console.log("\n[Executor] Shutting down...");
-  await queryClient.end();
   process.exit(0);
 });
 
