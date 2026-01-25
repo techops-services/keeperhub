@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   const { workflowId, userId, input } = body;
 
   // Validate required fields
-  if (!workflowId || !userId) {
+  if (!(workflowId && userId)) {
     return NextResponse.json(
       { error: "workflowId and userId are required" },
       { status: 400 }
