@@ -20,7 +20,6 @@ import {
   ReceiveMessageCommand,
   SQSClient,
 } from "@aws-sdk/client-sqs";
-import { CronExpressionParser } from "cron-parser";
 
 // SQS client - only use custom endpoint/credentials for local development
 const sqsConfig: ConstructorParameters<typeof SQSClient>[0] = {
@@ -165,24 +164,6 @@ async function updateScheduleStatus(
     method: "PATCH",
     body: JSON.stringify({ status, error }),
   });
-}
-
-/**
- * Compute next run time for a cron expression
- */
-function computeNextRunTime(
-  cronExpression: string,
-  timezone: string
-): Date | null {
-  try {
-    const interval = CronExpressionParser.parse(cronExpression, {
-      currentDate: new Date(),
-      tz: timezone,
-    });
-    return interval.next().toDate();
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -361,12 +342,12 @@ async function listen(): Promise<void> {
 }
 
 // Handle graceful shutdown
-process.on("SIGINT", async () => {
+process.on("SIGINT", () => {
   console.log("\n[Executor] Shutting down...");
   process.exit(0);
 });
 
-process.on("SIGTERM", async () => {
+process.on("SIGTERM", () => {
   console.log("\n[Executor] Shutting down...");
   process.exit(0);
 });
