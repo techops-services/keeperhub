@@ -39,13 +39,20 @@ type AddressBookOverlayProps = {
 type AddAddressOverlayProps = {
   overlayId: string;
   onSave: (label: string, address: string) => Promise<void>;
+  entry?: AddressBookEntry;
 };
 
-function AddAddressOverlay({ overlayId, onSave }: AddAddressOverlayProps) {
+function AddAddressOverlay({
+  overlayId,
+  onSave,
+  entry,
+}: AddAddressOverlayProps) {
   const { pop } = useOverlay();
-  const [newLabel, setNewLabel] = useState("");
-  const [newAddress, setNewAddress] = useState("");
+  const [newLabel, setNewLabel] = useState(entry?.label ?? "");
+  const [newAddress, setNewAddress] = useState(entry?.address ?? "");
   const [saving, setSaving] = useState(false);
+
+  const isEditing = !!entry;
 
   const handleSave = async () => {
     if (!newLabel.trim()) {
@@ -61,12 +68,19 @@ function AddAddressOverlay({ overlayId, onSave }: AddAddressOverlayProps) {
     setSaving(true);
     try {
       await onSave(newLabel.trim(), newAddress.trim());
-      toast.success("Address added to address book");
+      toast.success(
+        isEditing ? "Address updated" : "Address added to address book"
+      );
       pop();
     } catch (error) {
-      console.error("Failed to add address:", error);
+      console.error(
+        `Failed to ${isEditing ? "update" : "add"} address:`,
+        error
+      );
       toast.error(
-        error instanceof Error ? error.message : "Failed to add address"
+        error instanceof Error
+          ? error.message
+          : `Failed to ${isEditing ? "update" : "add"} address`
       );
     } finally {
       setSaving(false);
@@ -77,11 +91,12 @@ function AddAddressOverlay({ overlayId, onSave }: AddAddressOverlayProps) {
     <Overlay
       actions={[{ label: "Save", onClick: handleSave, loading: saving }]}
       overlayId={overlayId}
-      title="Add New Address"
+      title={isEditing ? "Edit Address" : "Add New Address"}
     >
       <p className="mb-4 text-muted-foreground text-sm">
-        Add a new address to your organization's address book for easy reuse
-        across workflows.
+        {isEditing
+          ? "Update the address details in your organization's address book."
+          : "Add a new address to your organization's address book for easy reuse across workflows."}
       </p>
       <div className="space-y-4">
         <div className="space-y-2">
@@ -169,8 +184,9 @@ type AddressBookTableProps = {
   entries: AddressBookEntry[];
   isOwner: boolean;
   deleting: string | null;
-  onDelete: (entryId: string) => void;
+  onDelete: (entry: AddressBookEntry) => void;
   onUpdate: () => void;
+  onEdit: (entry: AddressBookEntry) => void;
 };
 
 function AddressBookTable({
@@ -179,6 +195,7 @@ function AddressBookTable({
   deleting,
   onDelete,
   onUpdate,
+  onEdit,
 }: AddressBookTableProps) {
   return (
     <Table>
@@ -195,7 +212,8 @@ function AddressBookTable({
             deleting={deleting}
             entry={entry}
             key={entry.id}
-            onDelete={onDelete}
+            onDelete={() => onDelete(entry)}
+            onEdit={() => onEdit(entry)}
             onUpdate={onUpdate}
           />
         ))}
@@ -253,13 +271,10 @@ function AddressBookPagination({
         </Button>
 
         <div className="flex items-center gap-1">
-          {pageNumbers.map((page: number | string, index: number) => {
+          {pageNumbers.map((page: number | string) => {
             if (typeof page === "string") {
               return (
-                <span
-                  className="px-2 text-muted-foreground"
-                  key={`${page}-${index}`}
-                >
+                <span className="px-2 text-muted-foreground" key={page}>
                   ...
                 </span>
               );
@@ -357,24 +372,44 @@ export function AddressBookOverlay({ overlayId }: AddressBookOverlayProps) {
     await loadEntries();
   };
 
+  const handleUpdateAddress = async (
+    entryId: string,
+    label: string,
+    address: string
+  ) => {
+    await addressBookApi.update(entryId, {
+      label,
+      address,
+    });
+    await loadEntries();
+  };
+
   const handleOpenAddForm = () => {
     push(AddAddressOverlay, {
       onSave: handleAddAddress,
     });
   };
 
-  const handleDelete = (entryId: string) => {
+  const handleOpenEditForm = (entry: AddressBookEntry) => {
+    push(AddAddressOverlay, {
+      entry,
+      onSave: async (label: string, address: string) => {
+        await handleUpdateAddress(entry.id, label, address);
+      },
+    });
+  };
+
+  const handleDelete = (entry: AddressBookEntry) => {
     push(ConfirmOverlay, {
       title: "Delete Address",
-      message:
-        "Are you sure you want to delete this address from the address book?",
+      message: `Are you sure you want to delete "${entry.label}" from the address book?`,
       confirmLabel: "Delete",
       confirmVariant: "destructive" as const,
       destructive: true,
       onConfirm: async () => {
-        setDeleting(entryId);
+        setDeleting(entry.id);
         try {
-          await addressBookApi.delete(entryId);
+          await addressBookApi.delete(entry.id);
           toast.success("Address deleted");
           await loadEntries();
         } catch (error) {
@@ -443,6 +478,7 @@ export function AddressBookOverlay({ overlayId }: AddressBookOverlayProps) {
               entries={paginatedEntries}
               isOwner={isOwner}
               onDelete={handleDelete}
+              onEdit={handleOpenEditForm}
               onUpdate={loadEntries}
             />
 
