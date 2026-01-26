@@ -109,7 +109,7 @@ function AddAddressOverlay({
       </p>
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="new-label">Label</Label>
+          <Label htmlFor="new-label">Name</Label>
           <Input
             disabled={saving}
             id="new-label"
