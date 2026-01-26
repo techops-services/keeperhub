@@ -159,7 +159,12 @@ export function SaveAddressBookmark({
             {childWithInterception}
           </AddressSelectPopover>
         </div>
-        <SaveAddressButton address={currentAddress} onClick={handleSaveClick} />
+        {isOwner && (
+          <SaveAddressButton
+            address={currentAddress}
+            onClick={handleSaveClick}
+          />
+        )}
       </div>
 
       {showForm && (

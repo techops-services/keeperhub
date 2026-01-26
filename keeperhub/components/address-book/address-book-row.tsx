@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { truncateAddress } from "@/keeperhub/lib/address-utils";
-import { useActiveMember } from "@/keeperhub/lib/hooks/use-organization";
 import type { AddressBookEntry } from "@/lib/api-client";
 
 type AddressBookRowProps = {
@@ -15,6 +14,7 @@ type AddressBookRowProps = {
   onDelete: () => void;
   onEdit: (entry: AddressBookEntry) => void;
   deleting: string | null;
+  isOwner: boolean;
 };
 
 export function AddressBookRow({
@@ -22,9 +22,8 @@ export function AddressBookRow({
   onDelete,
   onEdit,
   deleting,
+  isOwner,
 }: AddressBookRowProps) {
-  const { isOwner } = useActiveMember();
-
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast.success("Copied to clipboard");

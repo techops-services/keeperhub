@@ -219,6 +219,7 @@ function AddressBookTable({
           <AddressBookRow
             deleting={deleting}
             entry={entry}
+            isOwner={isOwner}
             key={entry.id}
             onDelete={() => onDelete(entry)}
             onEdit={() => onEdit(entry)}
