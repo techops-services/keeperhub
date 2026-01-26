@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Plus, X } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -32,10 +32,10 @@ type TokenSelectFieldProps = {
  * Token Select Field
  *
  * Provides a toggle between:
- * - Supported Tokens: Multi-select dropdown of system-wide stablecoins
- * - Custom Token: Text input for any ERC20 token address(es)
+ * - Supported Tokens: Single-select dropdown of system-wide stablecoins
+ * - Custom Token: Text input for a single ERC20 token address
  *
- * The field stores a JSON object with the mode and selected values.
+ * The field stores a JSON object with the mode and a single selected token.
  */
 export function TokenSelectField({
   field,
@@ -65,8 +65,6 @@ export function TokenSelectField({
       // Network changed - reset the selection
       const resetValue: TokenFieldValue = {
         mode: currentValue.mode,
-        supportedTokenIds: [],
-        customTokens: [],
       };
       onUpdateConfig(field.key, JSON.stringify(resetValue));
       setValidationError(null);
@@ -109,8 +107,8 @@ export function TokenSelectField({
   const handleModeChange = (useCustom: boolean) => {
     const newValue: TokenFieldValue = {
       mode: useCustom ? "custom" : "supported",
-      supportedTokenIds: currentValue.supportedTokenIds,
-      customTokens: currentValue.customTokens,
+      supportedTokenId: currentValue.supportedTokenId,
+      customToken: currentValue.customToken,
     };
     onUpdateConfig(field.key, JSON.stringify(newValue));
     setValidationError(null);
@@ -118,15 +116,12 @@ export function TokenSelectField({
 
   // Handle supported token selection
   const handleTokenSelect = (tokenId: string) => {
-    // Toggle: if already selected, remove; otherwise, add
-    const currentIds = currentValue.supportedTokenIds;
-    const newIds = currentIds.includes(tokenId)
-      ? currentIds.filter((id) => id !== tokenId)
-      : [...currentIds, tokenId];
-
+    // Single-select: if already selected, clear; otherwise, set to this token
     const newValue: TokenFieldValue = {
       ...currentValue,
-      supportedTokenIds: newIds,
+      supportedTokenId:
+        currentValue.supportedTokenId === tokenId ? undefined : tokenId,
+      customToken: undefined, // Clear custom token when selecting supported
     };
     onUpdateConfig(field.key, JSON.stringify(newValue));
   };
@@ -138,11 +133,9 @@ export function TokenSelectField({
       return;
     }
 
-    // Avoid duplicates
+    // If same token already selected, just clear input
     if (
-      currentValue.customTokens.some(
-        (t) => t.address.toLowerCase() === trimmed.toLowerCase()
-      )
+      currentValue.customToken?.address.toLowerCase() === trimmed.toLowerCase()
     ) {
       setCustomInputValue("");
       setValidationError(null);
@@ -164,13 +157,14 @@ export function TokenSelectField({
         return;
       }
 
-      // Add the validated token
+      // Replace the existing custom token with the new one
       const newValue: TokenFieldValue = {
         ...currentValue,
-        customTokens: [
-          ...currentValue.customTokens,
-          { address: data.token.address, symbol: data.token.symbol },
-        ],
+        customToken: {
+          address: data.token.address,
+          symbol: data.token.symbol,
+        },
+        supportedTokenId: undefined, // Clear supported token when selecting custom
       };
       onUpdateConfig(field.key, JSON.stringify(newValue));
       setCustomInputValue("");
@@ -183,24 +177,7 @@ export function TokenSelectField({
     }
   };
 
-  // Remove a custom token
-  const handleRemoveCustomToken = (address: string) => {
-    const newTokens = currentValue.customTokens.filter(
-      (t) => t.address.toLowerCase() !== address.toLowerCase()
-    );
-    const newValue: TokenFieldValue = {
-      ...currentValue,
-      customTokens: newTokens,
-    };
-    onUpdateConfig(field.key, JSON.stringify(newValue));
-  };
-
   const isCustomMode = currentValue.mode === "custom";
-
-  // Check if we have any selected tokens
-  const hasSelectedTokens =
-    currentValue.supportedTokenIds.length > 0 ||
-    currentValue.customTokens.length > 0;
 
   // Render supported tokens section based on state
   const renderSupportedTokensSection = () => {
@@ -233,15 +210,17 @@ export function TokenSelectField({
       );
     }
     return (
-      <Select disabled={disabled} onValueChange={handleTokenSelect} value="">
+      <Select
+        disabled={disabled}
+        onValueChange={handleTokenSelect}
+        value={currentValue.supportedTokenId || ""}
+      >
         <SelectTrigger className="w-full">
-          <SelectValue placeholder="Select supported tokens..." />
+          <SelectValue placeholder="Select a token..." />
         </SelectTrigger>
         <SelectContent>
           {tokens.map((token) => {
-            const isSelected = currentValue.supportedTokenIds.includes(
-              token.id
-            );
+            const isSelected = currentValue.supportedTokenId === token.id;
             return (
               <SelectItem key={token.id} value={token.id}>
                 <div className="flex items-center gap-2">
@@ -287,7 +266,7 @@ export function TokenSelectField({
         </Select>
       </div>
 
-      {/* Supported Tokens Multi-Select */}
+      {/* Supported Tokens Single-Select */}
       {!isCustomMode && (
         <div className="space-y-2">{renderSupportedTokensSection()}</div>
       )}
@@ -338,50 +317,6 @@ export function TokenSelectField({
           )}
         </div>
       )}
-
-      {/* All Selected Tokens - Always visible */}
-      {hasSelectedTokens && (
-        <div className="space-y-1">
-          <Label className="text-muted-foreground text-xs">
-            Selected Tokens
-          </Label>
-          <div className="flex flex-wrap gap-1">
-            {/* Supported token badges */}
-            {currentValue.supportedTokenIds.map((tokenId) => {
-              const token = tokens.find((t) => t.id === tokenId);
-              if (!token) {
-                return null;
-              }
-              return (
-                <button
-                  className="flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-blue-700 text-xs hover:bg-blue-500/20 dark:text-blue-400"
-                  disabled={disabled}
-                  key={`supported-${tokenId}`}
-                  onClick={() => handleTokenSelect(tokenId)}
-                  type="button"
-                >
-                  {token.symbol}
-                  <X className="h-3 w-3 text-muted-foreground" />
-                </button>
-              );
-            })}
-            {/* Imported (custom) token badges */}
-            {currentValue.customTokens.map((customToken) => (
-              <button
-                className="flex items-center gap-1 rounded-full bg-orange-500/10 px-2 py-0.5 text-orange-700 text-xs hover:bg-orange-500/20 dark:text-orange-400"
-                disabled={disabled}
-                key={`custom-${customToken.address}`}
-                onClick={() => handleRemoveCustomToken(customToken.address)}
-                type="button"
-              >
-                {customToken.symbol}{" "}
-                <span className="text-orange-500/70">(imported)</span>
-                <X className="h-3 w-3 text-muted-foreground" />
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -390,67 +325,168 @@ export function TokenSelectField({
 // Value Parsing Utilities
 // ============================================================================
 
+/**
+ * Extract mode from parsed config, defaulting to "supported"
+ */
+function extractMode(parsed: unknown): "supported" | "custom" {
+  if (typeof parsed !== "object" || parsed === null) {
+    return "supported";
+  }
+
+  const config = parsed as Record<string, unknown>;
+  return config.mode === "supported" || config.mode === "custom"
+    ? (config.mode as "supported" | "custom")
+    : "supported";
+}
+
+/**
+ * Extract supported token ID from parsed config
+ * Handles both new (single) and legacy (array) formats
+ */
+function extractSupportedTokenId(parsed: unknown): string | undefined {
+  if (typeof parsed !== "object" || parsed === null) {
+    return;
+  }
+
+  const config = parsed as Record<string, unknown>;
+
+  // New format: single token ID
+  if (typeof config.supportedTokenId === "string") {
+    return config.supportedTokenId;
+  }
+
+  // Legacy format: array - use first element
+  if (
+    Array.isArray(config.supportedTokenIds) &&
+    config.supportedTokenIds.length > 0
+  ) {
+    const firstId = config.supportedTokenIds[0];
+    return typeof firstId === "string" ? firstId : undefined;
+  }
+
+  return;
+}
+
+/**
+ * Extract custom token from parsed config
+ * Handles both new (single) and legacy (array/string) formats
+ */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Handles multiple legacy formats for backwards compatibility
+function extractCustomToken(parsed: unknown): CustomToken | undefined {
+  if (typeof parsed !== "object" || parsed === null) {
+    return;
+  }
+
+  const config = parsed as Record<string, unknown>;
+
+  // New format: single custom token object
+  if (
+    config.customToken &&
+    typeof config.customToken === "object" &&
+    config.customToken !== null
+  ) {
+    const token = config.customToken as Record<string, unknown>;
+    if (typeof token.address === "string" && typeof token.symbol === "string") {
+      return { address: token.address, symbol: token.symbol };
+    }
+  }
+
+  // Legacy format: array of custom tokens - use first element
+  if (Array.isArray(config.customTokens) && config.customTokens.length > 0) {
+    const firstToken = config.customTokens[0];
+    if (
+      firstToken &&
+      typeof firstToken === "object" &&
+      typeof firstToken.address === "string" &&
+      typeof firstToken.symbol === "string"
+    ) {
+      return {
+        address: firstToken.address,
+        symbol: firstToken.symbol,
+      };
+    }
+  }
+
+  // Legacy format: array of addresses - convert first address to token
+  if (
+    Array.isArray(config.customTokenAddresses) &&
+    config.customTokenAddresses.length > 0
+  ) {
+    const address = config.customTokenAddresses.find(
+      (a): a is string => typeof a === "string" && a.trim() !== ""
+    );
+    if (address) {
+      return { address, symbol: "???" };
+    }
+  }
+
+  // Legacy format: single address string
+  if (typeof config.customTokenAddress === "string") {
+    return { address: config.customTokenAddress, symbol: "???" };
+  }
+
+  return;
+}
+
+/**
+ * Parse token value from JSON string
+ * Supports both new (single token) and legacy (array) formats
+ */
 function parseTokenValue(value: string | undefined): TokenFieldValue {
   if (!value) {
     return {
       mode: "supported",
-      supportedTokenIds: [],
-      customTokens: [],
     };
   }
 
   try {
     const parsed = JSON.parse(value);
 
-    // Parse custom tokens - support multiple formats for backwards compatibility
-    let customTokens: CustomToken[] = [];
-    if (Array.isArray(parsed.customTokens)) {
-      customTokens = parsed.customTokens;
-    } else if (Array.isArray(parsed.customTokenAddresses)) {
-      // Legacy: convert addresses to tokens with unknown symbol
-      customTokens = parsed.customTokenAddresses
-        .filter((a: string) => a && a.trim() !== "")
-        .map((address: string) => ({ address, symbol: "???" }));
-    } else if (parsed.customTokenAddress) {
-      // Legacy: single address
-      customTokens = [{ address: parsed.customTokenAddress, symbol: "???" }];
-    }
+    const supportedTokenId = extractSupportedTokenId(parsed);
+    const customToken = extractCustomToken(parsed);
+    const mode = extractMode(parsed);
 
     return {
-      mode: parsed.mode || "supported",
-      supportedTokenIds: Array.isArray(parsed.supportedTokenIds)
-        ? parsed.supportedTokenIds
-        : [],
-      customTokens,
+      mode,
+      supportedTokenId,
+      customToken,
     };
   } catch {
     // Legacy support: if value is just a string (old format), treat as custom
+    if (value.startsWith("0x")) {
+      return {
+        mode: "custom",
+        customToken: { address: value, symbol: "???" },
+      };
+    }
     return {
-      mode: "custom",
-      supportedTokenIds: [],
-      customTokens: [{ address: value, symbol: "???" }],
+      mode: "supported",
     };
   }
 }
 
 /**
- * Extract token addresses from the field value for step execution
- * Returns an array of ALL token addresses (both supported and custom)
+ * Extract token address from the field value for step execution
+ * Returns a single token address (either supported or custom)
  */
 export function extractTokenAddresses(
   value: string | undefined,
   supportedTokens: SupportedToken[]
-): string[] {
+): string | null {
   const parsed = parseTokenValue(value);
 
-  // Get supported token addresses
-  const supportedAddresses = parsed.supportedTokenIds
-    .map((id) => supportedTokens.find((t) => t.id === id)?.tokenAddress)
-    .filter((addr): addr is string => Boolean(addr));
+  // Get supported token address
+  if (parsed.supportedTokenId) {
+    const token = supportedTokens.find((t) => t.id === parsed.supportedTokenId);
+    if (token?.tokenAddress) {
+      return token.tokenAddress;
+    }
+  }
 
-  // Get custom token addresses
-  const customAddresses = parsed.customTokens.map((t) => t.address);
+  // Get custom token address
+  if (parsed.customToken?.address) {
+    return parsed.customToken.address;
+  }
 
-  // Return all unique addresses
-  return [...new Set([...supportedAddresses, ...customAddresses])];
+  return null;
 }
