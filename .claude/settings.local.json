@@ -20,7 +20,8 @@
       "Bash(echo:*)",
       "Bash(echo \"DEPLOYER_PRIVATE_KEY=\"\"\"\"\")",
       "Bash(node -e:*)",
-      "Bash(pnpm add:*)"
+      "Bash(pnpm add:*)",
+      "Bash(pnpm type-check:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
