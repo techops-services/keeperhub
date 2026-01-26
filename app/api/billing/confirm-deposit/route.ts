@@ -12,6 +12,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { creditTransactions, member, organization } from "@/lib/db/schema";
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex payment confirmation with blockchain verification and credit calculation
 export async function POST(req: Request) {
   try {
     // Authenticate user

@@ -8,8 +8,8 @@ import {
   useConnect,
   useDisconnect,
   useReadContract,
-  useWriteContract,
   useWaitForTransactionReceipt,
+  useWriteContract,
 } from "wagmi";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,7 +41,13 @@ import { api } from "@/lib/api-client";
 
 const CREDITS_CONTRACT = process.env.NEXT_PUBLIC_CREDITS_CONTRACT_ADDRESS || "";
 
-type Step = "input" | "connect" | "confirm" | "approve" | "processing" | "success";
+type Step =
+  | "input"
+  | "connect"
+  | "confirm"
+  | "approve"
+  | "processing"
+  | "success";
 type PaymentMethod = "eth" | "stablecoin";
 type StablecoinSymbol = "USDC" | "USDT" | "USDS";
 
@@ -72,7 +78,9 @@ export function BuyCreditsDialog({
   const [isCalculating, setIsCalculating] = useState(skipInput);
 
   const isStablecoinPayment = paymentMethod === "stablecoin";
-  const selectedTokenInfo = SUPPORTED_TOKENS.find((t) => t.symbol === selectedToken);
+  const selectedTokenInfo = SUPPORTED_TOKENS.find(
+    (t) => t.symbol === selectedToken
+  );
   const stablecoinAddress = isStablecoinPayment
     ? getStablecoinAddress(selectedToken)
     : undefined;
@@ -83,10 +91,7 @@ export function BuyCreditsDialog({
   const { address, isConnected, chain } = useAccount();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
-  const {
-    writeContract,
-    isPending: isSendingTx,
-  } = useWriteContract();
+  const { writeContract, isPending: isSendingTx } = useWriteContract();
 
   // Only watch for deposit transaction confirmation, not approval
   const { isLoading: isConfirming, isSuccess: isConfirmed } =
@@ -102,13 +107,18 @@ export function BuyCreditsDialog({
     address: stablecoinAddress,
     abi: ERC20_ABI,
     functionName: "allowance",
-    args: address && stablecoinAddress ? [address, CREDITS_CONTRACT as `0x${string}`] : undefined,
+    args:
+      address && stablecoinAddress
+        ? [address, CREDITS_CONTRACT as `0x${string}`]
+        : undefined,
     query: {
       enabled: !!(address && stablecoinAddress && isStablecoinPayment),
     },
   });
 
-  const currentAllowance = allowanceData ? (allowanceData as bigint) : BigInt(0);
+  const currentAllowance = allowanceData
+    ? (allowanceData as bigint)
+    : BigInt(0);
   const needsApproval = isStablecoinPayment && currentAllowance < tokenAmount;
 
   // Check token balance
@@ -123,7 +133,8 @@ export function BuyCreditsDialog({
   });
 
   const tokenBalance = balanceData ? (balanceData as bigint) : BigInt(0);
-  const hasInsufficientBalance = isStablecoinPayment && tokenBalance < tokenAmount;
+  const hasInsufficientBalance =
+    isStablecoinPayment && tokenBalance < tokenAmount;
 
   const SEPOLIA_CHAIN_ID = 11_155_111;
   const isOnSepoliaNetwork = chain?.id === SEPOLIA_CHAIN_ID;
@@ -403,7 +414,10 @@ export function BuyCreditsDialog({
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem id="eth-input" value="eth" />
-                  <Label className="cursor-pointer font-normal" htmlFor="eth-input">
+                  <Label
+                    className="cursor-pointer font-normal"
+                    htmlFor="eth-input"
+                  >
                     Ethereum (ETH)
                   </Label>
                 </div>

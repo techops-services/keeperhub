@@ -20,7 +20,9 @@ async function main() {
   for (const abi of mintABIs) {
     try {
       const contract = new ethers.Contract(USDT_ADDRESS, abi, signer);
-      const functionName = Object.keys(contract.interface.functions)[0].split("(")[0];
+      const functionName = Object.keys(contract.interface.functions)[0].split(
+        "("
+      )[0];
 
       console.log(`\nTrying ${functionName}...`);
 
@@ -58,7 +60,9 @@ async function main() {
   for (const abi of mintABIs) {
     try {
       const contract = new ethers.Contract(USDC_ADDRESS, abi, signer);
-      const functionName = Object.keys(contract.interface.functions)[0].split("(")[0];
+      const functionName = Object.keys(contract.interface.functions)[0].split(
+        "("
+      )[0];
 
       console.log(`\nTrying ${functionName}...`);
 

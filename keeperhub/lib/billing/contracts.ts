@@ -54,7 +54,9 @@ export const CHAIN_CONFIG = {
 };
 
 // Get stablecoin address for current network
-export function getStablecoinAddress(symbol: "USDC" | "USDT" | "USDS"): `0x${string}` {
+export function getStablecoinAddress(
+  symbol: "USDC" | "USDT" | "USDS"
+): `0x${string}` {
   const isMainnet = CHAIN_CONFIG.chainId === 1;
   const network = isMainnet ? "mainnet" : "sepolia";
   return STABLECOINS[network][symbol] as `0x${string}`;
@@ -66,7 +68,7 @@ export function usdToTokenAmount(usdAmount: number, decimals: number): bigint {
   // Token amount needs to be in token's smallest unit
   // For 6 decimals (USDC/USDT): $25 = 25_000_000 (25 * 10^6)
   // For 18 decimals (USDS): $25 = 25_000_000_000_000_000_000 (25 * 10^18)
-  return BigInt(Math.floor(usdAmount * Math.pow(10, decimals)));
+  return BigInt(Math.floor(usdAmount * 10 ** decimals));
 }
 
 // Minimal ABIs for event parsing and reading

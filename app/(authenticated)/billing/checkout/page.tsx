@@ -9,9 +9,9 @@ import {
   useAccount,
   useConnect,
   useReadContract,
-  useWriteContract,
   useSwitchChain,
   useWaitForTransactionReceipt,
+  useWriteContract,
 } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -57,6 +57,7 @@ const MOCK_TOKEN_ABI = [
 type PaymentMethod = "eth" | "stablecoin";
 type StablecoinSymbol = "USDC" | "USDT" | "USDS";
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex payment flow with multiple states and blockchain interactions
 export default function CheckoutPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -150,18 +151,21 @@ export default function CheckoutPage() {
   });
 
   // Watch for approval transaction confirmation
-  const { isSuccess: isApprovalConfirmed, isLoading: isApprovalPending } = useWaitForTransactionReceipt({
-    hash: approvalTxHash as `0x${string}` | undefined,
-    query: {
-      enabled: !!approvalTxHash,
-    },
-  });
+  const { isSuccess: isApprovalConfirmed, isLoading: isApprovalPending } =
+    useWaitForTransactionReceipt({
+      hash: approvalTxHash as `0x${string}` | undefined,
+      query: {
+        enabled: !!approvalTxHash,
+      },
+    });
 
   const SEPOLIA_CHAIN_ID = 11_155_111;
   const isOnSepoliaNetwork = chain?.id === SEPOLIA_CHAIN_ID;
 
   // Stablecoin logic
-  const selectedTokenInfo = SUPPORTED_TOKENS.find((t) => t.symbol === selectedToken);
+  const selectedTokenInfo = SUPPORTED_TOKENS.find(
+    (t) => t.symbol === selectedToken
+  );
   const stablecoinAddress = isStablecoinPayment
     ? getStablecoinAddress(selectedToken)
     : undefined;
@@ -174,13 +178,18 @@ export default function CheckoutPage() {
     address: stablecoinAddress,
     abi: ERC20_ABI,
     functionName: "allowance",
-    args: address && stablecoinAddress ? [address, CREDITS_CONTRACT as `0x${string}`] : undefined,
+    args:
+      address && stablecoinAddress
+        ? [address, CREDITS_CONTRACT as `0x${string}`]
+        : undefined,
     query: {
       enabled: !!(address && stablecoinAddress && isStablecoinPayment),
     },
   });
 
-  const currentAllowance = allowanceData ? (allowanceData as bigint) : BigInt(0);
+  const currentAllowance = allowanceData
+    ? (allowanceData as bigint)
+    : BigInt(0);
   const needsApproval = isStablecoinPayment && currentAllowance < tokenAmount;
 
   // Refetch allowance after approval is confirmed
@@ -204,7 +213,8 @@ export default function CheckoutPage() {
   });
 
   const tokenBalance = balanceData ? (balanceData as bigint) : BigInt(0);
-  const hasInsufficientBalance = isStablecoinPayment && tokenBalance < tokenAmount;
+  const hasInsufficientBalance =
+    isStablecoinPayment && tokenBalance < tokenAmount;
 
   // Log errors for debugging
   useEffect(() => {
@@ -245,7 +255,13 @@ export default function CheckoutPage() {
       };
       confirmDeposit();
     }
-  }, [isDepositConfirmed, depositTxHash, organizationId, estimatedCredits, router]);
+  }, [
+    isDepositConfirmed,
+    depositTxHash,
+    organizationId,
+    estimatedCredits,
+    router,
+  ]);
 
   const handleConnect = () => {
     const injectedConnector = connectors.find((c) => c.type === "injected");
@@ -264,7 +280,9 @@ export default function CheckoutPage() {
   };
 
   const handleMintTestTokens = async (token: "USDT" | "USDS") => {
-    if (!address || !isOnSepoliaNetwork) return;
+    if (!(address && isOnSepoliaNetwork)) {
+      return;
+    }
 
     const tokenAddress = MOCK_TOKENS[token];
     // USDT has 6 decimals, USDS has 18 decimals
@@ -301,7 +319,9 @@ export default function CheckoutPage() {
   };
 
   const handleApprove = async () => {
-    if (!(address && stablecoinAddress && organizationId)) return;
+    if (!(address && stablecoinAddress && organizationId)) {
+      return;
+    }
 
     // Check if user is on the correct network
     if (!isOnSepoliaNetwork) {
@@ -335,8 +355,11 @@ export default function CheckoutPage() {
     }
   };
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex payment flow handling both ETH and stablecoin transactions
   const handlePurchase = async () => {
-    if (!organizationId) return;
+    if (!organizationId) {
+      return;
+    }
 
     // Check if user is on the correct network
     if (!isOnSepoliaNetwork) {
@@ -350,7 +373,9 @@ export default function CheckoutPage() {
 
       if (isStablecoinPayment) {
         // Stablecoin payment
-        if (!(address && stablecoinAddress)) return;
+        if (!(address && stablecoinAddress)) {
+          return;
+        }
 
         writeContract(
           {
@@ -374,7 +399,9 @@ export default function CheckoutPage() {
         );
       } else {
         // ETH payment
-        if (!(address && ethAmount)) return;
+        if (!(address && ethAmount)) {
+          return;
+        }
 
         writeContract(
           {
@@ -549,7 +576,9 @@ export default function CheckoutPage() {
             <div className="space-y-2">
               <Label htmlFor="token">Select Token</Label>
               <Select
-                onValueChange={(value) => setSelectedToken(value as StablecoinSymbol)}
+                onValueChange={(value) =>
+                  setSelectedToken(value as StablecoinSymbol)
+                }
                 value={selectedToken}
               >
                 <SelectTrigger id="token">
@@ -581,7 +610,7 @@ export default function CheckoutPage() {
 
         {/* Mint Test Tokens - Only on Sepolia */}
         {isOnSepoliaNetwork && isConnected && (
-          <div className="rounded-lg border border-dashed border-yellow-500/50 bg-yellow-500/5 p-4">
+          <div className="rounded-lg border border-yellow-500/50 border-dashed bg-yellow-500/5 p-4">
             <div className="mb-3 flex items-center gap-2">
               <span className="text-yellow-600">🧪</span>
               <h3 className="font-medium text-sm text-yellow-700 dark:text-yellow-400">
@@ -589,7 +618,8 @@ export default function CheckoutPage() {
               </h3>
             </div>
             <p className="mb-3 text-muted-foreground text-xs">
-              Need test tokens? Mint 100 USDT or USDS to your wallet for testing.
+              Need test tokens? Mint 100 USDT or USDS to your wallet for
+              testing.
             </p>
             <div className="flex gap-2">
               <Button
@@ -627,9 +657,7 @@ export default function CheckoutPage() {
               </span>
             </div>
             <div className="flex justify-between border-t pt-3 font-semibold text-base">
-              <span>
-                Total ({isStablecoinPayment ? selectedToken : "ETH"})
-              </span>
+              <span>Total ({isStablecoinPayment ? selectedToken : "ETH"})</span>
               <span className="font-mono">
                 {isStablecoinPayment
                   ? `${formatUnits(tokenAmount, selectedTokenInfo?.decimals || 6)} ${selectedToken}`
@@ -661,16 +689,24 @@ export default function CheckoutPage() {
                 {isStablecoinPayment && needsApproval && (
                   <Button
                     className="w-full"
-                    disabled={!!approvalTxHash || isApprovalPending || hasInsufficientBalance}
+                    disabled={
+                      !!approvalTxHash ||
+                      isApprovalPending ||
+                      hasInsufficientBalance
+                    }
                     onClick={handleApprove}
                     size="lg"
                     variant="outline"
                   >
-                    {isApprovalPending
-                      ? "Confirming approval..."
-                      : approvalTxHash
-                        ? "Waiting for confirmation..."
-                        : `Approve ${selectedToken}`}
+                    {(() => {
+                      if (isApprovalPending) {
+                        return "Confirming approval...";
+                      }
+                      if (approvalTxHash) {
+                        return "Waiting for confirmation...";
+                      }
+                      return `Approve ${selectedToken}`;
+                    })()}
                   </Button>
                 )}
                 {isApprovalPending && (
@@ -692,12 +728,15 @@ export default function CheckoutPage() {
                 >
                   {isPurchasing ? "Confirming..." : "Purchase Credits"}
                 </Button>
-                {isStablecoinPayment && needsApproval && !isApprovalPending && !approvalTxHash && (
-                  <p className="text-center text-muted-foreground text-xs">
-                    You need to approve {selectedToken} spending before you can
-                    purchase
-                  </p>
-                )}
+                {isStablecoinPayment &&
+                  needsApproval &&
+                  !isApprovalPending &&
+                  !approvalTxHash && (
+                    <p className="text-center text-muted-foreground text-xs">
+                      You need to approve {selectedToken} spending before you
+                      can purchase
+                    </p>
+                  )}
               </div>
             ) : (
               <div className="space-y-3">

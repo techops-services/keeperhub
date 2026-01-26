@@ -63,7 +63,9 @@ export default function BillingHistoryPage() {
   const { data: balance } = useQuery({
     queryKey: ["billing-balance", organizationId],
     queryFn: () => {
-      if (!organizationId) throw new Error("No organization ID");
+      if (!organizationId) {
+        throw new Error("No organization ID");
+      }
       return api.billing.getBalance(organizationId);
     },
     enabled: !!organizationId,
@@ -72,7 +74,9 @@ export default function BillingHistoryPage() {
   const { data: historyData, isLoading } = useQuery({
     queryKey: ["billing-history", organizationId],
     queryFn: () => {
-      if (!organizationId) throw new Error("No organization ID");
+      if (!organizationId) {
+        throw new Error("No organization ID");
+      }
       return api.billing.getHistory(organizationId);
     },
     enabled: !!organizationId,
@@ -116,83 +120,93 @@ export default function BillingHistoryPage() {
       <Card>
         <div className="p-6">
           <h2 className="mb-4 font-semibold text-xl">All Transactions</h2>
-          {isLoading ? (
-            <div className="py-12 text-center text-muted-foreground">
-              Loading transactions...
-            </div>
-          ) : transactions.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground">
-              No transactions yet
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                    <TableHead>Transaction</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {transactions.map((tx) => (
-                    <TableRow key={tx.id}>
-                      <TableCell className="whitespace-nowrap">
-                        {formatDate(tx.createdAt)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {getTransactionIcon(tx.type)}
-                          <span className="font-medium">
-                            {getTransactionLabel(tx.type)}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate">
-                        {tx.note || tx.workflowId || "-"}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        <span
-                          className={
-                            tx.amount > 0 ? "text-green-600" : "text-red-600"
-                          }
-                        >
-                          {tx.amount > 0 ? "+" : ""}
-                          {tx.amount.toLocaleString()}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {tx.balanceAfter.toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        {tx.txHash ? (
-                          <a
-                            className="font-mono text-primary text-sm hover:underline"
-                            href={`${
-                              process.env.NEXT_PUBLIC_CHAIN_ID === "1"
-                                ? "https://etherscan.io"
-                                : "https://sepolia.etherscan.io"
-                            }/tx/${tx.txHash}`}
-                            rel="noopener noreferrer"
-                            target="_blank"
-                          >
-                            {tx.txHash.slice(0, 6)}...{tx.txHash.slice(-4)}
-                          </a>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">
-                            -
-                          </span>
-                        )}
-                      </TableCell>
+          {(() => {
+            if (isLoading) {
+              return (
+                <div className="py-12 text-center text-muted-foreground">
+                  Loading transactions...
+                </div>
+              );
+            }
+
+            if (transactions.length === 0) {
+              return (
+                <div className="py-12 text-center text-muted-foreground">
+                  No transactions yet
+                </div>
+              );
+            }
+
+            return (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="text-right">Balance</TableHead>
+                      <TableHead>Transaction</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                  </TableHeader>
+                  <TableBody>
+                    {transactions.map((tx) => (
+                      <TableRow key={tx.id}>
+                        <TableCell className="whitespace-nowrap">
+                          {formatDate(tx.createdAt)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {getTransactionIcon(tx.type)}
+                            <span className="font-medium">
+                              {getTransactionLabel(tx.type)}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="max-w-xs truncate">
+                          {tx.note || tx.workflowId || "-"}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          <span
+                            className={
+                              tx.amount > 0 ? "text-green-600" : "text-red-600"
+                            }
+                          >
+                            {tx.amount > 0 ? "+" : ""}
+                            {tx.amount.toLocaleString()}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {tx.balanceAfter.toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          {tx.txHash ? (
+                            <a
+                              className="font-mono text-primary text-sm hover:underline"
+                              href={`${
+                                process.env.NEXT_PUBLIC_CHAIN_ID === "1"
+                                  ? "https://etherscan.io"
+                                  : "https://sepolia.etherscan.io"
+                              }/tx/${tx.txHash}`}
+                              rel="noopener noreferrer"
+                              target="_blank"
+                            >
+                              {tx.txHash.slice(0, 6)}...{tx.txHash.slice(-4)}
+                            </a>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">
+                              -
+                            </span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            );
+          })()}
         </div>
       </Card>
 

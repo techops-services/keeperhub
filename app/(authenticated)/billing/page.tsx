@@ -51,7 +51,9 @@ export default function BillingPage() {
   const { data: balance } = useQuery({
     queryKey: ["billing-balance", organizationId],
     queryFn: () => {
-      if (!organizationId) throw new Error("No organization ID");
+      if (!organizationId) {
+        throw new Error("No organization ID");
+      }
       return api.billing.getBalance(organizationId);
     },
     enabled: !!organizationId,
@@ -76,9 +78,7 @@ export default function BillingPage() {
       {/* Current Balance */}
       <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-8">
         <div>
-          <p className="mb-1 text-muted-foreground text-sm">
-            Current Balance
-          </p>
+          <p className="mb-1 text-muted-foreground text-sm">Current Balance</p>
           <p className="font-bold text-5xl">
             {balance?.creditBalance?.toLocaleString() ?? 0}
           </p>

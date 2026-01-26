@@ -24,7 +24,10 @@ export async function POST(req: Request) {
     const { organizationId, workflowId, executionId } = body;
 
     if (!organizationId) {
-      return Response.json({ error: "Missing organizationId" }, { status: 400 });
+      return Response.json(
+        { error: "Missing organizationId" },
+        { status: 400 }
+      );
     }
 
     // Get organization with current balance
