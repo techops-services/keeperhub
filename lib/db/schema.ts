@@ -118,9 +118,9 @@ export const addressBookEntry = pgTable(
     address: text("address").notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
-    createdBy: text("created_by")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+    createdBy: text("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
   },
   (table) => [
     index("idx_address_book_org").on(table.organizationId),
