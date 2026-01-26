@@ -1,3 +1,4 @@
+// start custom keeperhub code //
 import { NextResponse } from "next/server";
 
 import { authenticateInternalService } from "@/keeperhub/lib/internal-service-auth";
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
   const { workflowId, userId, input } = body;
 
   // Validate required fields
-  if (!workflowId || !userId) {
+  if (!(workflowId && userId)) {
     return NextResponse.json(
       { error: "workflowId and userId are required" },
       { status: 400 }
@@ -36,3 +37,4 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ executionId: execution.id }, { status: 201 });
 }
+// end keeperhub code //

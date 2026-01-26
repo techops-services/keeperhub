@@ -1,9 +1,10 @@
+// start custom keeperhub code //
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { authenticateInternalService } from "@/keeperhub/lib/internal-service-auth";
 import { db } from "@/lib/db";
-import { workflows, workflowSchedules } from "@/lib/db/schema";
+import { workflowSchedules, workflows } from "@/lib/db/schema";
 
 export async function GET(request: Request) {
   const auth = authenticateInternalService(request);
@@ -29,3 +30,4 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ schedules });
 }
+// end keeperhub code //

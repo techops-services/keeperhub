@@ -1,3 +1,4 @@
+// start custom keeperhub code //
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
@@ -25,7 +26,7 @@ export async function PATCH(
   const validStatuses: ExecutionStatus[] = ["running", "success", "error"];
 
   // Validate status
-  if (!status || !validStatuses.includes(status)) {
+  if (!(status && validStatuses.includes(status))) {
     return NextResponse.json(
       { error: "status must be 'running', 'success', or 'error'" },
       { status: 400 }
@@ -65,3 +66,4 @@ export async function PATCH(
 
   return NextResponse.json({ success: true });
 }
+// end keeperhub code //
