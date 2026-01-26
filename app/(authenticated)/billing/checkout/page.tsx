@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  CHAIN_CONFIG,
   CREDITS_ABI,
   ERC20_ABI,
   getStablecoinAddress,
@@ -520,7 +521,7 @@ function CheckoutContent() {
               <a
                 className="text-primary text-sm hover:underline"
                 href={`${
-                  process.env.NEXT_PUBLIC_CHAIN_ID === "1"
+                  CHAIN_CONFIG.chainId === 1
                     ? "https://etherscan.io"
                     : "https://sepolia.etherscan.io"
                 }/tx/${depositTxHash}`}

@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  CHAIN_CONFIG,
   CREDITS_ABI,
   ERC20_ABI,
   getStablecoinAddress,
@@ -38,8 +39,22 @@ import {
   usdToTokenAmount,
 } from "@/keeperhub/lib/billing/contracts";
 import { api } from "@/lib/api-client";
+import { getRpcUrlByChainId } from "@/lib/rpc/rpc-config";
 
 const CREDITS_CONTRACT = process.env.NEXT_PUBLIC_CREDITS_CONTRACT_ADDRESS || "";
+const SEPOLIA_CHAIN_ID = 11_155_111;
+
+// Get RPC URL from centralized CHAIN_RPC_CONFIG at module initialization
+function getSepoliaRpcUrl(): string {
+  try {
+    return getRpcUrlByChainId(SEPOLIA_CHAIN_ID, "primary");
+  } catch {
+    // Fallback to public Sepolia RPC
+    return "https://ethereum-sepolia-rpc.publicnode.com";
+  }
+}
+
+const SEPOLIA_RPC_URL = getSepoliaRpcUrl();
 
 type Step =
   | "input"
@@ -137,7 +152,6 @@ export function BuyCreditsDialog({
   const hasInsufficientBalance =
     isStablecoinPayment && tokenBalance < tokenAmount;
 
-  const SEPOLIA_CHAIN_ID = 11_155_111;
   const isOnSepoliaNetwork = chain?.id === SEPOLIA_CHAIN_ID;
 
   // Calculate ETH amount and credits when USD amount changes
@@ -152,25 +166,22 @@ export function BuyCreditsDialog({
       const usdInCents = Math.floor(Number.parseFloat(usdAmount) * 1_000_000);
 
       // Call contract to get ETH amount needed
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_ETH_RPC_URL || "https://sepolia.infura.io/v3/YOUR_KEY"}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            method: "eth_call",
-            params: [
-              {
-                to: CREDITS_CONTRACT,
-                data: `0x8803dbee${usdInCents.toString(16).padStart(64, "0")}`, // usdToEth(uint256)
-              },
-              "latest",
-            ],
-            id: 1,
-          }),
-        }
-      );
+      const response = await fetch(SEPOLIA_RPC_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          method: "eth_call",
+          params: [
+            {
+              to: CREDITS_CONTRACT,
+              data: `0x8803dbee${usdInCents.toString(16).padStart(64, "0")}`, // usdToEth(uint256)
+            },
+            "latest",
+          ],
+          id: 1,
+        }),
+      });
 
       const result = await response.json();
       const ethWei = BigInt(result.result);
@@ -380,7 +391,7 @@ export function BuyCreditsDialog({
           <DialogTitle>Buy Credits</DialogTitle>
           <DialogDescription>
             Purchase credits to run workflows. Pay with ETH on{" "}
-            {process.env.NEXT_PUBLIC_CHAIN_ID === "1" ? "Ethereum" : "Sepolia"}.
+            {CHAIN_CONFIG.chainId === 1 ? "Ethereum" : "Sepolia"}.
           </DialogDescription>
         </DialogHeader>
 
@@ -650,7 +661,7 @@ export function BuyCreditsDialog({
             {depositTxHash && (
               <a
                 className="text-primary text-sm hover:underline"
-                href={`${process.env.NEXT_PUBLIC_CHAIN_ID === "1" ? "https://etherscan.io" : "https://sepolia.etherscan.io"}/tx/${depositTxHash}`}
+                href={`${CHAIN_CONFIG.chainId === 1 ? "https://etherscan.io" : "https://sepolia.etherscan.io"}/tx/${depositTxHash}`}
                 rel="noopener noreferrer"
                 target="_blank"
               >

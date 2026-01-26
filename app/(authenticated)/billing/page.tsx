@@ -5,6 +5,7 @@ import { Check, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { CHAIN_CONFIG } from "@/keeperhub/lib/billing/contracts";
 import { useActiveMember } from "@/keeperhub/lib/hooks/use-organization";
 import { api } from "@/lib/api-client";
 
@@ -92,7 +93,7 @@ export default function BillingPage() {
           <h2 className="font-semibold text-2xl">Credit Packages</h2>
           <p className="text-muted-foreground text-sm">
             Pay with ETH on{" "}
-            {process.env.NEXT_PUBLIC_CHAIN_ID === "1" ? "Ethereum" : "Sepolia"}
+            {CHAIN_CONFIG.chainId === 1 ? "Ethereum" : "Sepolia"}
           </p>
         </div>
 

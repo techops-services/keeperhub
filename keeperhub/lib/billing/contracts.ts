@@ -1,5 +1,6 @@
 import { ethers } from "ethers";
 import { parseAbi } from "viem";
+import { getRpcUrlByChainId } from "@/lib/rpc/rpc-config";
 
 // Contract addresses from deployment
 export const CONTRACTS = {
@@ -51,9 +52,19 @@ export const SUPPORTED_TOKENS = [
 ] as const;
 
 // Chain configuration
+// Billing contracts are currently deployed on Sepolia testnet
+// In production, update contract addresses to mainnet and this will automatically use chainId 1
 export const CHAIN_CONFIG = {
-  chainId: Number.parseInt(process.env.NEXT_PUBLIC_CHAIN_ID || "11155111", 10),
-  rpcUrl: process.env.ETH_RPC_URL || "",
+  chainId: 11_155_111, // Sepolia - where billing contracts are deployed
+  get rpcUrl() {
+    // Use centralized RPC config from CHAIN_RPC_CONFIG
+    try {
+      return getRpcUrlByChainId(this.chainId, "primary");
+    } catch {
+      // Fallback to empty string if chain not configured
+      return "";
+    }
+  },
 };
 
 // Get stablecoin address for current network
@@ -103,7 +114,9 @@ export const ERC20_ABI = parseAbi([
 // Get provider instance
 export function getProvider() {
   if (!CHAIN_CONFIG.rpcUrl) {
-    throw new Error("ETH_RPC_URL not configured");
+    throw new Error(
+      `RPC URL not configured for chain ID ${CHAIN_CONFIG.chainId}. Ensure CHAIN_RPC_CONFIG is set.`
+    );
   }
   return new ethers.JsonRpcProvider(CHAIN_CONFIG.rpcUrl);
 }
