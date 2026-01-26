@@ -1,11 +1,11 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
+import { ethers } from "ethers";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { addressBookEntry, users } from "@/lib/db/schema";
-import { ethers } from "ethers";
 
 // GET - List all address book entries for the current organization
 export async function GET(request: Request) {

@@ -1,5 +1,6 @@
 "use client";
 
+import { ethers } from "ethers";
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -16,7 +17,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SaveAddressBookmark } from "@/keeperhub/components/address-book/save-address-bookmark";
-import { ethers } from "ethers";
 
 export type WithdrawableAsset = {
   type: "native" | "token";

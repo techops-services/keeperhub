@@ -1,5 +1,6 @@
 "use client";
 
+import { ethers } from "ethers";
 import { Bookmark, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -13,7 +14,6 @@ import {
 } from "@/components/ui/tooltip";
 import { useActiveMember } from "@/keeperhub/lib/hooks/use-organization";
 import { addressBookApi } from "@/lib/api-client";
-import { ethers } from "ethers";
 
 type SaveAddressBookmarkProps = {
   address: string;
@@ -88,9 +88,7 @@ export function SaveAddressBookmark({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                disabled={
-                  !(isOwner && address && ethers.isAddress(address))
-                }
+                disabled={!(isOwner && address && ethers.isAddress(address))}
                 onClick={handleSaveClick}
                 size="icon"
                 type="button"
