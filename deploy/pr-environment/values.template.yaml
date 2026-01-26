@@ -187,6 +187,47 @@ env:
     type: parameterStore
     name: scheduler-service-api-key
     parameter_name: /eks/maker-staging/keeperhub-scheduler/keeperhub-api-key
+  HUB_SERVICE_API_KEY:
+    type: parameterStore
+    name: hub-service-api-key
+    parameter_name: /eks/maker-staging/keeperhub/hub-service-api-key
+  WORKFLOW_EXECUTOR_SERVICE_API_KEY:
+    type: parameterStore
+    name: workflow-executor-service-api-key
+    parameter_name: /eks/maker-staging/keeperhub/workflow-executor-service-api-key
+  # Billing & Blockchain Configuration
+  NEXT_PUBLIC_APP_URL:
+    type: kv
+    value: "https://app-pr-${PR_NUMBER}.keeperhub.com"
+  SEPOLIA_RPC_URL:
+    type: parameterStore
+    name: sepolia-rpc-url
+    parameter_name: /eks/maker-staging/keeperhub/sepolia-rpc-url
+  MAINNET_RPC_URL:
+    type: parameterStore
+    name: mainnet-rpc-url
+    parameter_name: /eks/maker-staging/keeperhub/mainnet-rpc-url
+  ETH_RPC_URL:
+    type: parameterStore
+    name: eth-rpc-url
+    parameter_name: /eks/maker-staging/keeperhub/eth-rpc-url
+  NEXT_PUBLIC_SEPOLIA_RPC_URL:
+    type: parameterStore
+    name: next-public-sepolia-rpc-url
+    parameter_name: /eks/maker-staging/keeperhub/next-public-sepolia-rpc-url
+  NEXT_PUBLIC_MAINNET_RPC_URL:
+    type: parameterStore
+    name: next-public-mainnet-rpc-url
+    parameter_name: /eks/maker-staging/keeperhub/next-public-mainnet-rpc-url
+  NEXT_PUBLIC_CREDITS_CONTRACT_ADDRESS:
+    type: kv
+    value: "0xB55ef961fc47bd67a3859fD61dc563e72B5605D6"
+  NEXT_PUBLIC_TIERS_CONTRACT_ADDRESS:
+    type: kv
+    value: "0x4B899Cc652944994741169875010E5a3C607975B"
+  NEXT_PUBLIC_CHAIN_ID:
+    type: kv
+    value: "11155111"
   # PR-specific SQS configuration (using LocalStack)
   AWS_REGION:
     type: kv
