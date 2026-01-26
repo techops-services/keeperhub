@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { formatEther, formatUnits, parseEther } from "viem";
 import {
@@ -60,6 +60,7 @@ type BuyCreditsDialogProps = {
   skipInput?: boolean;
 };
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex payment flow with ETH/stablecoin switching, approval logic, and transaction tracking
 export function BuyCreditsDialog({
   open,
   onOpenChange,
@@ -139,21 +140,8 @@ export function BuyCreditsDialog({
   const SEPOLIA_CHAIN_ID = 11_155_111;
   const isOnSepoliaNetwork = chain?.id === SEPOLIA_CHAIN_ID;
 
-  // Auto-calculate when dialog opens with pre-selected package
-  useEffect(() => {
-    if (open && skipInput && !ethAmount) {
-      setIsCalculating(true);
-      calculateEthAmount().then(() => {
-        setIsCalculating(false);
-        if (isConnected) {
-          setStep("confirm");
-        }
-      });
-    }
-  }, [open, skipInput, isConnected, calculateEthAmount, ethAmount]);
-
   // Calculate ETH amount and credits when USD amount changes
-  const calculateEthAmount = async () => {
+  const calculateEthAmount = useCallback(async () => {
     if (!usdAmount || Number.parseFloat(usdAmount) <= 0) {
       setEthAmount(null);
       setEstimatedCredits(null);
@@ -203,7 +191,20 @@ export function BuyCreditsDialog({
       console.error("Failed to calculate ETH amount:", error);
       toast.error("Failed to calculate ETH amount. Please try again.");
     }
-  };
+  }, [usdAmount]);
+
+  // Auto-calculate when dialog opens with pre-selected package
+  useEffect(() => {
+    if (open && skipInput && !ethAmount) {
+      setIsCalculating(true);
+      calculateEthAmount().then(() => {
+        setIsCalculating(false);
+        if (isConnected) {
+          setStep("confirm");
+        }
+      });
+    }
+  }, [open, skipInput, isConnected, calculateEthAmount, ethAmount]);
 
   const handleConnect = () => {
     const injectedConnector = connectors.find((c) => c.type === "injected");
@@ -213,8 +214,10 @@ export function BuyCreditsDialog({
     }
   };
 
-  const handleApprove = async () => {
-    if (!(address && stablecoinAddress)) return;
+  const handleApprove = () => {
+    if (!(address && stablecoinAddress)) {
+      return;
+    }
 
     try {
       writeContract(
@@ -243,8 +246,10 @@ export function BuyCreditsDialog({
     }
   };
 
-  const handleBuy = async () => {
-    if (!address) return;
+  const handleBuy = () => {
+    if (!address) {
+      return;
+    }
 
     try {
       setStep("processing");
@@ -253,7 +258,9 @@ export function BuyCreditsDialog({
 
       if (isStablecoinPayment) {
         // Stablecoin payment
-        if (!stablecoinAddress) return;
+        if (!stablecoinAddress) {
+          return;
+        }
 
         writeContract(
           {
@@ -277,7 +284,9 @@ export function BuyCreditsDialog({
         );
       } else {
         // ETH payment
-        if (!ethAmount) return;
+        if (!ethAmount) {
+          return;
+        }
 
         writeContract(
           {
@@ -342,12 +351,12 @@ export function BuyCreditsDialog({
     confirmDeposit();
   }
 
-  const resetDialog = () => {
+  const resetDialog = useCallback(() => {
     setStep(skipInput ? "connect" : "input");
     setEthAmount(null);
     setEstimatedCredits(null);
     setDepositTxHash(null);
-  };
+  }, [skipInput]);
 
   // Reset dialog when it closes
   useEffect(() => {
@@ -358,9 +367,9 @@ export function BuyCreditsDialog({
 
   return (
     <Dialog
-      onOpenChange={(open) => {
-        onOpenChange(open);
-        if (!open) {
+      onOpenChange={(isOpen) => {
+        onOpenChange(isOpen);
+        if (!isOpen) {
           resetDialog();
         }
       }}

@@ -1,4 +1,4 @@
-import * as fs from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { network, run } from "hardhat";
 
 // Chainlink ETH/USD Price Feed addresses
@@ -26,13 +26,13 @@ async function main() {
 
   // Read deployment file
   const deploymentPath = `./deployments/${networkName}.json`;
-  if (!fs.existsSync(deploymentPath)) {
+  if (!existsSync(deploymentPath)) {
     throw new Error(
       `No deployment found for ${networkName}. Run deploy first.`
     );
   }
 
-  const deployment = JSON.parse(fs.readFileSync(deploymentPath, "utf-8"));
+  const deployment = JSON.parse(readFileSync(deploymentPath, "utf-8"));
   const priceFeed = CHAINLINK_ETH_USD[networkName];
   const stables = STABLECOINS[networkName];
 
@@ -52,11 +52,12 @@ async function main() {
       ],
     });
     console.log("KeeperHubCredits verified!");
-  } catch (error: any) {
-    if (error.message.includes("Already Verified")) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("Already Verified")) {
       console.log("KeeperHubCredits already verified");
     } else {
-      console.error("Error verifying KeeperHubCredits:", error.message);
+      console.error("Error verifying KeeperHubCredits:", message);
     }
   }
 
@@ -74,11 +75,12 @@ async function main() {
       ],
     });
     console.log("KeeperHubTiers verified!");
-  } catch (error: any) {
-    if (error.message.includes("Already Verified")) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("Already Verified")) {
       console.log("KeeperHubTiers already verified");
     } else {
-      console.error("Error verifying KeeperHubTiers:", error.message);
+      console.error("Error verifying KeeperHubTiers:", message);
     }
   }
 

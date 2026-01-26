@@ -35,4 +35,4 @@ export const wagmiConfig = createConfig({
   ssr: true,
 });
 
-export { sepolia, mainnet };
+export { mainnet, sepolia } from "wagmi/chains";

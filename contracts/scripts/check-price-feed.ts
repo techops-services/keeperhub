@@ -68,8 +68,9 @@ async function main() {
       ethers.formatEther(ethNeeded),
       "ETH"
     );
-  } catch (error: any) {
-    console.error("❌ Error:", error.message);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("❌ Error:", message);
   }
 }
 

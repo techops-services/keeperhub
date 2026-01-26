@@ -3,6 +3,7 @@ import { ethers } from "hardhat";
 const USDC_ADDRESS = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238";
 const USDT_ADDRESS = "0x7169D38820dfd117C3FA1f22a697dBA58d90BA06";
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Script loops through multiple ABIs to find correct mint signature
 async function main() {
   const [signer] = await ethers.getSigners();
   console.log("Using account:", signer.address);
@@ -26,7 +27,7 @@ async function main() {
 
       console.log(`\nTrying ${functionName}...`);
 
-      let tx;
+      let tx: Awaited<ReturnType<typeof contract.mint>>;
       if (functionName === "mint" && abi[0].includes("to,")) {
         // mint(address to, uint256 amount)
         const amount = ethers.parseUnits("25", 6); // 25 USDT with 6 decimals
@@ -48,11 +49,12 @@ async function main() {
       await tx.wait();
       console.log("✓ Success! Tokens minted");
       break;
-    } catch (error: any) {
-      if (error.message.includes("no matching function")) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes("no matching function")) {
         continue; // Try next ABI
       }
-      console.log(`Failed: ${error.message.split("\n")[0]}`);
+      console.log(`Failed: ${message.split("\n")[0]}`);
     }
   }
 
@@ -66,7 +68,7 @@ async function main() {
 
       console.log(`\nTrying ${functionName}...`);
 
-      let tx;
+      let tx: Awaited<ReturnType<typeof contract.mint>>;
       if (functionName === "mint" && abi[0].includes("to,")) {
         const amount = ethers.parseUnits("25", 6);
         tx = await contract.mint(signer.address, amount);
@@ -84,11 +86,12 @@ async function main() {
       await tx.wait();
       console.log("✓ Success! Tokens minted");
       break;
-    } catch (error: any) {
-      if (error.message.includes("no matching function")) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes("no matching function")) {
         continue;
       }
-      console.log(`Failed: ${error.message.split("\n")[0]}`);
+      console.log(`Failed: ${message.split("\n")[0]}`);
     }
   }
 
