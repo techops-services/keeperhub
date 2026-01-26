@@ -31,6 +31,7 @@ import { useActiveMember } from "@/keeperhub/lib/hooks/use-organization";
 import { usePagination } from "@/keeperhub/lib/hooks/use-pagination";
 import type { AddressBookEntry } from "@/lib/api-client";
 import { addressBookApi } from "@/lib/api-client";
+import { useSession } from "@/lib/auth-client";
 
 type AddressBookOverlayProps = {
   overlayId: string;
@@ -317,15 +318,19 @@ function AddressBookPagination({
 export function AddressBookOverlay({ overlayId }: AddressBookOverlayProps) {
   const { push, closeAll } = useOverlay();
   const { isOwner } = useActiveMember();
+  const { data: session } = useSession();
   const [loading, setLoading] = useState(true);
   const [entries, setEntries] = useState<AddressBookEntry[]>([]);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Debounce search query
+  const isTemporalAccount =
+    !session?.user ||
+    session.user.name === "Anonymous" ||
+    session.user.email?.startsWith("temp-");
+
   const debouncedSearchQuery = useDebounce(searchQuery, 500);
 
-  // Filter entries by label (name)
   const filteredEntries = useMemo(() => {
     if (!debouncedSearchQuery.trim()) {
       return entries;
@@ -335,7 +340,6 @@ export function AddressBookOverlay({ overlayId }: AddressBookOverlayProps) {
     return entries.filter((entry) => entry.label.toLowerCase().includes(query));
   }, [entries, debouncedSearchQuery]);
 
-  // Pagination hook - use filtered entries
   const {
     paginatedItems: paginatedEntries,
     currentPage,
@@ -357,6 +361,11 @@ export function AddressBookOverlay({ overlayId }: AddressBookOverlayProps) {
   const shouldRenderItemsPerPageSelector = filteredEntries.length > 5; // default items per page is 5;
 
   const loadEntries = useCallback(async () => {
+    if (isTemporalAccount) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const data = await addressBookApi.getAll();
@@ -367,7 +376,7 @@ export function AddressBookOverlay({ overlayId }: AddressBookOverlayProps) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isTemporalAccount]);
 
   useEffect(() => {
     loadEntries();
@@ -453,7 +462,13 @@ export function AddressBookOverlay({ overlayId }: AddressBookOverlayProps) {
             <Spinner />
           </div>
         )}
-        {!loading && entries.length === 0 && (
+        {!loading && isTemporalAccount && (
+          <div className="py-8 text-center text-muted-foreground text-sm">
+            <Bookmark className="mx-auto mb-2 h-8 w-8 opacity-50" />
+            <p>Please sign in to access address book</p>
+          </div>
+        )}
+        {!(loading || isTemporalAccount) && entries.length === 0 && (
           <div className="py-8 text-center text-muted-foreground text-sm">
             <Bookmark className="mx-auto mb-2 h-8 w-8 opacity-50" />
             <p>No addresses saved yet</p>
@@ -464,48 +479,52 @@ export function AddressBookOverlay({ overlayId }: AddressBookOverlayProps) {
             )}
           </div>
         )}
-        {!loading && entries.length > 0 && filteredEntries.length === 0 && (
-          <div className="py-8 text-center text-muted-foreground text-sm">
-            <Bookmark className="mx-auto mb-2 h-8 w-8 opacity-50" />
-            <p>No addresses found matching "{debouncedSearchQuery}"</p>
-          </div>
-        )}
-        {!loading && entries.length > 0 && filteredEntries.length > 0 && (
-          <>
-            <AddressBookSearchAndControls
-              itemsPerPage={itemsPerPage}
-              onItemsPerPageChange={setItemsPerPage}
-              onSearchChange={setSearchQuery}
-              searchQuery={searchQuery}
-              shouldRenderItemsPerPageSelector={
-                shouldRenderItemsPerPageSelector
-              }
-            />
+        {!(loading || isTemporalAccount) &&
+          entries.length > 0 &&
+          filteredEntries.length === 0 && (
+            <div className="py-8 text-center text-muted-foreground text-sm">
+              <Bookmark className="mx-auto mb-2 h-8 w-8 opacity-50" />
+              <p>No addresses found matching "{debouncedSearchQuery}"</p>
+            </div>
+          )}
+        {!(loading || isTemporalAccount) &&
+          entries.length > 0 &&
+          filteredEntries.length > 0 && (
+            <>
+              <AddressBookSearchAndControls
+                itemsPerPage={itemsPerPage}
+                onItemsPerPageChange={setItemsPerPage}
+                onSearchChange={setSearchQuery}
+                searchQuery={searchQuery}
+                shouldRenderItemsPerPageSelector={
+                  shouldRenderItemsPerPageSelector
+                }
+              />
 
-            <AddressBookTable
-              deleting={deleting}
-              entries={paginatedEntries}
-              isOwner={isOwner}
-              onDelete={handleDelete}
-              onEdit={handleOpenEditForm}
-              onUpdate={loadEntries}
-            />
+              <AddressBookTable
+                deleting={deleting}
+                entries={paginatedEntries}
+                isOwner={isOwner}
+                onDelete={handleDelete}
+                onEdit={handleOpenEditForm}
+                onUpdate={loadEntries}
+              />
 
-            <AddressBookPagination
-              canGoNext={canGoNext}
-              canGoPrevious={canGoPrevious}
-              currentPage={currentPage}
-              itemsPerPage={itemsPerPage}
-              onGoToPage={goToPage}
-              onNextPage={goToNextPage}
-              onPreviousPage={goToPreviousPage}
-              pageNumbers={pageNumbers}
-              showingFrom={showingFrom}
-              showingTo={showingTo}
-              totalItems={totalItems}
-            />
-          </>
-        )}
+              <AddressBookPagination
+                canGoNext={canGoNext}
+                canGoPrevious={canGoPrevious}
+                currentPage={currentPage}
+                itemsPerPage={itemsPerPage}
+                onGoToPage={goToPage}
+                onNextPage={goToNextPage}
+                onPreviousPage={goToPreviousPage}
+                pageNumbers={pageNumbers}
+                showingFrom={showingFrom}
+                showingTo={showingTo}
+                totalItems={totalItems}
+              />
+            </>
+          )}
       </div>
     </Overlay>
   );

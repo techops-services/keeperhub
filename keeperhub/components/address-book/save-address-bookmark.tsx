@@ -4,6 +4,7 @@ import { ethers } from "ethers";
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useActiveMember } from "@/keeperhub/lib/hooks/use-organization";
+import { useSession } from "@/lib/auth-client";
 import { AddressSelectPopover } from "./address-select-popover";
 import { SaveAddressButton } from "./save-address-button";
 import { SaveAddressForm } from "./save-address-form";
@@ -23,11 +24,17 @@ export function SaveAddressBookmark({
   children,
 }: SaveAddressBookmarkProps) {
   const { isOwner } = useActiveMember();
+  const { data: session } = useSession();
   const [showForm, setShowForm] = useState(false);
   const [currentAddress, setCurrentAddress] = useState<string>("");
   const [isInputFocused, setIsInputFocused] = useState(false);
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const isTemporalAccount =
+    !session?.user ||
+    session.user.name === "Anonymous" ||
+    session.user.email?.startsWith("temp-");
 
   useEffect(() => {
     const childValue = children.props.value;
@@ -46,7 +53,9 @@ export function SaveAddressBookmark({
       children.props.onChange?.(value);
     },
     onFocus: (e: React.FocusEvent) => {
-      setIsInputFocused(true);
+      if (!isTemporalAccount) {
+        setIsInputFocused(true);
+      }
       if (children.props.onFocus) {
         children.props.onFocus(e);
       }
@@ -78,7 +87,9 @@ export function SaveAddressBookmark({
     }
 
     const handleFocus = () => {
-      setIsInputFocused(true);
+      if (!isTemporalAccount) {
+        setIsInputFocused(true);
+      }
     };
 
     const handleBlur = (_e: FocusEvent) => {
@@ -107,7 +118,7 @@ export function SaveAddressBookmark({
         clearTimeout(blurTimeoutRef.current);
       }
     };
-  }, []);
+  }, [isTemporalAccount]);
 
   const handleAddressSelect = (selectedAddress: string) => {
     if (children.props.onChange) {
@@ -152,14 +163,14 @@ export function SaveAddressBookmark({
         <div className="flex-1" ref={inputContainerRef}>
           <AddressSelectPopover
             currentAddress={currentAddress}
-            isOpen={isInputFocused}
+            isOpen={isInputFocused && !isTemporalAccount}
             onAddressSelect={handleAddressSelect}
             onClose={() => setIsInputFocused(false)}
           >
             {childWithInterception}
           </AddressSelectPopover>
         </div>
-        {isOwner && (
+        {isOwner && !isTemporalAccount && (
           <SaveAddressButton
             address={currentAddress}
             onClick={handleSaveClick}

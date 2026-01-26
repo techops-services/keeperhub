@@ -19,6 +19,7 @@ import {
 import { truncateAddress } from "@/keeperhub/lib/address-utils";
 import type { AddressBookEntry } from "@/lib/api-client";
 import { addressBookApi } from "@/lib/api-client";
+import { useSession } from "@/lib/auth-client";
 
 type AddressSelectPopoverProps = {
   children: React.ReactElement;
@@ -64,6 +65,7 @@ export function AddressSelectPopover({
   onAddressSelect,
   onClose,
 }: AddressSelectPopoverProps) {
+  const { data: session } = useSession();
   const [addressBookEntries, setAddressBookEntries] = useState<
     AddressBookEntry[]
   >([]);
@@ -73,7 +75,19 @@ export function AddressSelectPopover({
   );
   const anchorRef = useRef<HTMLDivElement>(null);
 
+  const isTemporalAccount =
+    !session?.user ||
+    session.user.name === "Anonymous" ||
+    session.user.email?.startsWith("temp-");
+
+  const shouldOpen = isOpen && !isTemporalAccount;
+
   const loadAddressBookEntries = useCallback(async () => {
+    if (isTemporalAccount) {
+      setLoadingEntries(false);
+      return;
+    }
+
     setLoadingEntries(true);
     try {
       const entries = await addressBookApi.getAll();
@@ -84,16 +98,16 @@ export function AddressSelectPopover({
     } finally {
       setLoadingEntries(false);
     }
-  }, []);
+  }, [isTemporalAccount]);
 
   useEffect(() => {
-    if (isOpen) {
+    if (shouldOpen) {
       loadAddressBookEntries();
     }
-  }, [isOpen, loadAddressBookEntries]);
+  }, [shouldOpen, loadAddressBookEntries]);
 
   useEffect(() => {
-    if (isOpen && anchorRef.current) {
+    if (shouldOpen && anchorRef.current) {
       const updateWidth = () => {
         if (anchorRef.current) {
           setPopoverWidth(anchorRef.current.offsetWidth);
@@ -107,7 +121,7 @@ export function AddressSelectPopover({
         window.removeEventListener("resize", updateWidth);
       };
     }
-  }, [isOpen]);
+  }, [shouldOpen]);
 
   const handleSelect = (address: string) => {
     onAddressSelect(address);
@@ -115,7 +129,7 @@ export function AddressSelectPopover({
   };
 
   return (
-    <Popover open={isOpen}>
+    <Popover open={shouldOpen}>
       <PopoverAnchor asChild>
         <div ref={anchorRef}>{children}</div>
       </PopoverAnchor>
