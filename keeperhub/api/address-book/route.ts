@@ -2,10 +2,10 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
-import { isValidEthereumAddress } from "@/keeperhub/lib/utils/address-validation";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { addressBookEntry, users } from "@/lib/db/schema";
+import { ethers } from "ethers";
 
 // GET - List all address book entries for the current organization
 export async function GET(request: Request) {
@@ -133,7 +133,7 @@ export async function POST(request: Request) {
     }
 
     // Validate address format
-    if (!isValidEthereumAddress(address)) {
+    if (!ethers.isAddress(address)) {
       return NextResponse.json(
         { error: "Invalid Ethereum address format" },
         { status: 400 }

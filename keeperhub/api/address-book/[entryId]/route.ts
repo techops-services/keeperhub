@@ -2,10 +2,10 @@ import { and, eq, ne } from "drizzle-orm";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
-import { isValidEthereumAddress } from "@/keeperhub/lib/utils/address-validation";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { addressBookEntry } from "@/lib/db/schema";
+import { ethers } from "ethers";
 
 // Helper: Validate authentication and owner permissions
 async function validateOwnerPermission(request: Request) {
@@ -132,7 +132,7 @@ async function buildUpdateObject(
       };
     }
 
-    if (!isValidEthereumAddress(address)) {
+    if (!ethers.isAddress(address)) {
       return {
         error: NextResponse.json(
           { error: "Invalid Ethereum address format" },
