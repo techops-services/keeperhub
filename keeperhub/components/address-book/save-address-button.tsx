@@ -3,7 +3,6 @@
 import { ethers } from "ethers";
 import { Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useActiveMember } from "@/keeperhub/lib/hooks/use-organization";
 
 type SaveAddressButtonProps = {
   address: string;
@@ -14,12 +13,6 @@ export function SaveAddressButton({
   address,
   onClick,
 }: SaveAddressButtonProps) {
-  const { isOwner } = useActiveMember();
-
-  if (!isOwner) {
-    return null;
-  }
-
   const isValidAddress = address && ethers.isAddress(address);
 
   return (

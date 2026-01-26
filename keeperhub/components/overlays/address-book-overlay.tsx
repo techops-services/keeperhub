@@ -27,7 +27,6 @@ import {
 } from "@/components/ui/table";
 import { AddressBookRow } from "@/keeperhub/components/address-book/address-book-row";
 import { useDebounce } from "@/keeperhub/lib/hooks/use-debounce";
-import { useActiveMember } from "@/keeperhub/lib/hooks/use-organization";
 import { usePagination } from "@/keeperhub/lib/hooks/use-pagination";
 import type { AddressBookEntry } from "@/lib/api-client";
 import { addressBookApi } from "@/lib/api-client";
@@ -191,7 +190,6 @@ function AddressBookSearchAndControls({
 
 type AddressBookTableProps = {
   entries: AddressBookEntry[];
-  isOwner: boolean;
   deleting: string | null;
   onDelete: (entry: AddressBookEntry) => void;
   onUpdate: () => void;
@@ -200,7 +198,6 @@ type AddressBookTableProps = {
 
 function AddressBookTable({
   entries,
-  isOwner,
   deleting,
   onDelete,
   onUpdate,
@@ -212,7 +209,7 @@ function AddressBookTable({
         <TableRow>
           <TableHead>Name</TableHead>
           <TableHead>Address</TableHead>
-          {isOwner && <TableHead className="text-right">Actions</TableHead>}
+          <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -220,7 +217,6 @@ function AddressBookTable({
           <AddressBookRow
             deleting={deleting}
             entry={entry}
-            isOwner={isOwner}
             key={entry.id}
             onDelete={() => onDelete(entry)}
             onEdit={() => onEdit(entry)}
@@ -317,7 +313,6 @@ function AddressBookPagination({
 
 export function AddressBookOverlay({ overlayId }: AddressBookOverlayProps) {
   const { push, closeAll } = useOverlay();
-  const { isOwner } = useActiveMember();
   const { data: session } = useSession();
   const [loading, setLoading] = useState(true);
   const [entries, setEntries] = useState<AddressBookEntry[]>([]);
@@ -442,15 +437,15 @@ export function AddressBookOverlay({ overlayId }: AddressBookOverlayProps) {
   return (
     <Overlay
       actions={[
-        ...(isOwner
-          ? [
+        ...(isTemporalAccount
+          ? []
+          : [
               {
                 label: "Add New Address",
                 variant: "outline" as const,
                 onClick: handleOpenAddForm,
               },
-            ]
-          : []),
+            ]),
         { label: "Done", onClick: closeAll },
       ]}
       overlayId={overlayId}
@@ -472,11 +467,6 @@ export function AddressBookOverlay({ overlayId }: AddressBookOverlayProps) {
           <div className="py-8 text-center text-muted-foreground text-sm">
             <Bookmark className="mx-auto mb-2 h-8 w-8 opacity-50" />
             <p>No addresses saved yet</p>
-            {!isOwner && (
-              <p className="mt-2 text-xs">
-                Only organization owners can add addresses
-              </p>
-            )}
           </div>
         )}
         {!(loading || isTemporalAccount) &&
@@ -504,7 +494,6 @@ export function AddressBookOverlay({ overlayId }: AddressBookOverlayProps) {
               <AddressBookTable
                 deleting={deleting}
                 entries={paginatedEntries}
-                isOwner={isOwner}
                 onDelete={handleDelete}
                 onEdit={handleOpenEditForm}
                 onUpdate={loadEntries}

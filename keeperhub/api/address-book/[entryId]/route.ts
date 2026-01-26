@@ -44,15 +44,6 @@ async function validateOwnerPermission(request: Request) {
     };
   }
 
-  if (activeMember.role !== "owner") {
-    return {
-      error: NextResponse.json(
-        { error: "Only organization owners can update address book entries" },
-        { status: 403 }
-      ),
-    };
-  }
-
   return { activeOrgId, session };
 }
 
@@ -224,14 +215,6 @@ export async function DELETE(
     if (!activeMember) {
       return NextResponse.json(
         { error: "You are not a member of the active organization" },
-        { status: 403 }
-      );
-    }
-
-    // Check if user is owner
-    if (activeMember.role !== "owner") {
-      return NextResponse.json(
-        { error: "Only organization owners can delete address book entries" },
         { status: 403 }
       );
     }

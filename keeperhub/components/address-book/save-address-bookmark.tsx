@@ -3,7 +3,6 @@
 import { ethers } from "ethers";
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { useActiveMember } from "@/keeperhub/lib/hooks/use-organization";
 import { useSession } from "@/lib/auth-client";
 import { AddressSelectPopover } from "./address-select-popover";
 import { SaveAddressButton } from "./save-address-button";
@@ -23,7 +22,6 @@ export function SaveAddressBookmark({
   address: addressProp,
   children,
 }: SaveAddressBookmarkProps) {
-  const { isOwner } = useActiveMember();
   const { data: session } = useSession();
   const [showForm, setShowForm] = useState(false);
   const [currentAddress, setCurrentAddress] = useState<string>("");
@@ -129,11 +127,6 @@ export function SaveAddressBookmark({
   };
 
   const handleSaveClick = () => {
-    if (!isOwner) {
-      toast.error("Only organization owners can save addresses");
-      return;
-    }
-
     if (!(address && ethers.isAddress(address))) {
       toast.error("Please enter a valid Ethereum address first");
       return;
@@ -170,7 +163,7 @@ export function SaveAddressBookmark({
             {childWithInterception}
           </AddressSelectPopover>
         </div>
-        {isOwner && !isTemporalAccount && (
+        {!isTemporalAccount && (
           <SaveAddressButton
             address={currentAddress}
             onClick={handleSaveClick}

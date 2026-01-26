@@ -112,14 +112,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check if user is owner
-    if (activeMember.role !== "owner") {
-      return NextResponse.json(
-        { error: "Only organization owners can create address book entries" },
-        { status: 403 }
-      );
-    }
-
     // Parse request body
     const body = await request.json().catch(() => ({}));
     const label = body.label?.trim();
