@@ -73,12 +73,7 @@ async function getExistingEntry(entryId: string, activeOrgId: string) {
 }
 
 // Helper: Validate and build update object
-async function buildUpdateObject(
-  body: { label?: string; address?: string },
-  existingEntry: { address: string },
-  activeOrgId: string,
-  entryId: string
-) {
+function buildUpdateObject(body: { label?: string; address?: string }) {
   const updates: {
     label?: string;
     address?: string;
@@ -152,12 +147,7 @@ export async function PATCH(
 
     // Parse and validate request body
     const body = await request.json().catch(() => ({}));
-    const updateResult = await buildUpdateObject(
-      body,
-      existingEntry,
-      activeOrgId,
-      entryId
-    );
+    const updateResult = buildUpdateObject(body);
     if (updateResult.error) {
       return updateResult.error;
     }

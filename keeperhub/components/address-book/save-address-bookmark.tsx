@@ -1,10 +1,9 @@
 "use client";
 
 import { ethers } from "ethers";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useActiveMember } from "@/keeperhub/lib/hooks/use-organization";
-import { addressBookApi } from "@/lib/api-client";
 import { AddressSelectPopover } from "./address-select-popover";
 import { SaveAddressButton } from "./save-address-button";
 import { SaveAddressForm } from "./save-address-form";
@@ -41,20 +40,6 @@ export function SaveAddressBookmark({
 
   const address = addressProp ?? currentAddress;
 
-  const loadAddressBookEntries = useCallback(async () => {
-    try {
-      const entries = await addressBookApi.getAll();
-    } catch (error) {
-      console.error("Failed to load address book entries:", error);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (isOwner) {
-      loadAddressBookEntries();
-    }
-  }, [isOwner, loadAddressBookEntries]);
-
   const childWithInterception = React.cloneElement(children, {
     onChange: (value: string) => {
       setCurrentAddress(value);
@@ -88,13 +73,15 @@ export function SaveAddressBookmark({
 
   useEffect(() => {
     const container = inputContainerRef.current;
-    if (!container) return;
+    if (!container) {
+      return;
+    }
 
     const handleFocus = () => {
       setIsInputFocused(true);
     };
 
-    const handleBlur = (e: FocusEvent) => {
+    const handleBlur = (_e: FocusEvent) => {
       if (blurTimeoutRef.current) {
         clearTimeout(blurTimeoutRef.current);
       }
@@ -150,7 +137,6 @@ export function SaveAddressBookmark({
 
   const handleFormSave = () => {
     setShowForm(false);
-    loadAddressBookEntries();
   };
 
   const handleFormAddressChange = (newAddress: string) => {
@@ -173,10 +159,7 @@ export function SaveAddressBookmark({
             {childWithInterception}
           </AddressSelectPopover>
         </div>
-        <SaveAddressButton
-          address={currentAddress}
-          onClick={handleSaveClick}
-        />
+        <SaveAddressButton address={currentAddress} onClick={handleSaveClick} />
       </div>
 
       {showForm && (

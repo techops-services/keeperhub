@@ -106,28 +106,29 @@ export function usePagination<T>(
       for (let i = 1; i <= totalPages; i++) {
         pages.push(i);
       }
-    } else {
-      // Always show first page
-      pages.push(1);
+      return pages;
+    }
 
-      const start = Math.max(2, currentPage - 1);
-      const end = Math.min(totalPages - 1, currentPage + 1);
+    // Always show first page
+    pages.push(1);
 
-      if (start > 2) {
-        pages.push("ellipsis-start");
-      }
+    const start = Math.max(2, currentPage - 1);
+    const end = Math.min(totalPages - 1, currentPage + 1);
 
-      for (let i = start; i <= end; i++) {
-        pages.push(i);
-      }
+    if (start > 2) {
+      pages.push("ellipsis-start");
+    }
 
-      if (end < totalPages - 1) {
-        pages.push("ellipsis-end");
-      }
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
 
-      if (totalPages > 1) {
-        pages.push(totalPages);
-      }
+    if (end < totalPages - 1) {
+      pages.push("ellipsis-end");
+    }
+
+    if (totalPages > 1) {
+      pages.push(totalPages);
     }
 
     return pages;

@@ -16,6 +16,7 @@ import {
   PopoverAnchor,
   PopoverContent,
 } from "@/components/ui/popover";
+import { truncateAddress } from "@/keeperhub/lib/address-utils";
 import type { AddressBookEntry } from "@/lib/api-client";
 import { addressBookApi } from "@/lib/api-client";
 
@@ -26,11 +27,6 @@ type AddressSelectPopoverProps = {
   onAddressSelect: (address: string) => void;
   onClose: () => void;
 };
-
-function truncateAddress(addr: string): string {
-  if (addr.length <= 10) return addr;
-  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-}
 
 function AddressSelectItem({
   entry,
@@ -139,13 +135,15 @@ export function AddressSelectPopover({
         <Command>
           <CommandInput placeholder="Search addresses..." />
           <CommandList>
-            {loadingEntries ? (
+            {loadingEntries && (
               <div className="py-6 text-center text-muted-foreground text-sm">
                 Loading addresses...
               </div>
-            ) : addressBookEntries.length === 0 ? (
+            )}
+            {!loadingEntries && addressBookEntries.length === 0 && (
               <CommandEmpty>No addresses saved yet</CommandEmpty>
-            ) : (
+            )}
+            {!loadingEntries && addressBookEntries.length > 0 && (
               <CommandGroup heading="Saved Addresses">
                 {addressBookEntries.map((entry) => (
                   <AddressSelectItem

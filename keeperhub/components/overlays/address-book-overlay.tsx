@@ -54,14 +54,30 @@ function AddAddressOverlay({
 
   const isEditing = !!entry;
 
-  const handleSave = async () => {
+  const validateInputs = (): boolean => {
     if (!newLabel.trim()) {
       toast.error("Please enter a label");
-      return;
+      return false;
     }
 
     if (!(newAddress.trim() && ethers.isAddress(newAddress))) {
       toast.error("Please enter a valid Ethereum address");
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSaveError = (error: unknown) => {
+    const action = isEditing ? "update" : "add";
+    console.error(`Failed to ${action} address:`, error);
+    toast.error(
+      error instanceof Error ? error.message : `Failed to ${action} address`
+    );
+  };
+
+  const handleSave = async () => {
+    if (!validateInputs()) {
       return;
     }
 
@@ -73,15 +89,7 @@ function AddAddressOverlay({
       );
       pop();
     } catch (error) {
-      console.error(
-        `Failed to ${isEditing ? "update" : "add"} address:`,
-        error
-      );
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : `Failed to ${isEditing ? "update" : "add"} address`
-      );
+      handleSaveError(error);
     } finally {
       setSaving(false);
     }
@@ -228,7 +236,6 @@ type AddressBookPaginationProps = {
   showingFrom: number;
   showingTo: number;
   currentPage: number;
-  totalPages: number;
   pageNumbers: (number | string)[];
   canGoPrevious: boolean;
   canGoNext: boolean;
@@ -243,7 +250,6 @@ function AddressBookPagination({
   showingFrom,
   showingTo,
   currentPage,
-  totalPages,
   pageNumbers,
   canGoPrevious,
   canGoNext,
@@ -331,7 +337,6 @@ export function AddressBookOverlay({ overlayId }: AddressBookOverlayProps) {
   // Pagination hook - use filtered entries
   const {
     paginatedItems: paginatedEntries,
-    totalPages,
     currentPage,
     itemsPerPage,
     setItemsPerPage,
@@ -442,11 +447,12 @@ export function AddressBookOverlay({ overlayId }: AddressBookOverlayProps) {
       title="Address Book"
     >
       <div className="space-y-4">
-        {loading ? (
+        {loading && (
           <div className="flex items-center justify-center py-8">
             <Spinner />
           </div>
-        ) : entries.length === 0 ? (
+        )}
+        {!loading && entries.length === 0 && (
           <div className="py-8 text-center text-muted-foreground text-sm">
             <Bookmark className="mx-auto mb-2 h-8 w-8 opacity-50" />
             <p>No addresses saved yet</p>
@@ -456,12 +462,14 @@ export function AddressBookOverlay({ overlayId }: AddressBookOverlayProps) {
               </p>
             )}
           </div>
-        ) : filteredEntries.length === 0 ? (
+        )}
+        {!loading && entries.length > 0 && filteredEntries.length === 0 && (
           <div className="py-8 text-center text-muted-foreground text-sm">
             <Bookmark className="mx-auto mb-2 h-8 w-8 opacity-50" />
             <p>No addresses found matching "{debouncedSearchQuery}"</p>
           </div>
-        ) : (
+        )}
+        {!loading && entries.length > 0 && filteredEntries.length > 0 && (
           <>
             <AddressBookSearchAndControls
               itemsPerPage={itemsPerPage}
@@ -494,7 +502,6 @@ export function AddressBookOverlay({ overlayId }: AddressBookOverlayProps) {
               showingFrom={showingFrom}
               showingTo={showingTo}
               totalItems={totalItems}
-              totalPages={totalPages}
             />
           </>
         )}

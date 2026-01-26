@@ -76,7 +76,7 @@ export function SaveAddressForm({
       </p>
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="save-label">Label</Label>
+          <Label htmlFor="save-label">Name</Label>
           <Input
             disabled={saving}
             id="save-label"
@@ -115,7 +115,7 @@ export function SaveAddressForm({
           {saving ? "Saving..." : "Save"}
         </Button>
         <Button
-          className="gap-2 flex"
+          className="flex gap-2"
           disabled={saving}
           onClick={onCancel}
           size="sm"

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { TableCell, TableRow } from "@/components/ui/table";
+import { truncateAddress } from "@/keeperhub/lib/address-utils";
 import { useActiveMember } from "@/keeperhub/lib/hooks/use-organization";
 import type { AddressBookEntry } from "@/lib/api-client";
 
@@ -18,7 +19,6 @@ type AddressBookRowProps = {
 
 export function AddressBookRow({
   entry,
-  onUpdate,
   onDelete,
   onEdit,
   deleting,
@@ -30,18 +30,13 @@ export function AddressBookRow({
     toast.success("Copied to clipboard");
   };
 
-  const truncateAddress = (address: string) => {
-    if (address.length <= 12) return address;
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  };
-
   return (
     <TableRow>
       <TableCell className="font-medium">{entry.label}</TableCell>
       <TableCell>
         <div className="flex items-center gap-2">
           <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-            {truncateAddress(entry.address)}
+            {truncateAddress(entry.address, 12)}
           </code>
           <Button
             onClick={() => copyToClipboard(entry.address)}
