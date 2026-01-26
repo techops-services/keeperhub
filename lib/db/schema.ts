@@ -104,6 +104,32 @@ export const invitation = pgTable("invitation", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
 });
+
+export const addressBookEntry = pgTable(
+  "address_book_entry",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => generateId()),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    address: text("address").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    index("idx_address_book_org").on(table.organizationId),
+    uniqueIndex("idx_address_book_org_address").on(
+      table.organizationId,
+      table.address
+    ),
+  ]
+);
 // end keeperhub code //
 
 // Workflow visibility type
@@ -399,6 +425,7 @@ export const workflowSchedulesRelations = relations(
 export const organizationRelations = relations(organization, ({ many }) => ({
   members: many(member),
   invitations: many(invitation),
+  addressBookEntries: many(addressBookEntry),
 }));
 
 export const memberRelations = relations(member, ({ one }) => ({
@@ -422,6 +449,20 @@ export const invitationRelations = relations(invitation, ({ one }) => ({
     references: [users.id],
   }),
 }));
+
+export const addressBookEntryRelations = relations(
+  addressBookEntry,
+  ({ one }) => ({
+    organization: one(organization, {
+      fields: [addressBookEntry.organizationId],
+      references: [organization.id],
+    }),
+    creator: one(users, {
+      fields: [addressBookEntry.createdBy],
+      references: [users.id],
+    }),
+  })
+);
 // end keeperhub code //
 
 export const chainsRelations = relations(chains, ({ one, many }) => ({
@@ -476,6 +517,8 @@ export type Member = typeof member.$inferSelect;
 export type NewMember = typeof member.$inferInsert;
 export type Invitation = typeof invitation.$inferSelect;
 export type NewInvitation = typeof invitation.$inferInsert;
+export type AddressBookEntry = typeof addressBookEntry.$inferSelect;
+export type NewAddressBookEntry = typeof addressBookEntry.$inferInsert;
 // end keeperhub code //
 export type Chain = typeof chains.$inferSelect;
 export type NewChain = typeof chains.$inferInsert;

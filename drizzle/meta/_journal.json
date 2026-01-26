@@ -99,6 +99,13 @@
       "when": 1768880520000,
       "tag": "0013_chain-gas-config",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1769441756056,
+      "tag": "0014_dapper_ogun",
+      "breakpoints": true
     }
   ]
 }
