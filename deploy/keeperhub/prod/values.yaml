@@ -220,36 +220,21 @@ cronjob:
         repository: ${ECR_REGISTRY}/keeperhub-prod
         tag: scheduler-${IMAGE_TAG}
       env:
+        # KeeperHub internal API (for fetching schedules via HTTP)
+        KEEPERHUB_API_URL:
+          type: kv
+          value: "http://keeperhub-common:3000"
+        KEEPERHUB_API_KEY:
+          type: parameterStore
+          name: scheduler-service-api-key
+          parameter_name: /eks/maker-prod/keeperhub-scheduler/keeperhub-api-key
+        # AWS/SQS configuration
         AWS_REGION:
           type: kv
           value: "us-east-1"
         SQS_QUEUE_URL:
           type: kv
           value: "https://sqs.us-east-1.amazonaws.com/${AWS_ACCOUNT_ID}/keeperhub-workflow-queue-prod"
-        RUNNER_IMAGE:
-          type: kv
-          value: "${ECR_REGISTRY}/keeperhub-prod:workflow-runner-${IMAGE_TAG}"
-        K8S_NAMESPACE:
-          type: kv
-          value: "keeperhub"
-        JOB_TTL_SECONDS:
-          type: kv
-          value: "3600"
-        JOB_ACTIVE_DEADLINE:
-          type: kv
-          value: "300"
-        DATABASE_URL:
-          type: parameterStore
-          name: db-url
-          parameter_name: /eks/maker-prod/keeperhub/db-url
-        CHAIN_RPC_CONFIG:
-          type: parameterStore
-          name: chain-rpc-config
-          parameter_name: /eks/maker-prod/keeperhub/chain-rpc-config
-        SCHEDULER_SERVICE_API_KEY:
-          type: parameterStore
-          name: scheduler-service-api-key
-          parameter_name: /eks/maker-prod/keeperhub-scheduler/keeperhub-api-key
       schedule: "* * * * *"
       command: ["/bin/sh"]
       args:
