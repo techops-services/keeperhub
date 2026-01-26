@@ -24,7 +24,7 @@ export function SaveAddressButton({
 
   return (
     <Button
-      className="gap-2 h-[38px] border border-gray-700 disabled:opacity-60"
+      className="h-[38px] gap-2 border border-gray-700 disabled:opacity-60"
       disabled={!isValidAddress}
       onClick={onClick}
       size="sm"
