@@ -32,18 +32,21 @@ export const SUPPORTED_TOKENS = [
     name: "USD Coin",
     decimals: 6,
     icon: "💵",
+    disabledOnSepolia: false,
   },
   {
     symbol: "USDT",
     name: "Tether USD",
     decimals: 6,
     icon: "💲",
+    disabledOnSepolia: false,
   },
   {
     symbol: "USDS",
     name: "Sky Dollar",
     decimals: 18,
     icon: "💰",
+    disabledOnSepolia: false, // We have mock USDS on Sepolia now
   },
 ] as const;
 
