@@ -14,9 +14,9 @@ const STABLECOINS = {
     usds: "0xdC035D45d973E3EC169d2276DDab16f1e407384F", // Sky Dollar
   },
   sepolia: {
-    usdc: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", // Circle's Sepolia USDC
-    usdt: "0x7169D38820dfd117C3FA1f22a697dBA58d90BA06", // Mock USDT
-    usds: "0x0000000000000000000000000000000000000000", // Deploy mock or skip
+    usdc: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", // Circle's official Sepolia USDC
+    usdt: "0x9F3BDc4459f0436eA0fe925d9aE6963eF1b7bb17", // Our mock USDT
+    usds: "0x39d38839AAC04327577c795b4aC1E1235700EfCF", // Our mock USDS
   },
 } as const;
 

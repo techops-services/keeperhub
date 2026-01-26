@@ -4,7 +4,7 @@ import { ArrowLeft, Check } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { formatEther, formatUnits, parseEther } from "viem";
+import { formatEther, formatUnits, parseEther, parseUnits } from "viem";
 import {
   useAccount,
   useConnect,
@@ -37,6 +37,23 @@ import { api } from "@/lib/api-client";
 
 const CREDITS_CONTRACT = process.env.NEXT_PUBLIC_CREDITS_CONTRACT_ADDRESS || "";
 
+// Mock token addresses on Sepolia for testing
+const MOCK_TOKENS = {
+  USDT: "0x9F3BDc4459f0436eA0fe925d9aE6963eF1b7bb17" as `0x${string}`,
+  USDS: "0x39d38839AAC04327577c795b4aC1E1235700EfCF" as `0x${string}`,
+};
+
+// ABI for mock token faucet function
+const MOCK_TOKEN_ABI = [
+  {
+    name: "faucet",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "amount", type: "uint256" }],
+    outputs: [],
+  },
+] as const;
+
 type PaymentMethod = "eth" | "stablecoin";
 type StablecoinSymbol = "USDC" | "USDT" | "USDS";
 
@@ -51,7 +68,8 @@ export default function CheckoutPage() {
   const [selectedToken, setSelectedToken] = useState<StablecoinSymbol>("USDC");
   const [depositTxHash, setDepositTxHash] = useState<string | null>(null);
   const [isPurchasing, setIsPurchasing] = useState(false);
-  const [isApproving, setIsApproving] = useState(false);
+  const [approvalTxHash, setApprovalTxHash] = useState<string | null>(null);
+  const [isMinting, setIsMinting] = useState<"USDT" | "USDS" | null>(null);
 
   const usdInCents = Math.floor(Number.parseFloat(usdAmount) * 1_000_000);
   const isStablecoinPayment = paymentMethod === "stablecoin";
@@ -123,11 +141,19 @@ export default function CheckoutPage() {
   const { switchChain } = useSwitchChain();
   const { writeContract } = useWriteContract();
 
-  // Only watch for deposit transaction confirmation, not approval
-  const { isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+  // Watch for deposit transaction confirmation
+  const { isSuccess: isDepositConfirmed } = useWaitForTransactionReceipt({
     hash: depositTxHash as `0x${string}` | undefined,
     query: {
       enabled: !!depositTxHash,
+    },
+  });
+
+  // Watch for approval transaction confirmation
+  const { isSuccess: isApprovalConfirmed, isLoading: isApprovalPending } = useWaitForTransactionReceipt({
+    hash: approvalTxHash as `0x${string}` | undefined,
+    query: {
+      enabled: !!approvalTxHash,
     },
   });
 
@@ -156,6 +182,15 @@ export default function CheckoutPage() {
 
   const currentAllowance = allowanceData ? (allowanceData as bigint) : BigInt(0);
   const needsApproval = isStablecoinPayment && currentAllowance < tokenAmount;
+
+  // Refetch allowance after approval is confirmed
+  useEffect(() => {
+    if (isApprovalConfirmed && approvalTxHash) {
+      refetchAllowance();
+      toast.success("Approval confirmed! You can now purchase credits.");
+      setApprovalTxHash(null);
+    }
+  }, [isApprovalConfirmed, approvalTxHash, refetchAllowance]);
 
   // Check token balance
   const { data: balanceData } = useReadContract({
@@ -193,7 +228,7 @@ export default function CheckoutPage() {
 
   // Confirm deposit after transaction is mined
   useEffect(() => {
-    if (isConfirmed && depositTxHash && organizationId) {
+    if (isDepositConfirmed && depositTxHash && organizationId) {
       const confirmDeposit = async () => {
         try {
           const result = await api.billing.confirmDeposit(
@@ -210,7 +245,7 @@ export default function CheckoutPage() {
       };
       confirmDeposit();
     }
-  }, [isConfirmed, depositTxHash, organizationId, estimatedCredits, router]);
+  }, [isDepositConfirmed, depositTxHash, organizationId, estimatedCredits, router]);
 
   const handleConnect = () => {
     const injectedConnector = connectors.find((c) => c.type === "injected");
@@ -228,6 +263,43 @@ export default function CheckoutPage() {
     }
   };
 
+  const handleMintTestTokens = async (token: "USDT" | "USDS") => {
+    if (!address || !isOnSepoliaNetwork) return;
+
+    const tokenAddress = MOCK_TOKENS[token];
+    // USDT has 6 decimals, USDS has 18 decimals
+    const decimals = token === "USDT" ? 6 : 18;
+    const amount = parseUnits("100", decimals); // Mint 100 tokens
+
+    try {
+      setIsMinting(token);
+      writeContract(
+        {
+          address: tokenAddress,
+          abi: MOCK_TOKEN_ABI,
+          functionName: "faucet",
+          args: [amount],
+          chainId: SEPOLIA_CHAIN_ID,
+        },
+        {
+          onSuccess: () => {
+            toast.success(`100 ${token} minted to your wallet!`);
+            setIsMinting(null);
+          },
+          onError: (error) => {
+            console.error("Minting failed:", error);
+            toast.error(`Failed to mint ${token}: ${error.message}`);
+            setIsMinting(null);
+          },
+        }
+      );
+    } catch (error) {
+      console.error("Failed to mint:", error);
+      toast.error(`Failed to mint ${token}`);
+      setIsMinting(null);
+    }
+  };
+
   const handleApprove = async () => {
     if (!(address && stablecoinAddress && organizationId)) return;
 
@@ -238,8 +310,6 @@ export default function CheckoutPage() {
     }
 
     try {
-      setIsApproving(true);
-
       writeContract(
         {
           address: stablecoinAddress,
@@ -249,22 +319,19 @@ export default function CheckoutPage() {
           chainId: SEPOLIA_CHAIN_ID,
         },
         {
-          onSuccess: () => {
-            toast.success("Approval successful! You can now complete the purchase.");
-            refetchAllowance();
-            setIsApproving(false);
+          onSuccess: (hash) => {
+            setApprovalTxHash(hash);
+            toast.success("Approval sent! Waiting for confirmation...");
           },
           onError: (error) => {
             console.error("Approval failed:", error);
             toast.error(`Approval failed: ${error.message}`);
-            setIsApproving(false);
           },
         }
       );
     } catch (error) {
       console.error("Failed to approve:", error);
       toast.error("Failed to approve token spending");
-      setIsApproving(false);
     }
   };
 
@@ -340,7 +407,7 @@ export default function CheckoutPage() {
 
   if (hasError) {
     return (
-      <div className="container pointer-events-auto mx-auto max-w-2xl space-y-8 p-6">
+      <div className="container pointer-events-auto mx-auto max-w-2xl space-y-8 p-6 pt-24">
         <Button className="gap-2" onClick={() => router.back()} variant="ghost">
           <ArrowLeft className="size-4" />
           Back
@@ -385,7 +452,7 @@ export default function CheckoutPage() {
 
   if (isCalculating) {
     return (
-      <div className="container pointer-events-auto mx-auto max-w-2xl space-y-8 p-6">
+      <div className="container pointer-events-auto mx-auto max-w-2xl space-y-8 p-6 pt-24">
         <Button className="gap-2" onClick={() => router.back()} variant="ghost">
           <ArrowLeft className="size-4" />
           Back
@@ -405,9 +472,9 @@ export default function CheckoutPage() {
 
   if (depositTxHash) {
     return (
-      <div className="container pointer-events-auto mx-auto max-w-2xl space-y-8 p-6">
+      <div className="container pointer-events-auto mx-auto max-w-2xl space-y-8 p-6 pt-24">
         <div className="space-y-6 py-12 text-center">
-          {isConfirmed ? (
+          {isDepositConfirmed ? (
             <>
               <div className="text-6xl text-green-500">✓</div>
               <h1 className="font-bold text-2xl">Payment Successful!</h1>
@@ -443,7 +510,7 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="container pointer-events-auto mx-auto max-w-2xl space-y-8 p-6">
+    <div className="container pointer-events-auto mx-auto max-w-2xl space-y-8 p-6 pt-24">
       <Button className="gap-2" onClick={() => router.back()} variant="ghost">
         <ArrowLeft className="size-4" />
         Back to Billing
@@ -512,6 +579,39 @@ export default function CheckoutPage() {
           )}
         </div>
 
+        {/* Mint Test Tokens - Only on Sepolia */}
+        {isOnSepoliaNetwork && isConnected && (
+          <div className="rounded-lg border border-dashed border-yellow-500/50 bg-yellow-500/5 p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="text-yellow-600">🧪</span>
+              <h3 className="font-medium text-sm text-yellow-700 dark:text-yellow-400">
+                Sepolia Testnet Only
+              </h3>
+            </div>
+            <p className="mb-3 text-muted-foreground text-xs">
+              Need test tokens? Mint 100 USDT or USDS to your wallet for testing.
+            </p>
+            <div className="flex gap-2">
+              <Button
+                disabled={isMinting !== null}
+                onClick={() => handleMintTestTokens("USDT")}
+                size="sm"
+                variant="outline"
+              >
+                {isMinting === "USDT" ? "Minting..." : "Mint 100 USDT"}
+              </Button>
+              <Button
+                disabled={isMinting !== null}
+                onClick={() => handleMintTestTokens("USDS")}
+                size="sm"
+                variant="outline"
+              >
+                {isMinting === "USDS" ? "Minting..." : "Mint 100 USDS"}
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-4">
           <h2 className="font-semibold text-xl">Order Summary</h2>
 
@@ -561,27 +661,38 @@ export default function CheckoutPage() {
                 {isStablecoinPayment && needsApproval && (
                   <Button
                     className="w-full"
-                    disabled={isApproving || hasInsufficientBalance}
+                    disabled={!!approvalTxHash || isApprovalPending || hasInsufficientBalance}
                     onClick={handleApprove}
                     size="lg"
                     variant="outline"
                   >
-                    {isApproving ? "Approving..." : `Approve ${selectedToken}`}
+                    {isApprovalPending
+                      ? "Confirming approval..."
+                      : approvalTxHash
+                        ? "Waiting for confirmation..."
+                        : `Approve ${selectedToken}`}
                   </Button>
+                )}
+                {isApprovalPending && (
+                  <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm">
+                    <div className="h-4 w-4 animate-spin rounded-full border-primary border-b-2" />
+                    Waiting for blockchain confirmation...
+                  </div>
                 )}
                 <Button
                   className="w-full"
                   disabled={
                     isPurchasing ||
                     hasInsufficientBalance ||
-                    (isStablecoinPayment && needsApproval)
+                    (isStablecoinPayment && needsApproval) ||
+                    isApprovalPending
                   }
                   onClick={handlePurchase}
                   size="lg"
                 >
                   {isPurchasing ? "Confirming..." : "Purchase Credits"}
                 </Button>
-                {isStablecoinPayment && needsApproval && (
+                {isStablecoinPayment && needsApproval && !isApprovalPending && !approvalTxHash && (
                   <p className="text-center text-muted-foreground text-xs">
                     You need to approve {selectedToken} spending before you can
                     purchase

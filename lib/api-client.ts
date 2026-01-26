@@ -747,6 +747,22 @@ export const billingApi = {
     apiCall<{ transactions: CreditTransaction[] }>(
       `/api/billing/history?orgId=${orgId}`
     ),
+
+  // Deduct credit for workflow execution
+  deductCredit: (
+    organizationId: string,
+    workflowId?: string,
+    executionId?: string
+  ) =>
+    apiCall<{
+      success: boolean;
+      creditsDeducted: number;
+      previousBalance: number;
+      newBalance: number;
+    }>("/api/billing/deduct-credit", {
+      method: "POST",
+      body: JSON.stringify({ organizationId, workflowId, executionId }),
+    }),
 };
 
 // Export all APIs as a single object

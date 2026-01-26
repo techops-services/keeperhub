@@ -19,9 +19,9 @@ export const STABLECOINS = {
     USDS: "0xdC035D45d973E3EC169d2276DDab16f1e407384F",
   },
   sepolia: {
-    USDC: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
-    USDT: "0x7169D38820dfd117C3FA1f22a697dBA58d90BA06",
-    USDS: "0x0000000000000000000000000000000000000000", // Not available on Sepolia
+    USDC: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", // Circle's official
+    USDT: "0x9F3BDc4459f0436eA0fe925d9aE6963eF1b7bb17", // Our mock USDT
+    USDS: "0x39d38839AAC04327577c795b4aC1E1235700EfCF", // Our mock USDS
   },
 } as const;
 
@@ -44,7 +44,6 @@ export const SUPPORTED_TOKENS = [
     name: "Sky Dollar",
     decimals: 18,
     icon: "💰",
-    disabledOnSepolia: true,
   },
 ] as const;
 
@@ -124,11 +123,17 @@ export function getTokenName(tokenAddress: string): string {
   if (addr === ethers.ZeroAddress.toLowerCase()) {
     return "ETH";
   }
+  // USDC (Circle's official on Sepolia)
   if (addr === "0x1c7d4b196cb0c7b01d743fbc6116a902379c7238") {
     return "USDC";
   }
-  if (addr === "0x7169d38820dfd117c3fa1f22a697dba58d90ba06") {
+  // USDT (our mock on Sepolia)
+  if (addr === "0x9f3bdc4459f0436ea0fe925d9ae6963ef1b7bb17") {
     return "USDT";
+  }
+  // USDS (our mock on Sepolia)
+  if (addr === "0x39d38839aac04327577c795b4ac1e1235700efcf") {
+    return "USDS";
   }
   return tokenAddress;
 }

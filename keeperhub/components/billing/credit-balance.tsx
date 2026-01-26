@@ -21,6 +21,8 @@ export function CreditBalance({ organizationId }: CreditBalanceProps) {
     queryKey: ["billing-balance", organizationId],
     queryFn: () => api.billing.getBalance(organizationId),
     enabled: !!organizationId,
+    refetchInterval: 5000, // Refetch every 5 seconds
+    refetchIntervalInBackground: true, // Continue refetching even when tab is not active
   });
 
   if (isLoading) {

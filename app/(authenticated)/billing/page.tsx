@@ -55,6 +55,8 @@ export default function BillingPage() {
       return api.billing.getBalance(organizationId);
     },
     enabled: !!organizationId,
+    refetchInterval: 5000, // Refetch every 5 seconds
+    refetchIntervalInBackground: true, // Continue refetching even when tab is not active
   });
 
   const handleSelectPackage = (usdAmount: number) => {
@@ -62,7 +64,7 @@ export default function BillingPage() {
   };
 
   return (
-    <div className="container pointer-events-auto mx-auto max-w-7xl space-y-8 p-6">
+    <div className="container pointer-events-auto mx-auto max-w-7xl space-y-8 p-6 pt-24">
       {/* Header */}
       <div className="space-y-2">
         <h1 className="font-bold text-4xl tracking-tight">Billing</h1>
