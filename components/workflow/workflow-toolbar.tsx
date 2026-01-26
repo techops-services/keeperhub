@@ -85,6 +85,12 @@ import { ExportWorkflowOverlay } from "../overlays/export-workflow-overlay";
 import { MakePublicOverlay } from "../overlays/make-public-overlay";
 import { useOverlay } from "../overlays/overlay-provider";
 import { WorkflowIssuesOverlay } from "../overlays/workflow-issues-overlay";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../ui/tooltip";
 import { WorkflowIcon } from "../ui/workflow-icon";
 import { UserMenu } from "../workflows/user-menu";
 
@@ -1436,12 +1442,23 @@ function RunButtonGroup({
   state: ReturnType<typeof useWorkflowState>;
   actions: ReturnType<typeof useWorkflowActions>;
 }) {
-  return (
+  // start custom keeperhub code //
+  const triggerType = state.nodes.find((node) => node.data.type === "trigger")
+    ?.data.config?.triggerType;
+
+  const isEventTrigger = triggerType === WorkflowTriggerEnum.EVENT;
+
+  const disabled =
+    state.isExecuting ||
+    state.nodes.length === 0 ||
+    state.isGenerating ||
+    isEventTrigger;
+  // end custom keeperhub code //
+
+  const button = (
     <Button
-      className="bg-keeperhub-green hover:bg-keeperhub-green-dark disabled:opacity-100 disabled:[&>svg]:text-muted-foreground"
-      disabled={
-        state.isExecuting || state.nodes.length === 0 || state.isGenerating
-      }
+      className="bg-keeperhub-green hover:bg-keeperhub-green-dark disabled:opacity-70 disabled:[&>svg]:text-muted-foreground"
+      disabled={disabled}
       onClick={() => actions.handleExecute()}
       title="Run Workflow"
     >
@@ -1454,6 +1471,26 @@ function RunButtonGroup({
       )}
     </Button>
   );
+
+  // start custom keeperhub code //
+  if (isEventTrigger) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            {/* inline block to prevent tooltip from being cut off when the button is disabled */}
+            <span className="inline-block">{button}</span>
+          </TooltipTrigger>
+          <TooltipContent align="center" side="bottom">
+            Manual runs are not available for Workflows with Event trigger
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
+  return button;
+  // end custom keeperhub code //
 }
 
 // Duplicate Button Component - placed next to Sign In for non-owners
