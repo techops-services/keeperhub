@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { TemplateBadgeInput } from "@/components/ui/template-badge-input";
 import { TemplateBadgeTextarea } from "@/components/ui/template-badge-textarea";
+import { SaveAddressBookmark } from "@/keeperhub/components/address-book/save-address-bookmark";
 import { getCustomFieldRenderer } from "@/lib/extension-registry";
 import {
   type ActionConfigField,
@@ -29,7 +30,13 @@ type FieldProps = {
 };
 
 function TemplateInputField({ field, value, onChange, disabled }: FieldProps) {
-  return (
+  const isAddressField =
+    field.key === "contractAddress" ||
+    field.key === "recipientAddress" ||
+    field.key === "address" ||
+    field.key.toLowerCase().endsWith("address");
+
+  const input = (
     <TemplateBadgeInput
       disabled={disabled}
       id={field.key}
@@ -38,6 +45,12 @@ function TemplateInputField({ field, value, onChange, disabled }: FieldProps) {
       value={value}
     />
   );
+
+  if (isAddressField) {
+    return <SaveAddressBookmark>{input}</SaveAddressBookmark>;
+  }
+
+  return input;
 }
 
 function TemplateTextareaField({

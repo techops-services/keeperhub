@@ -1,33 +1,119 @@
 "use client";
 
 import { ethers } from "ethers";
-import { Bookmark, X } from "lucide-react";
-import { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { useActiveMember } from "@/keeperhub/lib/hooks/use-organization";
-import { addressBookApi } from "@/lib/api-client";
+import { AddressSelectPopover } from "./address-select-popover";
+import { SaveAddressButton } from "./save-address-button";
+import { SaveAddressForm } from "./save-address-form";
 
 type SaveAddressBookmarkProps = {
-  address: string;
-  children: React.ReactNode;
+  address?: string;
+  children: React.ReactElement<{
+    value?: string;
+    onChange?: (value: string) => void;
+    onFocus?: (e: React.FocusEvent) => void;
+    onBlur?: (e: React.FocusEvent) => void;
+  }>;
 };
 
 export function SaveAddressBookmark({
-  address,
+  address: addressProp,
   children,
 }: SaveAddressBookmarkProps) {
   const { isOwner } = useActiveMember();
   const [showForm, setShowForm] = useState(false);
-  const [label, setLabel] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [currentAddress, setCurrentAddress] = useState<string>("");
+  const [isInputFocused, setIsInputFocused] = useState(false);
+  const inputContainerRef = useRef<HTMLDivElement>(null);
+  const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const childValue = children.props.value;
+    if (childValue !== undefined) {
+      setCurrentAddress(childValue);
+    } else if (addressProp !== undefined) {
+      setCurrentAddress(addressProp);
+    }
+  }, [children.props.value, addressProp]);
+
+  const address = addressProp ?? currentAddress;
+
+  const childWithInterception = React.cloneElement(children, {
+    onChange: (value: string) => {
+      setCurrentAddress(value);
+      children.props.onChange?.(value);
+    },
+    onFocus: (e: React.FocusEvent) => {
+      setIsInputFocused(true);
+      if (children.props.onFocus) {
+        children.props.onFocus(e);
+      }
+    },
+    onBlur: (e: React.FocusEvent) => {
+      if (blurTimeoutRef.current) {
+        clearTimeout(blurTimeoutRef.current);
+      }
+      blurTimeoutRef.current = setTimeout(() => {
+        const activeElement = document.activeElement;
+        if (
+          activeElement?.closest('[data-slot="popover-content"]') ||
+          activeElement?.closest('[data-slot="command"]')
+        ) {
+          return;
+        }
+        setIsInputFocused(false);
+      }, 200);
+      if (children.props.onBlur) {
+        children.props.onBlur(e);
+      }
+    },
+  });
+
+  useEffect(() => {
+    const container = inputContainerRef.current;
+    if (!container) return;
+
+    const handleFocus = () => {
+      setIsInputFocused(true);
+    };
+
+    const handleBlur = (e: FocusEvent) => {
+      if (blurTimeoutRef.current) {
+        clearTimeout(blurTimeoutRef.current);
+      }
+      blurTimeoutRef.current = setTimeout(() => {
+        const activeElement = document.activeElement;
+        if (
+          activeElement?.closest('[data-slot="popover-content"]') ||
+          activeElement?.closest('[data-slot="command"]')
+        ) {
+          return;
+        }
+        setIsInputFocused(false);
+      }, 200);
+    };
+
+    container.addEventListener("focusin", handleFocus);
+    container.addEventListener("focusout", handleBlur);
+
+    return () => {
+      container.removeEventListener("focusin", handleFocus);
+      container.removeEventListener("focusout", handleBlur);
+      if (blurTimeoutRef.current) {
+        clearTimeout(blurTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleAddressSelect = (selectedAddress: string) => {
+    if (children.props.onChange) {
+      children.props.onChange(selectedAddress);
+    }
+    setCurrentAddress(selectedAddress);
+    setIsInputFocused(false);
+  };
 
   const handleSaveClick = () => {
     if (!isOwner) {
@@ -43,100 +129,44 @@ export function SaveAddressBookmark({
     setShowForm(true);
   };
 
-  const handleCancel = () => {
+  const handleFormCancel = () => {
     setShowForm(false);
-    setLabel("");
   };
 
-  const handleSave = async () => {
-    if (!label.trim()) {
-      toast.error("Please enter a label");
-      return;
-    }
+  const handleFormSave = () => {
+    setShowForm(false);
+  };
 
-    if (!(address && ethers.isAddress(address))) {
-      toast.error("Invalid address format");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await addressBookApi.create({
-        label: label.trim(),
-        address,
-      });
-      toast.success("Address saved to address book");
-      setShowForm(false);
-      setLabel("");
-    } catch (error) {
-      console.error("Failed to save address:", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to save address to address book"
-      );
-    } finally {
-      setSaving(false);
+  const handleFormAddressChange = (newAddress: string) => {
+    setCurrentAddress(newAddress);
+    if (children.props.onChange) {
+      children.props.onChange(newAddress);
     }
   };
 
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <div className="flex-1">{children}</div>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                disabled={!(isOwner && address && ethers.isAddress(address))}
-                onClick={handleSaveClick}
-                size="icon"
-                type="button"
-                variant="ghost"
-              >
-                <Bookmark className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {isOwner
-                ? address && ethers.isAddress(address)
-                  ? "Save to Address Book"
-                  : "Enter a valid address to save"
-                : "Only organization owners can save addresses"}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <div className="flex-1" ref={inputContainerRef}>
+          <AddressSelectPopover
+            currentAddress={currentAddress}
+            isOpen={isInputFocused}
+            onAddressSelect={handleAddressSelect}
+            onClose={() => setIsInputFocused(false)}
+          >
+            {childWithInterception}
+          </AddressSelectPopover>
+        </div>
+        <SaveAddressButton address={address} onClick={handleSaveClick} />
       </div>
 
       {showForm && (
-        <div className="space-y-2 rounded-md border bg-muted/50 p-3">
-          <Input
-            disabled={saving}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder="Enter label (e.g., Treasury Wallet)"
-            value={label}
-          />
-          <div className="flex gap-2">
-            <Button
-              disabled={saving}
-              onClick={handleSave}
-              size="sm"
-              type="button"
-            >
-              {saving ? "Saving..." : "Save to Address Book"}
-            </Button>
-            <Button
-              disabled={saving}
-              onClick={handleCancel}
-              size="sm"
-              type="button"
-              variant="ghost"
-            >
-              <X className="mr-1 h-4 w-4" />
-              Cancel
-            </Button>
-          </div>
-        </div>
+        <SaveAddressForm
+          address={address}
+          onAddressChange={handleFormAddressChange}
+          onCancel={handleFormCancel}
+          onSave={handleFormSave}
+        />
       )}
     </div>
   );
