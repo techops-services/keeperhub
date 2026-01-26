@@ -8,8 +8,8 @@
  *   npx tsx scripts/schedule-dispatcher.ts
  *
  * Environment variables:
- *   KEEPERHUB_URL - KeeperHub API URL (default: http://localhost:3000)
- *   SCHEDULER_SERVICE_API_KEY - Service API key for authentication
+ *   KEEPERHUB_API_URL - KeeperHub API URL (default: http://localhost:3000)
+ *   KEEPERHUB_API_KEY - Service API key for authentication
  *   AWS_ENDPOINT_URL - LocalStack endpoint (default: http://localhost:4566)
  *   SQS_QUEUE_URL - SQS queue URL (default: LocalStack queue)
  */
@@ -37,8 +37,8 @@ const QUEUE_URL =
   process.env.SQS_QUEUE_URL ||
   "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/keeperhub-workflow-queue";
 
-const KEEPERHUB_URL = process.env.KEEPERHUB_URL || "http://localhost:3000";
-const SERVICE_API_KEY = process.env.SCHEDULER_SERVICE_API_KEY || "";
+const KEEPERHUB_URL = process.env.KEEPERHUB_API_URL || "http://localhost:3000";
+const SERVICE_API_KEY = process.env.KEEPERHUB_API_KEY || "";
 
 type Schedule = {
   id: string;
