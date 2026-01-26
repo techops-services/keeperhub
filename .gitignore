@@ -72,3 +72,8 @@ tailwindcss-*.log
 
 # Subdirectory node_modules
 */node_modules/*
+
+# Hardhat artifacts (auto-generated during contract compilation)
+contracts/artifacts/
+contracts/cache/
+contracts/typechain-types/

@@ -240,6 +240,79 @@ export async function POST(
     }
 
     // start custom keeperhub code //
+    // Deduct 1 credit before executing workflow (if workflow has an organizationId)
+    if (workflow.organizationId) {
+      try {
+        const deductResponse = await fetch(
+          `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/billing/deduct-credit`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Service-Key":
+                process.env.WORKFLOW_EXECUTOR_SERVICE_API_KEY || "",
+            },
+            body: JSON.stringify({
+              organizationId: workflow.organizationId,
+              workflowId,
+              executionId,
+            }),
+          }
+        );
+
+        if (!deductResponse.ok) {
+          const errorData = await deductResponse.json().catch(() => ({
+            error: "Failed to deduct credit",
+          }));
+
+          // Update execution status to failed
+          await db
+            .update(workflowExecutions)
+            .set({
+              status: "error",
+              error:
+                errorData.error === "Insufficient credits"
+                  ? "Insufficient credits. Please purchase more credits to continue."
+                  : errorData.error || "Failed to deduct credit",
+              completedAt: new Date(),
+            })
+            .where(eq(workflowExecutions.id, executionId));
+
+          return NextResponse.json(
+            {
+              error:
+                errorData.error === "Insufficient credits"
+                  ? "Insufficient credits. Please purchase more credits to continue."
+                  : errorData.error || "Failed to deduct credit",
+              currentBalance: errorData.currentBalance,
+            },
+            { status: deductResponse.status }
+          );
+        }
+
+        const deductResult = await deductResponse.json();
+        console.log(
+          `[Workflow Execute] Credit deducted for org ${workflow.organizationId}. New balance: ${deductResult.newBalance}`
+        );
+      } catch (error) {
+        console.error("[Workflow Execute] Failed to deduct credit:", error);
+        // Update execution status to failed
+        await db
+          .update(workflowExecutions)
+          .set({
+            status: "error",
+            error: "Failed to deduct credit for workflow execution",
+            completedAt: new Date(),
+          })
+          .where(eq(workflowExecutions.id, executionId));
+
+        return NextResponse.json(
+          { error: "Failed to deduct credit for workflow execution" },
+          { status: 500 }
+        );
+      }
+    }
+
     // Record workflow execution metric in API process (workflow runs in separate context)
     const triggerType = isInternalExecution ? "scheduled" : "manual";
     const metrics = getMetricsCollector();

@@ -21,7 +21,7 @@ export const metadata = {
 // Hidden sections that should not appear in sidebar
 const HIDDEN_SECTIONS = ["api", "plans-features"];
 
-// Filter and reorder page map items
+// Filter out hidden sections from page map and reorder items
 function filterPageMap(
   items: Awaited<ReturnType<typeof getPageMap>>
 ): typeof items {
