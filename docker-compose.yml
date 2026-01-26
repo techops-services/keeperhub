@@ -173,17 +173,20 @@ services:
     restart: unless-stopped
     working_dir: /app
     environment:
-      <<: *env_db_connection
       AWS_REGION: us-east-1
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
       AWS_ENDPOINT_URL: http://localstack:4566
       SQS_QUEUE_URL: http://localstack:4566/000000000000/keeperhub-workflow-queue
+      KEEPERHUB_API_URL: http://keeperhub:3000
+      KEEPERHUB_API_KEY: local-scheduler-key-for-dev
     depends_on:
       db:
         condition: service_healthy
       localstack:
         condition: service_healthy
+      app-dev:
+        condition: service_started
     # Run dispatcher every minute using a simple loop
     # (Docker doesn't have native cron, so we simulate it)
     command: |
