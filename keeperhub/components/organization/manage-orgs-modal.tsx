@@ -2,8 +2,10 @@
 
 import {
   ArrowLeft,
+  Check,
   LogOut,
   Mail,
+  Pencil,
   Plus,
   Settings,
   Trash2,
@@ -11,7 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -47,6 +49,8 @@ import {
   useOrganization,
   useOrganizations,
 } from "@/keeperhub/lib/hooks/use-organization";
+import { refetchOrganizations } from "@/keeperhub/lib/refetch-organizations";
+import { api } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
 
 // Helper function to get status color based on invitation status
@@ -239,7 +243,7 @@ export function ManageOrgsModal({
   const [managedOrgId, setManagedOrgId] = useState<string | null>(null);
 
   const { organization, switchOrganization } = useOrganization();
-  const { organizations, refetch: refetchOrganizations } = useOrganizations();
+  const { organizations } = useOrganizations();
   const { isOwner: isActiveOrgOwner, isAdmin: isActiveOrgAdmin } =
     useActiveMember();
   const router = useRouter();
@@ -249,6 +253,7 @@ export function ManageOrgsModal({
   const managedOrg = managedOrgId
     ? organizations.find((org) => org.id === managedOrgId)
     : null;
+  const managedOrgName = managedOrg?.name ?? "";
 
   // Determine if the managed org is the active session org
   const isManagedOrgActive = managedOrgId === organization?.id;
@@ -258,6 +263,11 @@ export function ManageOrgsModal({
   const [orgSlug, setOrgSlug] = useState("");
   const [orgSlugManuallyEdited, setOrgSlugManuallyEdited] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
+
+  // Organization name editing state (managed org detail view)
+  const [isEditingOrgName, setIsEditingOrgName] = useState(false);
+  const [editingOrgName, setEditingOrgName] = useState("");
+  const [updatingOrgName, setUpdatingOrgName] = useState(false);
 
   // Invite state
   const [inviteEmail, setInviteEmail] = useState("");
@@ -421,6 +431,27 @@ export function ManageOrgsModal({
       fetchMembers();
     }
   }, [open, managedOrgId, fetchSentInvitations, fetchMembers]);
+
+  // Keep edit input in sync when switching orgs / name updates
+  const lastManagedOrgIdForNameEditRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (lastManagedOrgIdForNameEditRef.current !== managedOrgId) {
+      lastManagedOrgIdForNameEditRef.current = managedOrgId;
+      setIsEditingOrgName(false);
+    }
+
+    if (!managedOrgId) {
+      setEditingOrgName("");
+      return;
+    }
+
+    if (isEditingOrgName) {
+      return;
+    }
+
+    setEditingOrgName(managedOrgName);
+  }, [managedOrgId, managedOrgName, isEditingOrgName]);
 
   // Reset managed org when modal closes
   useEffect(() => {
@@ -653,6 +684,37 @@ export function ManageOrgsModal({
     }
   };
 
+  const handleUpdateOrgName = async () => {
+    if (!(managedOrgId && managedOrg)) {
+      return;
+    }
+
+    const nextName = editingOrgName.trim();
+
+    if (!nextName) {
+      toast.error("Organization name is required");
+      return;
+    }
+
+    if (nextName === managedOrg.name) {
+      setIsEditingOrgName(false);
+      return;
+    }
+
+    setUpdatingOrgName(true);
+    try {
+      await api.organization.updateName(managedOrgId, { name: nextName });
+      toast.success("Organization name updated");
+      setIsEditingOrgName(false);
+      refetchOrganizations();
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update name");
+    } finally {
+      setUpdatingOrgName(false);
+    }
+  };
+
   return (
     <>
       <Dialog onOpenChange={setOpen} open={open}>
@@ -826,11 +888,73 @@ export function ManageOrgsModal({
                   <div className="space-y-4 rounded-lg border p-4">
                     <div>
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-lg">
-                          {managedOrg.name}
-                        </h3>
+                        {isEditingOrgName ? (
+                          <>
+                            <Input
+                              aria-label="Organization name"
+                              className="h-8 max-w-xs"
+                              disabled={updatingOrgName}
+                              onChange={(e) =>
+                                setEditingOrgName(e.target.value)
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  handleUpdateOrgName();
+                                }
+                                if (e.key === "Escape") {
+                                  setIsEditingOrgName(false);
+                                  setEditingOrgName(managedOrg.name);
+                                }
+                              }}
+                              value={editingOrgName}
+                            />
+                            <Button
+                              aria-label="Save organization name"
+                              disabled={
+                                updatingOrgName || !editingOrgName.trim()
+                              }
+                              onClick={handleUpdateOrgName}
+                              size="icon"
+                              variant="ghost"
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              aria-label="Cancel editing organization name"
+                              disabled={updatingOrgName}
+                              onClick={() => {
+                                setIsEditingOrgName(false);
+                                setEditingOrgName(managedOrg.name);
+                              }}
+                              size="icon"
+                              variant="ghost"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <h3 className="font-semibold text-lg">
+                              {managedOrg.name}
+                            </h3>
+                            {isOwner && (
+                              <Button
+                                aria-label="Edit organization name"
+                                disabled={updatingOrgName}
+                                onClick={() => {
+                                  setIsEditingOrgName(true);
+                                  setEditingOrgName(managedOrg.name);
+                                }}
+                                size="icon"
+                                variant="ghost"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </>
+                        )}
                         {isManagedOrgActive && (
-                          <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-700 text-xs">
+                          <span className="min-w-11 rounded-full bg-green-100 px-2 py-0.5 text-green-700 text-xs">
                             Active
                           </span>
                         )}
