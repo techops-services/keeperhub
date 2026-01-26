@@ -8,23 +8,14 @@
  *   npx tsx scripts/schedule-dispatcher.ts
  *
  * Environment variables:
- *   DATABASE_URL - PostgreSQL connection string
+ *   KEEPERHUB_API_URL - KeeperHub API URL (default: http://localhost:3000)
+ *   KEEPERHUB_API_KEY - Service API key for authentication
  *   AWS_ENDPOINT_URL - LocalStack endpoint (default: http://localhost:4566)
  *   SQS_QUEUE_URL - SQS queue URL (default: LocalStack queue)
  */
 
 import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { CronExpressionParser } from "cron-parser";
-import { and, eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
-import { getDatabaseUrl } from "../lib/db/connection-utils";
-import { workflowSchedules, workflows } from "../lib/db/schema";
-
-// Database connection
-const connectionString = getDatabaseUrl();
-const queryClient = postgres(connectionString);
-const db = drizzle(queryClient, { schema: { workflowSchedules, workflows } });
 
 // SQS client - only use custom endpoint/credentials for local development
 const sqsConfig: ConstructorParameters<typeof SQSClient>[0] = {
@@ -46,12 +37,43 @@ const QUEUE_URL =
   process.env.SQS_QUEUE_URL ||
   "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/keeperhub-workflow-queue";
 
+const KEEPERHUB_URL = process.env.KEEPERHUB_API_URL || "http://localhost:3000";
+const SERVICE_API_KEY = process.env.KEEPERHUB_API_KEY || "";
+
+type Schedule = {
+  id: string;
+  workflowId: string;
+  cronExpression: string;
+  timezone: string;
+};
+
 type ScheduleMessage = {
   workflowId: string;
   scheduleId: string;
   triggerTime: string;
   triggerType: "schedule";
 };
+
+/**
+ * Fetch enabled schedules from KeeperHub API
+ */
+async function fetchSchedules(): Promise<Schedule[]> {
+  const response = await fetch(`${KEEPERHUB_URL}/api/internal/schedules`, {
+    method: "GET",
+    headers: {
+      "X-Service-Key": SERVICE_API_KEY,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch schedules: ${response.status} ${await response.text()}`
+    );
+  }
+
+  const data = await response.json();
+  return data.schedules;
+}
 
 /**
  * Check if a cron expression should trigger at the given time
@@ -116,19 +138,8 @@ async function dispatch(): Promise<{
     `[${runId}] Starting dispatch run at ${new Date().toISOString()}`
   );
 
-  // Query all enabled schedules for enabled workflows
-  const schedules = await db
-    .select({
-      id: workflowSchedules.id,
-      workflowId: workflowSchedules.workflowId,
-      cronExpression: workflowSchedules.cronExpression,
-      timezone: workflowSchedules.timezone,
-    })
-    .from(workflowSchedules)
-    .innerJoin(workflows, eq(workflowSchedules.workflowId, workflows.id))
-    .where(
-      and(eq(workflowSchedules.enabled, true), eq(workflows.enabled, true))
-    );
+  // Fetch all enabled schedules via API
+  const schedules = await fetchSchedules();
 
   console.log(`[${runId}] Found ${schedules.length} enabled schedules`);
 
@@ -184,13 +195,9 @@ async function main() {
   try {
     const result = await dispatch();
 
-    // Close database connection
-    await queryClient.end();
-
     process.exit(result.errors > 0 ? 1 : 0);
   } catch (error) {
     console.error("Fatal error:", error);
-    await queryClient.end();
     process.exit(1);
   }
 }
