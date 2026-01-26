@@ -1,3 +1,4 @@
+// start custom keeperhub code //
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
@@ -29,3 +30,4 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ schedules });
 }
+// end keeperhub code //

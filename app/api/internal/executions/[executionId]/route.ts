@@ -1,3 +1,4 @@
+// start custom keeperhub code //
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
@@ -65,3 +66,4 @@ export async function PATCH(
 
   return NextResponse.json({ success: true });
 }
+// end keeperhub code //
