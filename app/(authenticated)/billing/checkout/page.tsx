@@ -2,7 +2,7 @@
 
 import { ArrowLeft, Check } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { formatEther, formatUnits, parseEther, parseUnits } from "viem";
 import {
@@ -58,7 +58,7 @@ type PaymentMethod = "eth" | "stablecoin";
 type StablecoinSymbol = "USDC" | "USDT" | "USDS";
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex payment flow with multiple states and blockchain interactions
-export default function CheckoutPage() {
+function CheckoutContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const usdAmount = searchParams.get("amount") || "25";
@@ -767,5 +767,22 @@ export default function CheckoutPage() {
         )}
       </Card>
     </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="container pointer-events-auto mx-auto max-w-2xl space-y-8 p-6 pt-24">
+          <div className="py-12 text-center">
+            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-primary border-b-2" />
+            <p className="text-muted-foreground">Loading checkout...</p>
+          </div>
+        </div>
+      }
+    >
+      <CheckoutContent />
+    </Suspense>
   );
 }

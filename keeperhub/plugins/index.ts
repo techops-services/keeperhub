@@ -26,6 +26,7 @@ export type {
   PluginAction,
 } from "@/plugins/registry";
 
+// biome-ignore lint/performance/noBarrelFile: Intentional re-exports for plugin architecture
 export {
   computeActionId,
   findActionById,
