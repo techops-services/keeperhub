@@ -154,7 +154,20 @@ jobs:
 
       - name: Configure kubectl
         run: |
+          echo "Configuring kubectl for EKS cluster..."
           aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.REGION }}
+
+          echo "Verifying kubectl connection..."
+          kubectl cluster-info
+          kubectl version --client
+
+          echo "Testing cluster access..."
+          kubectl get namespaces || {
+            echo "Failed to connect to Kubernetes cluster"
+            echo "Checking AWS caller identity..."
+            aws sts get-caller-identity
+            exit 1
+          }
 
       - name: Create namespace
         run: |
