@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { ethers } from "ethers";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
@@ -137,27 +137,6 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "Invalid Ethereum address format" },
         { status: 400 }
-      );
-    }
-
-    // Check for duplicate address within the organization
-    const existingEntries = await db
-      .select()
-      .from(addressBookEntry)
-      .where(
-        and(
-          eq(addressBookEntry.organizationId, activeOrgId),
-          eq(addressBookEntry.address, address)
-        )
-      )
-      .limit(1);
-
-    const existingEntry = existingEntries[0];
-
-    if (existingEntry) {
-      return NextResponse.json(
-        { error: "This address already exists in the address book" },
-        { status: 409 }
       );
     }
 

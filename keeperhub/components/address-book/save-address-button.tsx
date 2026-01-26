@@ -20,10 +20,12 @@ export function SaveAddressButton({
     return null;
   }
 
+  const isValidAddress = address && ethers.isAddress(address);
+
   return (
     <Button
-      className="gap-2 border border-gray-700 disabled:opacity-70"
-      disabled={!(address && ethers.isAddress(address))}
+      className="gap-2 border border-gray-700 disabled:opacity-60"
+      disabled={!isValidAddress}
       onClick={onClick}
       size="sm"
       type="button"

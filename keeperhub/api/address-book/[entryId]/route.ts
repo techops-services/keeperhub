@@ -1,4 +1,4 @@
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { ethers } from "ethers";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
@@ -72,27 +72,6 @@ async function getExistingEntry(entryId: string, activeOrgId: string) {
   return existingEntries[0] || null;
 }
 
-// Helper: Check for duplicate address
-async function checkDuplicateAddress(
-  address: string,
-  activeOrgId: string,
-  excludeEntryId: string
-) {
-  const duplicates = await db
-    .select()
-    .from(addressBookEntry)
-    .where(
-      and(
-        eq(addressBookEntry.organizationId, activeOrgId),
-        eq(addressBookEntry.address, address),
-        ne(addressBookEntry.id, excludeEntryId)
-      )
-    )
-    .limit(1);
-
-  return duplicates.length > 0;
-}
-
 // Helper: Validate and build update object
 async function buildUpdateObject(
   body: { label?: string; address?: string },
@@ -139,22 +118,6 @@ async function buildUpdateObject(
           { status: 400 }
         ),
       };
-    }
-
-    if (address !== existingEntry.address) {
-      const isDuplicate = await checkDuplicateAddress(
-        address,
-        activeOrgId,
-        entryId
-      );
-      if (isDuplicate) {
-        return {
-          error: NextResponse.json(
-            { error: "This address already exists in the address book" },
-            { status: 409 }
-          ),
-        };
-      }
     }
 
     updates.address = address;

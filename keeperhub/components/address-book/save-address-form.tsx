@@ -115,7 +115,7 @@ export function SaveAddressForm({
           {saving ? "Saving..." : "Save"}
         </Button>
         <Button
-          className="gap-2"
+          className="gap-2 flex"
           disabled={saving}
           onClick={onCancel}
           size="sm"

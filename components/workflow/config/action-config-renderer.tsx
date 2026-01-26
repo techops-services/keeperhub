@@ -30,6 +30,7 @@ type FieldProps = {
 };
 
 function TemplateInputField({ field, value, onChange, disabled }: FieldProps) {
+  // start custom keeperhub code
   const isAddressField =
     field.key === "contractAddress" ||
     field.key === "recipientAddress" ||
@@ -51,6 +52,7 @@ function TemplateInputField({ field, value, onChange, disabled }: FieldProps) {
   }
 
   return input;
+  // end custom keeperhub code
 }
 
 function TemplateTextareaField({
