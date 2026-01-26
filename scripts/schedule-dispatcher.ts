@@ -66,7 +66,9 @@ async function fetchSchedules(): Promise<Schedule[]> {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch schedules: ${response.status} ${await response.text()}`);
+    throw new Error(
+      `Failed to fetch schedules: ${response.status} ${await response.text()}`
+    );
   }
 
   const data = await response.json();

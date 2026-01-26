@@ -89,7 +89,9 @@ async function apiRequest<T>(
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`API ${options.method || "GET"} ${path} failed: ${response.status} ${text}`);
+    throw new Error(
+      `API ${options.method || "GET"} ${path} failed: ${response.status} ${text}`
+    );
   }
 
   return response.json();
@@ -98,7 +100,9 @@ async function apiRequest<T>(
 // Fetch workflow by ID
 async function fetchWorkflow(workflowId: string): Promise<Workflow | null> {
   try {
-    const result = await apiRequest<{ workflow: Workflow }>(`/api/internal/workflows/${workflowId}`);
+    const result = await apiRequest<{ workflow: Workflow }>(
+      `/api/internal/workflows/${workflowId}`
+    );
     return result.workflow;
   } catch (error) {
     if (error instanceof Error && error.message.includes("404")) {
@@ -111,7 +115,9 @@ async function fetchWorkflow(workflowId: string): Promise<Workflow | null> {
 // Fetch schedule by ID
 async function fetchSchedule(scheduleId: string): Promise<Schedule | null> {
   try {
-    const result = await apiRequest<{ schedule: Schedule }>(`/api/internal/schedules/${scheduleId}`);
+    const result = await apiRequest<{ schedule: Schedule }>(
+      `/api/internal/schedules/${scheduleId}`
+    );
     return result.schedule;
   } catch (error) {
     if (error instanceof Error && error.message.includes("404")) {
@@ -217,15 +223,11 @@ async function processScheduledWorkflow(
   }
 
   // Create execution record
-  const executionId = await createExecution(
-    workflowId,
-    workflow.userId,
-    {
-      triggerType: "schedule",
-      scheduleId,
-      triggerTime,
-    }
-  );
+  const executionId = await createExecution(workflowId, workflow.userId, {
+    triggerType: "schedule",
+    scheduleId,
+    triggerTime,
+  });
 
   console.log(`[Executor] Created execution ${executionId}`);
 
