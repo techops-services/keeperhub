@@ -29,6 +29,7 @@ import {
 import { integrationRequiresCredentials } from "@/keeperhub/lib/integration-helpers";
 // end keeperhub
 import { aiGatewayStatusAtom } from "@/lib/ai-gateway/state";
+import { validateConditionExpressionUI } from "@/lib/condition-validator";
 import {
   integrationsAtom,
   integrationsVersionAtom,
@@ -204,6 +205,30 @@ function ConditionFields({
   onUpdateConfig: (key: string, value: string) => void;
   disabled: boolean;
 }) {
+  // start custom keeperhub code
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const conditionValue = (config?.condition as string) || "";
+
+  // Debounced validation - validate after user stops typing
+  useEffect(() => {
+    if (!conditionValue.trim()) {
+      setValidationError(null);
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      const result = validateConditionExpressionUI(conditionValue);
+      if (result.valid) {
+        setValidationError(null);
+      } else {
+        setValidationError(result.error);
+      }
+    }, 400); // 400ms debounce delay
+
+    return () => clearTimeout(timeoutId);
+  }, [conditionValue]);
+  // end keeperhub code
+
   return (
     <div className="space-y-2">
       <Label htmlFor="condition">Condition Expression</Label>
@@ -212,8 +237,13 @@ function ConditionFields({
         id="condition"
         onChange={(value) => onUpdateConfig("condition", value)}
         placeholder="e.g., 5 > 3, status === 200, {{PreviousNode.value}} > 100"
-        value={(config?.condition as string) || ""}
+        value={conditionValue}
       />
+      {/* start custom keeperhub code */}
+      {validationError && (
+        <p className="text-xs text-yellow-600">{validationError}</p>
+      )}
+      {/* end keeperhub code */}
       <p className="text-muted-foreground text-xs">
         Enter a JavaScript expression that evaluates to true or false. You can
         use @ to reference previous node outputs.
