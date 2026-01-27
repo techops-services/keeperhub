@@ -1,8 +1,9 @@
 "use client";
 
-import { Loader2, Plus } from "lucide-react";
+import { Copy, ExternalLink, Loader2, Plus } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -179,6 +180,91 @@ export function TokenSelectField({
 
   const isCustomMode = currentValue.mode === "custom";
 
+  // Get the currently selected token for display
+  const selectedSupportedToken = currentValue.supportedTokenId
+    ? tokens.find((t) => t.id === currentValue.supportedTokenId)
+    : null;
+
+  // Copy token address to clipboard
+  const copyTokenAddress = (address: string) => {
+    navigator.clipboard.writeText(address);
+    toast.success("Token address copied");
+  };
+
+  // Render selected token info with copy + explorer icons
+  const renderSelectedTokenInfo = () => {
+    // For supported tokens mode
+    if (!isCustomMode && selectedSupportedToken) {
+      return (
+        <div className="mt-2 flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-sm">
+          {selectedSupportedToken.logoUrl && (
+            <Image
+              alt={selectedSupportedToken.symbol}
+              className="h-4 w-4 rounded-full"
+              height={16}
+              src={selectedSupportedToken.logoUrl}
+              width={16}
+            />
+          )}
+          <span className="font-medium">{selectedSupportedToken.symbol}</span>
+          <span className="truncate font-mono text-muted-foreground text-xs">
+            {selectedSupportedToken.tokenAddress.slice(0, 10)}...
+            {selectedSupportedToken.tokenAddress.slice(-8)}
+          </span>
+          <div className="ml-auto flex items-center gap-1">
+            <button
+              className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              onClick={() =>
+                copyTokenAddress(selectedSupportedToken.tokenAddress)
+              }
+              title="Copy token address"
+              type="button"
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </button>
+            {selectedSupportedToken.explorerUrl && (
+              <a
+                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                href={selectedSupportedToken.explorerUrl}
+                rel="noopener noreferrer"
+                target="_blank"
+                title="View on explorer"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // For custom token mode
+    if (isCustomMode && currentValue.customToken) {
+      const customToken = currentValue.customToken;
+      return (
+        <div className="mt-2 flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-sm">
+          <span className="font-medium">{customToken.symbol}</span>
+          <span className="truncate font-mono text-muted-foreground text-xs">
+            {customToken.address.slice(0, 10)}...
+            {customToken.address.slice(-8)}
+          </span>
+          <div className="ml-auto flex items-center gap-1">
+            <button
+              className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              onClick={() => copyTokenAddress(customToken.address)}
+              title="Copy token address"
+              type="button"
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   // Render supported tokens section based on state
   const renderSupportedTokensSection = () => {
     if (!networkValue) {
@@ -303,7 +389,10 @@ export function TokenSelectField({
 
       {/* Supported Tokens Single-Select */}
       {!isCustomMode && (
-        <div className="space-y-2">{renderSupportedTokensSection()}</div>
+        <div className="space-y-2">
+          {renderSupportedTokensSection()}
+          {renderSelectedTokenInfo()}
+        </div>
       )}
 
       {/* Custom Token Address Input */}
@@ -350,6 +439,7 @@ export function TokenSelectField({
               Select a network first to add custom tokens
             </p>
           )}
+          {renderSelectedTokenInfo()}
         </div>
       )}
     </div>

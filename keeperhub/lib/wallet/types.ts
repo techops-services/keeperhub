@@ -57,6 +57,8 @@ export type SupportedToken = {
   logoUrl: string | null;
   /** Whether this token is available on the requested chain. Undefined means available. */
   available?: boolean;
+  /** Explorer URL for the token contract */
+  explorerUrl?: string | null;
 };
 
 /**
@@ -109,6 +111,8 @@ export type SupportedTokenBalance = {
   error?: string;
   /** Whether this token is available on the chain. Undefined means available. */
   available?: boolean;
+  /** Explorer URL for the token contract */
+  explorerUrl?: string | null;
 };
 
 // ============================================================================

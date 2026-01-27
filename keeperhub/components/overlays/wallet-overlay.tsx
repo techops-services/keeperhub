@@ -104,6 +104,11 @@ function StablecoinWithWithdraw({
   const numBalance = Number.parseFloat(token.balance);
   const hasBalance = Number.isFinite(numBalance) && numBalance > 0;
 
+  const copyTokenAddress = () => {
+    navigator.clipboard.writeText(token.tokenAddress);
+    toast.success("Token address copied");
+  };
+
   const renderBalance = () => {
     if (isUnavailable) {
       return <span className="italic">Not available</span>;
@@ -131,6 +136,29 @@ function StablecoinWithWithdraw({
         />
       )}
       <span className="font-medium text-xs">{token.symbol}</span>
+      {!isUnavailable && (
+        <div className="flex items-center gap-1">
+          <button
+            className="text-muted-foreground hover:text-foreground"
+            onClick={copyTokenAddress}
+            title="Copy token address"
+            type="button"
+          >
+            <Copy className="h-3 w-3" />
+          </button>
+          {token.explorerUrl && (
+            <a
+              className="text-muted-foreground hover:text-foreground"
+              href={token.explorerUrl}
+              rel="noopener noreferrer"
+              target="_blank"
+              title="View on explorer"
+            >
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+        </div>
+      )}
       <span className="ml-auto text-muted-foreground text-xs">
         {renderBalance()}
       </span>

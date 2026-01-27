@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { chains, supportedTokens } from "@/lib/db/schema";
+import { chains, explorerConfigs, supportedTokens } from "@/lib/db/schema";
 import { getChainIdFromNetwork } from "@/lib/rpc";
 
 // Mainnet chain ID - used as the "master list" of supported tokens
@@ -9,6 +9,21 @@ const MAINNET_CHAIN_ID = 1;
 
 // TEMPO testnet chain IDs - excluded from master list logic (have their own tokens)
 const TEMPO_CHAIN_IDS = [42_429];
+
+/**
+ * Build explorer URL for a token address
+ */
+function buildTokenExplorerUrl(
+  explorerUrl: string | null,
+  explorerAddressPath: string | null,
+  tokenAddress: string
+): string | null {
+  if (!explorerUrl) {
+    return null;
+  }
+  const path = explorerAddressPath || "/address/{address}";
+  return `${explorerUrl}${path.replace("{address}", tokenAddress)}`;
+}
 
 /**
  * GET /api/supported-tokens
@@ -67,12 +82,18 @@ export async function GET(request: Request) {
       );
     }
 
-    // Verify chain exists and is enabled
-    const chain = await db
-      .select()
-      .from(chains)
-      .where(eq(chains.chainId, chainId))
-      .limit(1);
+    // Verify chain exists and is enabled, and fetch explorer config
+    const [chainResult, explorerResult] = await Promise.all([
+      db.select().from(chains).where(eq(chains.chainId, chainId)).limit(1),
+      db
+        .select()
+        .from(explorerConfigs)
+        .where(eq(explorerConfigs.chainId, chainId))
+        .limit(1),
+    ]);
+
+    const chain = chainResult;
+    const explorer = explorerResult[0];
 
     if (chain.length === 0) {
       return NextResponse.json(
@@ -88,6 +109,16 @@ export async function GET(request: Request) {
       );
     }
 
+    // Helper to add explorer URL to a token
+    const addExplorerUrl = <T extends { tokenAddress: string }>(token: T) => ({
+      ...token,
+      explorerUrl: buildTokenExplorerUrl(
+        explorer?.explorerUrl ?? null,
+        explorer?.explorerAddressPath ?? null,
+        token.tokenAddress
+      ),
+    });
+
     // For TEMPO chains, just return their own tokens (no master list logic)
     if (TEMPO_CHAIN_IDS.includes(chainId)) {
       const tokens = await db
@@ -99,7 +130,7 @@ export async function GET(request: Request) {
       return NextResponse.json({
         chainId,
         chainName: chain[0].name,
-        tokens: tokens.map((t) => ({ ...t, available: true })),
+        tokens: tokens.map((t) => addExplorerUrl({ ...t, available: true })),
       });
     }
 
@@ -125,7 +156,9 @@ export async function GET(request: Request) {
       return NextResponse.json({
         chainId,
         chainName: chain[0].name,
-        tokens: mainnetTokens.map((t) => ({ ...t, available: true })),
+        tokens: mainnetTokens.map((t) =>
+          addExplorerUrl({ ...t, available: true })
+        ),
       });
     }
 
@@ -137,17 +170,19 @@ export async function GET(request: Request) {
       const chainToken = chainTokensBySymbol.get(mainnetToken.symbol);
 
       if (chainToken) {
-        // Token is available on this chain - return chain-specific data
-        return {
+        // Token is available on this chain - return chain-specific data with explorer URL
+        return addExplorerUrl({
           ...chainToken,
           available: true,
-        };
+        });
       }
 
       // Token not available on this chain - return mainnet data with available: false
+      // No explorer URL since token doesn't exist on this chain
       return {
         ...mainnetToken,
         available: false,
+        explorerUrl: null,
       };
     });
 
