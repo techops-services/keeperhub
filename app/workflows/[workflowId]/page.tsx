@@ -1,21 +1,23 @@
 "use client";
 
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { ChevronLeft, ChevronRight, LayoutTemplate, Plus } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useOverlay } from "@/components/overlays/overlay-provider";
 import { Button } from "@/components/ui/button";
 import { NodeConfigPanel } from "@/components/workflow/node-config-panel";
 import { useIsMobile } from "@/hooks/use-mobile";
 // start custom keeperhub code //
+import { FeaturedOverlay } from "@/keeperhub/components/overlays/featured-overlay";
 import {
   getPendingClaim,
   useClaimWorkflow,
 } from "@/keeperhub/lib/hooks/use-claim-workflow";
 // end keeperhub code //
 import { api } from "@/lib/api-client";
+import { authClient, useSession } from "@/lib/auth-client";
 import {
   integrationsAtom,
   integrationsLoadedAtom,
@@ -113,6 +115,7 @@ function checkNodeIntegration(
 const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   const { workflowId } = use(params);
   const searchParams = useSearchParams();
+  const router = useRouter();
   const isMobile = useIsMobile();
   const [isGenerating, setIsGenerating] = useAtom(isGeneratingAtom);
   const [_isSaving, setIsSaving] = useAtom(isSavingAtom);
@@ -151,6 +154,16 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   const setGlobalIntegrations = useSetAtom(integrationsAtom);
   const setIntegrationsLoaded = useSetAtom(integrationsLoadedAtom);
   const integrationsVersion = useAtomValue(integrationsVersionAtom);
+  const { open: openOverlay } = useOverlay();
+  const { data: session } = useSession();
+
+  // Helper to create anonymous session if needed
+  const ensureSession = useCallback(async () => {
+    if (!session) {
+      await authClient.signIn.anonymous();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }, [session]);
 
   // Panel width state for resizing
   const [panelWidth, setPanelWidth] = useState(30); // default percentage
@@ -707,9 +720,50 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
             <p className="mb-6 text-muted-foreground">
               The workflow you're looking for doesn't exist or has been deleted.
             </p>
-            <Button asChild>
-              <Link href="/">New Workflow</Link>
-            </Button>
+            <div className="flex justify-center gap-3">
+              <Button
+                className="gap-2"
+                onClick={async () => {
+                  try {
+                    await ensureSession();
+                    const triggerNode = {
+                      id: `trigger-${Date.now()}`,
+                      type: "trigger" as const,
+                      position: { x: 400, y: 200 },
+                      data: {
+                        label: "",
+                        type: "trigger" as const,
+                        config: { triggerType: "Manual" },
+                        status: "idle" as const,
+                      },
+                    };
+                    const newWorkflow = await api.workflow.create({
+                      name: "Untitled Workflow",
+                      description: "",
+                      nodes: [triggerNode],
+                      edges: [],
+                    });
+                    router.replace(`/workflows/${newWorkflow.id}`);
+                  } catch (error) {
+                    console.error("Failed to create workflow:", error);
+                    toast.error("Failed to create workflow. Please try again.");
+                  }
+                }}
+              >
+                <Plus className="size-4" />
+                Start building
+              </Button>
+              <Button
+                className="gap-2"
+                onClick={() =>
+                  openOverlay(FeaturedOverlay, {}, { size: "full" })
+                }
+                variant="outline"
+              >
+                <LayoutTemplate className="size-4" />
+                Explore Workflows
+              </Button>
+            </div>
           </div>
         </div>
       )}
