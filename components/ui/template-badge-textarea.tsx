@@ -70,6 +70,78 @@ function getDisplayTextForTemplate(template: string, nodes: ReturnType<typeof us
   return `${displayLabel}.${field}`;
 }
 
+// start keeperhub custom code //
+// Helper to find all template pattern ranges in text
+function findTemplateRanges(text: string): Array<{ start: number; end: number }> {
+  const templatePattern = /\{\{@[^}]+\}\}/g;
+  const ranges: Array<{ start: number; end: number }> = [];
+  let match;
+  
+  while ((match = templatePattern.exec(text)) !== null) {
+    ranges.push({ start: match.index, end: match.index + match[0].length });
+  }
+  
+  return ranges;
+}
+
+// Helper to check if a position is inside any template range
+function isInsideTemplate(position: number, templateRanges: Array<{ start: number; end: number }>): boolean {
+  return templateRanges.some(range => position >= range.start && position < range.end);
+}
+
+// Helper to collect all @ signs that are not inside templates
+function collectActiveAtSigns(text: string, templateRanges: Array<{ start: number; end: number }>): number[] {
+  const activeAtSigns: number[] = [];
+  
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '@' && !isInsideTemplate(i, templateRanges)) {
+      activeAtSigns.push(i);
+    }
+  }
+  
+  return activeAtSigns;
+}
+
+// Helper to find the @ closest to cursor position
+function findClosestAtSign(activeAtSigns: number[], cursorOffset: number): number {
+  let closestAt = activeAtSigns[0];
+  let minDistance = Math.abs(closestAt - cursorOffset);
+  
+  for (const atPos of activeAtSigns) {
+    const distance = Math.abs(atPos - cursorOffset);
+    const isBeforeCursor = atPos <= cursorOffset;
+    const isCloseAfterCursor = atPos > cursorOffset && distance <= 5;
+    
+    if (isBeforeCursor || isCloseAfterCursor) {
+      const shouldUpdate = distance < minDistance || (isBeforeCursor && closestAt > cursorOffset);
+      if (shouldUpdate) {
+        closestAt = atPos;
+        minDistance = distance;
+      }
+    }
+  }
+  
+  return closestAt;
+}
+
+// Helper to find the "@" closest to cursor that's not inside a completed template pattern
+function findActiveAtSign(text: string, cursorOffset?: number): number {
+  const templateRanges = findTemplateRanges(text);
+  const activeAtSigns = collectActiveAtSigns(text, templateRanges);
+  
+  if (activeAtSigns.length === 0) {
+    return -1;
+  }
+  
+  if (cursorOffset !== undefined && cursorOffset !== null) {
+    return findClosestAtSign(activeAtSigns, cursorOffset);
+  }
+  
+  // No cursor info, return the last @
+  return activeAtSigns[activeAtSigns.length - 1];
+}
+// end keeperhub custom code //
+
 /**
  * A textarea component that renders template variables as styled badges
  * Converts {{@nodeId:DisplayName.field}} to badges showing "DisplayName.field"
@@ -428,13 +500,43 @@ export function TemplateBadgeTextarea({
       onChange?.(newValue);
       // Don't trigger display update - this prevents cursor reset!
       
+      // start keeperhub custom code //
+
       // Check for @ sign to show autocomplete (moved here so it works with existing badges)
-      const lastAtSign = newValue.lastIndexOf("@");
+      // Get cursor position first to find the closest @
+      const cursorPos = saveCursorPosition();
+      const cursorOffset = cursorPos?.offset ?? newValue.length;
+      
+      // Check if cursor is in a text node that contains "@"
+      const selection = window.getSelection();
+      const cursorInTextNodeWithAt = selection && selection.rangeCount > 0 && 
+        selection.getRangeAt(0).endContainer.nodeType === Node.TEXT_NODE &&
+        (selection.getRangeAt(0).endContainer.textContent || "").includes("@");
+      
+      const lastAtSign = findActiveAtSign(newValue, cursorOffset);
       
       if (lastAtSign !== -1) {
-        const filter = newValue.slice(lastAtSign + 1);
+        const textAfterAt = newValue.slice(lastAtSign + 1);
         
-        if (!filter.includes(" ") && !filter.includes("\n")) {
+        // Extract filter up to next space, newline, or end of string
+        const spaceIndex = textAfterAt.search(/[\s\n]/);
+        const filter = spaceIndex === -1 ? textAfterAt : textAfterAt.slice(0, spaceIndex);
+        
+      // Calculate distance from cursor to @
+      const distanceFromAt = cursorOffset - lastAtSign;
+      // Only consider cursor "near" if within 10 chars - if further, it's just normal text, not active typing
+      const isCursorNearAt = distanceFromAt <= 10;
+      
+      // Only open if cursor is very close to @ (within 10 chars) - if further, it's just normal text
+      // Always open if cursor is in a text node containing "@" (user is actively typing there)
+      // Close if cursor is far from @ OR if there's a space/newline immediately after and cursor moved away
+      const shouldClose = !cursorInTextNodeWithAt && !isCursorNearAt;
+        
+        if (shouldClose) {
+          // User typed @ followed by space and moved cursor far away - they've moved on
+          setShowAutocomplete(false);
+        } else {
+          // Always open dropdown when @ is detected and cursor is nearby
           setAutocompleteFilter(filter);
           setAtSignPosition(lastAtSign);
           
@@ -447,12 +549,11 @@ export function TemplateBadgeTextarea({
             setAutocompletePosition(position);
           }
           setShowAutocomplete(true);
-        } else {
-          setShowAutocomplete(false);
         }
       } else {
         setShowAutocomplete(false);
       }
+      // end keeperhub custom code //
       
       return;
     }
@@ -472,13 +573,43 @@ export function TemplateBadgeTextarea({
     setInternalValue(newValue);
     onChange?.(newValue);
     
+    // start keeperhub custom code //
+
     // Check for @ sign to show autocomplete
-    const lastAtSign = newValue.lastIndexOf("@");
+    // Get cursor position first to find the closest @
+    const cursorPos = saveCursorPosition();
+    const cursorOffset = cursorPos?.offset ?? newValue.length;
+    
+    // Check if cursor is in a text node that contains "@"
+    const selection2 = window.getSelection();
+    const cursorInTextNodeWithAt2 = selection2 && selection2.rangeCount > 0 && 
+      selection2.getRangeAt(0).endContainer.nodeType === Node.TEXT_NODE &&
+      (selection2.getRangeAt(0).endContainer.textContent || "").includes("@");
+    
+    const lastAtSign = findActiveAtSign(newValue, cursorOffset);
     
     if (lastAtSign !== -1) {
-      const filter = newValue.slice(lastAtSign + 1);
+      const textAfterAt = newValue.slice(lastAtSign + 1);
       
-      if (!filter.includes(" ") && !filter.includes("\n")) {
+      // Extract filter up to next space, newline, or end of string
+      const spaceIndex = textAfterAt.search(/[\s\n]/);
+      const filter = spaceIndex === -1 ? textAfterAt : textAfterAt.slice(0, spaceIndex);
+      
+      // Calculate distance from cursor to @
+      const distanceFromAt = cursorOffset - lastAtSign;
+      // Only consider cursor "near" if within 10 chars - if further, it's just normal text, not active typing
+      const isCursorNearAt = distanceFromAt <= 10;
+      
+      // Only open if cursor is very close to @ (within 10 chars) - if further, it's just normal text
+      // Always open if cursor is in a text node containing "@" (user is actively typing there)
+      // Close if cursor is far from @ OR if there's a space/newline immediately after and cursor moved away
+      const shouldClose = !cursorInTextNodeWithAt2 && !isCursorNearAt;
+      
+      if (shouldClose) {
+        // User typed @ followed by space and moved cursor far away - they've moved on
+        setShowAutocomplete(false);
+      } else {
+        // Always open dropdown when @ is detected and cursor is nearby
         setAutocompleteFilter(filter);
         setAtSignPosition(lastAtSign);
         
@@ -491,12 +622,11 @@ export function TemplateBadgeTextarea({
           setAutocompletePosition(position);
         }
         setShowAutocomplete(true);
-      } else {
-        setShowAutocomplete(false);
       }
     } else {
       setShowAutocomplete(false);
     }
+    // end keeperhub custom code //
   };
 
   const handleAutocompleteSelect = (template: string) => {
