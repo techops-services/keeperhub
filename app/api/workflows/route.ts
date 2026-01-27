@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 // start custom keeperhub code //
 import { authenticateApiKey } from "@/keeperhub/lib/api-key-auth";
@@ -45,7 +45,7 @@ export async function GET(request: Request) {
             .where(
               and(eq(workflows.userId, userId), eq(workflows.isAnonymous, true))
             )
-            .orderBy(desc(workflows.updatedAt))
+            .orderBy(asc(workflows.createdAt))
         : // Authenticated users with org or API key: show org workflows
           await db
             .select()
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
                 eq(workflows.isAnonymous, false)
               )
             )
-            .orderBy(desc(workflows.updatedAt));
+            .orderBy(asc(workflows.createdAt));
     // end keeperhub code //
 
     const mappedWorkflows = userWorkflows.map((workflow) => ({
