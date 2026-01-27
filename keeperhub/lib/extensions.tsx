@@ -10,6 +10,7 @@
 
 import { Label } from "@/components/ui/label";
 import { KeeperHubLogo } from "@/keeperhub/components/icons/keeperhub-logo";
+import { SendGridConnectionSection } from "@/keeperhub/components/settings/sendgrid-connection-section";
 import { Web3WalletSection } from "@/keeperhub/components/settings/web3-wallet-section";
 import { AbiEventSelectField } from "@/keeperhub/components/workflow/config/abi-event-select-field";
 import { AbiWithAutoFetchField } from "@/keeperhub/components/workflow/config/abi-with-auto-fetch-field";
@@ -154,6 +155,14 @@ registerFieldRenderer(
  * Shows the wallet creation/management UI instead of a standard form
  */
 registerIntegrationFormHandler("web3", () => <Web3WalletSection />);
+
+/**
+ * SendGrid Email Integration
+ * Shows login requirement for anonymous users to prevent token abuse
+ */
+registerIntegrationFormHandler("sendgrid", ({ config, updateConfig }) => (
+  <SendGridConnectionSection config={config} updateConfig={updateConfig} />
+));
 
 // ============================================================================
 // Register Branding

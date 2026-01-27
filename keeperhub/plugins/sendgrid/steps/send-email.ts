@@ -1,7 +1,10 @@
 import "server-only";
 
+import { eq } from "drizzle-orm";
 import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 import { fetchCredentials } from "@/lib/credential-fetcher";
+import { db } from "@/lib/db";
+import { workflowExecutions, workflows } from "@/lib/db/schema";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import type { SendGridCredentials } from "../credentials";
 
@@ -130,12 +133,38 @@ async function stepHandler(
 }
 
 /**
+ * Check if execution belongs to an anonymous workflow
+ */
+async function isAnonymousExecution(executionId?: string): Promise<boolean> {
+  if (!executionId) {
+    return false;
+  }
+
+  const execution = await db
+    .select({ isAnonymous: workflows.isAnonymous })
+    .from(workflowExecutions)
+    .innerJoin(workflows, eq(workflowExecutions.workflowId, workflows.id))
+    .where(eq(workflowExecutions.id, executionId))
+    .limit(1);
+
+  return execution[0]?.isAnonymous ?? false;
+}
+
+/**
  * App entry point - fetches credentials and wraps with logging
  */
 export async function sendEmailStep(
   input: SendEmailInput
 ): Promise<SendEmailResult> {
   "use step";
+
+  // Block anonymous users from sending emails
+  if (await isAnonymousExecution(input._context?.executionId)) {
+    return {
+      success: false,
+      error: "Please sign in to send emails.",
+    };
+  }
 
   const credentials = input.integrationId
     ? await fetchCredentials(input.integrationId)
