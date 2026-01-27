@@ -91,6 +91,16 @@ export const UserMenu = () => {
 
   const signInInProgress = isSingleProviderSignInInitiated();
 
+  // Check if user is anonymous
+  // Better Auth anonymous plugin creates users with name "Anonymous" and temp- email
+  const isAnonymousUser =
+    !session?.user ||
+    session.user.name === "Anonymous" ||
+    session.user.email?.startsWith("temp-");
+
+  // Check if user's email is verified
+  const isEmailVerified = session?.user?.emailVerified === true;
+
   // Don't render anything while session is loading to prevent flash
   // BUT if sign-in is in progress, keep showing the AuthDialog with loading state
   if (isPending && !signInInProgress) {
@@ -99,15 +109,8 @@ export const UserMenu = () => {
     );
   }
 
-  // Check if user is anonymous
-  // Better Auth anonymous plugin creates users with name "Anonymous" and temp- email
-  const isAnonymous =
-    !session?.user ||
-    session.user.name === "Anonymous" ||
-    session.user.email?.startsWith("temp-");
-
-  // Show Sign In button if user is anonymous or not logged in
-  if (isAnonymous) {
+  // Show Sign In button if user is anonymous, not logged in, or email not verified
+  if (isAnonymousUser || !isEmailVerified) {
     return (
       <div className="flex items-center gap-2">
         <AuthDialog>
