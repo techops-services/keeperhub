@@ -1,5 +1,6 @@
 "use client";
 
+import { ethers } from "ethers";
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -15,8 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-const ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
+import { SaveAddressBookmark } from "@/keeperhub/components/address-book/save-address-bookmark";
 
 export type WithdrawableAsset = {
   type: "native" | "token";
@@ -58,8 +58,6 @@ export function WithdrawModal({
 
   const selectedAsset = assets[selectedAssetIndex];
 
-  const isValidAddress = (address: string) => ADDRESS_REGEX.test(address);
-
   const handleMaxClick = () => {
     if (selectedAsset) {
       setAmount(selectedAsset.balance);
@@ -76,7 +74,7 @@ export function WithdrawModal({
     if (Number.parseFloat(amount) > Number.parseFloat(selectedAsset.balance)) {
       return "Insufficient balance";
     }
-    if (!isValidAddress(recipient)) {
+    if (!ethers.isAddress(recipient)) {
       return "Please enter a valid recipient address";
     }
     if (recipient.toLowerCase() === walletAddress.toLowerCase()) {
@@ -191,7 +189,7 @@ export function WithdrawModal({
           label: "Withdraw",
           onClick: handleSubmit,
           disabled:
-            !(amount && recipient && isValidAddress(recipient)) ||
+            !(amount && recipient && ethers.isAddress(recipient)) ||
             Number.parseFloat(amount) <= 0 ||
             Number.parseFloat(amount) >
               Number.parseFloat(selectedAsset?.balance || "0"),
@@ -260,12 +258,14 @@ export function WithdrawModal({
         {/* Recipient Address */}
         <div className="space-y-2">
           <Label>Recipient Address</Label>
-          <Input
-            onChange={(e) => setRecipient(e.target.value)}
-            placeholder="0x..."
-            value={recipient}
-          />
-          {recipient && !isValidAddress(recipient) && (
+          <SaveAddressBookmark address={recipient}>
+            <Input
+              onChange={(e) => setRecipient(e.target.value)}
+              placeholder="0x..."
+              value={recipient}
+            />
+          </SaveAddressBookmark>
+          {recipient && !ethers.isAddress(recipient) && (
             <p className="text-destructive text-xs">Invalid address format</p>
           )}
         </div>
