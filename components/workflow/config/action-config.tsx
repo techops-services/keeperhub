@@ -334,6 +334,7 @@ function normalizeActionType(actionType: string): string {
   return actionType;
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex UI logic with many conditional renders
 export function ActionConfig({
   config,
   onUpdateConfig,
@@ -349,6 +350,24 @@ export function ActionConfig({
   const setIntegrationsVersion = useSetAtom(integrationsVersionAtom);
   const globalIntegrations = useAtomValue(integrationsAtom);
   const { push } = useOverlay();
+
+  // start custom keeperhub code //
+  // Check if user is anonymous (for email action restriction)
+  const [isAnonymous, setIsAnonymous] = useState(false);
+  useEffect(() => {
+    fetch("/api/user")
+      .then((res) => res.json())
+      .then((data) => {
+        const anon =
+          data.isAnonymous ||
+          data.email?.includes("@http://") ||
+          data.email?.includes("@https://") ||
+          data.email?.startsWith("temp-");
+        setIsAnonymous(anon);
+      })
+      .catch(() => undefined);
+  }, []);
+  // end keeperhub code //
 
   // AI Gateway managed keys state
   const aiGatewayStatus = useAtomValue(aiGatewayStatusAtom);
@@ -558,14 +577,28 @@ export function ActionConfig({
       />
 
       {/* Plugin actions - declarative config fields */}
-      {pluginAction && !SYSTEM_ACTION_IDS.includes(actionType) && (
-        <ActionConfigRenderer
-          config={config}
-          disabled={disabled}
-          fields={pluginAction.configFields}
-          onUpdateConfig={handlePluginUpdateConfig}
-        />
-      )}
+      {/* start custom keeperhub code // */}
+      {pluginAction &&
+        !SYSTEM_ACTION_IDS.includes(actionType) &&
+        isAnonymous &&
+        pluginAction.integration === "sendgrid" && (
+          <div className="rounded-lg border bg-muted/50 p-3">
+            <p className="text-muted-foreground text-sm">
+              Please sign in to configure email actions.
+            </p>
+          </div>
+        )}
+      {/* end keeperhub code // */}
+      {pluginAction &&
+        !SYSTEM_ACTION_IDS.includes(actionType) &&
+        !(isAnonymous && pluginAction.integration === "sendgrid") && (
+          <ActionConfigRenderer
+            config={config}
+            disabled={disabled}
+            fields={pluginAction.configFields}
+            onUpdateConfig={handlePluginUpdateConfig}
+          />
+        )}
     </>
   );
 }
