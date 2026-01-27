@@ -7,7 +7,7 @@ import { organizationHasWallet } from "@/keeperhub/lib/para/wallet-helpers";
 import { auth } from "@/lib/auth";
 import { ERC20_ABI } from "@/lib/contracts";
 import { db } from "@/lib/db";
-import { chains, organizationTokens } from "@/lib/db/schema";
+import { chains, organizationTokens, supportedTokens } from "@/lib/db/schema";
 
 /**
  * GET /api/user/wallet/tokens
@@ -130,7 +130,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check if token is already tracked
+    // Check if token is already tracked by the organization
     const existing = await db
       .select()
       .from(organizationTokens)
@@ -145,7 +145,28 @@ export async function POST(request: Request) {
 
     if (existing.length > 0) {
       return NextResponse.json(
-        { error: "Token is already being tracked" },
+        { error: `Token (${existing[0].symbol}) is already being tracked` },
+        { status: 400 }
+      );
+    }
+
+    // Check if token is a default supported token (KEEP-1303)
+    const existingDefault = await db
+      .select()
+      .from(supportedTokens)
+      .where(
+        and(
+          eq(supportedTokens.chainId, chainId),
+          eq(supportedTokens.tokenAddress, tokenAddress.toLowerCase())
+        )
+      )
+      .limit(1);
+
+    if (existingDefault.length > 0) {
+      return NextResponse.json(
+        {
+          error: `Token (${existingDefault[0].symbol}) is already being tracked`,
+        },
         { status: 400 }
       );
     }
