@@ -1684,7 +1684,9 @@ export const WorkflowToolbar = ({
           {(() => {
             const CustomLogo = getCustomLogo();
             return CustomLogo ? (
-              <CustomLogo className="size-7 shrink-0" />
+              <a href="/">
+                <CustomLogo className="size-7 shrink-0" />
+              </a>
             ) : null;
           })()}
           <WorkflowMenuComponent
@@ -1738,7 +1740,9 @@ export const WorkflowToolbar = ({
           {(() => {
             const CustomLogo = getCustomLogo();
             return CustomLogo ? (
-              <CustomLogo className="size-7 shrink-0" />
+              <a href="/">
+                <CustomLogo className="size-7 shrink-0" />
+              </a>
             ) : null;
           })()}
           <WorkflowMenuComponent
