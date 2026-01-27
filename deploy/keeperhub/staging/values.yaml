@@ -23,7 +23,7 @@ service:
 ingress:
   enabled: true
   hosts:
-    - workflows-staging.keeperhub.com
+    - app-staging.keeperhub.com
   annotations:
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
@@ -117,7 +117,7 @@ env:
     value: "http://localhost:3000"
   BETTER_AUTH_URL:
     type: kv
-    value: "https://workflows-staging.keeperhub.com"
+    value: "https://app-staging.keeperhub.com"
   BETTER_AUTH_SECRET:
     type: parameterStore
     name: better-auth-secret
