@@ -11,9 +11,13 @@ export function Web3WalletSection() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [isAnonymous, setIsAnonymous] = useState(false);
+  // start keeperhub - store user email for wallet creation
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  // end keeperhub
 
   // Check wallet status and user type on mount
   useEffect(() => {
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Sequential checks for wallet status
     async function checkWallet() {
       try {
         // Check if user is anonymous by fetching user profile
@@ -28,6 +32,11 @@ export function Web3WalletSection() {
           userData.email?.startsWith("temp-");
 
         setIsAnonymous(isAnonUser);
+        // start keeperhub - store user email for wallet creation
+        if (!isAnonUser && userData.email) {
+          setUserEmail(userData.email);
+        }
+        // end keeperhub
 
         // Only check for wallet if not anonymous
         if (!isAnonUser) {
@@ -50,11 +59,22 @@ export function Web3WalletSection() {
   }, []);
 
   async function handleCreateWallet() {
+    // start keeperhub - validate email before creating
+    if (!userEmail) {
+      toast.error("Unable to get your email. Please refresh and try again.");
+      return;
+    }
+    // end keeperhub
+
     setCreating(true);
     try {
+      // start keeperhub - send email in request body
       const response = await fetch("/api/user/wallet", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: userEmail }),
       });
+      // end keeperhub
 
       const data = await response.json();
 

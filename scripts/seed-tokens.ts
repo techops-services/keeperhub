@@ -103,7 +103,13 @@ const TOKEN_CONFIGS: TokenConfig[] = [
     isStablecoin: true,
     sortOrder: 2,
   },
-  // Note: USDS not yet deployed on Base
+  {
+    chainId: 8453,
+    tokenAddress: "0x820c137fa70c8691f0e44dc420a5e53c168921dc", // USDS (Sky/MakerDAO)
+    logoUrl: LOGOS.USDS,
+    isStablecoin: true,
+    sortOrder: 3,
+  },
 
   // ==========================================================================
   // Base Sepolia (chainId: 84532)

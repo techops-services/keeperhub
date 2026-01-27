@@ -438,6 +438,34 @@ export const organizationApi = {
     ),
 };
 
+// Address Book API
+export type AddressBookEntry = {
+  id: string;
+  label: string;
+  address: string;
+  createdAt: string;
+  updatedAt: string;
+  createdByName?: string | null;
+};
+
+export const addressBookApi = {
+  getAll: () => apiCall<AddressBookEntry[]>("/api/address-book"),
+  create: (data: { label: string; address: string }) =>
+    apiCall<AddressBookEntry>("/api/address-book", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  update: (entryId: string, data: { label?: string; address?: string }) =>
+    apiCall<AddressBookEntry>(`/api/address-book/${entryId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  delete: (entryId: string) =>
+    apiCall<{ success: boolean }>(`/api/address-book/${entryId}`, {
+      method: "DELETE",
+    }),
+};
+
 // User API
 export const userApi = {
   get: () =>

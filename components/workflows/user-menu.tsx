@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Bookmark,
   Github,
   Key,
   LogOut,
@@ -37,6 +38,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 // start custom keeperhub code //
 import { ManageOrgsModal } from "@/keeperhub/components/organization/manage-orgs-modal";
+import { AddressBookOverlay } from "@/keeperhub/components/overlays/address-book-overlay";
 import { FeedbackOverlay } from "@/keeperhub/components/overlays/feedback-overlay";
 import { WalletOverlay } from "@/keeperhub/components/overlays/wallet-overlay";
 // end keeperhub code //
@@ -168,6 +170,7 @@ export const UserMenu = () => {
             <Plug className="size-4" />
             <span>Connections</span>
           </DropdownMenuItem>
+          {/* start custom keeperhub code */}
           <DropdownMenuItem onClick={() => openOverlay(ApiKeysOverlay)}>
             <Key className="size-4" />
             <span>API Keys</span>
@@ -176,6 +179,11 @@ export const UserMenu = () => {
             <Wallet className="size-4" />
             <span>Wallet</span>
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => openOverlay(AddressBookOverlay)}>
+            <Bookmark className="size-4" />
+            <span>Address Book</span>
+          </DropdownMenuItem>
+          {/* end keeperhub code */}
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
               <Sun className="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />

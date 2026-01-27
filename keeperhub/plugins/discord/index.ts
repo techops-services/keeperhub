@@ -29,6 +29,13 @@ const discordPlugin: IntegrationPlugin = {
   ],
   // end keeperhub
 
+  testConfig: {
+    getTestFunction: async () => {
+      const { testDiscord } = await import("./test");
+      return testDiscord;
+    },
+  },
+
   actions: [
     {
       slug: "send-message",

@@ -71,7 +71,7 @@ export const TriggerNode = memo(({ data, selected }: TriggerNodeProps) => {
         <div className="flex flex-col items-center gap-1 text-center">
           <NodeTitle className="text-base">{displayTitle}</NodeTitle>
           {displayDescription && (
-            <NodeDescription className="text-xs">
+            <NodeDescription className="line-clamp-2 text-xs">
               {displayDescription}
             </NodeDescription>
           )}
