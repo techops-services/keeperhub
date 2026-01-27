@@ -148,8 +148,9 @@ const web3Plugin: IntegrationPlugin = {
     },
     {
       slug: "transfer-funds",
-      label: "Transfer Funds",
-      description: "Transfer ETH from your wallet to a recipient address",
+      label: "Transfer Native Token",
+      description:
+        "Transfer native tokens (ETH, MATIC, etc.) from your wallet to a recipient address",
       category: "Web3",
       stepFunction: "transferFundsStep",
       stepImportPath: "transfer-funds",
@@ -196,9 +197,8 @@ const web3Plugin: IntegrationPlugin = {
     },
     {
       slug: "transfer-token",
-      label: "Transfer Token",
-      description:
-        "Transfer ERC20 tokens from your wallet to a recipient address",
+      label: "Transfer ERC20 Token",
+      description: "Transfer ERC20 tokens on your desired EVM chain",
       category: "Web3",
       stepFunction: "transferTokenStep",
       stepImportPath: "transfer-token",
