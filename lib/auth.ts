@@ -402,7 +402,7 @@ export const auth = betterAuth({
   },
   trustedOrigins: [
     "http://localhost:3000",
-    "https://workflows-staging.keeperhub.com",
+    "https://app-staging.keeperhub.com",
     "https://*.keeperhub.com",
   ],
   plugins,
