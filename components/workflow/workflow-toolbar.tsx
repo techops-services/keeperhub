@@ -1650,6 +1650,7 @@ export const WorkflowToolbar = ({
 }: WorkflowToolbarProps) => {
   const state = useWorkflowState();
   const actions = useWorkflowActions(state);
+  const router = useRouter();
 
   // Use prop if provided, otherwise fall back to atom value
   const effectiveWorkflowId =
@@ -1658,6 +1659,14 @@ export const WorkflowToolbar = ({
   const pathname = usePathname();
   const isWorkflowRoute =
     pathname === "/workflows" || pathname.startsWith("/workflows/");
+
+  // start custom keeperhub code //
+  const handleLogoClick = () => {
+    // Add a flag to the session storage to prevent the homepage from creating a workflow
+    sessionStorage.setItem("skip-workflow-creation", Date.now().toString());
+    router.replace("/");
+  };
+  // end custom keeperhub code //
 
   // If persistent mode, use fixed positioning
   const containerClassName = persistent
@@ -1684,7 +1693,9 @@ export const WorkflowToolbar = ({
           {(() => {
             const CustomLogo = getCustomLogo();
             return CustomLogo ? (
-              <CustomLogo className="size-7 shrink-0" />
+              <a href="/">
+                <CustomLogo className="size-7 shrink-0" />
+              </a>
             ) : null;
           })()}
           <WorkflowMenuComponent
@@ -1738,7 +1749,13 @@ export const WorkflowToolbar = ({
           {(() => {
             const CustomLogo = getCustomLogo();
             return CustomLogo ? (
-              <CustomLogo className="size-7 shrink-0" />
+              <button
+                className="cursor-pointer"
+                onClick={handleLogoClick}
+                type="button"
+              >
+                <CustomLogo className="size-7 shrink-0" />
+              </button>
             ) : null;
           })()}
           <WorkflowMenuComponent
