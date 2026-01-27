@@ -52,6 +52,7 @@ import {
   showClearDialogAtom,
   showDeleteDialogAtom,
   updateNodeDataAtom,
+  workflowNotFoundAtom,
 } from "@/lib/workflow-store";
 import { findActionById } from "@/plugins";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
@@ -163,6 +164,7 @@ export const PanelInner = () => {
     currentWorkflowDescriptionAtom
   );
   const isOwner = useAtomValue(isWorkflowOwnerAtom);
+  const workflowNotFound = useAtomValue(workflowNotFoundAtom);
   const updateNodeData = useSetAtom(updateNodeDataAtom);
   const deleteNode = useSetAtom(deleteNodeAtom);
   const deleteEdge = useSetAtom(deleteEdgeAtom);
@@ -712,6 +714,7 @@ export const PanelInner = () => {
                 <div className="flex items-center gap-2 pt-4">
                   <Button
                     className="text-muted-foreground"
+                    disabled={workflowNotFound}
                     onClick={() => setShowClearDialog(true)}
                     size="sm"
                     variant="ghost"
@@ -721,6 +724,7 @@ export const PanelInner = () => {
                   </Button>
                   <Button
                     className="text-muted-foreground"
+                    disabled={workflowNotFound}
                     onClick={() => {
                       setShowDeleteDialog(true);
                     }}
@@ -752,6 +756,7 @@ export const PanelInner = () => {
                 </Button>
                 <Button
                   className="text-muted-foreground"
+                  disabled={workflowNotFound}
                   onClick={() => setShowDeleteRunsAlert(true)}
                   size="sm"
                   variant="ghost"

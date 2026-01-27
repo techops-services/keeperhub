@@ -4,7 +4,7 @@ import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { use, useCallback, useEffect, useRef, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { NodeConfigPanel } from "@/components/workflow/node-config-panel";
@@ -117,6 +117,12 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   const [isGenerating, setIsGenerating] = useAtom(isGeneratingAtom);
   const [_isSaving, setIsSaving] = useAtom(isSavingAtom);
   const [nodes] = useAtom(nodesAtom);
+
+  // Check if workflow has a trigger node - panels only show when trigger exists
+  const hasTriggerNode = useMemo(
+    () => nodes.some((node) => node.data.type === "trigger"),
+    [nodes]
+  );
   const [edges] = useAtom(edgesAtom);
   const [currentWorkflowId] = useAtom(currentWorkflowIdAtom);
   const [selectedExecutionId] = useAtom(selectedExecutionIdAtom);
@@ -398,6 +404,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
 
   // start custom keeperhub code //
   const { claimPending } = useClaimWorkflow(workflowId, loadExistingWorkflow);
+
   // end keeperhub code //
 
   // Track if we've already auto-fixed integrations for this workflow+version
@@ -707,8 +714,8 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
         </div>
       )}
 
-      {/* Expand button when panel is collapsed */}
-      {!isMobile && panelCollapsed && (
+      {/* Expand button when panel is collapsed - only show if trigger exists */}
+      {!isMobile && hasTriggerNode && panelCollapsed && (
         <button
           className="pointer-events-auto absolute top-1/2 right-0 z-20 flex size-6 -translate-y-1/2 items-center justify-center rounded-l-full border border-r-0 bg-background shadow-sm transition-colors hover:bg-muted"
           onClick={() => {
@@ -722,8 +729,8 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
         </button>
       )}
 
-      {/* Right panel overlay (desktop only) */}
-      {!isMobile && (
+      {/* Right panel overlay (desktop only) - only show if trigger exists */}
+      {!isMobile && hasTriggerNode && (
         <div
           className="pointer-events-auto absolute top-[60px] right-0 bottom-0 z-20 border-l bg-background transition-transform duration-300 ease-out"
           style={{
@@ -767,8 +774,8 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
         </div>
       )}
 
-      {/* Mobile: NodeConfigPanel renders the overlay trigger button */}
-      {isMobile && <NodeConfigPanel />}
+      {/* Mobile: NodeConfigPanel renders the overlay trigger button - only show if trigger exists */}
+      {isMobile && hasTriggerNode && <NodeConfigPanel />}
     </div>
   );
 };

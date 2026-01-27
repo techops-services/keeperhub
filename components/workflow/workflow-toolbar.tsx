@@ -995,6 +995,12 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
       return;
     }
 
+    // When enabling, check if user is logged in
+    if (!session?.user) {
+      toast.error("Please login to activate your workflow");
+      return;
+    }
+
     // When enabling, validate first
     if (
       validateAndProceed(() => updateWorkflowEnabled(true), "Enable Anyway")
