@@ -25,7 +25,12 @@ const webhookPlugin: IntegrationPlugin = {
     },
   ],
 
-  // No test function needed since there are no credentials to test
+  testConfig: {
+    getTestFunction: async () => {
+      const { testWebhook } = await import("./test");
+      return testWebhook;
+    },
+  },
 
   actions: [
     {

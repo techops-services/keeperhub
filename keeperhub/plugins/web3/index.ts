@@ -15,8 +15,12 @@ const web3Plugin: IntegrationPlugin = {
   // No form fields - wallet creation is handled by the custom form handler
   formFields: [],
 
-  // No test function needed - no credentials to test
-  // testConfig is optional, so we omit it
+  testConfig: {
+    getTestFunction: async () => {
+      const { testWeb3 } = await import("./test");
+      return testWeb3;
+    },
+  },
 
   actions: [
     {
