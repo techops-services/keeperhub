@@ -323,9 +323,7 @@ export function TokenSelectField({
                       width={16}
                     />
                   )}
-                  <span>
-                    {token.symbol} - {token.name}
-                  </span>
+                  <span>{token.symbol}</span>
                   {isSelected && <span className="text-primary">✓</span>}
                 </div>
               </SelectItem>
@@ -355,7 +353,7 @@ export function TokenSelectField({
                       />
                     )}
                     <span className="text-muted-foreground">
-                      {token.symbol} - {token.name}
+                      {token.symbol}
                     </span>
                   </div>
                 </SelectItem>
