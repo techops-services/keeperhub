@@ -56,6 +56,7 @@ function truncateAddress(address: string): string {
 
 // TEMPO testnet uses stablecoins for gas, so we display stablecoins only (no native token)
 const TEMPO_CHAIN_ID = 42_429;
+const MAINNET_CHAIN_ID = 1;
 
 // ============================================================================
 // Balance Display Components
@@ -99,10 +100,14 @@ function StablecoinWithWithdraw({
   isAdmin: boolean;
   onWithdraw: (chainId: number, tokenAddress: string) => void;
 }) {
+  const isUnavailable = token.available === false;
   const numBalance = Number.parseFloat(token.balance);
   const hasBalance = Number.isFinite(numBalance) && numBalance > 0;
 
   const renderBalance = () => {
+    if (isUnavailable) {
+      return <span className="italic">Not available</span>;
+    }
     if (token.loading) {
       return <Spinner className="h-3 w-3" />;
     }
@@ -113,11 +118,13 @@ function StablecoinWithWithdraw({
   };
 
   return (
-    <div className="flex items-center gap-2 py-1.5">
+    <div
+      className={`flex items-center gap-2 py-1.5 ${isUnavailable ? "opacity-50" : ""}`}
+    >
       {token.logoUrl && (
         <Image
           alt={token.symbol}
-          className="h-4 w-4 rounded-full"
+          className={`h-4 w-4 rounded-full ${isUnavailable ? "grayscale" : ""}`}
           height={16}
           src={token.logoUrl}
           width={16}
@@ -127,7 +134,7 @@ function StablecoinWithWithdraw({
       <span className="ml-auto text-muted-foreground text-xs">
         {renderBalance()}
       </span>
-      {isAdmin && hasBalance && !token.loading && (
+      {isAdmin && hasBalance && !token.loading && !isUnavailable && (
         <Button
           className="h-6 px-2 text-xs"
           onClick={() => onWithdraw(token.chainId, token.tokenAddress)}
@@ -159,11 +166,46 @@ function ChainBalanceItem({
   const chainTokens = tokenBalances.filter(
     (t) => t.chainId === balance.chainId
   );
-  const chainSupportedTokens = supportedTokenBalances.filter(
-    (t) => t.chainId === balance.chainId
-  );
 
   const isTempo = balance.chainId === TEMPO_CHAIN_ID;
+  const isMainnet = balance.chainId === MAINNET_CHAIN_ID;
+
+  // For TEMPO chains, just show their own tokens
+  // For other chains, use mainnet tokens as the master list
+  const chainSupportedTokens = (() => {
+    if (isTempo) {
+      return supportedTokenBalances.filter(
+        (t) => t.chainId === balance.chainId
+      );
+    }
+
+    // Get mainnet tokens as master list
+    const mainnetTokens = supportedTokenBalances.filter(
+      (t) => t.chainId === MAINNET_CHAIN_ID
+    );
+
+    // If viewing mainnet, just return mainnet tokens
+    if (isMainnet) {
+      return mainnetTokens;
+    }
+
+    // For other chains, map mainnet tokens with availability
+    const chainTokensMap = new Map(
+      supportedTokenBalances
+        .filter((t) => t.chainId === balance.chainId)
+        .map((t) => [t.symbol, t])
+    );
+
+    return mainnetTokens.map((mainnetToken) => {
+      const chainToken = chainTokensMap.get(mainnetToken.symbol);
+      if (chainToken) {
+        // Token available on this chain
+        return { ...chainToken, available: true };
+      }
+      // Token not available - show mainnet data with unavailable flag
+      return { ...mainnetToken, available: false, balance: "N/A" };
+    });
+  })();
 
   // For non-TEMPO chains, check if native balance is withdrawable
   const nativeBalance = Number.parseFloat(balance.balance);

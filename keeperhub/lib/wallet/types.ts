@@ -107,6 +107,8 @@ export type SupportedTokenBalance = {
   balance: string;
   loading: boolean;
   error?: string;
+  /** Whether this token is available on the chain. Undefined means available. */
+  available?: boolean;
 };
 
 // ============================================================================
