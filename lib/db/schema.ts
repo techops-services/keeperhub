@@ -122,13 +122,7 @@ export const addressBookEntry = pgTable(
       onDelete: "set null",
     }),
   },
-  (table) => [
-    index("idx_address_book_org").on(table.organizationId),
-    uniqueIndex("idx_address_book_org_address").on(
-      table.organizationId,
-      table.address
-    ),
-  ]
+  (table) => [index("idx_address_book_org").on(table.organizationId)]
 );
 // end keeperhub code //
 
