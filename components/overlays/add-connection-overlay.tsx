@@ -16,6 +16,7 @@ import {
 import { api } from "@/lib/api-client";
 // start keeperhub
 import { getCustomIntegrationFormHandler } from "@/lib/extension-registry";
+import { integrationsAtom } from "@/lib/integrations-store";
 // end keeperhub
 import type { IntegrationType } from "@/lib/types/integration";
 import {
@@ -79,6 +80,14 @@ export function AddConnectionOverlay({
   const shouldUseManagedKeys =
     aiGatewayStatus?.enabled && aiGatewayStatus?.isVercelUser;
 
+  // start keeperhub - filter out singleConnection types that already exist
+  const existingIntegrations = useAtomValue(integrationsAtom);
+  const existingIntegrationTypes = useMemo(
+    () => new Set(existingIntegrations.map((i) => i.type)),
+    [existingIntegrations]
+  );
+  // end keeperhub
+
   const integrationTypes = getIntegrationTypes();
 
   const filteredTypes = useMemo(() => {
@@ -90,6 +99,13 @@ export function AddConnectionOverlay({
       getLabel(type).toLowerCase().includes(query)
     );
   }, [integrationTypes, searchQuery]);
+
+  // start keeperhub - check if a singleConnection type is already configured
+  const isAlreadyConfigured = (type: IntegrationType) => {
+    const plugin = getIntegration(type);
+    return plugin?.singleConnection && existingIntegrationTypes.has(type);
+  };
+  // end keeperhub
 
   const showConsentModalWithCallbacks = useCallback(() => {
     push(AiGatewayConsentOverlay, {
@@ -158,9 +174,17 @@ export function AddConnectionOverlay({
           ) : (
             filteredTypes.map((type) => {
               const description = getDescription(type);
+              // start keeperhub - grey out singleConnection types that are already configured
+              const configured = isAlreadyConfigured(type);
+              // end keeperhub
               return (
                 <button
-                  className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-muted/50"
+                  className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                    configured
+                      ? "cursor-not-allowed opacity-50"
+                      : "hover:bg-muted/50"
+                  }`}
+                  disabled={configured}
                   key={type}
                   onClick={() => handleSelectType(type)}
                   type="button"
@@ -171,6 +195,11 @@ export function AddConnectionOverlay({
                   />
                   <span className="min-w-0 flex-1 truncate">
                     <span className="font-medium">{getLabel(type)}</span>
+                    {configured && (
+                      <span className="ml-1 text-muted-foreground text-xs">
+                        (Configured)
+                      </span>
+                    )}
                     {description && (
                       <span className="text-muted-foreground text-xs">
                         {" "}

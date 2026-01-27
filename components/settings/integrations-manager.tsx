@@ -1,5 +1,6 @@
 "use client";
 
+import { useSetAtom } from "jotai";
 import { Pencil, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -12,6 +13,9 @@ import { Button } from "@/components/ui/button";
 import { IntegrationIcon } from "@/components/ui/integration-icon";
 import { Spinner } from "@/components/ui/spinner";
 import { api, type Integration } from "@/lib/api-client";
+// start keeperhub - sync to global atom for singleConnection filtering
+import { integrationsAtom } from "@/lib/integrations-store";
+// end keeperhub
 import { getIntegrationLabels } from "@/plugins";
 
 // System integrations that don't have plugins
@@ -32,19 +36,25 @@ export function IntegrationsManager({
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [loading, setLoading] = useState(true);
   const [_testingId, setTestingId] = useState<string | null>(null);
+  // start keeperhub - sync to global atom for singleConnection filtering
+  const setGlobalIntegrations = useSetAtom(integrationsAtom);
+  // end keeperhub
 
   const loadIntegrations = useCallback(async () => {
     try {
       setLoading(true);
       const data = await api.integration.getAll();
       setIntegrations(data);
+      // start keeperhub - sync to global atom for singleConnection filtering
+      setGlobalIntegrations(data);
+      // end keeperhub
     } catch (error) {
       console.error("Failed to load integrations:", error);
       toast.error("Failed to load integrations");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setGlobalIntegrations]);
 
   useEffect(() => {
     loadIntegrations();
