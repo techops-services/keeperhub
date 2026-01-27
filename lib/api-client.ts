@@ -336,6 +336,11 @@ export type IntegrationWithConfig = Integration & {
   config: IntegrationConfig;
 };
 
+export type Organization = {
+  id: string;
+  name: string;
+};
+
 // AI Gateway types
 export type AiGatewayStatusResponse = {
   enabled: boolean;
@@ -416,6 +421,18 @@ export const integrationApi = {
       "/api/integrations/test",
       {
         method: "POST",
+        body: JSON.stringify(data),
+      }
+    ),
+};
+
+// Organization API
+export const organizationApi = {
+  updateName: (organizationId: string, data: { name: string }) =>
+    apiCall<{ organization: Organization }>(
+      `/api/organizations/${organizationId}`,
+      {
+        method: "PATCH",
         body: JSON.stringify(data),
       }
     ),
@@ -690,6 +707,7 @@ export const api = {
   ai: aiApi,
   aiGateway: aiGatewayApi,
   integration: integrationApi,
+  organization: organizationApi,
   user: userApi,
   workflow: workflowApi,
 };

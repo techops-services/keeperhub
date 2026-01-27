@@ -28,7 +28,8 @@ data:
   AWS_ACCESS_KEY_ID: "test"
   AWS_SECRET_ACCESS_KEY: "test"
   SQS_QUEUE_URL: "http://localstack:4566/000000000000/keeperhub-workflow-queue"
-  KEEPERHUB_URL: "http://keeperhub-common:3000"
+  KEEPERHUB_API_URL: "http://keeperhub-common:3000"
+  KEEPERHUB_API_KEY: "local-scheduler-key-for-dev"
   DATABASE_URL: "postgresql://local:local@postgresql:5432/keeperhub"
   # Job spawner settings
   RUNNER_IMAGE: "keeperhub-runner:latest"

@@ -142,7 +142,7 @@ test-e2e:
 	DATABASE_URL="postgresql://local:local@localhost:5433/keeperhub" \
 	AWS_ENDPOINT_URL="http://localhost:4566" \
 	SQS_QUEUE_URL="http://localhost:4566/000000000000/keeperhub-workflow-queue" \
-	KEEPERHUB_URL="https://workflow.keeperhub.local" \
+	KEEPERHUB_API_URL="https://workflow.keeperhub.local" \
 	pnpm test -- --run tests/e2e/; \
 	kill $$PF_PID_DB 2>/dev/null || true; \
 	kill $$PF_PID_SQS 2>/dev/null || true
