@@ -4,6 +4,12 @@ import { db } from "@/lib/db";
 import { chains, supportedTokens } from "@/lib/db/schema";
 import { getChainIdFromNetwork } from "@/lib/rpc";
 
+// Mainnet chain ID - used as the "master list" of supported tokens
+const MAINNET_CHAIN_ID = 1;
+
+// TEMPO testnet chain IDs - excluded from master list logic (have their own tokens)
+const TEMPO_CHAIN_IDS = [42_429];
+
 /**
  * GET /api/supported-tokens
  *
@@ -12,6 +18,10 @@ import { getChainIdFromNetwork } from "@/lib/rpc";
  * - network: Network name (e.g., "eth-mainnet", "sepolia") - returns tokens for specific chain
  * - chainId: Chain ID (alternative to network name) - returns tokens for specific chain
  * - (no params): Returns ALL supported tokens across all enabled chains
+ *
+ * For non-TEMPO chains, returns all mainnet tokens as a "master list" with availability
+ * info for the requested chain. This ensures users see consistent token options across
+ * chains, with clear indication when a token isn't available on their selected chain.
  */
 export async function GET(request: Request) {
   try {
@@ -78,12 +88,68 @@ export async function GET(request: Request) {
       );
     }
 
-    // Fetch supported tokens for this chain
-    const tokens = await db
-      .select()
-      .from(supportedTokens)
-      .where(eq(supportedTokens.chainId, chainId))
-      .orderBy(supportedTokens.sortOrder);
+    // For TEMPO chains, just return their own tokens (no master list logic)
+    if (TEMPO_CHAIN_IDS.includes(chainId)) {
+      const tokens = await db
+        .select()
+        .from(supportedTokens)
+        .where(eq(supportedTokens.chainId, chainId))
+        .orderBy(supportedTokens.sortOrder);
+
+      return NextResponse.json({
+        chainId,
+        chainName: chain[0].name,
+        tokens: tokens.map((t) => ({ ...t, available: true })),
+      });
+    }
+
+    // For non-TEMPO chains, use mainnet tokens as the master list
+    // Fetch both mainnet tokens and tokens for the requested chain
+    const [mainnetTokens, chainTokens] = await Promise.all([
+      db
+        .select()
+        .from(supportedTokens)
+        .where(eq(supportedTokens.chainId, MAINNET_CHAIN_ID))
+        .orderBy(supportedTokens.sortOrder),
+      chainId !== MAINNET_CHAIN_ID
+        ? db
+            .select()
+            .from(supportedTokens)
+            .where(eq(supportedTokens.chainId, chainId))
+            .orderBy(supportedTokens.sortOrder)
+        : Promise.resolve([]),
+    ]);
+
+    // If requesting mainnet, just return mainnet tokens (all available)
+    if (chainId === MAINNET_CHAIN_ID) {
+      return NextResponse.json({
+        chainId,
+        chainName: chain[0].name,
+        tokens: mainnetTokens.map((t) => ({ ...t, available: true })),
+      });
+    }
+
+    // Build a map of chain tokens by symbol for quick lookup
+    const chainTokensBySymbol = new Map(chainTokens.map((t) => [t.symbol, t]));
+
+    // Return mainnet tokens as master list with availability for requested chain
+    const tokens = mainnetTokens.map((mainnetToken) => {
+      const chainToken = chainTokensBySymbol.get(mainnetToken.symbol);
+
+      if (chainToken) {
+        // Token is available on this chain - return chain-specific data
+        return {
+          ...chainToken,
+          available: true,
+        };
+      }
+
+      // Token not available on this chain - return mainnet data with available: false
+      return {
+        ...mainnetToken,
+        available: false,
+      };
+    });
 
     return NextResponse.json({
       chainId,

@@ -209,6 +209,10 @@ export function TokenSelectField({
         </div>
       );
     }
+    // Separate available and unavailable tokens
+    const availableTokens = tokens.filter((t) => t.available !== false);
+    const unavailableTokens = tokens.filter((t) => t.available === false);
+
     return (
       <Select
         disabled={disabled}
@@ -219,7 +223,7 @@ export function TokenSelectField({
           <SelectValue placeholder="Select a token..." />
         </SelectTrigger>
         <SelectContent>
-          {tokens.map((token) => {
+          {availableTokens.map((token) => {
             const isSelected = currentValue.supportedTokenId === token.id;
             return (
               <SelectItem key={token.id} value={token.id}>
@@ -241,6 +245,37 @@ export function TokenSelectField({
               </SelectItem>
             );
           })}
+          {unavailableTokens.length > 0 && (
+            <>
+              <div className="my-1 border-t" />
+              <div className="px-2 py-1.5 text-muted-foreground text-xs">
+                Not available on this chain
+              </div>
+              {unavailableTokens.map((token) => (
+                <SelectItem
+                  className="opacity-50"
+                  disabled
+                  key={token.id}
+                  value={token.id}
+                >
+                  <div className="flex items-center gap-2">
+                    {token.logoUrl && (
+                      <Image
+                        alt={token.symbol}
+                        className="h-4 w-4 rounded-full grayscale"
+                        height={16}
+                        src={token.logoUrl}
+                        width={16}
+                      />
+                    )}
+                    <span className="text-muted-foreground">
+                      {token.symbol} - {token.name}
+                    </span>
+                  </div>
+                </SelectItem>
+              ))}
+            </>
+          )}
         </SelectContent>
       </Select>
     );
