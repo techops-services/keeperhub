@@ -90,6 +90,7 @@ export type TokenData = {
 export type TokenBalance = {
   tokenId: string;
   chainId: number;
+  tokenAddress: string;
   symbol: string;
   name: string;
   balance: string;

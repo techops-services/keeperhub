@@ -179,6 +179,7 @@ export async function fetchTokenBalance(
       return {
         tokenId: token.id,
         chainId: token.chainId,
+        tokenAddress: token.tokenAddress,
         symbol: token.symbol,
         name: token.name,
         balance: "0.000000",
@@ -191,6 +192,7 @@ export async function fetchTokenBalance(
     return {
       tokenId: token.id,
       chainId: token.chainId,
+      tokenAddress: token.tokenAddress,
       symbol: token.symbol,
       name: token.name,
       balance: formatWeiToBalance(balanceWei, token.decimals),
@@ -201,6 +203,7 @@ export async function fetchTokenBalance(
     return {
       tokenId: token.id,
       chainId: token.chainId,
+      tokenAddress: token.tokenAddress,
       symbol: token.symbol,
       name: token.name,
       balance: "0",
@@ -235,6 +238,7 @@ export function fetchAllTokenBalances(
       return Promise.resolve({
         tokenId: token.id,
         chainId: token.chainId,
+        tokenAddress: token.tokenAddress,
         symbol: token.symbol,
         name: token.name,
         balance: "0",

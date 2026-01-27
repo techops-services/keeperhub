@@ -62,20 +62,6 @@ const MAINNET_CHAIN_ID = 1;
 // Balance Display Components
 // ============================================================================
 
-function TokenBalanceDisplay({ token }: { token: TokenBalance }) {
-  if (token.loading) {
-    return <div className="text-muted-foreground text-xs">Loading...</div>;
-  }
-  if (token.error) {
-    return <div className="text-destructive text-xs">{token.error}</div>;
-  }
-  return (
-    <div className="text-muted-foreground text-xs">
-      {token.balance} {token.symbol}
-    </div>
-  );
-}
-
 function ChainBalanceDisplay({ balance }: { balance: ChainBalance }) {
   if (balance.loading) {
     return <div className="mt-1 text-muted-foreground text-xs">Loading...</div>;
@@ -90,23 +76,46 @@ function ChainBalanceDisplay({ balance }: { balance: ChainBalance }) {
   );
 }
 
-// Stablecoin item with individual withdraw button
-function StablecoinWithWithdraw({
+// Token item with withdraw and optional delete button
+function TokenItemWithActions({
   token,
   isAdmin,
+  isCustom,
+  customExplorerUrl,
+  onDelete,
   onWithdraw,
 }: {
-  token: SupportedTokenBalance;
+  token: SupportedTokenBalance | TokenBalance;
   isAdmin: boolean;
+  isCustom?: boolean;
+  customExplorerUrl?: string | null;
+  onDelete?: (tokenId: string, symbol: string) => void;
   onWithdraw: (chainId: number, tokenAddress: string) => void;
 }) {
-  const isUnavailable = token.available === false;
+  // Type guard to check if it's a SupportedTokenBalance (has logoUrl)
+  const isSupportedToken = (
+    t: SupportedTokenBalance | TokenBalance
+  ): t is SupportedTokenBalance => "logoUrl" in t;
+
+  const supportedToken = isSupportedToken(token) ? token : null;
+  const customToken = isSupportedToken(token) ? null : token;
+
+  const isUnavailable = supportedToken?.available === false;
   const numBalance = Number.parseFloat(token.balance);
   const hasBalance = Number.isFinite(numBalance) && numBalance > 0;
 
+  // Both types now have tokenAddress
+  const tokenAddress =
+    supportedToken?.tokenAddress || customToken?.tokenAddress;
+
+  // Explorer URL: use supported token's URL or custom explorer URL for custom tokens
+  const explorerUrl = supportedToken?.explorerUrl || customExplorerUrl;
+
   const copyTokenAddress = () => {
-    navigator.clipboard.writeText(token.tokenAddress);
-    toast.success("Token address copied");
+    if (tokenAddress) {
+      navigator.clipboard.writeText(tokenAddress);
+      toast.success("Token address copied");
+    }
   };
 
   const renderBalance = () => {
@@ -126,17 +135,24 @@ function StablecoinWithWithdraw({
     <div
       className={`flex items-center gap-2 py-1.5 ${isUnavailable ? "opacity-50" : ""}`}
     >
-      {token.logoUrl && (
+      {/* Logo: supported tokens show logo, custom tokens show $ */}
+      {supportedToken?.logoUrl && (
         <Image
           alt={token.symbol}
           className={`h-4 w-4 rounded-full ${isUnavailable ? "grayscale" : ""}`}
           height={16}
-          src={token.logoUrl}
+          src={supportedToken.logoUrl}
           width={16}
         />
       )}
+      {!supportedToken?.logoUrl && (
+        <div className="flex h-4 w-4 items-center justify-center rounded-full bg-muted font-medium text-[10px]">
+          $
+        </div>
+      )}
       <span className="font-medium text-xs">{token.symbol}</span>
-      {!isUnavailable && (
+      {/* Copy + explorer link for all tokens with addresses */}
+      {!isUnavailable && tokenAddress && (
         <div className="flex items-center gap-1">
           <button
             className="text-muted-foreground hover:text-foreground"
@@ -146,10 +162,10 @@ function StablecoinWithWithdraw({
           >
             <Copy className="h-3 w-3" />
           </button>
-          {token.explorerUrl && (
+          {explorerUrl && (
             <a
               className="text-muted-foreground hover:text-foreground"
-              href={token.explorerUrl}
+              href={explorerUrl}
               rel="noopener noreferrer"
               target="_blank"
               title="View on explorer"
@@ -159,25 +175,58 @@ function StablecoinWithWithdraw({
           )}
         </div>
       )}
-      <span className="ml-auto text-muted-foreground text-xs">
-        {renderBalance()}
-      </span>
-      {isAdmin && hasBalance && !token.loading && !isUnavailable && (
+      {/* Delete button for custom tokens - before balance */}
+      {isAdmin && isCustom && customToken && onDelete && (
         <Button
-          className="h-6 px-2 text-xs"
-          onClick={() => onWithdraw(token.chainId, token.tokenAddress)}
-          size="sm"
+          className="ml-auto h-6 w-6"
+          onClick={() => onDelete(customToken.tokenId, customToken.symbol)}
+          size="icon"
+          title="Remove token"
           variant="ghost"
         >
-          <SendHorizontal className="h-3 w-3" />
+          <Trash2 className="h-3 w-3 text-muted-foreground" />
         </Button>
       )}
+      {/* Balance */}
+      <span
+        className={`text-muted-foreground text-xs ${isAdmin && isCustom ? "" : "ml-auto"}`}
+      >
+        {renderBalance()}
+      </span>
+      {/* Withdraw button for tokens with balance */}
+      {isAdmin &&
+        hasBalance &&
+        !token.loading &&
+        !isUnavailable &&
+        tokenAddress && (
+          <Button
+            className="h-6 px-2 text-xs"
+            onClick={() => onWithdraw(token.chainId, tokenAddress)}
+            size="sm"
+            variant="ghost"
+          >
+            <SendHorizontal className="h-3 w-3" />
+          </Button>
+        )}
     </div>
   );
 }
 
+// Helper to build explorer URL for a token address
+function buildTokenExplorerUrl(
+  chain: ChainData | undefined,
+  tokenAddress: string
+): string | null {
+  if (!chain?.explorerUrl) {
+    return null;
+  }
+  const path = chain.explorerAddressPath || "/address/{address}";
+  return `${chain.explorerUrl}${path.replace("{address}", tokenAddress)}`;
+}
+
 function ChainBalanceItem({
   balance,
+  chain,
   isAdmin,
   onRemoveToken,
   onWithdraw,
@@ -185,13 +234,14 @@ function ChainBalanceItem({
   tokenBalances,
 }: {
   balance: ChainBalance;
+  chain: ChainData | undefined;
   isAdmin: boolean;
   onRemoveToken: (tokenId: string, symbol: string) => void;
   onWithdraw: (chainId: number, tokenAddress?: string) => void;
   supportedTokenBalances: SupportedTokenBalance[];
   tokenBalances: TokenBalance[];
 }) {
-  const chainTokens = tokenBalances.filter(
+  const chainCustomTokens = tokenBalances.filter(
     (t) => t.chainId === balance.chainId
   );
 
@@ -239,13 +289,72 @@ function ChainBalanceItem({
   const nativeBalance = Number.parseFloat(balance.balance);
   const hasNativeBalance = Number.isFinite(nativeBalance) && nativeBalance > 0;
 
-  // For TEMPO, show stablecoins only (no native balance display)
+  // Determine section label based on whether there are custom tokens
+  const tokenSectionLabel =
+    chainCustomTokens.length > 0 ? "Tokens" : "Stablecoins";
+
+  // For TEMPO, show tokens only (no native balance display)
   if (isTempo) {
     return (
-      <div className="space-y-2">
-        <div className="rounded-lg border bg-muted/50 p-3">
-          <div className="mb-2 flex items-center gap-1">
-            <span className="font-medium text-sm">TEMPO</span>
+      <div className="rounded-lg border bg-muted/50 p-3">
+        <div className="mb-2 flex items-center gap-1">
+          <span className="font-medium text-sm">TEMPO</span>
+          {balance.explorerUrl && (
+            <a
+              className="text-muted-foreground hover:text-foreground"
+              href={balance.explorerUrl}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+        </div>
+        <div className="mb-1 font-medium text-muted-foreground text-xs">
+          {tokenSectionLabel}
+        </div>
+        {chainSupportedTokens.length > 0 || chainCustomTokens.length > 0 ? (
+          <div className="divide-y rounded border bg-background/50 px-2">
+            {/* Supported tokens (stablecoins) */}
+            {chainSupportedTokens.map((token) => (
+              <TokenItemWithActions
+                isAdmin={isAdmin}
+                key={`supported-${token.chainId}-${token.tokenAddress}`}
+                onWithdraw={onWithdraw}
+                token={token}
+              />
+            ))}
+            {/* Custom tokens integrated in the same list */}
+            {chainCustomTokens.map((token) => (
+              <TokenItemWithActions
+                customExplorerUrl={buildTokenExplorerUrl(
+                  chain,
+                  token.tokenAddress
+                )}
+                isAdmin={isAdmin}
+                isCustom
+                key={`custom-${token.tokenId}`}
+                onDelete={onRemoveToken}
+                onWithdraw={onWithdraw}
+                token={token}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="text-muted-foreground text-xs">Loading tokens...</div>
+        )}
+      </div>
+    );
+  }
+
+  // Non-TEMPO chains: show native balance and tokens in same card
+  return (
+    <div className="rounded-lg border bg-muted/50 p-3">
+      {/* Chain header with native balance */}
+      <div className="flex items-center justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-1">
+            <span className="font-medium text-sm">{balance.name}</span>
             {balance.explorerUrl && (
               <a
                 className="text-muted-foreground hover:text-foreground"
@@ -257,139 +366,52 @@ function ChainBalanceItem({
               </a>
             )}
           </div>
-          <div className="mb-1 font-medium text-muted-foreground text-xs">
-            Stablecoins
-          </div>
-          {chainSupportedTokens.length > 0 ? (
-            <div className="divide-y rounded border bg-background/50 px-2">
-              {chainSupportedTokens.map((token) => (
-                <StablecoinWithWithdraw
-                  isAdmin={isAdmin}
-                  key={`${token.chainId}-${token.tokenAddress}`}
-                  onWithdraw={onWithdraw}
-                  token={token}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-muted-foreground text-xs">
-              Loading stablecoins...
-            </div>
-          )}
+          <ChainBalanceDisplay balance={balance} />
         </div>
-        {/* Custom Tracked Tokens for TEMPO */}
-        {chainTokens.length > 0 && (
-          <div className="ml-4 space-y-1">
-            <div className="font-medium text-muted-foreground text-xs">
-              Tracked Tokens
-            </div>
-            {chainTokens.map((token) => (
-              <div
-                className="flex items-center justify-between rounded border bg-background p-2"
-                key={token.tokenId}
-              >
-                <div className="flex-1">
-                  <div className="font-medium text-xs">{token.symbol}</div>
-                  <TokenBalanceDisplay token={token} />
-                </div>
-                {isAdmin && (
-                  <Button
-                    className="h-6 w-6"
-                    onClick={() => onRemoveToken(token.tokenId, token.symbol)}
-                    size="icon"
-                    variant="ghost"
-                  >
-                    <Trash2 className="h-3 w-3 text-muted-foreground" />
-                  </Button>
+        {isAdmin && hasNativeBalance && (
+          <Button
+            className="h-7 px-2 text-xs"
+            onClick={() => onWithdraw(balance.chainId)}
+            size="sm"
+            variant="ghost"
+          >
+            <SendHorizontal className="h-3 w-3" />
+            Withdraw
+          </Button>
+        )}
+      </div>
+      {/* Tokens section (stablecoins + custom tokens combined) */}
+      {(chainSupportedTokens.length > 0 || chainCustomTokens.length > 0) && (
+        <div className="mt-3">
+          <div className="mb-1 font-medium text-muted-foreground text-xs">
+            {tokenSectionLabel}
+          </div>
+          <div className="divide-y rounded border bg-background/50 px-2">
+            {/* Supported tokens (stablecoins) */}
+            {chainSupportedTokens.map((token) => (
+              <TokenItemWithActions
+                isAdmin={isAdmin}
+                key={`supported-${token.chainId}-${token.tokenAddress}`}
+                onWithdraw={onWithdraw}
+                token={token}
+              />
+            ))}
+            {/* Custom tokens integrated in the same list */}
+            {chainCustomTokens.map((token) => (
+              <TokenItemWithActions
+                customExplorerUrl={buildTokenExplorerUrl(
+                  chain,
+                  token.tokenAddress
                 )}
-              </div>
+                isAdmin={isAdmin}
+                isCustom
+                key={`custom-${token.tokenId}`}
+                onDelete={onRemoveToken}
+                onWithdraw={onWithdraw}
+                token={token}
+              />
             ))}
           </div>
-        )}
-      </div>
-    );
-  }
-
-  // Non-TEMPO chains: show native balance and stablecoins in same card
-  return (
-    <div className="space-y-2">
-      <div className="rounded-lg border bg-muted/50 p-3">
-        {/* Chain header with native balance */}
-        <div className="flex items-center justify-between">
-          <div className="flex-1">
-            <div className="flex items-center gap-1">
-              <span className="font-medium text-sm">{balance.name}</span>
-              {balance.explorerUrl && (
-                <a
-                  className="text-muted-foreground hover:text-foreground"
-                  href={balance.explorerUrl}
-                  rel="noopener noreferrer"
-                  target="_blank"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              )}
-            </div>
-            <ChainBalanceDisplay balance={balance} />
-          </div>
-          {isAdmin && hasNativeBalance && (
-            <Button
-              className="h-7 px-2 text-xs"
-              onClick={() => onWithdraw(balance.chainId)}
-              size="sm"
-              variant="ghost"
-            >
-              <SendHorizontal className="h-3 w-3" />
-              Withdraw
-            </Button>
-          )}
-        </div>
-        {/* Stablecoins inside same card */}
-        {chainSupportedTokens.length > 0 && (
-          <div className="mt-3">
-            <div className="mb-1 font-medium text-muted-foreground text-xs">
-              Stablecoins
-            </div>
-            <div className="divide-y rounded border bg-background/50 px-2">
-              {chainSupportedTokens.map((token) => (
-                <StablecoinWithWithdraw
-                  isAdmin={isAdmin}
-                  key={`${token.chainId}-${token.tokenAddress}`}
-                  onWithdraw={onWithdraw}
-                  token={token}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-      {/* Custom Tracked Tokens (outside main card) */}
-      {chainTokens.length > 0 && (
-        <div className="ml-4 space-y-1">
-          <div className="font-medium text-muted-foreground text-xs">
-            Tracked Tokens
-          </div>
-          {chainTokens.map((token) => (
-            <div
-              className="flex items-center justify-between rounded border bg-background p-2"
-              key={token.tokenId}
-            >
-              <div className="flex-1">
-                <div className="font-medium text-xs">{token.symbol}</div>
-                <TokenBalanceDisplay token={token} />
-              </div>
-              {isAdmin && (
-                <Button
-                  className="h-6 w-6"
-                  onClick={() => onRemoveToken(token.tokenId, token.symbol)}
-                  size="icon"
-                  variant="ghost"
-                >
-                  <Trash2 className="h-3 w-3 text-muted-foreground" />
-                </Button>
-              )}
-            </div>
-          ))}
         </div>
       )}
     </div>
@@ -653,6 +675,7 @@ function BalanceListSection({
           {filteredBalances.map((balance) => (
             <ChainBalanceItem
               balance={balance}
+              chain={chains.find((c) => c.chainId === balance.chainId)}
               isAdmin={isAdmin}
               key={balance.chainId}
               onRemoveToken={onRemoveToken}
@@ -1066,7 +1089,7 @@ export function WalletOverlay({ overlayId }: WalletOverlayProps) {
       }
 
       toast.success(`Removed ${symbol} from tracked tokens`);
-      setTokens((prev) => prev.filter((t) => t.id !== tokenId));
+      await loadWallet(); // Refresh to show updated token list
     } catch (error) {
       console.error("Failed to remove token:", error);
       toast.error(
