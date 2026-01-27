@@ -179,6 +179,7 @@ export async function fetchTokenBalance(
       return {
         tokenId: token.id,
         chainId: token.chainId,
+        tokenAddress: token.tokenAddress,
         symbol: token.symbol,
         name: token.name,
         balance: "0.000000",
@@ -191,6 +192,7 @@ export async function fetchTokenBalance(
     return {
       tokenId: token.id,
       chainId: token.chainId,
+      tokenAddress: token.tokenAddress,
       symbol: token.symbol,
       name: token.name,
       balance: formatWeiToBalance(balanceWei, token.decimals),
@@ -201,6 +203,7 @@ export async function fetchTokenBalance(
     return {
       tokenId: token.id,
       chainId: token.chainId,
+      tokenAddress: token.tokenAddress,
       symbol: token.symbol,
       name: token.name,
       balance: "0",
@@ -235,6 +238,7 @@ export function fetchAllTokenBalances(
       return Promise.resolve({
         tokenId: token.id,
         chainId: token.chainId,
+        tokenAddress: token.tokenAddress,
         symbol: token.symbol,
         name: token.name,
         balance: "0",
@@ -300,6 +304,11 @@ export function fetchSupportedTokenBalance(
         throw new Error(result.error.message || "RPC error");
       }
 
+      const tokenExplorerUrl = buildExplorerAddressUrl(
+        chain,
+        token.tokenAddress
+      );
+
       if (!result.result || result.result === "0x") {
         return {
           chainId: token.chainId,
@@ -309,6 +318,7 @@ export function fetchSupportedTokenBalance(
           logoUrl: token.logoUrl,
           balance: "0.000000",
           loading: false,
+          explorerUrl: tokenExplorerUrl,
         };
       }
 
@@ -322,6 +332,7 @@ export function fetchSupportedTokenBalance(
         logoUrl: token.logoUrl,
         balance: formatWeiToBalance(balanceWei, token.decimals),
         loading: false,
+        explorerUrl: tokenExplorerUrl,
       };
     } catch (error) {
       // Retry on network errors
@@ -345,6 +356,7 @@ export function fetchSupportedTokenBalance(
         balance: "0",
         loading: false,
         error: error instanceof Error ? error.message : "Failed to fetch",
+        explorerUrl: buildExplorerAddressUrl(chain, token.tokenAddress),
       };
     }
   };

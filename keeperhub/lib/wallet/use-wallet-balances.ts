@@ -59,6 +59,7 @@ export function useWalletBalances(): UseWalletBalancesReturn {
           tokens.map((token) => ({
             tokenId: token.id,
             chainId: token.chainId,
+            tokenAddress: token.tokenAddress,
             symbol: token.symbol,
             name: token.name,
             balance: "0",

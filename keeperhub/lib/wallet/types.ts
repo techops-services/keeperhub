@@ -40,6 +40,12 @@ export type ChainBalance = {
 /**
  * Supported token from the system-wide supported_tokens table.
  * These are pre-configured tokens (primarily stablecoins) available on each chain.
+ *
+ * When fetching tokens for a specific chain, the API returns all mainnet tokens
+ * as a "master list" with availability info for the requested chain:
+ * - `available: true` - Token has an official contract on this chain
+ * - `available: false` - Token exists on mainnet but not on this chain
+ * - `tokenAddress` - The chain-specific contract address (only when available)
  */
 export type SupportedToken = {
   id: string;
@@ -49,6 +55,10 @@ export type SupportedToken = {
   name: string;
   decimals: number;
   logoUrl: string | null;
+  /** Whether this token is available on the requested chain. Undefined means available. */
+  available?: boolean;
+  /** Explorer URL for the token contract */
+  explorerUrl?: string | null;
 };
 
 /**
@@ -80,6 +90,7 @@ export type TokenData = {
 export type TokenBalance = {
   tokenId: string;
   chainId: number;
+  tokenAddress: string;
   symbol: string;
   name: string;
   balance: string;
@@ -99,6 +110,10 @@ export type SupportedTokenBalance = {
   balance: string;
   loading: boolean;
   error?: string;
+  /** Whether this token is available on the chain. Undefined means available. */
+  available?: boolean;
+  /** Explorer URL for the token contract */
+  explorerUrl?: string | null;
 };
 
 // ============================================================================
