@@ -26,7 +26,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { integrationRequiresCredentials } from "@/keeperhub/lib/integration-helpers";
+import { actionRequiresCredentials } from "@/keeperhub/lib/integration-helpers";
 // end keeperhub
 import { aiGatewayStatusAtom } from "@/lib/ai-gateway/state";
 import { validateConditionExpressionUI } from "@/lib/condition-validator";
@@ -446,10 +446,10 @@ export function ActionConfig({
   }, [actionType]);
 
   // start keeperhub
-  // Check if integration requires credentials (some like web3 don't)
+  // Check if action requires credentials (some like web3 read-only actions don't)
   const requiresCredentials = useMemo(
-    () => integrationRequiresCredentials(integrationType),
-    [integrationType]
+    () => actionRequiresCredentials(actionType),
+    [actionType]
   );
   // end keeperhub
 

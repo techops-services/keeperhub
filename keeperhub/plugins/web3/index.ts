@@ -12,6 +12,10 @@ const web3Plugin: IntegrationPlugin = {
   // Web3 uses Para wallet - one wallet per user
   singleConnection: true,
 
+  // Read-only actions (check balance, read contract) don't require a wallet
+  // Write actions will check for wallet at execution time
+  requiresCredentials: false,
+
   // No form fields - wallet creation is handled by the custom form handler
   formFields: [],
 
@@ -25,7 +29,7 @@ const web3Plugin: IntegrationPlugin = {
   actions: [
     {
       slug: "check-balance",
-      label: "Get Native Balance",
+      label: "Get Native Token Balance",
       description: "Get native token balance (ETH, MATIC, etc.) of any address",
       category: "Web3",
       stepFunction: "checkBalanceStep",
@@ -156,6 +160,7 @@ const web3Plugin: IntegrationPlugin = {
       description:
         "Transfer native tokens (ETH, MATIC, etc.) from your wallet to a recipient address",
       category: "Web3",
+      requiresCredentials: true,
       stepFunction: "transferFundsStep",
       stepImportPath: "transfer-funds",
       outputFields: [
@@ -204,6 +209,7 @@ const web3Plugin: IntegrationPlugin = {
       label: "Transfer ERC20 Token",
       description: "Transfer ERC20 tokens on your desired EVM chain",
       category: "Web3",
+      requiresCredentials: true,
       stepFunction: "transferTokenStep",
       stepImportPath: "transfer-token",
       outputFields: [
@@ -340,6 +346,7 @@ const web3Plugin: IntegrationPlugin = {
       label: "Write Contract",
       description: "Write data to a smart contract (state-changing functions)",
       category: "Web3",
+      requiresCredentials: true,
       stepFunction: "writeContractStep",
       stepImportPath: "write-contract",
       outputFields: [

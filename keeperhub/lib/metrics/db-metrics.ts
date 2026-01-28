@@ -445,6 +445,58 @@ export async function getOrgStatsFromDb(): Promise<OrgStats> {
   }
 }
 
+export type UserListEntry = {
+  email: string;
+  name: string;
+  verified: boolean;
+};
+
+export async function getUserListFromDb(): Promise<UserListEntry[]> {
+  try {
+    const result = await db
+      .select({
+        email: users.email,
+        name: users.name,
+        verified: users.emailVerified,
+      })
+      .from(users)
+      .where(eq(users.isAnonymous, false));
+
+    return result.map((row) => ({
+      email: row.email ?? "unknown",
+      name: row.name ?? "unknown",
+      verified: row.verified,
+    }));
+  } catch (error) {
+    console.error("[Metrics] Failed to query user list from DB:", error);
+    return [];
+  }
+}
+
+export type OrgListEntry = {
+  name: string;
+  slug: string;
+};
+
+export async function getOrgListFromDb(): Promise<OrgListEntry[]> {
+  try {
+    const result = await db
+      .select({
+        name: organization.name,
+        slug: organization.slug,
+      })
+      .from(organization);
+
+    return result.map((row) => ({
+      name: row.name,
+      slug: row.slug,
+    }));
+  } catch (error) {
+    console.error("[Metrics] Failed to query org list from DB:", error);
+    return [];
+  }
+}
+
 export type WorkflowDefinitionStats = {
   total: number;
   public: number;

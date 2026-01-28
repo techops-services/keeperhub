@@ -1,45 +1,55 @@
 "use client";
 
+import { useSetAtom } from "jotai";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { useSession } from "@/lib/auth-client";
+import { integrationsVersionAtom } from "@/lib/integrations-store";
 
-export function Web3WalletSection() {
+type Web3WalletSectionProps = {
+  onSuccess?: (integrationId: string) => void;
+  closeAll?: () => void;
+  showDelete?: boolean;
+};
+
+export function Web3WalletSection({
+  onSuccess,
+  closeAll,
+  showDelete = true,
+}: Web3WalletSectionProps) {
+  const setIntegrationsVersion = useSetAtom(integrationsVersionAtom);
+  const { data: session } = useSession();
   const [hasWallet, setHasWallet] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [isAnonymous, setIsAnonymous] = useState(false);
-  // start keeperhub - store user email for wallet creation
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-  // end keeperhub
 
-  // Check wallet status and user type on mount
+  // Derive anonymous state from session reactively
+  const isAnonymous =
+    !session?.user ||
+    session.user.name === "Anonymous" ||
+    session.user.email?.includes("@http://") ||
+    session.user.email?.includes("@https://") ||
+    session.user.email?.startsWith("temp-");
+
+  // Get user email from session
+  const userEmail = isAnonymous ? null : session?.user?.email;
+
+  // Check wallet status when session changes (user signs in)
+  const sessionUserId = session?.user?.id;
+
   useEffect(() => {
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Sequential checks for wallet status
     async function checkWallet() {
+      // Reset state when checking
+      setLoading(true);
+      setHasWallet(false);
+      setWalletAddress(null);
+
       try {
-        // Check if user is anonymous by fetching user profile
-        const userResponse = await fetch("/api/user");
-        const userData = await userResponse.json();
-
-        // Detect anonymous user by email pattern or isAnonymous flag
-        const isAnonUser =
-          userData.isAnonymous ||
-          userData.email?.includes("@http://") ||
-          userData.email?.includes("@https://") ||
-          userData.email?.startsWith("temp-");
-
-        setIsAnonymous(isAnonUser);
-        // start keeperhub - store user email for wallet creation
-        if (!isAnonUser && userData.email) {
-          setUserEmail(userData.email);
-        }
-        // end keeperhub
-
         // Only check for wallet if not anonymous
-        if (!isAnonUser) {
+        if (!isAnonymous && sessionUserId) {
           const response = await fetch("/api/user/wallet");
           const data = await response.json();
 
@@ -56,8 +66,9 @@ export function Web3WalletSection() {
     }
 
     checkWallet();
-  }, []);
+  }, [isAnonymous, sessionUserId]);
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Sequential wallet creation with error handling
   async function handleCreateWallet() {
     // start keeperhub - validate email before creating
     if (!userEmail) {
@@ -92,6 +103,17 @@ export function Web3WalletSection() {
       setHasWallet(true);
       setWalletAddress(data.wallet.address);
       toast.success("Wallet created successfully!");
+
+      // Trigger re-fetch of integrations so UI syncs and auto-selects the new wallet
+      setIntegrationsVersion((v) => v + 1);
+
+      // Close overlay and return to sidepanel with wallet selected
+      if (onSuccess) {
+        onSuccess(data.integration?.id || "web3-wallet");
+      }
+      if (closeAll) {
+        closeAll();
+      }
     } catch (error) {
       console.error("Wallet creation failed:", error);
       toast.error(
@@ -120,6 +142,8 @@ export function Web3WalletSection() {
       setHasWallet(false);
       setWalletAddress(null);
       toast.success("Wallet deleted");
+      // Trigger re-fetch of integrations so UI syncs
+      setIntegrationsVersion((v) => v + 1);
     } catch {
       toast.error("Failed to delete wallet");
     }
@@ -164,14 +188,16 @@ export function Web3WalletSection() {
                   {walletAddress}
                 </code>
               </div>
-              <Button
-                className="w-full"
-                onClick={handleDeleteWallet}
-                size="sm"
-                variant="destructive"
-              >
-                Delete Wallet
-              </Button>
+              {showDelete && (
+                <Button
+                  className="w-full"
+                  onClick={handleDeleteWallet}
+                  size="sm"
+                  variant="destructive"
+                >
+                  Delete Wallet
+                </Button>
+              )}
             </div>
           );
         }

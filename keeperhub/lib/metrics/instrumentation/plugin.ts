@@ -38,9 +38,6 @@ export function recordPluginMetrics(options: {
     [LabelKeys.ACTION_NAME]: options.actionName,
     [LabelKeys.STATUS]: options.success ? "success" : "failure",
   };
-  if (options.executionId) {
-    labels[LabelKeys.EXECUTION_ID] = options.executionId;
-  }
 
   // Record plugin action duration
   metrics.recordLatency(
@@ -86,13 +83,10 @@ export async function withPluginMetrics<T>(
     [LabelKeys.ACTION_NAME]: context.actionName,
   };
 
-  // Extended labels for latency/error metrics (includes execution_id)
+  // Labels for latency/error metrics
   const labels: Record<string, string> = {
     ...invocationLabels,
   };
-  if (context.executionId) {
-    labels[LabelKeys.EXECUTION_ID] = context.executionId;
-  }
 
   // Increment invocation counter (only uses plugin_name, action_name)
   metrics.incrementCounter(

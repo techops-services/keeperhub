@@ -62,6 +62,10 @@ type IntegrationFormContext = {
   isEditMode: boolean;
   config: Record<string, unknown>;
   updateConfig: (key: string, value: string) => void;
+  // start keeperhub - callbacks for closing overlay after success
+  onSuccess?: (integrationId: string) => void;
+  closeAll?: () => void;
+  // end keeperhub
 };
 
 type CustomIntegrationFormHandler = (

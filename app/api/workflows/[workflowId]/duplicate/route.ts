@@ -69,6 +69,7 @@ function updateEdgeReferences(
   }));
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Sequential workflow duplication logic
 export async function POST(
   request: Request,
   context: { params: Promise<{ workflowId: string }> }
@@ -169,6 +170,14 @@ export async function POST(
         visibility: "private", // Duplicated workflows are always private
       })
       .returning();
+
+    // start custom keeperhub code //
+    // If moving an anonymous workflow to an org, delete the original
+    // This prevents the old anonymous workflow from being accessible after sign out
+    if (sourceWorkflow.isAnonymous && isOwner && !isAnonymous) {
+      await db.delete(workflows).where(eq(workflows.id, workflowId));
+    }
+    // end keeperhub code //
 
     return NextResponse.json({
       ...newWorkflow,
