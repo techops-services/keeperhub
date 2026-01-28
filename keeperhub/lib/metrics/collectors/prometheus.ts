@@ -83,20 +83,22 @@ function getOrCreateGauge(
 
 // start custom keeperhub code //
 // DB-sourced workflow metrics (populated from database on each scrape)
-// Using gauges instead of histograms/counters because workflow runner jobs
-// exit before Prometheus can scrape them - data must come from the database.
+// Workflow runner jobs exit before Prometheus can scrape - data must come from DB.
+//
+// All metrics are GAUGES (point-in-time snapshots). Use max() aggregation across pods.
+// For rate/delta queries, use PromQL delta() function: max(delta(metric[1h]))
 
-// Workflow execution counts by status (replaces counter)
+// Workflow execution counts by status
 const workflowExecutionsTotal = getOrCreateGauge(
   "keeperhub_workflow_executions_total",
-  "Total workflow executions",
+  "Total workflow executions by status (all-time)",
   ["status"]
 );
 
-// Workflow errors (derived from executions with status=error)
+// Workflow errors total (convenience gauge for alerting)
 const workflowErrorsTotal = getOrCreateGauge(
   "keeperhub_workflow_execution_errors_total",
-  "Failed workflow executions",
+  "Total failed workflow executions (all-time)",
   []
 );
 
@@ -590,7 +592,7 @@ export async function updateDbMetrics(): Promise<void> {
       getInfraStatsFromDb(),
     ]);
 
-    // Update workflow execution counts by status
+    // Update workflow execution counts by status (gauges - point-in-time snapshots)
     workflowExecutionsTotal.set(
       { status: "success" },
       workflowStats.totalSuccess
@@ -609,7 +611,7 @@ export async function updateDbMetrics(): Promise<void> {
       workflowStats.totalCancelled
     );
 
-    // Update workflow errors total
+    // Update workflow errors total (convenience gauge for alerting)
     workflowErrorsTotal.set(workflowStats.totalError);
 
     // Update workflow duration histogram buckets

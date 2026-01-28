@@ -22,6 +22,8 @@ Metrics are collected from two sources depending on the collector type:
 
 > **Note:** DB-sourced duration metrics (workflow/step) are exposed as Prometheus gauges with `_bucket/_sum/_count` suffixes to simulate histogram semantics. Standard `histogram_quantile()` queries work, but `# TYPE` will show `gauge` instead of `histogram`.
 
+> **Note:** All DB-sourced metrics are gauges (point-in-time snapshots). Use `max()` aggregation in multi-pod deployments. For rate/delta queries, use PromQL's `delta()` function on gauges. See "Using delta() for Rate Queries" section.
+
 > **Note:** Runtime code (executor, routes) also increments workflow metrics for console logging, but Prometheus relies solely on DB snapshots. This dual approach ensures complete data even when workflow runners exit before scrape.
 
 ---
@@ -66,7 +68,8 @@ Counter/Gauge metrics tracking request/event counts.
 
 | Metric Name | Description | Labels | Unit | Source |
 |-------------|-------------|--------|------|--------|
-| `workflow.executions.total` | Total workflow executions | `status` | gauge | DB |
+| `workflow.executions.total` | Total workflow executions by status (all-time) | `status` | gauge | DB |
+| `workflow.execution.errors.total` | Total failed workflow executions (all-time) | - | gauge | DB |
 | `plugin.invocations.total` | Plugin action invocations | `plugin_name`, `action_name` | count | API |
 | `user.active.daily` | Daily active users (24h) | - | gauge | DB |
 
@@ -225,6 +228,125 @@ The following tables are queried:
 - `chains` - blockchain network count
 - `para_wallets` - Para wallet count
 
+### Multi-Pod Aggregation (Important)
+
+When running multiple pod replicas, all DB-sourced gauge metrics report identical values from each pod (since they query the same database). In Grafana/PromQL:
+
+**Use `max()` instead of `sum()` for DB-sourced gauges:**
+
+```promql
+# CORRECT - returns actual count
+max(keeperhub_user_total{cluster="prod", namespace="keeperhub"})
+
+# WRONG - doubles count with 2 replicas
+sum(keeperhub_user_total{cluster="prod", namespace="keeperhub"})
+```
+
+**For labeled gauges, use `max by (label)`:**
+
+```promql
+# CORRECT
+max by (status) (keeperhub_workflow_executions_total{...})
+max by (role) (keeperhub_org_members_by_role{...})
+
+# WRONG
+sum by (status) (keeperhub_workflow_executions_total{...})
+```
+
+**Metrics requiring `max()` aggregation:**
+
+| Category | Metrics |
+|----------|---------|
+| User | `user_total`, `user_verified_total`, `user_anonymous_total`, `user_with_workflows_total`, `user_with_integrations_total`, `user_active_daily` |
+| Organization | `org_total`, `org_members_total`, `org_members_by_role`, `org_invitations_pending`, `org_with_workflows_total` |
+| Workflow | `workflow_total`, `workflow_by_visibility`, `workflow_anonymous_total`, `workflow_executions_total`, `workflow_execution_errors_total`, `workflow_queue_depth`, `workflow_concurrent_count` |
+| Schedule | `schedule_total`, `schedule_enabled_total`, `schedule_by_last_status` |
+| Integration | `integration_total`, `integration_managed_total`, `integration_by_type` |
+| Infrastructure | `apikey_total`, `para_wallet_total`, `chain_total`, `chain_enabled_total`, `session_active_total` |
+
+**Why this happens:** Each pod queries the same PostgreSQL database and reports the same gauge value. With 2 pods reporting 21 users each, `sum()` returns 42 while `max()` correctly returns 21.
+
+**API-sourced histograms and counters** can use `sum()` since each pod accumulates independent observations from requests it handles.
+
+---
+
+### Using delta() for Rate Queries
+
+For rate and change-over-time queries on DB-sourced gauges, use PromQL's `delta()` function instead of separate counter metrics. This approach is simpler and more reliable in multi-pod deployments.
+
+**Why delta() on gauges:**
+- `delta()` calculates `last_value - first_value` within the time window
+- All pods report identical gauge values from DB, so `delta()` gives consistent results
+- No in-memory state tracking required
+- No counter reset issues on pod restarts
+
+**PromQL examples:**
+
+```promql
+# Point-in-time snapshots (use max() for multi-pod)
+max(keeperhub_workflow_executions_total{status="error"})
+max(keeperhub_workflow_execution_errors_total)
+
+# Errors added in the last hour
+max(delta(keeperhub_workflow_execution_errors_total[1h]))
+
+# Errors per minute (rate)
+max(delta(keeperhub_workflow_execution_errors_total[1h])) / 60
+
+# Executions in last 30 minutes by status
+max by (status) (delta(keeperhub_workflow_executions_total[30m]))
+
+# Error rate percentage over last hour
+100 * max(delta(keeperhub_workflow_execution_errors_total[1h]))
+    / clamp_min(max(delta(keeperhub_workflow_executions_total[1h])), 1)
+```
+
+**delta() vs offset:**
+- `offset 1h`: Takes a single data point from 1 hour ago (may be missing)
+- `delta([1h])`: Uses first and last points in range (more stable with scrape intervals)
+
+---
+
+### Dashboard vs Alert Time Windows
+
+Dashboards and alerts use different time window strategies by design:
+
+| Component | Time Window | Purpose |
+|-----------|-------------|---------|
+| **Dashboard stat panels** | `$__range` (user-selected) | Exploration: "What happened in this time range?" |
+| **Dashboard graphs** | `$__range` or fixed window | Visualization over selected period |
+| **Alerts** | Fixed windows (`[1h]`, `[5m]`) | Monitoring: "Is something wrong right now?" |
+
+**Why they differ:**
+
+- **Dashboards** are for exploration and investigation. When looking at an incident from 3 days ago, you'd set the time picker to that period and expect all panels to reflect that range.
+
+- **Alerts** must evaluate consistently regardless of who's viewing what dashboard. A "high error count" alert should always check the last hour, not vary based on dashboard settings.
+
+**Example scenarios:**
+
+```
+Dashboard time picker: "Last 6 hours"
+├── Workflow Errors stat: Shows errors in last 6 hours (delta[$__range])
+├── Success Rate stat: Shows rate over last 6 hours
+└── Alert evaluating: Still checks last 1 hour (delta[1h] > 10)
+```
+
+**This is intentional:** The stat panel shows "156 errors in 6 hours" while the alert only fires if "errors in last 1 hour > 10". Different questions, different windows.
+
+**Labeled gauge aggregation:**
+
+When a gauge has labels (e.g., `step_errors_total` with `step_type`), use:
+```promql
+# Wrong: max() picks only the highest label value
+max(keeperhub_workflow_step_errors_total{...})
+
+# Correct: max per label, then sum for total
+sum(max by (step_type) (keeperhub_workflow_step_errors_total{...}))
+```
+
+---
+
 ### ServiceMonitor (Prometheus Operator)
 
 Prometheus scraping is configured via the Helm chart's built-in ServiceMonitor support in values.yaml:
@@ -247,7 +369,7 @@ Prometheus metrics are prefixed with `keeperhub_` and use snake_case:
 | Original Name | Prometheus Name | Type |
 |---------------|-----------------|------|
 | `workflow.executions.total` | `keeperhub_workflow_executions_total` | gauge |
-| `workflow.execution.errors` | `keeperhub_workflow_execution_errors_total` | gauge |
+| `workflow.execution.errors.total` | `keeperhub_workflow_execution_errors_total` | gauge |
 | `workflow.execution.duration_ms` | `keeperhub_workflow_execution_duration_ms_bucket` | gauge |
 | `workflow.execution.duration_ms` | `keeperhub_workflow_execution_duration_ms_sum` | gauge |
 | `workflow.execution.duration_ms` | `keeperhub_workflow_execution_duration_ms_count` | gauge |
