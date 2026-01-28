@@ -29,8 +29,8 @@ const _WORKFLOW_LABELS = [
 ];
 const _STEP_LABELS = ["execution_id", "step_type", "status"];
 const _API_LABELS = ["endpoint", "status_code", "status"];
-const WEBHOOK_LABELS = ["workflow_id", "status_code", "status", "execution_id"];
-const PLUGIN_LABELS = ["plugin_name", "action_name", "execution_id", "status"];
+const WEBHOOK_LABELS = ["status_code", "status"];
+const PLUGIN_LABELS = ["plugin_name", "action_name", "status"];
 const _ERROR_LABELS = ["error_type", "plugin_name", "action_name", "service"];
 const DB_LABELS = ["query_type", "threshold"];
 const POOL_LABELS = ["active", "max"];
@@ -163,7 +163,7 @@ const webhookLatency = getOrCreateHistogram(
 const statusLatency = getOrCreateHistogram(
   "keeperhub_api_status_latency_ms",
   "Status polling response time in milliseconds",
-  ["execution_id", "status_code", "status", "execution_status"],
+  ["status_code", "status", "execution_status"],
   [5, 10, 25, 50, 100]
 );
 

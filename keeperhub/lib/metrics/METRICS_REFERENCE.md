@@ -53,9 +53,9 @@ Histogram metrics tracking duration/response times.
 |-------------|-------------|--------|--------|--------|
 | `workflow.execution.duration_ms` | Total workflow execution time | `le` (bucket) | P95 < 2000ms | DB |
 | `workflow.step.duration_ms` | Individual step execution time | `le` (bucket) | P95 < 500ms | DB |
-| `api.webhook.latency_ms` | Webhook trigger response time | `workflow_id`, `execution_id`, `status`, `status_code` | P95 < 50ms | API |
-| `api.status.latency_ms` | Status polling response time | `execution_id`, `status`, `status_code`, `execution_status` | P95 < 30ms | API |
-| `plugin.action.duration_ms` | Plugin action execution time | `plugin_name`, `action_name`, `execution_id`, `status` | P95 < 1000ms | API |
+| `api.webhook.latency_ms` | Webhook trigger response time | `status_code`, `status` | P95 < 50ms | API |
+| `api.status.latency_ms` | Status polling response time | `status_code`, `status`, `execution_status` | P95 < 30ms | API |
+| `plugin.action.duration_ms` | Plugin action execution time | `plugin_name`, `action_name`, `status` | P95 < 1000ms | API |
 | `ai.generation.duration_ms` | AI workflow generation time | `status` | P95 < 5000ms | API |
 
 ---
