@@ -263,6 +263,13 @@ const userWithIntegrations = getOrCreateGauge(
   []
 );
 
+// User info gauge (DB-sourced, one series per user)
+const userInfo = getOrCreateGauge(
+  "keeperhub_user_info",
+  "User info with email and name labels",
+  ["email", "name", "verified"]
+);
+
 // Organization metrics (DB-sourced)
 const orgTotal = getOrCreateGauge(
   "keeperhub_org_total",
@@ -292,6 +299,13 @@ const orgWithWorkflows = getOrCreateGauge(
   "keeperhub_org_with_workflows_total",
   "Organizations with at least one workflow",
   []
+);
+
+// Organization info gauge (DB-sourced, one series per org)
+const orgInfo = getOrCreateGauge(
+  "keeperhub_org_info",
+  "Organization info with name and slug labels",
+  ["org_name", "slug"]
 );
 
 // Workflow definition metrics (DB-sourced)
@@ -567,6 +581,8 @@ export async function updateDbMetrics(): Promise<void> {
       getScheduleStatsFromDb,
       getIntegrationStatsFromDb,
       getInfraStatsFromDb,
+      getUserListFromDb,
+      getOrgListFromDb,
     } = await import("../db-metrics");
     const [
       workflowStats,
@@ -578,6 +594,8 @@ export async function updateDbMetrics(): Promise<void> {
       scheduleStats,
       integrationStats,
       infraStats,
+      userList,
+      orgList,
     ] = await Promise.all([
       getWorkflowStatsFromDb(),
       getStepStatsFromDb(),
@@ -588,6 +606,8 @@ export async function updateDbMetrics(): Promise<void> {
       getScheduleStatsFromDb(),
       getIntegrationStatsFromDb(),
       getInfraStatsFromDb(),
+      getUserListFromDb(),
+      getOrgListFromDb(),
     ]);
 
     // Update workflow execution counts by status
@@ -677,6 +697,19 @@ export async function updateDbMetrics(): Promise<void> {
     userWithWorkflows.set(userStats.withWorkflows);
     userWithIntegrations.set(userStats.withIntegrations);
 
+    // Update user info gauge (one series per user)
+    userInfo.reset();
+    for (const user of userList) {
+      userInfo.set(
+        {
+          email: user.email,
+          name: user.name,
+          verified: String(user.verified),
+        },
+        1
+      );
+    }
+
     // Update organization metrics from DB
     orgTotal.set(orgStats.total);
     orgMembersTotal.set(orgStats.membersTotal);
@@ -687,6 +720,12 @@ export async function updateDbMetrics(): Promise<void> {
     }
     orgInvitationsPending.set(orgStats.invitationsPending);
     orgWithWorkflows.set(orgStats.withWorkflows);
+
+    // Update org info gauge (one series per org)
+    orgInfo.reset();
+    for (const org of orgList) {
+      orgInfo.set({ org_name: org.name, slug: org.slug }, 1);
+    }
 
     // Update workflow definition metrics from DB
     workflowTotal.set(workflowDefStats.total);
