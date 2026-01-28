@@ -523,17 +523,24 @@ function ExecutionLogEntry({
                 </span>
                 {explorerLink && (
                   <>
-                    <button
-                      className="text-muted-foreground hover:text-foreground"
+                    <span
+                      className="cursor-pointer text-muted-foreground hover:text-foreground"
                       onClick={async (e) => {
                         e.stopPropagation();
                         await navigator.clipboard.writeText(explorerLink);
                       }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.stopPropagation();
+                          navigator.clipboard.writeText(explorerLink);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
                       title="Copy link"
-                      type="button"
                     >
                       <Copy className="h-3 w-3" />
-                    </button>
+                    </span>
                     <a
                       className="text-muted-foreground hover:text-foreground"
                       href={explorerLink}

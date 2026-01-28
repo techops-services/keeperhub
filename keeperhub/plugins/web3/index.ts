@@ -12,6 +12,10 @@ const web3Plugin: IntegrationPlugin = {
   // Web3 uses Para wallet - one wallet per user
   singleConnection: true,
 
+  // Read-only actions (check balance, read contract) don't require a wallet
+  // Write actions will check for wallet at execution time
+  requiresCredentials: false,
+
   // No form fields - wallet creation is handled by the custom form handler
   formFields: [],
 
