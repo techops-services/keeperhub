@@ -22,7 +22,7 @@ Metrics are collected from two sources depending on the collector type:
 
 > **Note:** DB-sourced duration metrics (workflow/step) are exposed as Prometheus gauges with `_bucket/_sum/_count` suffixes to simulate histogram semantics. Standard `histogram_quantile()` queries work, but `# TYPE` will show `gauge` instead of `histogram`.
 
-> **Note:** Workflow metrics include gauges (point-in-time snapshots) and delta-based counters (for `rate()` queries). Use `max()` aggregation in multi-pod deployments. See "Delta-Based Counters" section for usage and known limitations.
+> **Note:** All DB-sourced metrics are gauges (point-in-time snapshots). Use `max()` aggregation in multi-pod deployments. For rate/delta queries, use PromQL's `delta()` function on gauges. See "Using delta() for Rate Queries" section.
 
 > **Note:** Runtime code (executor, routes) also increments workflow metrics for console logging, but Prometheus relies solely on DB snapshots. This dual approach ensures complete data even when workflow runners exit before scrape.
 
@@ -70,8 +70,6 @@ Counter/Gauge metrics tracking request/event counts.
 |-------------|-------------|--------|------|--------|
 | `workflow.executions.total` | Total workflow executions by status (all-time) | `status` | gauge | DB |
 | `workflow.execution.errors.total` | Total failed workflow executions (all-time) | - | gauge | DB |
-| `workflow.executions.counter` | Delta-based counter for rate() queries | `status` | counter | DB |
-| `workflow.errors.counter` | Delta-based error counter for rate() | - | counter | DB |
 | `plugin.invocations.total` | Plugin action invocations | `plugin_name`, `action_name` | count | API |
 | `user.active.daily` | Daily active users (24h) | - | gauge | DB |
 
@@ -261,7 +259,7 @@ sum by (status) (keeperhub_workflow_executions_total{...})
 |----------|---------|
 | User | `user_total`, `user_verified_total`, `user_anonymous_total`, `user_with_workflows_total`, `user_with_integrations_total`, `user_active_daily` |
 | Organization | `org_total`, `org_members_total`, `org_members_by_role`, `org_invitations_pending`, `org_with_workflows_total` |
-| Workflow | `workflow_total`, `workflow_by_visibility`, `workflow_anonymous_total`, `workflow_executions_total`, `workflow_execution_errors_total`, `workflow_executions_counter`, `workflow_errors_counter`, `workflow_queue_depth`, `workflow_concurrent_count` |
+| Workflow | `workflow_total`, `workflow_by_visibility`, `workflow_anonymous_total`, `workflow_executions_total`, `workflow_execution_errors_total`, `workflow_queue_depth`, `workflow_concurrent_count` |
 | Schedule | `schedule_total`, `schedule_enabled_total`, `schedule_by_last_status` |
 | Integration | `integration_total`, `integration_managed_total`, `integration_by_type` |
 | Infrastructure | `apikey_total`, `para_wallet_total`, `chain_total`, `chain_enabled_total`, `session_active_total` |
@@ -272,60 +270,40 @@ sum by (status) (keeperhub_workflow_executions_total{...})
 
 ---
 
-### Delta-Based Counters for rate() Queries
+### Using delta() for Rate Queries
 
-Workflow execution metrics include delta-based counters that enable `rate()` and `increase()` queries.
+For rate and change-over-time queries on DB-sourced gauges, use PromQL's `delta()` function instead of separate counter metrics. This approach is simpler and more reliable in multi-pod deployments.
 
-**Available metrics:**
-
-| Metric | Type | Description |
-|--------|------|-------------|
-| `keeperhub_workflow_executions_total` | gauge | Point-in-time DB snapshot (all-time) |
-| `keeperhub_workflow_execution_errors_total` | gauge | Error count snapshot (all-time) |
-| `keeperhub_workflow_executions_counter` | counter | Delta-based counter for rate() |
-| `keeperhub_workflow_errors_counter` | counter | Delta-based error counter for rate() |
-
-**How delta counters work:**
-
-1. On each scrape, query current DB totals
-2. Calculate delta: `current - lastSeen` (only positive deltas)
-3. Increment counter by delta
-4. Update lastSeen for next scrape
+**Why delta() on gauges:**
+- `delta()` calculates `last_value - first_value` within the time window
+- All pods report identical gauge values from DB, so `delta()` gives consistent results
+- No in-memory state tracking required
+- No counter reset issues on pod restarts
 
 **PromQL examples:**
 
 ```promql
-# Gauges - point-in-time snapshots (use max() for multi-pod)
+# Point-in-time snapshots (use max() for multi-pod)
 max(keeperhub_workflow_executions_total{status="error"})
 max(keeperhub_workflow_execution_errors_total)
 
-# Counters - rate() queries (apply rate first, then max)
-max(rate(keeperhub_workflow_errors_counter[15m]))
-max(rate(keeperhub_workflow_executions_counter[15m]))
-
-# Error rate over time window
-100 * max(rate(keeperhub_workflow_errors_counter[15m]))
-    / clamp_min(max(rate(keeperhub_workflow_executions_counter[15m])), 0.001)
-
 # Errors added in the last hour
-max(increase(keeperhub_workflow_errors_counter[1h]))
+max(delta(keeperhub_workflow_execution_errors_total[1h]))
+
+# Errors per minute (rate)
+max(delta(keeperhub_workflow_execution_errors_total[1h])) / 60
+
+# Executions in last 30 minutes by status
+max by (status) (delta(keeperhub_workflow_executions_total[30m]))
+
+# Error rate percentage over last hour
+100 * max(delta(keeperhub_workflow_execution_errors_total[1h]))
+    / clamp_min(max(delta(keeperhub_workflow_executions_total[1h])), 1)
 ```
 
-**Known limitations in multi-pod deployments:**
-
-The delta-based counters have inherent issues when running multiple replicas:
-
-1. **All pods calculate identical deltas** from the same DB, so `sum()` overcounts by N×
-2. **`max()` on counters is non-standard**: when pods restart or have scrape timing skew, the `max()` series can drop as it switches between pods. `rate()` interprets drops as counter resets, potentially producing false spikes or incorrect values
-3. **Pod restarts lose delta state**: counter values reset to 0, causing discontinuities
-
-**For reliable rate() with multi-pod:**
-
-| Approach | Description |
-|----------|-------------|
-| **Single metrics pod** | Dedicated 1-replica deployment for metrics export |
-| **Shared state** | Redis/DB for coordinated last-seen tracking |
-| **Accept limitations** | Use counters knowing they may have artifacts during pod churn |
+**delta() vs offset:**
+- `offset 1h`: Takes a single data point from 1 hour ago (may be missing)
+- `delta([1h])`: Uses first and last points in range (more stable with scrape intervals)
 
 ---
 
@@ -352,8 +330,6 @@ Prometheus metrics are prefixed with `keeperhub_` and use snake_case:
 |---------------|-----------------|------|
 | `workflow.executions.total` | `keeperhub_workflow_executions_total` | gauge |
 | `workflow.execution.errors.total` | `keeperhub_workflow_execution_errors_total` | gauge |
-| `workflow.executions.counter` | `keeperhub_workflow_executions_counter` | counter |
-| `workflow.errors.counter` | `keeperhub_workflow_errors_counter` | counter |
 | `workflow.execution.duration_ms` | `keeperhub_workflow_execution_duration_ms_bucket` | gauge |
 | `workflow.execution.duration_ms` | `keeperhub_workflow_execution_duration_ms_sum` | gauge |
 | `workflow.execution.duration_ms` | `keeperhub_workflow_execution_duration_ms_count` | gauge |

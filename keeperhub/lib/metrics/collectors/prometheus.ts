@@ -85,17 +85,10 @@ function getOrCreateGauge(
 // DB-sourced workflow metrics (populated from database on each scrape)
 // Workflow runner jobs exit before Prometheus can scrape - data must come from DB.
 //
-// GAUGES: Point-in-time snapshots of DB totals. Use max() aggregation across pods.
-// COUNTERS: Delta-based counters for rate() queries. Each pod tracks lastSeen and
-//           increments by (current - lastSeen). Use max() aggregation.
-//
-// KNOWN LIMITATIONS with multi-pod counters:
-// - All pods calculate identical deltas from same DB, so sum() overcounts
-// - max() on counters is non-standard: pod restarts/scrape skew can cause
-//   the max series to drop, which rate() interprets as counter resets
-// - For reliable rate() in multi-pod, consider single metrics exporter pod
+// All metrics are GAUGES (point-in-time snapshots). Use max() aggregation across pods.
+// For rate/delta queries, use PromQL delta() function: max(delta(metric[1h]))
 
-// Workflow execution counts by status (gauges - point-in-time)
+// Workflow execution counts by status
 const workflowExecutionsTotal = getOrCreateGauge(
   "keeperhub_workflow_executions_total",
   "Total workflow executions by status (all-time)",
@@ -108,28 +101,6 @@ const workflowErrorsTotal = getOrCreateGauge(
   "Total failed workflow executions (all-time)",
   []
 );
-
-// Delta-based counters for rate() queries
-// WARNING: In multi-pod deployments, these have known issues - see comment above
-const workflowExecutionsCounter = getOrCreateCounter(
-  "keeperhub_workflow_executions_counter",
-  "Workflow executions counter for rate() queries (delta-based)",
-  ["status"]
-);
-
-const workflowErrorsCounter = getOrCreateCounter(
-  "keeperhub_workflow_errors_counter",
-  "Workflow errors counter for rate() queries (delta-based)",
-  []
-);
-
-// State tracking for delta calculation (per-pod, in-memory)
-const lastSeenValues = {
-  success: 0,
-  error: 0,
-  cancelled: 0,
-  initialized: false,
-};
 
 // Workflow duration histogram as gauges (replaces histogram)
 const workflowDurationBucket = getOrCreateGauge(
@@ -642,47 +613,6 @@ export async function updateDbMetrics(): Promise<void> {
 
     // Update workflow errors total (convenience gauge for alerting)
     workflowErrorsTotal.set(workflowStats.totalError);
-
-    // Update delta-based counters for rate() queries
-    // On first scrape, initialize lastSeen without incrementing (avoids huge initial spike)
-    // On subsequent scrapes, calculate delta and increment counter
-    if (!lastSeenValues.initialized) {
-      lastSeenValues.success = workflowStats.totalSuccess;
-      lastSeenValues.error = workflowStats.totalError;
-      lastSeenValues.cancelled = workflowStats.totalCancelled;
-      lastSeenValues.initialized = true;
-    } else {
-      // Calculate deltas (only positive - ignore if DB value decreased)
-      const successDelta = Math.max(
-        0,
-        workflowStats.totalSuccess - lastSeenValues.success
-      );
-      const errorDelta = Math.max(
-        0,
-        workflowStats.totalError - lastSeenValues.error
-      );
-      const cancelledDelta = Math.max(
-        0,
-        workflowStats.totalCancelled - lastSeenValues.cancelled
-      );
-
-      // Increment counters by delta
-      if (successDelta > 0) {
-        workflowExecutionsCounter.inc({ status: "success" }, successDelta);
-      }
-      if (errorDelta > 0) {
-        workflowExecutionsCounter.inc({ status: "error" }, errorDelta);
-        workflowErrorsCounter.inc(errorDelta);
-      }
-      if (cancelledDelta > 0) {
-        workflowExecutionsCounter.inc({ status: "cancelled" }, cancelledDelta);
-      }
-
-      // Update lastSeen for next scrape
-      lastSeenValues.success = workflowStats.totalSuccess;
-      lastSeenValues.error = workflowStats.totalError;
-      lastSeenValues.cancelled = workflowStats.totalCancelled;
-    }
 
     // Update workflow duration histogram buckets
     for (let i = 0; i < WORKFLOW_DURATION_BUCKETS.length; i++) {
