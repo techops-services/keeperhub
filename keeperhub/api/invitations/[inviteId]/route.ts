@@ -95,6 +95,15 @@ export async function GET(_request: Request, { params }: RouteParams) {
       );
     }
 
+    // Check if user with this email already exists
+    const existingUser = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, inv.email))
+      .limit(1);
+
+    const userExists = existingUser.length > 0;
+
     // Return invitation details
     return NextResponse.json({
       invitation: {
@@ -105,6 +114,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
         expiresAt: inv.expiresAt,
         organizationName: inv.organizationName,
         inviterName: inv.inviterName || "A team member",
+        userExists,
       },
     });
   } catch (error) {
