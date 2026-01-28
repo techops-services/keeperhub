@@ -995,6 +995,12 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
       return;
     }
 
+    // When enabling, check if user is logged in
+    if (!session?.user) {
+      toast.error("Please login to activate your workflow");
+      return;
+    }
+
     // When enabling, validate first
     if (
       validateAndProceed(() => updateWorkflowEnabled(true), "Enable Anyway")
@@ -1457,7 +1463,7 @@ function RunButtonGroup({
 
   const button = (
     <Button
-      className="bg-keeperhub-green hover:bg-keeperhub-green-dark disabled:opacity-70 disabled:[&>svg]:text-muted-foreground"
+      className="min-w-20 bg-keeperhub-green hover:bg-keeperhub-green-dark disabled:opacity-70 disabled:[&>svg]:text-muted-foreground"
       disabled={disabled}
       onClick={() => actions.handleExecute()}
       title="Run Workflow"
@@ -1684,7 +1690,9 @@ export const WorkflowToolbar = ({
           {(() => {
             const CustomLogo = getCustomLogo();
             return CustomLogo ? (
-              <CustomLogo className="size-7 shrink-0" />
+              <a href="/">
+                <CustomLogo className="size-7 shrink-0" />
+              </a>
             ) : null;
           })()}
           <WorkflowMenuComponent
@@ -1738,7 +1746,9 @@ export const WorkflowToolbar = ({
           {(() => {
             const CustomLogo = getCustomLogo();
             return CustomLogo ? (
-              <CustomLogo className="size-7 shrink-0" />
+              <a href="/">
+                <CustomLogo className="size-7 shrink-0" />
+              </a>
             ) : null;
           })()}
           <WorkflowMenuComponent

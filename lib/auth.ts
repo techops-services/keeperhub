@@ -1,11 +1,19 @@
 import { randomUUID } from "node:crypto";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { anonymous, genericOAuth, organization } from "better-auth/plugins";
+import {
+  anonymous,
+  emailOTP,
+  genericOAuth,
+  organization,
+} from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { sendInvitationEmail } from "@/keeperhub/lib/email";
+import {
+  sendInvitationEmail,
+  sendVerificationOTP,
+} from "@/keeperhub/lib/email";
 import { isAiGatewayManagedKeysEnabled } from "./ai-gateway/config";
 import { db } from "./db";
 import {
@@ -115,6 +123,19 @@ function getBaseURL() {
 
 // Build plugins array conditionally
 const plugins = [
+  emailOTP({
+    async sendVerificationOTP({ email, otp, type }) {
+      console.log(`[Auth] Sending OTP to ${email} for ${type}`);
+      await sendVerificationOTP({
+        email,
+        otp,
+        type,
+      });
+    },
+    otpLength: 6,
+    expiresIn: 300, // 5 minutes
+    sendVerificationOnSignUp: true,
+  }),
   anonymous({
     async onLinkAccount(data) {
       // // When an anonymous user links to a real account, migrate their data
@@ -382,7 +403,7 @@ export const auth = betterAuth({
   },
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: false,
+    requireEmailVerification: true,
   },
   socialProviders: {
     github: {
