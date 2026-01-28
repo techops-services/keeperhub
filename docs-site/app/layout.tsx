@@ -12,7 +12,7 @@ export const metadata = {
     default: "KeeperHub Docs",
     template: "%s - KeeperHub Docs",
   },
-  description: "KeeperHub Documentation - Blockchain automation without code",
+  description: "KeeperHub Documentation - Automate anything onchain",
   icons: {
     icon: "/favicon.ico",
   },

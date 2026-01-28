@@ -1,5 +1,18 @@
 {
   "mcpServers": {
+    "keeperhub": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "KEEPERHUB_API_KEY",
+        "-e",
+        "KEEPERHUB_API_URL=https://app.keeperhub.com",
+        "ghcr.io/techops-services/keeperhub-mcp"
+      ]
+    },
     "terraform": {
       "command": "docker",
       "args": [
@@ -10,14 +23,6 @@
         "TFE_TOKEN",
         "hashicorp/terraform-mcp-server"
       ]
-    },
-    "mcp-obsidian": {
-      "command": "uvx",
-      "args": ["mcp-obsidian"]
-    },
-    "chrome-devtools": {
-      "command": "npx",
-      "args": ["chrome-devtools-mcp@latest"]
     },
     "memory": {
       "command": "npx",
