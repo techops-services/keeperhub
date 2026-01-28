@@ -29,7 +29,7 @@ const config = {
     <>
       <meta content="width=device-width, initial-scale=1.0" name="viewport" />
       <meta
-        content="KeeperHub Documentation - Blockchain automation without code"
+        content="KeeperHub Documentation - Automate anything onchain"
         name="description"
       />
       <meta content="KeeperHub Docs" name="og:title" />

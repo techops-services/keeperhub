@@ -13,11 +13,25 @@ type SendEmailOptions = {
 };
 
 /**
+ * Normalize email address by removing + suffix
+ * e.g., "jacob+test@example.com" -> "jacob@example.com"
+ */
+function normalizeEmail(email: string): string {
+  const [localPart, domain] = email.split("@");
+  if (!domain) {
+    return email;
+  }
+  const normalizedLocal = localPart.split("+")[0];
+  return `${normalizedLocal}@${domain}`;
+}
+
+/**
  * Send an email using SendGrid
  */
 export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
   const apiKey = process.env.SENDGRID_API_KEY;
   const fromAddress = process.env.FROM_ADDRESS || "noreply@keeperhub.com";
+  const toAddress = normalizeEmail(options.to);
 
   if (!apiKey) {
     console.error("[Email] SENDGRID_API_KEY not configured");
@@ -27,7 +41,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
   const emailData = {
     personalizations: [
       {
-        to: [{ email: options.to }],
+        to: [{ email: toAddress }],
         subject: options.subject,
       },
     ],
@@ -79,9 +93,111 @@ type InvitationEmailData = {
   inviteLink: string;
 };
 
+type VerificationOTPData = {
+  email: string;
+  otp: string;
+  type: "sign-in" | "email-verification" | "forget-password";
+};
+
 /**
- * Send organization invitation email
+ * Send email verification OTP code
  */
+export async function sendVerificationOTP(
+  data: VerificationOTPData
+): Promise<boolean> {
+  const { email, otp, type } = data;
+
+  const logoUrl =
+    "https://raw.githubusercontent.com/techops-services/keeperhub/staging/public/keeperhub_logo.png";
+
+  const subjectMap = {
+    "sign-in": "Your KeeperHub sign-in code",
+    "email-verification": "Verify your email address - KeeperHub",
+    "forget-password": "Reset your KeeperHub password",
+  };
+
+  const actionTextMap = {
+    "sign-in": "sign in",
+    "email-verification": "verify your email address",
+    "forget-password": "reset your password",
+  };
+
+  const actionPromptMap = {
+    "sign-in": "Enter this code to sign in:",
+    "email-verification": "Enter this code to verify your email address:",
+    "forget-password": "Enter this code to reset your password:",
+  };
+
+  const subject = subjectMap[type];
+  const actionText = actionTextMap[type];
+  const actionPrompt = actionPromptMap[type];
+
+  const text = `
+Hi there,
+
+Your verification code is: ${otp}
+
+Enter this code to ${actionText}.
+
+This code will expire in 5 minutes.
+
+If you didn't request this code, you can safely ignore this email.
+
+---
+KeeperHub - Blockchain Workflow Automation
+`.trim();
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+    <img src="${logoUrl}" alt="KeeperHub" style="max-width: 200px; height: auto;" />
+  </div>
+
+  <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e5e5; border-top: none; border-radius: 0 0 12px 12px;">
+    <h2 style="color: #1a1a2e; margin-top: 0;">Your Verification Code</h2>
+
+    <p>${actionPrompt}</p>
+
+    <div style="text-align: center; margin: 30px 0;">
+      <div style="display: inline-block; background: #f5f5f5; padding: 20px 40px; border-radius: 8px; font-size: 32px; font-weight: bold; letter-spacing: 8px; font-family: monospace; color: #1a1a2e;">${otp}</div>
+    </div>
+
+    <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
+
+    <p style="color: #999; font-size: 12px; margin-bottom: 0;">
+      This code will expire in 5 minutes. If you didn't request this code, you can safely ignore this email.
+    </p>
+  </div>
+
+  <div style="text-align: center; padding: 20px; color: #999; font-size: 12px;">
+    <p style="margin: 0;">KeeperHub - Blockchain Workflow Automation</p>
+  </div>
+</body>
+</html>
+`.trim();
+
+  const success = await sendEmail({
+    to: email,
+    subject,
+    text,
+    html,
+  });
+
+  if (success) {
+    console.log(`[Email] OTP sent to ${email} for ${type}`);
+  } else {
+    console.error(`[Email] Failed to send OTP to ${email}`);
+  }
+
+  return success;
+}
+
 export async function sendInvitationEmail(
   data: InvitationEmailData
 ): Promise<boolean> {

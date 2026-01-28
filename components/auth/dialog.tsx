@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,7 +33,7 @@ type AuthDialogProps = {
   children?: ReactNode;
 };
 
-type ModalView = "signin" | "signup";
+type ModalView = "signin" | "signup" | "verify";
 
 const VercelIcon = ({ className = "mr-2 h-3 w-3" }: { className?: string }) => (
   <svg
@@ -243,6 +243,10 @@ let singleProviderSignInInitiated = false;
 export const isSingleProviderSignInInitiated = () =>
   singleProviderSignInInitiated;
 
+// Track verification state to persist through component remounts
+let pendingVerifyEmail: string | null = null;
+let pendingVerifyPassword: string | null = null;
+
 type SingleProviderButtonProps = {
   provider: Provider;
   loadingProvider: "github" | "google" | "vercel" | null;
@@ -288,32 +292,63 @@ const getViewTitle = (view: ModalView) => {
       return "Sign in";
     case "signup":
       return "Create account";
+    case "verify":
+      return "Verify your email";
     default:
       return "Sign in";
   }
 };
 
-const getViewDescription = (view: ModalView) => {
+const getViewDescription = (view: ModalView, email?: string) => {
   switch (view) {
     case "signin":
       return "Sign in to your account to continue.";
     case "signup":
       return "Create your account to get started.";
+    case "verify":
+      return email
+        ? `Enter the 6-digit code sent to ${email}`
+        : "Enter the verification code sent to your email.";
     default:
       return null;
   }
 };
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Auth dialog handles multiple views and flows
 export const AuthDialog = ({ children }: AuthDialogProps) => {
-  const [open, setOpen] = useState(false);
-  const [view, setView] = useState<ModalView>("signin");
+  // Use lazy initialization to check for pending verification on mount/remount
+  const [open, setOpen] = useState(() => pendingVerifyEmail !== null);
+  const [view, setView] = useState<ModalView>(() =>
+    pendingVerifyEmail !== null ? "verify" : "signin"
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [verifyEmail, setVerifyEmail] = useState(
+    () => pendingVerifyEmail || ""
+  );
+  const [verifyPassword, setVerifyPassword] = useState(
+    () => pendingVerifyPassword || ""
+  );
+  const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingProvider, setLoadingProvider] = useState<
     "github" | "google" | "vercel" | null
   >(null);
+
+  // Handle pending verification when component mounts/remounts
+  useEffect(() => {
+    if (pendingVerifyEmail) {
+      setOpen(true);
+      setView("verify");
+      setVerifyEmail(pendingVerifyEmail);
+      if (pendingVerifyPassword) {
+        setVerifyPassword(pendingVerifyPassword);
+      }
+      pendingVerifyEmail = null;
+      pendingVerifyPassword = null;
+    }
+  }, []);
 
   const enabledProviders = getEnabledAuthProviders();
   const singleProvider = getSingleProvider();
@@ -325,6 +360,9 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
   const resetForm = () => {
     setEmail("");
     setPassword("");
+    setVerifyEmail("");
+    setVerifyPassword("");
+    setOtp("");
     setError("");
   };
 
@@ -389,7 +427,35 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
     try {
       const response = await signIn.email({ email, password });
       if (response.error) {
-        setError(response.error.message || "Sign in failed");
+        const errorMsg = response.error.message || "Sign in failed";
+
+        // Check if error is about unverified email
+        if (
+          errorMsg.toLowerCase().includes("verify") ||
+          errorMsg.toLowerCase().includes("verification") ||
+          errorMsg.toLowerCase().includes("not verified")
+        ) {
+          // Send new OTP and switch to verify view
+          await authClient.emailOtp.sendVerificationOtp({
+            email,
+            type: "email-verification",
+          });
+
+          setVerifyEmail(email);
+          setVerifyPassword(password);
+          setView("verify");
+          setOtp("");
+          pendingVerifyEmail = email;
+          pendingVerifyPassword = password;
+
+          toast.info("Please verify your email. A new code has been sent.", {
+            duration: 5000,
+          });
+          setLoading(false);
+          return;
+        }
+
+        setError(errorMsg);
         return;
       }
 
@@ -410,14 +476,11 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
     }
   };
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Handles signup with unverified user detection
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-
-    // start custom keeperhub code //
-    const claimContext = await getClaimContext();
-    // end keeperhub code //
 
     try {
       const signUpResponse = await signUp.email({
@@ -427,30 +490,149 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
       });
 
       if (signUpResponse.error) {
-        setError(signUpResponse.error.message || "Sign up failed");
+        const errorMsg = signUpResponse.error.message || "Sign up failed";
+
+        // Check if error is about existing user (might be unverified)
+        if (
+          errorMsg.toLowerCase().includes("already") ||
+          errorMsg.toLowerCase().includes("exists") ||
+          errorMsg.toLowerCase().includes("duplicate")
+        ) {
+          // Try to send verification OTP - if user exists but unverified, this will work
+          try {
+            await authClient.emailOtp.sendVerificationOtp({
+              email,
+              type: "email-verification",
+            });
+
+            // OTP sent successfully - user exists but is unverified
+            setVerifyEmail(email);
+            setVerifyPassword(password);
+            setView("verify");
+            setOtp("");
+            pendingVerifyEmail = email;
+            pendingVerifyPassword = password;
+
+            toast.info(
+              "An account with this email already exists. Please verify your email.",
+              { duration: 5000 }
+            );
+            setLoading(false);
+            return;
+          } catch {
+            // OTP send failed - user is already verified, show original error
+            setError(
+              "An account with this email already exists. Please sign in."
+            );
+            setLoading(false);
+            return;
+          }
+        }
+
+        setError(errorMsg);
+        setLoading(false);
         return;
       }
 
-      const signInResponse = await signIn.email({ email, password });
+      // Store email and password for verification view
+      const signedUpEmail = email;
+      const signedUpPassword = password;
 
-      if (signInResponse.error) {
-        setError(signInResponse.error.message || "Sign in failed");
+      // Switch to verify view
+      setLoading(false);
+      setVerifyEmail(signedUpEmail);
+      setVerifyPassword(signedUpPassword);
+      setView("verify");
+      setError("");
+      setOtp("");
+
+      // Store in module-level vars in case component remounts
+      pendingVerifyEmail = signedUpEmail;
+      pendingVerifyPassword = signedUpPassword;
+
+      toast.success(
+        `Verification code sent to ${signedUpEmail}. Please check your inbox.`,
+        { duration: 5000 }
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create account");
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await authClient.emailOtp.verifyEmail({
+        email: verifyEmail,
+        otp,
+      });
+
+      if (response.error) {
+        setError(response.error.message || "Verification failed");
+        setLoading(false);
         return;
       }
 
-      // start custom keeperhub code //
-      storeClaimIfNeeded(claimContext);
-      // end keeperhub code //
+      // Clear pending state
+      pendingVerifyEmail = null;
+      pendingVerifyPassword = null;
 
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      // Auto sign-in after verification using stored password
+      if (verifyPassword) {
+        const signInResponse = await signIn.email({
+          email: verifyEmail,
+          password: verifyPassword,
+        });
+
+        if (signInResponse.error) {
+          // Verification succeeded but sign-in failed - redirect to sign in
+          toast.success("Email verified! Please sign in.");
+          setView("signin");
+          setEmail(verifyEmail);
+          setPassword("");
+          setOtp("");
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Refresh session
       await authClient.getSession();
       refetchOrganizations();
 
-      toast.success("Account created successfully!");
+      toast.success("Email verified! You're now signed in.");
       setOpen(false);
+      resetForm();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create account");
-    } finally {
+      setError(err instanceof Error ? err.message : "Verification failed");
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await authClient.emailOtp.sendVerificationOtp({
+        email: verifyEmail,
+        type: "email-verification",
+      });
+
+      if (response.error) {
+        setError(response.error.message || "Failed to resend code");
+        setLoading(false);
+        return;
+      }
+
+      toast.success("New verification code sent!");
+      setLoading(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to resend code");
       setLoading(false);
     }
   };
@@ -477,8 +659,10 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{getViewTitle(view)}</DialogTitle>
-          {getViewDescription(view) && (
-            <DialogDescription>{getViewDescription(view)}</DialogDescription>
+          {getViewDescription(view, verifyEmail) && (
+            <DialogDescription>
+              {getViewDescription(view, verifyEmail)}
+            </DialogDescription>
           )}
         </DialogHeader>
 
@@ -579,6 +763,71 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
                   type="button"
                 >
                   Sign in
+                </button>
+              </div>
+            </div>
+          )}
+
+          {view === "verify" && (
+            <div className="space-y-4">
+              <form className="space-y-4" onSubmit={handleVerifyOtp}>
+                <div className="space-y-2">
+                  <Label className="ml-1" htmlFor="otp">
+                    Verification Code
+                  </Label>
+                  <Input
+                    autoComplete="one-time-code"
+                    autoFocus
+                    className="text-center font-mono text-2xl tracking-[0.5em]"
+                    id="otp"
+                    inputMode="numeric"
+                    maxLength={6}
+                    onChange={(e) =>
+                      setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                    }
+                    pattern="[0-9]*"
+                    placeholder="000000"
+                    required
+                    value={otp}
+                  />
+                </div>
+                {error && (
+                  <div className="text-destructive text-sm">{error}</div>
+                )}
+                <Button
+                  className="w-full"
+                  disabled={loading || otp.length !== 6}
+                  type="submit"
+                >
+                  {loading ? <Spinner className="mr-2 size-4" /> : null}
+                  Verify
+                </Button>
+              </form>
+              <div className="flex items-center justify-center gap-1 text-sm">
+                <span className="text-muted-foreground">
+                  Didn't receive the code?
+                </span>
+                <button
+                  className="font-medium text-foreground underline underline-offset-2 hover:text-foreground/80"
+                  disabled={loading}
+                  onClick={handleResendOtp}
+                  type="button"
+                >
+                  Resend
+                </button>
+              </div>
+              <div className="flex items-center justify-center gap-1 text-sm">
+                <button
+                  className="font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground/80"
+                  onClick={() => {
+                    setView("signin");
+                    setError("");
+                    setOtp("");
+                    pendingVerifyEmail = null;
+                  }}
+                  type="button"
+                >
+                  Back to sign in
                 </button>
               </div>
             </div>

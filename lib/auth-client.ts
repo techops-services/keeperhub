@@ -1,5 +1,6 @@
 import {
   anonymousClient,
+  emailOTPClient,
   organizationClient,
 } from "better-auth/client/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
@@ -52,6 +53,7 @@ export const authClient = createAuthClient({
       : "http://localhost:3000",
   plugins: [
     anonymousClient(),
+    emailOTPClient(),
     // start custom keeperhub code //
     organizationClient({
       ac,

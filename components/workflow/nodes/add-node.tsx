@@ -31,7 +31,7 @@ export function AddNode({ data }: NodeProps & { data?: AddNodeData }) {
           {CustomLogo && <CustomLogo className="size-10" />} {appName}
         </h1>
         <p className="text-muted-foreground">
-          Blockchain automation
+          Automate anything onchain
           {/* ,{" "}
           <a
             className="underline underline-offset-2 transition duration-200 ease-out hover:text-foreground"
