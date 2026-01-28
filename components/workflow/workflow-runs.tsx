@@ -523,6 +523,7 @@ function ExecutionLogEntry({
                 </span>
                 {explorerLink && (
                   <>
+                    {/* biome-ignore lint/a11y/useSemanticElements: Using span with role=button to avoid nested button hydration error */}
                     <span
                       className="cursor-pointer text-muted-foreground hover:text-foreground"
                       onClick={async (e) => {

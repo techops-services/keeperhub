@@ -415,6 +415,7 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
     }
   };
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex auth flow with multiple verification paths
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -436,21 +437,41 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
           errorMsg.toLowerCase().includes("not verified")
         ) {
           // Send new OTP and switch to verify view
-          await authClient.emailOtp.sendVerificationOtp({
-            email,
-            type: "email-verification",
-          });
+          try {
+            const otpResponse = await authClient.emailOtp.sendVerificationOtp({
+              email,
+              type: "email-verification",
+            });
 
-          setVerifyEmail(email);
-          setVerifyPassword(password);
-          setView("verify");
-          setOtp("");
-          pendingVerifyEmail = email;
-          pendingVerifyPassword = password;
+            if (otpResponse.error) {
+              toast.error(
+                otpResponse.error.message || "Failed to send verification code"
+              );
+              setError(
+                otpResponse.error.message || "Failed to send verification code"
+              );
+              setLoading(false);
+              return;
+            }
 
-          toast.info("Please verify your email. A new code has been sent.", {
-            duration: 5000,
-          });
+            setVerifyEmail(email);
+            setVerifyPassword(password);
+            setView("verify");
+            setOtp("");
+            pendingVerifyEmail = email;
+            pendingVerifyPassword = password;
+
+            toast.info("Please verify your email. A new code has been sent.", {
+              duration: 5000,
+            });
+          } catch (otpErr) {
+            const otpErrMsg =
+              otpErr instanceof Error
+                ? otpErr.message
+                : "Failed to send verification code";
+            toast.error(otpErrMsg);
+            setError(otpErrMsg);
+          }
           setLoading(false);
           return;
         }
@@ -500,10 +521,22 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
         ) {
           // Try to send verification OTP - if user exists but unverified, this will work
           try {
-            await authClient.emailOtp.sendVerificationOtp({
+            const otpResponse = await authClient.emailOtp.sendVerificationOtp({
               email,
               type: "email-verification",
             });
+
+            if (otpResponse.error) {
+              // OTP send failed due to API error
+              const otpErrMsg =
+                otpResponse.error.message || "Failed to send verification code";
+              toast.error(otpErrMsg);
+              setError(
+                "An account with this email already exists. Please sign in."
+              );
+              setLoading(false);
+              return;
+            }
 
             // OTP sent successfully - user exists but is unverified
             setVerifyEmail(email);
@@ -519,8 +552,15 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
             );
             setLoading(false);
             return;
-          } catch {
-            // OTP send failed - user is already verified, show original error
+          } catch (otpErr) {
+            // OTP send failed - user is already verified or email send failed
+            const otpErrMsg =
+              otpErr instanceof Error
+                ? otpErr.message
+                : "Failed to send verification code";
+            if (otpErrMsg.toLowerCase().includes("email")) {
+              toast.error(otpErrMsg);
+            }
             setError(
               "An account with this email already exists. Please sign in."
             );
@@ -624,7 +664,9 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
       });
 
       if (response.error) {
-        setError(response.error.message || "Failed to resend code");
+        const errorMsg = response.error.message || "Failed to resend code";
+        setError(errorMsg);
+        toast.error(errorMsg);
         setLoading(false);
         return;
       }
@@ -632,7 +674,10 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
       toast.success("New verification code sent!");
       setLoading(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to resend code");
+      const errorMsg =
+        err instanceof Error ? err.message : "Failed to resend code";
+      setError(errorMsg);
+      toast.error(errorMsg);
       setLoading(false);
     }
   };

@@ -1,11 +1,24 @@
 "use client";
 
+import { useSetAtom } from "jotai";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { integrationsVersionAtom } from "@/lib/integrations-store";
 
-export function Web3WalletSection() {
+type Web3WalletSectionProps = {
+  onSuccess?: (integrationId: string) => void;
+  closeAll?: () => void;
+  showDelete?: boolean;
+};
+
+export function Web3WalletSection({
+  onSuccess,
+  closeAll,
+  showDelete = true,
+}: Web3WalletSectionProps) {
+  const setIntegrationsVersion = useSetAtom(integrationsVersionAtom);
   const [hasWallet, setHasWallet] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,6 +71,7 @@ export function Web3WalletSection() {
     checkWallet();
   }, []);
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Sequential wallet creation with error handling
   async function handleCreateWallet() {
     // start keeperhub - validate email before creating
     if (!userEmail) {
@@ -92,6 +106,17 @@ export function Web3WalletSection() {
       setHasWallet(true);
       setWalletAddress(data.wallet.address);
       toast.success("Wallet created successfully!");
+
+      // Trigger re-fetch of integrations so UI syncs and auto-selects the new wallet
+      setIntegrationsVersion((v) => v + 1);
+
+      // Close overlay and return to sidepanel with wallet selected
+      if (onSuccess) {
+        onSuccess(data.integration?.id || "web3-wallet");
+      }
+      if (closeAll) {
+        closeAll();
+      }
     } catch (error) {
       console.error("Wallet creation failed:", error);
       toast.error(
@@ -120,6 +145,8 @@ export function Web3WalletSection() {
       setHasWallet(false);
       setWalletAddress(null);
       toast.success("Wallet deleted");
+      // Trigger re-fetch of integrations so UI syncs
+      setIntegrationsVersion((v) => v + 1);
     } catch {
       toast.error("Failed to delete wallet");
     }
@@ -164,14 +191,16 @@ export function Web3WalletSection() {
                   {walletAddress}
                 </code>
               </div>
-              <Button
-                className="w-full"
-                onClick={handleDeleteWallet}
-                size="sm"
-                variant="destructive"
-              >
-                Delete Wallet
-              </Button>
+              {showDelete && (
+                <Button
+                  className="w-full"
+                  onClick={handleDeleteWallet}
+                  size="sm"
+                  variant="destructive"
+                >
+                  Delete Wallet
+                </Button>
+              )}
             </div>
           );
         }

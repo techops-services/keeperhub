@@ -126,11 +126,14 @@ const plugins = [
   emailOTP({
     async sendVerificationOTP({ email, otp, type }) {
       console.log(`[Auth] Sending OTP to ${email} for ${type}`);
-      await sendVerificationOTP({
+      const success = await sendVerificationOTP({
         email,
         otp,
         type,
       });
+      if (!success) {
+        throw new Error("Failed to send verification email");
+      }
     },
     otpLength: 6,
     expiresIn: 300, // 5 minutes

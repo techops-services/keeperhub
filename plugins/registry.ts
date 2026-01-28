@@ -157,6 +157,11 @@ export type PluginAction = {
   // Output display configuration (how to render output in workflow runs panel)
   outputConfig?: OutputDisplayConfig;
 
+  // Whether this specific action requires credentials/integration setup
+  // Overrides the plugin-level requiresCredentials if set
+  // Useful for plugins with mixed read/write actions (e.g., web3)
+  requiresCredentials?: boolean;
+
   // Code generation template (the actual template string, not a path)
   // Optional - if not provided, will fall back to auto-generated template
   // from steps that export _exportCore

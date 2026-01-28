@@ -160,6 +160,7 @@ const web3Plugin: IntegrationPlugin = {
       description:
         "Transfer native tokens (ETH, MATIC, etc.) from your wallet to a recipient address",
       category: "Web3",
+      requiresCredentials: true,
       stepFunction: "transferFundsStep",
       stepImportPath: "transfer-funds",
       outputFields: [
@@ -208,6 +209,7 @@ const web3Plugin: IntegrationPlugin = {
       label: "Transfer ERC20 Token",
       description: "Transfer ERC20 tokens on your desired EVM chain",
       category: "Web3",
+      requiresCredentials: true,
       stepFunction: "transferTokenStep",
       stepImportPath: "transfer-token",
       outputFields: [
@@ -344,6 +346,7 @@ const web3Plugin: IntegrationPlugin = {
       label: "Write Contract",
       description: "Write data to a smart contract (state-changing functions)",
       category: "Web3",
+      requiresCredentials: true,
       stepFunction: "writeContractStep",
       stepImportPath: "write-contract",
       outputFields: [

@@ -2,8 +2,10 @@
 
 import { useAtomValue, useSetAtom } from "jotai";
 import { Search } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { AuthDialog } from "@/components/auth/dialog";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { IntegrationIcon } from "@/components/ui/integration-icon";
 import { Label } from "@/components/ui/label";
@@ -28,6 +30,7 @@ import { getIntegrationDescriptions } from "@/plugins/registry";
 import { AiGatewayConsentOverlay } from "./ai-gateway-consent-overlay";
 import { ConfirmOverlay } from "./confirm-overlay";
 import { Overlay } from "./overlay";
+import { OverlayFooter } from "./overlay-footer";
 import { useOverlay } from "./overlay-provider";
 
 // System integrations that don't have plugins
@@ -292,6 +295,25 @@ export function ConfigureConnectionOverlay({
   } | null>(null);
   const [name, setName] = useState("");
   const [config, setConfig] = useState<Record<string, string>>({});
+  // start keeperhub - track anonymous state for web3
+  const [isAnonymous, setIsAnonymous] = useState(false);
+
+  useEffect(() => {
+    if (type === "web3") {
+      fetch("/api/user")
+        .then((res) => res.json())
+        .then((userData) => {
+          const isAnonUser =
+            userData.isAnonymous ||
+            userData.email?.includes("@http://") ||
+            userData.email?.includes("@https://") ||
+            userData.email?.startsWith("temp-");
+          setIsAnonymous(isAnonUser);
+        })
+        .catch(() => setIsAnonymous(false));
+    }
+  }, [type]);
+  // end keeperhub
 
   const updateConfig = (key: string, value: string) => {
     setConfig((prev) => ({ ...prev, [key]: value }));
@@ -401,6 +423,8 @@ export function ConfigureConnectionOverlay({
         isEditMode: false,
         config,
         updateConfig,
+        onSuccess,
+        closeAll,
       });
     }
     // end keeperhub
@@ -470,21 +494,19 @@ export function ConfigureConnectionOverlay({
     });
   };
 
+  // start keeperhub - for web3 + anonymous, show Sign In button with AuthDialog
+  const showSignInButton = type === "web3" && isAnonymous;
+  // Web3 uses custom form handler with its own Create Wallet button
+  const hideOverlayActions = type === "web3";
+  // end keeperhub
+
   return (
     <Overlay
-      actions={[
-        // start custom keeperhub code //
-        // Test button hidden - unreliable functionality
-        // {
-        //   label: "Test",
-        //   variant: "outline",
-        //   onClick: handleTest,
-        //   loading: testing,
-        //   disabled: saving,
-        // },
-        // end keeperhub code //
-        { label: "Create", onClick: handleSave, loading: saving },
-      ]}
+      actions={
+        hideOverlayActions
+          ? undefined
+          : [{ label: "Create", onClick: handleSave, loading: saving }]
+      }
       overlayId={overlayId}
       title={`Add ${getLabel(type)}`}
     >
@@ -505,6 +527,16 @@ export function ConfigureConnectionOverlay({
           />
         </div>
       </div>
+
+      {/* start keeperhub - Sign In button for anonymous web3 users */}
+      {showSignInButton && (
+        <OverlayFooter>
+          <AuthDialog>
+            <Button>Sign In</Button>
+          </AuthDialog>
+        </OverlayFooter>
+      )}
+      {/* end keeperhub */}
     </Overlay>
   );
 }
