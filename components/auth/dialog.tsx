@@ -605,6 +605,11 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
     setError("");
     setLoading(true);
 
+    // start custom keeperhub code //
+    // Capture claim context BEFORE verification (while still anonymous)
+    const claimContext = await getClaimContext();
+    // end keeperhub code //
+
     try {
       const response = await authClient.emailOtp.verifyEmail({
         email: verifyEmail,
@@ -639,6 +644,11 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
           return;
         }
       }
+
+      // start custom keeperhub code //
+      // Store claim context after successful sign-in
+      storeClaimIfNeeded(claimContext);
+      // end keeperhub code //
 
       // Refresh session
       await authClient.getSession();

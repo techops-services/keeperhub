@@ -2,7 +2,7 @@
 
 import { useAtomValue, useSetAtom } from "jotai";
 import { Search } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AuthDialog } from "@/components/auth/dialog";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
 } from "@/lib/ai-gateway/state";
 import { api } from "@/lib/api-client";
 // start keeperhub
+import { useSession } from "@/lib/auth-client";
 import { getCustomIntegrationFormHandler } from "@/lib/extension-registry";
 import { integrationsAtom } from "@/lib/integrations-store";
 // end keeperhub
@@ -295,24 +296,15 @@ export function ConfigureConnectionOverlay({
   } | null>(null);
   const [name, setName] = useState("");
   const [config, setConfig] = useState<Record<string, string>>({});
-  // start keeperhub - track anonymous state for web3
-  const [isAnonymous, setIsAnonymous] = useState(false);
-
-  useEffect(() => {
-    if (type === "web3") {
-      fetch("/api/user")
-        .then((res) => res.json())
-        .then((userData) => {
-          const isAnonUser =
-            userData.isAnonymous ||
-            userData.email?.includes("@http://") ||
-            userData.email?.includes("@https://") ||
-            userData.email?.startsWith("temp-");
-          setIsAnonymous(isAnonUser);
-        })
-        .catch(() => setIsAnonymous(false));
-    }
-  }, [type]);
+  // start keeperhub - derive anonymous state from session reactively
+  const { data: session } = useSession();
+  const isAnonymous =
+    type === "web3" &&
+    (!session?.user ||
+      session.user.name === "Anonymous" ||
+      session.user.email?.includes("@http://") ||
+      session.user.email?.includes("@https://") ||
+      session.user.email?.startsWith("temp-"));
   // end keeperhub
 
   const updateConfig = (key: string, value: string) => {
