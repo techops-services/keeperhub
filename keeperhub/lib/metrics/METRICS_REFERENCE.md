@@ -307,6 +307,46 @@ max by (status) (delta(keeperhub_workflow_executions_total[30m]))
 
 ---
 
+### Dashboard vs Alert Time Windows
+
+Dashboards and alerts use different time window strategies by design:
+
+| Component | Time Window | Purpose |
+|-----------|-------------|---------|
+| **Dashboard stat panels** | `$__range` (user-selected) | Exploration: "What happened in this time range?" |
+| **Dashboard graphs** | `$__range` or fixed window | Visualization over selected period |
+| **Alerts** | Fixed windows (`[1h]`, `[5m]`) | Monitoring: "Is something wrong right now?" |
+
+**Why they differ:**
+
+- **Dashboards** are for exploration and investigation. When looking at an incident from 3 days ago, you'd set the time picker to that period and expect all panels to reflect that range.
+
+- **Alerts** must evaluate consistently regardless of who's viewing what dashboard. A "high error count" alert should always check the last hour, not vary based on dashboard settings.
+
+**Example scenarios:**
+
+```
+Dashboard time picker: "Last 6 hours"
+├── Workflow Errors stat: Shows errors in last 6 hours (delta[$__range])
+├── Success Rate stat: Shows rate over last 6 hours
+└── Alert evaluating: Still checks last 1 hour (delta[1h] > 10)
+```
+
+**This is intentional:** The stat panel shows "156 errors in 6 hours" while the alert only fires if "errors in last 1 hour > 10". Different questions, different windows.
+
+**Labeled gauge aggregation:**
+
+When a gauge has labels (e.g., `step_errors_total` with `step_type`), use:
+```promql
+# Wrong: max() picks only the highest label value
+max(keeperhub_workflow_step_errors_total{...})
+
+# Correct: max per label, then sum for total
+sum(max by (step_type) (keeperhub_workflow_step_errors_total{...}))
+```
+
+---
+
 ### ServiceMonitor (Prometheus Operator)
 
 Prometheus scraping is configured via the Helm chart's built-in ServiceMonitor support in values.yaml:
