@@ -29,20 +29,6 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Detect changed paths
-        uses: dorny/paths-filter@v3
-        id: changes
-        with:
-          filters: |
-            migrator:
-              - 'package.json'
-              - 'pnpm-lock.yaml'
-              - 'Dockerfile'
-              - 'lib/db/**'
-              - 'keeperhub/db/**'
-              - 'drizzle/**'
-              - 'drizzle.config.ts'
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -82,7 +68,7 @@ jobs:
 
       - name: Build, tag, and push migrator image to ECR
         id: build-migrator
-        if: ${{ !contains(github.event.head_commit.message, '[skip build]') && (steps.changes.outputs.migrator == 'true' || github.event_name == 'workflow_dispatch') }}
+        if: ${{ !contains(github.event.head_commit.message, '[skip build]') }}
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -96,14 +82,6 @@ jobs:
             type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-app
             type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-migrator
           cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-migrator,mode=max
-
-      # Re-tag existing images when builds are skipped (creates new tag pointing to -latest)
-      - name: Re-tag migrator image if build skipped
-        if: ${{ !contains(github.event.head_commit.message, '[skip build]') && steps.changes.outputs.migrator != 'true' && github.event_name != 'workflow_dispatch' }}
-        run: |
-          docker buildx imagetools create \
-            --tag ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:migrator-${{ steps.vars.outputs.sha_short }} \
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:migrator-latest
 
       - name: Replace variables in the Helm values file
         id: replace-vars

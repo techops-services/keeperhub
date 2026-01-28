@@ -25,7 +25,7 @@ const web3Plugin: IntegrationPlugin = {
   actions: [
     {
       slug: "check-balance",
-      label: "Get Native Balance",
+      label: "Get Native Token Balance",
       description: "Get native token balance (ETH, MATIC, etc.) of any address",
       category: "Web3",
       stepFunction: "checkBalanceStep",
