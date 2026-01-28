@@ -8,6 +8,9 @@ import { cn } from "@/lib/utils";
 import { edgesAtom, nodesAtom, WorkflowTriggerEnum, type WorkflowNode } from "@/lib/workflow-store";
 import { findActionById } from "@/plugins";
 import { getTriggerOutputFields } from "@/keeperhub/lib/trigger-output-fields";
+// start custom keeperhub code //
+import { getReadContractOutputFields } from "@/keeperhub/lib/action-output-fields";
+// end keeperhub code //
 
 type TemplateAutocompleteProps = {
   isOpen: boolean;
@@ -155,6 +158,19 @@ const getCommonFields = (node: WorkflowNode) => {
     }
     return [{ field: "text", description: "Generated text" }];
   }
+
+  // start custom keeperhub code //
+  // Check for Read Contract action with dynamic outputs based on ABI
+  // This must be BEFORE the plugin outputFields check to override static fields
+  if (isActionType(actionType, "Read Contract", "web3/read-contract")) {
+    const abi = node.data.config?.abi as string | undefined;
+    const abiFunction = node.data.config?.abiFunction as string | undefined;
+    const dynamicFields = getReadContractOutputFields(abi, abiFunction);
+    if (dynamicFields.length > 0) {
+      return dynamicFields;
+    }
+  }
+  // end keeperhub code //
 
   // Check if the plugin defines output fields
   if (actionType) {
