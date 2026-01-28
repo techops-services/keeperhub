@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronsUpDown, Settings, Users } from "lucide-react";
+import { Check, ChevronsUpDown, Plus, Settings, Users } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,7 +43,21 @@ export function OrgSwitcher() {
   // Handle edge case: user has no active organization
   if (!organization) {
     return (
-      <div className="text-muted-foreground text-sm">No organization found</div>
+      <>
+        <Button
+          onClick={() => setManageModalOpen(true)}
+          size="sm"
+          variant="outline"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Create Organization
+        </Button>
+        <ManageOrgsModal
+          defaultShowCreateForm
+          onOpenChange={setManageModalOpen}
+          open={manageModalOpen}
+        />
+      </>
     );
   }
 
