@@ -1208,9 +1208,13 @@ export function WalletOverlay({ overlayId }: WalletOverlayProps) {
     [walletData?.walletAddress, buildWithdrawableAssets, findAssetIndex, push]
   );
 
+  // Re-fetch wallet when session changes (e.g., user signs in)
+  const sessionUserId = session?.user?.id;
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: sessionUserId is intentionally included to trigger re-fetch on sign-in
   useEffect(() => {
     loadWallet();
-  }, [loadWallet]);
+  }, [loadWallet, sessionUserId]);
 
   const description = walletData?.hasWallet
     ? "View your organization's wallet address and balances across different chains"

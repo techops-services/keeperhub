@@ -154,7 +154,13 @@ registerFieldRenderer(
  * Web3 Wallet Integration
  * Shows the wallet creation/management UI instead of a standard form
  */
-registerIntegrationFormHandler("web3", () => <Web3WalletSection />);
+registerIntegrationFormHandler("web3", ({ onSuccess, closeAll }) => (
+  <Web3WalletSection
+    closeAll={closeAll}
+    onSuccess={onSuccess}
+    showDelete={false}
+  />
+));
 
 /**
  * SendGrid Email Integration

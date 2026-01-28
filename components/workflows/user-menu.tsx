@@ -68,6 +68,8 @@ export const UserMenu = () => {
 
   const handleLogout = async () => {
     await signOut();
+    // Full page refresh to clear all React/jotai state
+    window.location.href = "/";
   };
 
   // OAuth users can't edit their profile
