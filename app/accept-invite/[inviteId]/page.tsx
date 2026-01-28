@@ -24,6 +24,7 @@ type InvitationData = {
   expiresAt: string;
   organizationName: string;
   inviterName: string;
+  userExists?: boolean;
 };
 
 type InvitationError = {
@@ -150,11 +151,18 @@ async function trySignIn(email: string, password: string) {
   const response = await signIn.email({ email, password });
 
   if (!response.error) {
-    return { success: true };
+    return { success: true, needsVerification: false };
   }
+
+  const errorMsg = response.error.message?.toLowerCase() || "";
+  const needsVerification =
+    errorMsg.includes("verify") ||
+    errorMsg.includes("verification") ||
+    errorMsg.includes("not verified");
 
   return {
     success: false,
+    needsVerification,
     error: response.error.message || "Failed to sign in",
   };
 }
@@ -330,72 +338,247 @@ function EmailMismatchState({
   );
 }
 
-// Helper to handle signup flow
-async function handleSignupFlow(
-  email: string,
-  password: string,
-  setAuthMode: (mode: "signin" | "signup") => void,
-  setFormError: (error: string) => void
-): Promise<{ shouldContinue: boolean }> {
-  const signUpResult = await trySignUp(email, password);
-
-  if (signUpResult.userExists) {
-    setAuthMode("signin");
-    setFormError("An account with this email already exists. Please sign in.");
-    return { shouldContinue: false };
-  }
-
-  if (!signUpResult.success) {
-    setFormError(signUpResult.error || "Failed to create account");
-    return { shouldContinue: false };
-  }
-
-  return { shouldContinue: true };
-}
-
-// Helper to handle signin and accept flow
-async function handleSigninAndAccept(params: {
-  email: string;
-  password: string;
-  invitationId: string;
-  authMode: "signin" | "signup";
-  setFormError: (error: string) => void;
+// Component for email verification during invite acceptance
+function VerificationFormState({
+  invitation,
+  storedPassword,
+  onSuccess,
+  onBack,
+}: {
+  invitation: InvitationData;
+  storedPassword: string;
   onSuccess: () => void;
-}): Promise<void> {
-  const { email, password, invitationId, authMode, setFormError, onSuccess } =
-    params;
+  onBack: () => void;
+}) {
+  const [otp, setOtp] = useState("");
+  const [formError, setFormError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const signInResult = await trySignIn(email, password);
-  if (!signInResult.success) {
-    const errorMsg =
-      authMode === "signin"
-        ? "Incorrect password. Please try again."
-        : signInResult.error || "Failed to sign in";
-    setFormError(errorMsg);
-    return;
-  }
+  const handleVerifyAndJoin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError("");
+    setSubmitting(true);
 
-  const acceptResult = await acceptInvitation(invitationId);
-  if (!acceptResult.success) {
-    setFormError(acceptResult.error || "Failed to accept invitation");
-    return;
-  }
+    try {
+      const verifyResponse = await authClient.emailOtp.verifyEmail({
+        email: invitation.email,
+        otp,
+      });
 
-  onSuccess();
+      if (verifyResponse.error) {
+        setFormError(
+          verifyResponse.error.message || "Invalid verification code"
+        );
+        setSubmitting(false);
+        return;
+      }
+
+      const signInResult = await trySignIn(invitation.email, storedPassword);
+      if (!signInResult.success) {
+        setFormError(
+          signInResult.error || "Failed to sign in after verification"
+        );
+        setSubmitting(false);
+        return;
+      }
+
+      const acceptResult = await acceptInvitation(invitation.id);
+      if (!acceptResult.success) {
+        setFormError(acceptResult.error || "Failed to accept invitation");
+        setSubmitting(false);
+        return;
+      }
+
+      onSuccess();
+    } catch (error) {
+      console.error("Verification failed:", error);
+      setFormError(
+        error instanceof Error ? error.message : "Verification failed"
+      );
+      setSubmitting(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setFormError("");
+    setSubmitting(true);
+
+    try {
+      const response = await authClient.emailOtp.sendVerificationOtp({
+        email: invitation.email,
+        type: "email-verification",
+      });
+
+      if (response.error) {
+        setFormError(response.error.message || "Failed to resend code");
+        setSubmitting(false);
+        return;
+      }
+
+      toast.success("New verification code sent!");
+      setSubmitting(false);
+    } catch (error) {
+      setFormError(
+        error instanceof Error ? error.message : "Failed to resend code"
+      );
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="pointer-events-auto flex min-h-screen items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-6 rounded-lg border bg-card p-8">
+        <div className="space-y-2 text-center">
+          <h1 className="font-semibold text-2xl">Verify Your Email</h1>
+          <p className="text-muted-foreground text-sm">
+            Enter the 6-digit code sent to{" "}
+            <span className="font-medium text-foreground">
+              {invitation.email}
+            </span>
+          </p>
+        </div>
+
+        <form className="space-y-4" onSubmit={handleVerifyAndJoin}>
+          <div className="space-y-2">
+            <Label htmlFor="otp">Verification Code</Label>
+            <Input
+              autoComplete="one-time-code"
+              autoFocus
+              className="text-center font-mono text-2xl tracking-[0.5em]"
+              disabled={submitting}
+              id="otp"
+              inputMode="numeric"
+              maxLength={6}
+              onChange={(e) =>
+                setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+              }
+              pattern="[0-9]*"
+              placeholder="000000"
+              required
+              value={otp}
+            />
+          </div>
+
+          {formError && (
+            <div className="rounded-md bg-destructive/10 p-3 text-destructive text-sm">
+              {formError}
+            </div>
+          )}
+
+          <Button
+            className="w-full"
+            disabled={submitting || otp.length !== 6}
+            type="submit"
+          >
+            {submitting && <Spinner className="mr-2 size-4" />}
+            {submitting ? "Verifying..." : "Verify & Join"}
+          </Button>
+        </form>
+
+        <div className="space-y-2 text-center text-sm">
+          <p className="text-muted-foreground">
+            Didn&apos;t receive the code?{" "}
+            <button
+              className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
+              disabled={submitting}
+              onClick={handleResendOtp}
+              type="button"
+            >
+              Resend
+            </button>
+          </p>
+          <button
+            className="font-medium text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            onClick={onBack}
+            type="button"
+          >
+            Back
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // Component for logged-out users with sign-in/sign-up toggle
 function AuthFormState({
   invitation,
   onSuccess,
+  onShowVerification,
 }: {
   invitation: InvitationData;
   onSuccess: () => void;
+  onShowVerification: (password: string) => void;
 }) {
-  const [authMode, setAuthMode] = useState<"signin" | "signup">("signup");
+  const [authMode, setAuthMode] = useState<"signin" | "signup">(
+    invitation.userExists ? "signin" : "signup"
+  );
   const [password, setPassword] = useState("");
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const handleSignupSubmit = async () => {
+    const signUpResult = await trySignUp(invitation.email, password);
+
+    if (signUpResult.userExists) {
+      try {
+        await authClient.emailOtp.sendVerificationOtp({
+          email: invitation.email,
+          type: "email-verification",
+        });
+        toast.info(
+          "Account exists but needs verification. Please check your email."
+        );
+        onShowVerification(password);
+        return { done: true };
+      } catch {
+        setAuthMode("signin");
+        setFormError(
+          "An account with this email already exists. Please sign in."
+        );
+        return { done: true };
+      }
+    }
+
+    if (!signUpResult.success) {
+      setFormError(signUpResult.error || "Failed to create account");
+      return { done: true };
+    }
+
+    toast.success(
+      "Account created! Please check your email for a verification code."
+    );
+    onShowVerification(password);
+    return { done: true };
+  };
+
+  const handleSigninSubmit = async () => {
+    const signInResult = await trySignIn(invitation.email, password);
+
+    if (!signInResult.success) {
+      if (signInResult.needsVerification) {
+        await authClient.emailOtp.sendVerificationOtp({
+          email: invitation.email,
+          type: "email-verification",
+        });
+        toast.info("Please verify your email. A new code has been sent.");
+        onShowVerification(password);
+        return { done: true };
+      }
+
+      setFormError("Incorrect password. Please try again.");
+      return { done: true };
+    }
+
+    const acceptResult = await acceptInvitation(invitation.id);
+    if (!acceptResult.success) {
+      setFormError(acceptResult.error || "Failed to accept invitation");
+      return { done: true };
+    }
+
+    onSuccess();
+    return { done: true };
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -410,26 +593,10 @@ function AuthFormState({
 
     try {
       if (authMode === "signup") {
-        const { shouldContinue } = await handleSignupFlow(
-          invitation.email,
-          password,
-          setAuthMode,
-          setFormError
-        );
-        if (!shouldContinue) {
-          setSubmitting(false);
-          return;
-        }
+        await handleSignupSubmit();
+      } else {
+        await handleSigninSubmit();
       }
-
-      await handleSigninAndAccept({
-        email: invitation.email,
-        password,
-        invitationId: invitation.id,
-        authMode,
-        setFormError,
-        onSuccess,
-      });
     } catch (error) {
       console.error("Failed to complete auth flow:", error);
       setFormError(
@@ -584,6 +751,10 @@ export default function AcceptInvitePage() {
   const [inviteLoading, setInviteLoading] = useState(true);
   const [invitation, setInvitation] = useState<InvitationData | null>(null);
   const [inviteError, setInviteError] = useState<InvitationError | null>(null);
+  const [verificationData, setVerificationData] = useState<{
+    showVerification: boolean;
+    storedPassword: string;
+  }>({ showVerification: false, storedPassword: "" });
 
   useEffect(() => {
     async function fetchInvitation() {
@@ -643,6 +814,21 @@ export default function AcceptInvitePage() {
     return <NotFoundState />;
   }
 
+  // Show verification form if we're in the middle of verification flow
+  // This takes priority over pageState to prevent losing state on session changes
+  if (verificationData.showVerification) {
+    return (
+      <VerificationFormState
+        invitation={invitation}
+        onBack={() =>
+          setVerificationData({ showVerification: false, storedPassword: "" })
+        }
+        onSuccess={handleSuccess}
+        storedPassword={verificationData.storedPassword}
+      />
+    );
+  }
+
   if (pageState === "logged-in-match") {
     return (
       <AcceptDirectState invitation={invitation} onSuccess={handleSuccess} />
@@ -658,5 +844,16 @@ export default function AcceptInvitePage() {
     );
   }
 
-  return <AuthFormState invitation={invitation} onSuccess={handleSuccess} />;
+  return (
+    <AuthFormState
+      invitation={invitation}
+      onShowVerification={(password) =>
+        setVerificationData({
+          showVerification: true,
+          storedPassword: password,
+        })
+      }
+      onSuccess={handleSuccess}
+    />
+  );
 }
