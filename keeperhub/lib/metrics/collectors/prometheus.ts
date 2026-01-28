@@ -29,8 +29,8 @@ const _WORKFLOW_LABELS = [
 ];
 const _STEP_LABELS = ["execution_id", "step_type", "status"];
 const _API_LABELS = ["endpoint", "status_code", "status"];
-const WEBHOOK_LABELS = ["workflow_id", "status_code", "status", "execution_id"];
-const PLUGIN_LABELS = ["plugin_name", "action_name", "execution_id", "status"];
+const WEBHOOK_LABELS = ["status_code", "status"];
+const PLUGIN_LABELS = ["plugin_name", "action_name", "status"];
 const _ERROR_LABELS = ["error_type", "plugin_name", "action_name", "service"];
 const DB_LABELS = ["query_type", "threshold"];
 const POOL_LABELS = ["active", "max"];
@@ -165,7 +165,7 @@ const webhookLatency = getOrCreateHistogram(
 const statusLatency = getOrCreateHistogram(
   "keeperhub_api_status_latency_ms",
   "Status polling response time in milliseconds",
-  ["execution_id", "status_code", "status", "execution_status"],
+  ["status_code", "status", "execution_status"],
   [5, 10, 25, 50, 100]
 );
 
@@ -265,6 +265,13 @@ const userWithIntegrations = getOrCreateGauge(
   []
 );
 
+// User info gauge (DB-sourced, one series per user)
+const userInfo = getOrCreateGauge(
+  "keeperhub_user_info",
+  "User info with email and name labels",
+  ["email", "name", "verified"]
+);
+
 // Organization metrics (DB-sourced)
 const orgTotal = getOrCreateGauge(
   "keeperhub_org_total",
@@ -294,6 +301,13 @@ const orgWithWorkflows = getOrCreateGauge(
   "keeperhub_org_with_workflows_total",
   "Organizations with at least one workflow",
   []
+);
+
+// Organization info gauge (DB-sourced, one series per org)
+const orgInfo = getOrCreateGauge(
+  "keeperhub_org_info",
+  "Organization info with name and slug labels",
+  ["org_name", "slug"]
 );
 
 // Workflow definition metrics (DB-sourced)
@@ -569,6 +583,8 @@ export async function updateDbMetrics(): Promise<void> {
       getScheduleStatsFromDb,
       getIntegrationStatsFromDb,
       getInfraStatsFromDb,
+      getUserListFromDb,
+      getOrgListFromDb,
     } = await import("../db-metrics");
     const [
       workflowStats,
@@ -580,6 +596,8 @@ export async function updateDbMetrics(): Promise<void> {
       scheduleStats,
       integrationStats,
       infraStats,
+      userList,
+      orgList,
     ] = await Promise.all([
       getWorkflowStatsFromDb(),
       getStepStatsFromDb(),
@@ -590,6 +608,8 @@ export async function updateDbMetrics(): Promise<void> {
       getScheduleStatsFromDb(),
       getIntegrationStatsFromDb(),
       getInfraStatsFromDb(),
+      getUserListFromDb(),
+      getOrgListFromDb(),
     ]);
 
     // Update workflow execution counts by status (gauges - point-in-time snapshots)
@@ -679,6 +699,19 @@ export async function updateDbMetrics(): Promise<void> {
     userWithWorkflows.set(userStats.withWorkflows);
     userWithIntegrations.set(userStats.withIntegrations);
 
+    // Update user info gauge (one series per user)
+    userInfo.reset();
+    for (const user of userList) {
+      userInfo.set(
+        {
+          email: user.email,
+          name: user.name,
+          verified: String(user.verified),
+        },
+        1
+      );
+    }
+
     // Update organization metrics from DB
     orgTotal.set(orgStats.total);
     orgMembersTotal.set(orgStats.membersTotal);
@@ -689,6 +722,12 @@ export async function updateDbMetrics(): Promise<void> {
     }
     orgInvitationsPending.set(orgStats.invitationsPending);
     orgWithWorkflows.set(orgStats.withWorkflows);
+
+    // Update org info gauge (one series per org)
+    orgInfo.reset();
+    for (const org of orgList) {
+      orgInfo.set({ org_name: org.name, slug: org.slug }, 1);
+    }
 
     // Update workflow definition metrics from DB
     workflowTotal.set(workflowDefStats.total);

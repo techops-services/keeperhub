@@ -55,9 +55,9 @@ Histogram metrics tracking duration/response times.
 |-------------|-------------|--------|--------|--------|
 | `workflow.execution.duration_ms` | Total workflow execution time | `le` (bucket) | P95 < 2000ms | DB |
 | `workflow.step.duration_ms` | Individual step execution time | `le` (bucket) | P95 < 500ms | DB |
-| `api.webhook.latency_ms` | Webhook trigger response time | `workflow_id`, `execution_id`, `status`, `status_code` | P95 < 50ms | API |
-| `api.status.latency_ms` | Status polling response time | `execution_id`, `status`, `status_code`, `execution_status` | P95 < 30ms | API |
-| `plugin.action.duration_ms` | Plugin action execution time | `plugin_name`, `action_name`, `execution_id`, `status` | P95 < 1000ms | API |
+| `api.webhook.latency_ms` | Webhook trigger response time | `status_code`, `status` | P95 < 50ms | API |
+| `api.status.latency_ms` | Status polling response time | `status_code`, `status`, `execution_status` | P95 < 30ms | API |
+| `plugin.action.duration_ms` | Plugin action execution time | `plugin_name`, `action_name`, `status` | P95 < 1000ms | API |
 | `ai.generation.duration_ms` | AI workflow generation time | `status` | P95 < 5000ms | API |
 
 ---
@@ -113,6 +113,7 @@ Gauge metrics tracking user and organization statistics.
 | `user.with_workflows` | Users who have created at least one workflow | - | DB |
 | `user.with_integrations` | Users who have configured at least one integration | - | DB |
 | `user.active.daily` | Daily active users (24h) | - | DB |
+| `user.info` | Info gauge with one series per user | `email`, `name`, `verified` | DB |
 
 ### Organization Metrics
 
@@ -123,6 +124,7 @@ Gauge metrics tracking user and organization statistics.
 | `org.members_by_role` | Organization members by role | `role` | DB |
 | `org.invitations.pending` | Pending organization invitations | - | DB |
 | `org.with_workflows` | Organizations with at least one workflow | - | DB |
+| `org.info` | Info gauge with one series per org | `org_name`, `slug` | DB |
 
 ### Workflow Definition Metrics
 
@@ -179,6 +181,11 @@ Gauge metrics tracking user and organization statistics.
 | `role` | Organization member role | `owner`, `admin`, `member` |
 | `visibility` | Workflow visibility | `public`, `private` |
 | `type` | Integration type | `discord`, `sendgrid`, `web3` |
+| `email` | User email address (info gauge) | `user@example.com` |
+| `name` | User display name (info gauge) | `John Doe` |
+| `verified` | User email verified status (info gauge) | `true`, `false` |
+| `org_name` | Organization name (info gauge) | `Acme Corp` |
+| `slug` | Organization slug (info gauge) | `acme-corp` |
 
 ---
 
@@ -187,7 +194,7 @@ Gauge metrics tracking user and organization statistics.
 | Category | File | Functions |
 |----------|------|-----------|
 | Core | `keeperhub/lib/metrics/index.ts` | `getMetricsCollector()`, `createTimer()`, `withMetrics()` |
-| DB Metrics | `keeperhub/lib/metrics/db-metrics.ts` | `getWorkflowStatsFromDb()`, `getStepStatsFromDb()`, `getDailyActiveUsersFromDb()`, `getUserStatsFromDb()`, `getOrgStatsFromDb()`, `getWorkflowDefinitionStatsFromDb()`, `getScheduleStatsFromDb()`, `getIntegrationStatsFromDb()`, `getInfraStatsFromDb()` |
+| DB Metrics | `keeperhub/lib/metrics/db-metrics.ts` | `getWorkflowStatsFromDb()`, `getStepStatsFromDb()`, `getDailyActiveUsersFromDb()`, `getUserStatsFromDb()`, `getOrgStatsFromDb()`, `getWorkflowDefinitionStatsFromDb()`, `getScheduleStatsFromDb()`, `getIntegrationStatsFromDb()`, `getInfraStatsFromDb()`, `getUserListFromDb()`, `getOrgListFromDb()` |
 | API | `keeperhub/lib/metrics/instrumentation/api.ts` | `recordWebhookMetrics()`, `recordStatusPollMetrics()` |
 | Plugin | `keeperhub/lib/metrics/instrumentation/plugin.ts` | `withPluginMetrics()` |
 
@@ -217,10 +224,10 @@ The following tables are queried:
 - `workflow_executions` - execution counts by status, duration histogram
 - `workflow_execution_logs` - step counts by type/status, step duration histogram
 - `sessions` - daily active users (distinct users with sessions updated in 24h)
-- `users` - total, verified, anonymous user counts
+- `users` - total, verified, anonymous user counts; individual user info (email, name, verified)
 - `workflows` - users/orgs with workflows
 - `integrations` - users with integrations
-- `organization` - total organization count
+- `organization` - total organization count; individual org info (name, slug)
 - `member` - member counts by role
 - `invitation` - pending invitation counts
 - `workflow_schedules` - schedule counts, enabled status, last run status
@@ -386,11 +393,13 @@ Prometheus metrics are prefixed with `keeperhub_` and use snake_case:
 | `user.anonymous` | `keeperhub_user_anonymous_total` | gauge |
 | `user.with_workflows` | `keeperhub_user_with_workflows_total` | gauge |
 | `user.with_integrations` | `keeperhub_user_with_integrations_total` | gauge |
+| `user.info` | `keeperhub_user_info` | gauge |
 | `org.total` | `keeperhub_org_total` | gauge |
 | `org.members.total` | `keeperhub_org_members_total` | gauge |
 | `org.members_by_role` | `keeperhub_org_members_by_role` | gauge |
 | `org.invitations.pending` | `keeperhub_org_invitations_pending` | gauge |
 | `org.with_workflows` | `keeperhub_org_with_workflows_total` | gauge |
+| `org.info` | `keeperhub_org_info` | gauge |
 | `workflow.total` | `keeperhub_workflow_total` | gauge |
 | `workflow.by_visibility` | `keeperhub_workflow_by_visibility` | gauge |
 | `workflow.anonymous` | `keeperhub_workflow_anonymous_total` | gauge |
