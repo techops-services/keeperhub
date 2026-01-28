@@ -72,3 +72,6 @@ tailwindcss-*.log
 
 # Subdirectory node_modules
 */node_modules/*
+
+# Worktrees (local only)
+.worktrees/
