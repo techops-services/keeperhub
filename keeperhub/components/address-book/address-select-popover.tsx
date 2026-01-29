@@ -2,7 +2,6 @@
 
 import { Bookmark, Check } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
 import {
   Command,
   CommandEmpty,
