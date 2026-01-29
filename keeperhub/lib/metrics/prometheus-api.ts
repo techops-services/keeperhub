@@ -14,5 +14,7 @@ export {
   prometheusMetricsCollector,
   // start custom keeperhub code //
   updateDbMetrics,
+  getDbMetrics,
+  getApiProcessMetrics,
   // end keeperhub code //
 } from "./collectors/prometheus";
