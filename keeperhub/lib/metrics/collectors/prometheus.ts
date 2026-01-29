@@ -10,15 +10,19 @@ import "server-only";
 import { Counter, Gauge, Histogram, Registry } from "prom-client";
 import type { ErrorContext, MetricLabels, MetricsCollector } from "../types";
 
-// Use global singleton to prevent duplicate registration during hot reload
+// Use global singletons to prevent duplicate registration during hot reload
 // This is safe because each pod has its own Node.js process
 const globalForProm = globalThis as unknown as {
-  prometheusRegistry: Registry | undefined;
+  dbRegistry: Registry | undefined;
+  apiRegistry: Registry | undefined;
 };
 
-// Create a dedicated registry for application metrics (singleton)
-const registry = globalForProm.prometheusRegistry ?? new Registry();
-globalForProm.prometheusRegistry = registry;
+// Two registries: DB-sourced gauges (identical across pods) and API-process metrics (per-pod)
+const dbRegistry = globalForProm.dbRegistry ?? new Registry();
+globalForProm.dbRegistry = dbRegistry;
+
+const apiRegistry = globalForProm.apiRegistry ?? new Registry();
+globalForProm.apiRegistry = apiRegistry;
 
 // Pre-defined label names for each metric
 const _WORKFLOW_LABELS = [
@@ -39,6 +43,7 @@ const POOL_LABELS = ["active", "max"];
  * Helper to get or create a metric (handles hot reload gracefully)
  */
 function getOrCreateHistogram(
+  registry: Registry,
   name: string,
   help: string,
   labelNames: string[],
@@ -58,6 +63,7 @@ function getOrCreateHistogram(
 }
 
 function getOrCreateCounter(
+  registry: Registry,
   name: string,
   help: string,
   labelNames: string[]
@@ -70,6 +76,7 @@ function getOrCreateCounter(
 }
 
 function getOrCreateGauge(
+  registry: Registry,
   name: string,
   help: string,
   labelNames: string[]
@@ -82,7 +89,7 @@ function getOrCreateGauge(
 }
 
 // start custom keeperhub code //
-// DB-sourced workflow metrics (populated from database on each scrape)
+// DB-sourced workflow metrics → dbRegistry (identical across pods, scrape one)
 // Workflow runner jobs exit before Prometheus can scrape - data must come from DB.
 //
 // All metrics are GAUGES (point-in-time snapshots). Use max() aggregation across pods.
@@ -90,6 +97,7 @@ function getOrCreateGauge(
 
 // Workflow execution counts by status
 const workflowExecutionsTotal = getOrCreateGauge(
+  dbRegistry,
   "keeperhub_workflow_executions_total",
   "Total workflow executions by status (all-time)",
   ["status"]
@@ -97,6 +105,7 @@ const workflowExecutionsTotal = getOrCreateGauge(
 
 // Workflow errors total (convenience gauge for alerting)
 const workflowErrorsTotal = getOrCreateGauge(
+  dbRegistry,
   "keeperhub_workflow_execution_errors_total",
   "Total failed workflow executions (all-time)",
   []
@@ -104,18 +113,21 @@ const workflowErrorsTotal = getOrCreateGauge(
 
 // Workflow duration histogram as gauges (replaces histogram)
 const workflowDurationBucket = getOrCreateGauge(
+  dbRegistry,
   "keeperhub_workflow_execution_duration_ms_bucket",
   "Workflow execution duration histogram buckets",
   ["le"]
 );
 
 const workflowDurationSum = getOrCreateGauge(
+  dbRegistry,
   "keeperhub_workflow_execution_duration_ms_sum",
   "Sum of workflow execution durations",
   []
 );
 
 const workflowDurationCount = getOrCreateGauge(
+  dbRegistry,
   "keeperhub_workflow_execution_duration_ms_count",
   "Count of workflow executions with duration",
   []
@@ -123,6 +135,7 @@ const workflowDurationCount = getOrCreateGauge(
 
 // Step execution counts by status (populated from DB)
 const stepExecutionsTotal = getOrCreateGauge(
+  dbRegistry,
   "keeperhub_workflow_step_executions_total",
   "Total workflow step executions",
   ["step_type", "status"]
@@ -130,6 +143,7 @@ const stepExecutionsTotal = getOrCreateGauge(
 
 // Step errors (derived from step executions with status=error)
 const stepErrorsTotal = getOrCreateGauge(
+  dbRegistry,
   "keeperhub_workflow_step_errors_total",
   "Failed step executions",
   ["step_type"]
@@ -137,25 +151,242 @@ const stepErrorsTotal = getOrCreateGauge(
 
 // Step duration histogram as gauges
 const stepDurationBucket = getOrCreateGauge(
+  dbRegistry,
   "keeperhub_workflow_step_duration_ms_bucket",
   "Workflow step duration histogram buckets",
   ["le"]
 );
 
 const stepDurationSum = getOrCreateGauge(
+  dbRegistry,
   "keeperhub_workflow_step_duration_ms_sum",
   "Sum of workflow step durations",
   []
 );
 
 const stepDurationCount = getOrCreateGauge(
+  dbRegistry,
   "keeperhub_workflow_step_duration_ms_count",
   "Count of workflow steps with duration",
   []
 );
+
+// Saturation gauges (DB-sourced)
+const workflowQueueDepth = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_workflow_queue_depth",
+  "Pending workflow jobs in queue",
+  []
+);
+
+const workflowConcurrent = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_workflow_concurrent_count",
+  "Current concurrent workflow executions",
+  []
+);
+
+const activeUsers = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_user_active_daily",
+  "Daily active users",
+  []
+);
+
+// User metrics (DB-sourced)
+const userTotal = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_user_total",
+  "Total registered users",
+  []
+);
+
+const userVerified = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_user_verified_total",
+  "Users with verified email",
+  []
+);
+
+const userAnonymous = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_user_anonymous_total",
+  "Anonymous users",
+  []
+);
+
+const userWithWorkflows = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_user_with_workflows_total",
+  "Users who have created at least one workflow",
+  []
+);
+
+const userWithIntegrations = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_user_with_integrations_total",
+  "Users who have configured at least one integration",
+  []
+);
+
+// User info gauge (DB-sourced, one series per user)
+const userInfo = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_user_info",
+  "User info with email and name labels",
+  ["email", "name", "verified"]
+);
+
+// Organization metrics (DB-sourced)
+const orgTotal = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_org_total",
+  "Total organizations",
+  []
+);
+
+const orgMembersTotal = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_org_members_total",
+  "Total organization members across all orgs",
+  []
+);
+
+const orgMembersByRole = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_org_members_by_role",
+  "Organization members by role",
+  ["role"]
+);
+
+const orgInvitationsPending = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_org_invitations_pending",
+  "Pending organization invitations",
+  []
+);
+
+const orgWithWorkflows = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_org_with_workflows_total",
+  "Organizations with at least one workflow",
+  []
+);
+
+// Organization info gauge (DB-sourced, one series per org)
+const orgInfo = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_org_info",
+  "Organization info with name and slug labels",
+  ["org_name", "slug"]
+);
+
+// Workflow definition metrics (DB-sourced)
+const workflowTotal = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_workflow_total",
+  "Total workflow definitions",
+  []
+);
+
+const workflowByVisibility = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_workflow_by_visibility",
+  "Workflows by visibility",
+  ["visibility"]
+);
+
+const workflowAnonymous = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_workflow_anonymous_total",
+  "Anonymous workflows",
+  []
+);
+
+// Schedule metrics (DB-sourced)
+const scheduleTotal = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_schedule_total",
+  "Total workflow schedules",
+  []
+);
+
+const scheduleEnabled = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_schedule_enabled_total",
+  "Enabled workflow schedules",
+  []
+);
+
+const scheduleByLastStatus = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_schedule_by_last_status",
+  "Schedules by last run status",
+  ["status"]
+);
+
+// Integration metrics (DB-sourced)
+const integrationTotal = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_integration_total",
+  "Total integrations",
+  []
+);
+
+const integrationManaged = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_integration_managed_total",
+  "OAuth-managed integrations",
+  []
+);
+
+const integrationByType = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_integration_by_type",
+  "Integrations by type",
+  ["type"]
+);
+
+// Infrastructure metrics (DB-sourced)
+const apiKeyTotal = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_apikey_total",
+  "Total API keys",
+  []
+);
+
+const chainTotal = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_chain_total",
+  "Total blockchain networks configured",
+  []
+);
+
+const chainEnabled = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_chain_enabled_total",
+  "Enabled blockchain networks",
+  []
+);
+
+const paraWalletTotal = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_para_wallet_total",
+  "Total Para wallets",
+  []
+);
+
+const sessionActive = getOrCreateGauge(
+  dbRegistry,
+  "keeperhub_session_active_total",
+  "Active (non-expired) sessions",
+  []
+);
 // end keeperhub code //
 
+// API-process metrics → apiRegistry (per-pod in-memory, scrape all pods)
 const webhookLatency = getOrCreateHistogram(
+  apiRegistry,
   "keeperhub_api_webhook_latency_ms",
   "Webhook trigger response time in milliseconds",
   WEBHOOK_LABELS,
@@ -163,6 +394,7 @@ const webhookLatency = getOrCreateHistogram(
 );
 
 const statusLatency = getOrCreateHistogram(
+  apiRegistry,
   "keeperhub_api_status_latency_ms",
   "Status polling response time in milliseconds",
   ["status_code", "status", "execution_status"],
@@ -170,6 +402,7 @@ const statusLatency = getOrCreateHistogram(
 );
 
 const pluginDuration = getOrCreateHistogram(
+  apiRegistry,
   "keeperhub_plugin_action_duration_ms",
   "Plugin action execution duration in milliseconds",
   PLUGIN_LABELS,
@@ -177,6 +410,7 @@ const pluginDuration = getOrCreateHistogram(
 );
 
 const aiDuration = getOrCreateHistogram(
+  apiRegistry,
   "keeperhub_ai_generation_duration_ms",
   "AI workflow generation duration in milliseconds",
   ["status"],
@@ -185,6 +419,7 @@ const aiDuration = getOrCreateHistogram(
 
 // Traffic counters
 const pluginInvocations = getOrCreateCounter(
+  apiRegistry,
   "keeperhub_plugin_invocations_total",
   "Total plugin invocations",
   ["plugin_name", "action_name"]
@@ -192,210 +427,32 @@ const pluginInvocations = getOrCreateCounter(
 
 // Error counters
 const pluginErrors = getOrCreateCounter(
+  apiRegistry,
   "keeperhub_plugin_action_errors_total",
   "Failed plugin actions",
   ["plugin_name", "action_name", "error_type"]
 );
 
 const apiErrors = getOrCreateCounter(
+  apiRegistry,
   "keeperhub_api_errors_total",
   "API errors by status code",
   ["endpoint", "status_code", "error_type"]
 );
 
 const slowQueries = getOrCreateCounter(
+  apiRegistry,
   "keeperhub_db_query_slow_total",
   "Slow database queries (>100ms)",
   DB_LABELS
 );
 
-// Saturation gauges
+// Saturation gauge (API-process, per-pod)
 const dbPoolUtilization = getOrCreateGauge(
+  apiRegistry,
   "keeperhub_db_pool_utilization_percent",
   "Database connection pool utilization percentage",
   POOL_LABELS
-);
-
-const workflowQueueDepth = getOrCreateGauge(
-  "keeperhub_workflow_queue_depth",
-  "Pending workflow jobs in queue",
-  []
-);
-
-const workflowConcurrent = getOrCreateGauge(
-  "keeperhub_workflow_concurrent_count",
-  "Current concurrent workflow executions",
-  []
-);
-
-const activeUsers = getOrCreateGauge(
-  "keeperhub_user_active_daily",
-  "Daily active users",
-  []
-);
-
-// User metrics (DB-sourced)
-const userTotal = getOrCreateGauge(
-  "keeperhub_user_total",
-  "Total registered users",
-  []
-);
-
-const userVerified = getOrCreateGauge(
-  "keeperhub_user_verified_total",
-  "Users with verified email",
-  []
-);
-
-const userAnonymous = getOrCreateGauge(
-  "keeperhub_user_anonymous_total",
-  "Anonymous users",
-  []
-);
-
-const userWithWorkflows = getOrCreateGauge(
-  "keeperhub_user_with_workflows_total",
-  "Users who have created at least one workflow",
-  []
-);
-
-const userWithIntegrations = getOrCreateGauge(
-  "keeperhub_user_with_integrations_total",
-  "Users who have configured at least one integration",
-  []
-);
-
-// User info gauge (DB-sourced, one series per user)
-const userInfo = getOrCreateGauge(
-  "keeperhub_user_info",
-  "User info with email and name labels",
-  ["email", "name", "verified"]
-);
-
-// Organization metrics (DB-sourced)
-const orgTotal = getOrCreateGauge(
-  "keeperhub_org_total",
-  "Total organizations",
-  []
-);
-
-const orgMembersTotal = getOrCreateGauge(
-  "keeperhub_org_members_total",
-  "Total organization members across all orgs",
-  []
-);
-
-const orgMembersByRole = getOrCreateGauge(
-  "keeperhub_org_members_by_role",
-  "Organization members by role",
-  ["role"]
-);
-
-const orgInvitationsPending = getOrCreateGauge(
-  "keeperhub_org_invitations_pending",
-  "Pending organization invitations",
-  []
-);
-
-const orgWithWorkflows = getOrCreateGauge(
-  "keeperhub_org_with_workflows_total",
-  "Organizations with at least one workflow",
-  []
-);
-
-// Organization info gauge (DB-sourced, one series per org)
-const orgInfo = getOrCreateGauge(
-  "keeperhub_org_info",
-  "Organization info with name and slug labels",
-  ["org_name", "slug"]
-);
-
-// Workflow definition metrics (DB-sourced)
-const workflowTotal = getOrCreateGauge(
-  "keeperhub_workflow_total",
-  "Total workflow definitions",
-  []
-);
-
-const workflowByVisibility = getOrCreateGauge(
-  "keeperhub_workflow_by_visibility",
-  "Workflows by visibility",
-  ["visibility"]
-);
-
-const workflowAnonymous = getOrCreateGauge(
-  "keeperhub_workflow_anonymous_total",
-  "Anonymous workflows",
-  []
-);
-
-// Schedule metrics (DB-sourced)
-const scheduleTotal = getOrCreateGauge(
-  "keeperhub_schedule_total",
-  "Total workflow schedules",
-  []
-);
-
-const scheduleEnabled = getOrCreateGauge(
-  "keeperhub_schedule_enabled_total",
-  "Enabled workflow schedules",
-  []
-);
-
-const scheduleByLastStatus = getOrCreateGauge(
-  "keeperhub_schedule_by_last_status",
-  "Schedules by last run status",
-  ["status"]
-);
-
-// Integration metrics (DB-sourced)
-const integrationTotal = getOrCreateGauge(
-  "keeperhub_integration_total",
-  "Total integrations",
-  []
-);
-
-const integrationManaged = getOrCreateGauge(
-  "keeperhub_integration_managed_total",
-  "OAuth-managed integrations",
-  []
-);
-
-const integrationByType = getOrCreateGauge(
-  "keeperhub_integration_by_type",
-  "Integrations by type",
-  ["type"]
-);
-
-// Infrastructure metrics (DB-sourced)
-const apiKeyTotal = getOrCreateGauge(
-  "keeperhub_apikey_total",
-  "Total API keys",
-  []
-);
-
-const chainTotal = getOrCreateGauge(
-  "keeperhub_chain_total",
-  "Total blockchain networks configured",
-  []
-);
-
-const chainEnabled = getOrCreateGauge(
-  "keeperhub_chain_enabled_total",
-  "Enabled blockchain networks",
-  []
-);
-
-const paraWalletTotal = getOrCreateGauge(
-  "keeperhub_para_wallet_total",
-  "Total Para wallets",
-  []
-);
-
-const sessionActive = getOrCreateGauge(
-  "keeperhub_session_active_total",
-  "Active (non-expired) sessions",
-  []
 );
 
 // Allowed labels per error metric (must match counter definitions)
@@ -770,22 +827,30 @@ export async function updateDbMetrics(): Promise<void> {
 // end keeperhub code //
 
 /**
- * Get Prometheus registry for metrics endpoint
+ * Get all metrics in Prometheus format (backward compat: /api/metrics)
  */
-export function getPrometheusRegistry(): Registry {
-  return registry;
+export async function getPrometheusMetrics(): Promise<string> {
+  const merged = Registry.merge([dbRegistry, apiRegistry]);
+  return await merged.metrics();
 }
 
 /**
- * Get metrics in Prometheus format
+ * Get DB-sourced metrics only (/api/metrics/db)
  */
-export async function getPrometheusMetrics(): Promise<string> {
-  return await registry.metrics();
+export async function getDbMetrics(): Promise<string> {
+  return await dbRegistry.metrics();
+}
+
+/**
+ * Get API-process metrics only (/api/metrics/api)
+ */
+export async function getApiProcessMetrics(): Promise<string> {
+  return await apiRegistry.metrics();
 }
 
 /**
  * Get content type for Prometheus metrics
  */
 export function getPrometheusContentType(): string {
-  return registry.contentType;
+  return dbRegistry.contentType;
 }

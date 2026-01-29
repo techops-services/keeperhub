@@ -9,6 +9,10 @@
 import "server-only";
 
 export {
+  // start custom keeperhub code //
+  getApiProcessMetrics,
+  getDbMetrics,
+  // end keeperhub code //
   getPrometheusContentType,
   getPrometheusMetrics,
   prometheusMetricsCollector,
