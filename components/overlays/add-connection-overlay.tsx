@@ -109,6 +109,12 @@ export function AddConnectionOverlay({
     const plugin = getIntegration(type);
     return plugin?.singleConnection && existingIntegrationTypes.has(type);
   };
+
+  // Check if integration doesn't require credentials (e.g., webhook)
+  const noCredentialsRequired = (type: IntegrationType) => {
+    const plugin = getIntegration(type);
+    return plugin?.requiresCredentials === false;
+  };
   // end keeperhub
 
   const showConsentModalWithCallbacks = useCallback(() => {
@@ -179,16 +185,19 @@ export function AddConnectionOverlay({
             filteredTypes.map((type) => {
               const description = getDescription(type);
               // start keeperhub - grey out singleConnection types that are already configured
+              // or integrations that don't require credentials
               const configured = isAlreadyConfigured(type);
+              const noCredentials = noCredentialsRequired(type);
+              const isDisabled = configured || noCredentials;
               // end keeperhub
               return (
                 <button
                   className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors ${
-                    configured
+                    isDisabled
                       ? "cursor-not-allowed opacity-50"
                       : "hover:bg-muted/50"
                   }`}
-                  disabled={configured}
+                  disabled={isDisabled}
                   key={type}
                   onClick={() => handleSelectType(type)}
                   type="button"
@@ -202,6 +211,11 @@ export function AddConnectionOverlay({
                     {configured && (
                       <span className="ml-1 text-muted-foreground text-xs">
                         (Configured)
+                      </span>
+                    )}
+                    {noCredentials && !configured && (
+                      <span className="ml-1 text-muted-foreground text-xs">
+                        (Not required)
                       </span>
                     )}
                     {description && (
