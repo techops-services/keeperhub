@@ -79,9 +79,14 @@ podAnnotations:
 serviceMonitors:
   enabled: true
   monitors:
-    - name: metrics
+    - name: api-metrics
       port: http
-      path: /api/metrics
+      path: /api/metrics/api
+      interval: 30s
+      scrapeTimeout: 10s
+    - name: db-metrics
+      port: http
+      path: /api/metrics/db
       interval: 30s
       scrapeTimeout: 10s
 
