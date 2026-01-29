@@ -1,9 +1,12 @@
 "use client";
 
+import { getDefaultStore } from "jotai";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { registerOrganizationRefetch } from "@/keeperhub/lib/refetch-organizations";
+import { api } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
+import { resetWorkflowStateForOrgSwitchAtom } from "@/lib/workflow-store";
 
 export function useOrganization() {
   const {
@@ -25,8 +28,19 @@ export function useOrganization() {
   );
 
   const switchOrganization = async (orgId: string) => {
+    getDefaultStore().set(resetWorkflowStateForOrgSwitchAtom);
     await authClient.organization.setActive({ organizationId: orgId });
-    router.refresh();
+    try {
+      const list = await api.workflow.getAll();
+      const youngest = list.at(-1);
+      if (youngest) {
+        router.replace(`/workflows/${youngest.id}`);
+      } else {
+        router.replace("/");
+      }
+    } catch {
+      router.replace("/");
+    }
   };
 
   return {
