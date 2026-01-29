@@ -3,10 +3,12 @@
 import { ethers } from "ethers";
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useOverlay } from "@/components/overlays/overlay-provider";
+import { AddAddressOverlay } from "@/keeperhub/components/overlays/address-book-overlay";
+import { addressBookApi } from "@/lib/api-client";
 import { useSession } from "@/lib/auth-client";
 import { AddressSelectPopover } from "./address-select-popover";
 import { SaveAddressButton } from "./save-address-button";
-import { SaveAddressForm } from "./save-address-form";
 
 type SaveAddressBookmarkProps = {
   address?: string;
@@ -23,7 +25,7 @@ export function SaveAddressBookmark({
   children,
 }: SaveAddressBookmarkProps) {
   const { data: session } = useSession();
-  const [showForm, setShowForm] = useState(false);
+  const { push } = useOverlay();
   const [currentAddress, setCurrentAddress] = useState<string>("");
   const [isInputFocused, setIsInputFocused] = useState(false);
   const inputContainerRef = useRef<HTMLDivElement>(null);
@@ -132,22 +134,12 @@ export function SaveAddressBookmark({
       return;
     }
 
-    setShowForm(true);
-  };
-
-  const handleFormCancel = () => {
-    setShowForm(false);
-  };
-
-  const handleFormSave = () => {
-    setShowForm(false);
-  };
-
-  const handleFormAddressChange = (newAddress: string) => {
-    setCurrentAddress(newAddress);
-    if (children.props.onChange) {
-      children.props.onChange(newAddress);
-    }
+    push(AddAddressOverlay, {
+      initialAddress: address,
+      onSave: async (label: string, addr: string) => {
+        await addressBookApi.create({ label, address: addr });
+      },
+    });
   };
 
   return (
@@ -170,15 +162,6 @@ export function SaveAddressBookmark({
           />
         )}
       </div>
-
-      {showForm && (
-        <SaveAddressForm
-          address={currentAddress}
-          onAddressChange={handleFormAddressChange}
-          onCancel={handleFormCancel}
-          onSave={handleFormSave}
-        />
-      )}
     </div>
   );
 }

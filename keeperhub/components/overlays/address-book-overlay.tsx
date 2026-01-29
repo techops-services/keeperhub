@@ -40,16 +40,20 @@ type AddAddressOverlayProps = {
   overlayId: string;
   onSave: (label: string, address: string) => Promise<void>;
   entry?: AddressBookEntry;
+  initialAddress?: string;
 };
 
-function AddAddressOverlay({
+export function AddAddressOverlay({
   overlayId,
   onSave,
   entry,
+  initialAddress,
 }: AddAddressOverlayProps) {
   const { pop } = useOverlay();
   const [newLabel, setNewLabel] = useState(entry?.label ?? "");
-  const [newAddress, setNewAddress] = useState(entry?.address ?? "");
+  const [newAddress, setNewAddress] = useState(
+    entry?.address ?? initialAddress ?? ""
+  );
   const [saving, setSaving] = useState(false);
 
   const isEditing = !!entry;
