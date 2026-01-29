@@ -94,7 +94,6 @@ export function AddressSelectPopover({
       setAddressBookEntries(entries);
     } catch (error) {
       console.error("Failed to load address book entries:", error);
-      toast.error("Failed to load address book");
     } finally {
       setLoadingEntries(false);
     }
