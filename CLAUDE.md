@@ -1,6 +1,6 @@
 # AI Workflow Builder Template (KeeperHub Fork)
 
-## 🚨 Important: AI Agents Code Policy
+## AI Agents Code Policy
 
 - **No Emojis**: Do not use emojis in any code, documentation, or README files
 - **No File Structure**: Do not include file/folder structure diagrams in README files
@@ -8,6 +8,90 @@
 - **No co-authored with Claude in PR descriptions and git commits**
 - **Do not git push or create Github PRs without user's confirmation**
 - **Do not leave code comments with summaries of user's prompt**
+
+## Code Quality: Lint and Type Checking
+
+**Before writing or editing any code**, review the lint configuration to write compliant code:
+
+1. **Check `biome.jsonc`** for project-specific lint rules and exclusions
+2. **Check `.cursor/rules/ultracite.mdc`** for detailed coding standards
+
+### Key Ultracite/Biome Rules
+
+- Use explicit types for function parameters and return values
+- Prefer `unknown` over `any`
+- Use `for...of` loops over `.forEach()` and indexed loops
+- Use optional chaining (`?.`) and nullish coalescing (`??`)
+- Use `const` by default, `let` only when reassignment is needed
+- Always `await` promises in async functions
+- Remove `console.log`, `debugger`, and `alert` from production code
+- Use Next.js `<Image>` component instead of `<img>` tags
+- Add `rel="noopener"` when using `target="_blank"`
+
+### Before Every Commit
+
+Run these checks and fix any issues before committing:
+
+```bash
+pnpm check      # Lint check (Ultracite/Biome)
+pnpm type-check # TypeScript validation
+pnpm fix        # Auto-fix lint issues (run if check fails)
+```
+
+If `pnpm check` or `pnpm type-check` fails, fix the issues before committing. Do not commit code with lint or type errors.
+
+### Lint Output Caching
+
+When lint/type-check commands run, their output is saved to gitignored files:
+
+- `.claude/lint-output.txt` - Output from `pnpm check`
+- `.claude/typecheck-output.txt` - Output from `pnpm type-check`
+
+**Workflow for fixing errors:**
+1. Run `pnpm check` or `pnpm type-check` once
+2. Read `.claude/lint-output.txt` or `.claude/typecheck-output.txt` for errors
+3. Fix the errors in code
+4. Re-run the check command only when you need fresh output
+
+**Do NOT** repeatedly run lint commands to check progress. Read the cached output file instead - this saves time and context.
+
+### Claude Hooks (Automatic Checks)
+
+This project has Claude Code hooks configured in `.claude/settings.json`:
+
+**Pre-Edit Lint Context** (`.claude/hooks/pre-edit-lint-context.sh`):
+- Fires before Edit/Write on .ts/.tsx/.js/.jsx files
+- Injects key Ultracite/Biome lint rules into context
+- **Rationale**: Higher upfront token cost, but saves overall context by writing correct code the first time instead of the expensive cycle of: write code → run lint → see errors → fix partially → re-run lint → repeat
+
+**Pre-Commit Checks** (`.claude/hooks/pre-commit-checks.sh`):
+- Detects `git commit` commands
+- Runs `pnpm check` (lint) and `pnpm type-check` (TypeScript)
+- Saves output to `.claude/*.txt` files for reading without re-running
+- Blocks the commit (exit code 2) if either fails
+
+### Lint Ignore Comments
+
+**Only use lint ignore comments when absolutely necessary.** Valid reasons:
+
+- Third-party library types are incorrect and cannot be fixed
+- Generated code that cannot be modified
+- Rare edge cases where the rule genuinely does not apply
+
+**Invalid reasons** (fix the code instead):
+
+- "It works fine"
+- "The rule is too strict"
+- "It's faster to ignore than fix"
+
+When you must use an ignore comment:
+1. Use the most specific ignore possible (target the exact rule, not all rules)
+2. Add a brief comment explaining why the ignore is necessary
+3. Example:
+   ```typescript
+   // biome-ignore lint/suspicious/noExplicitAny: third-party SDK types are incomplete
+   const result = externalLib.call() as any;
+   ```
 
 ## 🚨 CRITICAL: KeeperHub Custom Code Policy
 
