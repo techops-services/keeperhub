@@ -257,46 +257,6 @@ ALTER TABLE workflows ADD COLUMN cost_notification_threshold DECIMAL(5, 2) DEFAU
 
 ### Flow 1: Creating a New Workflow
 
-```
-┌─────────────┐     ┌─────────────────┐     ┌──────────────────┐
-│   User      │     │  Build Workflow │     │  See Dynamic     │
-│   Starts    │────▶│  (add actions)  │────▶│  Cost Estimate   │
-└─────────────┘     └─────────────────┘     └────────┬─────────┘
-                                                     │
-                    ┌─────────────────────────────────┘
-                    ▼
-        ┌───────────────────────┐
-        │  Is it recurring?     │
-        │  (cron/event/block)   │
-        └───────────┬───────────┘
-                    │
-           ┌────────┴────────┐
-           ▼                 ▼
-        ┌──────┐          ┌──────┐
-        │ YES  │          │  NO  │
-        └──┬───┘          └──┬───┘
-           │                 │
-           ▼                 │
-    ┌──────────────┐         │
-    │ Show checkbox │        │
-    │ for price     │        │
-    │ acknowledgment│        │
-    └──────┬───────┘         │
-           │                 │
-           ▼                 │
-    ┌──────────────┐         │
-    │ User clicks  │         │
-    │ checkbox     │         │
-    └──────┬───────┘         │
-           │                 │
-           └────────┬────────┘
-                    ▼
-           ┌───────────────┐
-           │ Save Workflow │
-           │ (store est.)  │
-           └───────────────┘
-```
-
 ```mermaid
 flowchart TD
     A[User Starts] --> B[Build Workflow<br/>add actions]
@@ -317,37 +277,6 @@ flowchart TD
 ```
 
 ### Flow 2: Execution & Cost Tracking
-
-```
-┌─────────────┐     ┌─────────────────┐     ┌──────────────────┐
-│  Trigger    │     │  Execute        │     │  Record Actual   │
-│  Fires      │────▶│  Transaction    │────▶│  Gas/Cost Data   │
-└─────────────┘     └─────────────────┘     └────────┬─────────┘
-                                                     │
-                                                     ▼
-                                            ┌───────────────────┐
-                                            │  Cost > Est + 20%?│
-                                            └─────────┬─────────┘
-                                                      │
-                                             ┌────────┴────────┐
-                                             ▼                 ▼
-                                          ┌──────┐          ┌──────┐
-                                          │ YES  │          │  NO  │
-                                          └──┬───┘          └──┬───┘
-                                             │                 │
-                                             ▼                 │
-                                      ┌──────────────┐         │
-                                      │ Send Email   │         │
-                                      │ Notification │         │
-                                      └──────┬───────┘         │
-                                             │                 │
-                                             └────────┬────────┘
-                                                      ▼
-                                             ┌───────────────┐
-                                             │ Deduct Credits│
-                                             │ from Org      │
-                                             └───────────────┘
-```
 
 ```mermaid
 flowchart TD
