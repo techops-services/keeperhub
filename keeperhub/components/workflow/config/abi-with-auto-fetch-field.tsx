@@ -497,7 +497,7 @@ export function AbiWithAutoFetchField({
             if (isLoading) {
               return "Fetching ABI from Etherscan...";
             }
-            return "ABI will be fetched automatically, or click the button above to fetch manually";
+            return "Click the button above to fetch the ABI from Etherscan";
           })()}
         </p>
       )}
