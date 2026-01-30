@@ -9,6 +9,33 @@ dotenv.config({ path: ".env.local" });
 const DATABASE_URL =
   process.env.DATABASE_URL || "postgres://localhost:5432/workflow";
 
+// Query the invitation table for the invite ID sent to an email
+async function getInvitationIdFromDb(
+  email: string,
+  maxRetries = 10
+): Promise<string> {
+  const sql = postgres(DATABASE_URL, { max: 1 });
+  try {
+    for (let i = 0; i < maxRetries; i++) {
+      const result = await sql`
+        SELECT id FROM invitation
+        WHERE email = ${email} AND status = 'pending'
+        ORDER BY expires_at DESC
+        LIMIT 1
+      `;
+      if (result.length > 0) {
+        return result[0].id;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    throw new Error(
+      `No invitation found for ${email} after ${maxRetries} retries`
+    );
+  } finally {
+    await sql.end();
+  }
+}
+
 // Query the verifications table for the OTP code sent to an email
 async function getOtpFromDb(
   email: string,
@@ -68,8 +95,11 @@ async function signUpOnly(page: Page): Promise<{ email: string }> {
 }
 
 // Sign up a new user, verify OTP from DB, and return authenticated
-async function signUpAndVerify(page: Page): Promise<{ email: string }> {
-  const testEmail = `jacob+e2e${Date.now()}@techops.services`;
+async function signUpAndVerify(
+  page: Page,
+  opts?: { email?: string }
+): Promise<{ email: string }> {
+  const testEmail = opts?.email ?? `jacob+e2e${Date.now()}@techops.services`;
   const testPassword = "TestPassword123!";
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -130,6 +160,24 @@ async function openInviteForm(page: Page): Promise<void> {
   await dialog.locator('button:has-text("Invite Members")').click();
 
   await expect(dialog.locator("#invite-email")).toBeVisible({ timeout: 5000 });
+}
+
+// Send an invite from the current user and return the invitation ID
+async function sendInvite(page: Page, inviteeEmail: string): Promise<string> {
+  await openInviteForm(page);
+
+  const dialog = page.locator('[role="dialog"]');
+  await dialog.locator("#invite-email").fill(inviteeEmail);
+  await dialog.locator('button:has-text("Send Invitation")').click();
+
+  await expect(
+    page
+      .locator("[data-sonner-toast]")
+      .filter({ hasText: `Invitation sent to ${inviteeEmail}` })
+  ).toBeVisible({ timeout: 10_000 });
+
+  const invitationId = await getInvitationIdFromDb(inviteeEmail);
+  return invitationId;
 }
 
 // Run tests serially to avoid session state conflicts
@@ -243,6 +291,187 @@ test.describe("Organization Invitations", () => {
           .locator("[data-sonner-toast]")
           .filter({ hasText: "already a member" })
       ).toBeVisible({ timeout: 10_000 });
+    });
+  });
+
+  test.describe("Receiving Invites", () => {
+    test("INV-RECV-1: accept invite as logged-out new user via signup and OTP", async ({
+      page,
+      context,
+    }) => {
+      // Set up: inviter creates an invite for a new email
+      await signUpAndVerify(page);
+
+      const inviteeEmail = `jacob+e2einvitee${Date.now()}@techops.services`;
+      const invitationId = await sendInvite(page, inviteeEmail);
+
+      // Log out so we visit the accept page as a new user
+      await context.clearCookies();
+
+      // Navigate to the accept invite page
+      await page.goto(`/accept-invite/${invitationId}`, {
+        waitUntil: "domcontentloaded",
+      });
+
+      // Should show auth form in signup mode
+      await expect(page.locator("h1:has-text('Join')")).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(
+        page.locator('button:has-text("Create Account & Join")')
+      ).toBeVisible();
+
+      // Fill password and submit
+      await page.locator("#password").fill("TestPassword123!");
+      await page.locator('button:has-text("Create Account & Join")').click();
+
+      // Should show account creation toast
+      await expect(
+        page
+          .locator("[data-sonner-toast]")
+          .filter({ hasText: "Account created" })
+      ).toBeVisible({ timeout: 10_000 });
+
+      // Should transition to verification form
+      await expect(
+        page.locator("h1:has-text('Verify Your Email')")
+      ).toBeVisible({ timeout: 10_000 });
+
+      // Get OTP from DB for the invitee and verify
+      const otp = await getOtpFromDb(inviteeEmail);
+      await page.locator("#otp").fill(otp);
+      await page.locator('button:has-text("Verify & Join")').click();
+
+      // Should show welcome toast and navigate away from accept-invite
+      await expect(
+        page.locator("[data-sonner-toast]").filter({ hasText: "Welcome to" })
+      ).toBeVisible({ timeout: 15_000 });
+
+      // New user has no workflows, so /workflows redirects to /
+      await expect(page).not.toHaveURL(/\/accept-invite/, {
+        timeout: 15_000,
+      });
+    });
+
+    test("INV-RECV-2: accept invite as logged-out existing user via sign in", async ({
+      page,
+      context,
+    }) => {
+      // Create the invitee first (verified, existing user)
+      const inviteeEmail = `jacob+e2einvitee${Date.now()}@techops.services`;
+      await signUpAndVerify(page, { email: inviteeEmail });
+      await context.clearCookies();
+
+      // Create inviter and send invite to the existing user
+      await signUpAndVerify(page);
+      const invitationId = await sendInvite(page, inviteeEmail);
+      await context.clearCookies();
+
+      // Visit accept-invite page as logged-out existing user
+      await page.goto(`/accept-invite/${invitationId}`, {
+        waitUntil: "domcontentloaded",
+      });
+
+      // Should show auth form in signin mode (userExists = true)
+      await expect(page.locator("h1:has-text('Join')")).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(
+        page.locator('button:has-text("Sign In & Join")')
+      ).toBeVisible();
+
+      // Sign in with the existing user's password
+      await page.locator("#password").fill("TestPassword123!");
+      await page.locator('button:has-text("Sign In & Join")').click();
+
+      // Should show welcome toast and navigate away
+      await expect(
+        page.locator("[data-sonner-toast]").filter({ hasText: "Welcome to" })
+      ).toBeVisible({ timeout: 15_000 });
+
+      await expect(page).not.toHaveURL(/\/accept-invite/, {
+        timeout: 15_000,
+      });
+    });
+
+    test("INV-RECV-3: accept invite while logged in as the correct user", async ({
+      page,
+      context,
+    }) => {
+      // Create inviter and send invite
+      await signUpAndVerify(page);
+      const inviteeEmail = `jacob+e2einvitee${Date.now()}@techops.services`;
+      const invitationId = await sendInvite(page, inviteeEmail);
+      await context.clearCookies();
+
+      // Create invitee with the matching email (now logged in)
+      await signUpAndVerify(page, { email: inviteeEmail });
+
+      // Navigate to accept-invite page while logged in as correct user
+      await page.goto(`/accept-invite/${invitationId}`, {
+        waitUntil: "domcontentloaded",
+      });
+
+      // Should show AcceptDirectState
+      await expect(page.locator("h1:has-text('Join')")).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(
+        page.locator(`text=You're signed in as`)
+      ).toBeVisible();
+      await expect(
+        page.locator('button:has-text("Accept Invitation")')
+      ).toBeVisible();
+
+      // Accept the invitation
+      await page.locator('button:has-text("Accept Invitation")').click();
+
+      // Should show welcome toast and navigate away
+      await expect(
+        page.locator("[data-sonner-toast]").filter({ hasText: "Welcome to" })
+      ).toBeVisible({ timeout: 15_000 });
+
+      await expect(page).not.toHaveURL(/\/accept-invite/, {
+        timeout: 15_000,
+      });
+    });
+
+    test("INV-RECV-4: accept invite while logged in as a different user shows mismatch", async ({
+      page,
+      context,
+    }) => {
+      // Create inviter and send invite to a specific email
+      await signUpAndVerify(page);
+      const inviteeEmail = `jacob+e2einvitee${Date.now()}@techops.services`;
+      const invitationId = await sendInvite(page, inviteeEmail);
+      await context.clearCookies();
+
+      // Log in as a DIFFERENT user
+      const { email: differentEmail } = await signUpAndVerify(page);
+
+      // Navigate to accept-invite page while logged in as wrong user
+      await page.goto(`/accept-invite/${invitationId}`, {
+        waitUntil: "domcontentloaded",
+      });
+
+      // Should show EmailMismatchState
+      await expect(page.locator("h1:has-text('Wrong Account')")).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(
+        page.locator(`text=This invitation is for`)
+      ).toBeVisible();
+      await expect(
+        page.locator(`text=You're currently signed in as`)
+      ).toBeVisible();
+
+      // Click "Sign Out & Continue" to sign out and reload
+      await page.locator('button:has-text("Sign Out & Continue")').click();
+
+      // Page should reload as logged-out, showing auth form
+      await expect(page.locator("h1:has-text('Join')")).toBeVisible({
+        timeout: 15_000,
+      });
     });
   });
 });
