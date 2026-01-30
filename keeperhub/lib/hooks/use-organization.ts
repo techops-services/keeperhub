@@ -28,9 +28,9 @@ export function useOrganization() {
   );
 
   const switchOrganization = async (orgId: string) => {
-    // Reset workflow state using default store (safe in hook context)
-    getDefaultStore().set(resetWorkflowStateForOrgSwitchAtom);
     await authClient.organization.setActive({ organizationId: orgId });
+    // Reset workflow state only after org switch succeeds (safe in hook context)
+    getDefaultStore().set(resetWorkflowStateForOrgSwitchAtom);
     try {
       const list = await api.workflow.getAll();
       // Sort by createdAt descending to get the most recent workflow
