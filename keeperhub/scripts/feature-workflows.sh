@@ -1,13 +1,11 @@
 #!/bin/bash
 
-# Fetch API key from SSM if not already set
+# Get API key from SSM:
 # Prod: aws ssm get-parameter --name "/eks/maker-prod/keeperhub-hub/keeperhub-api-key" --with-decryption --query "Parameter.Value" --output text
 # Staging: aws ssm get-parameter --name "/eks/maker-staging/keeperhub-hub/keeperhub-api-key" --with-decryption --query "Parameter.Value" --output text
 
-HUB_SERVICE_API_KEY="${HUB_SERVICE_API_KEY:-$(aws ssm get-parameter --name "/eks/maker-prod/keeperhub-hub/keeperhub-api-key" --with-decryption --query "Parameter.Value" --output text)}"
-
 if [[ -z "$HUB_SERVICE_API_KEY" ]]; then
-  echo "Error: HUB_SERVICE_API_KEY is not set and could not be fetched from SSM"
+  echo "Error: HUB_SERVICE_API_KEY env var not found"
   exit 1
 fi
 
