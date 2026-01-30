@@ -287,27 +287,47 @@ function AbiFunctionArgsField({
     }
   }, [abiValue, functionValue]);
 
-  // Parse current value (JSON array) into individual arg values
-  const argValues = React.useMemo(() => {
-    if (!value || value.trim() === "") {
+  // Parse prop value into array
+  const parsePropValue = React.useCallback((val: string): unknown[] => {
+    if (!val || val.trim() === "") {
       return [];
     }
     try {
-      const parsed = JSON.parse(value);
+      const parsed = JSON.parse(val);
       return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }
-  }, [value]);
+  }, []);
 
-  // Handle individual arg change
+  // Use local state to manage arg values - this prevents race conditions on blur
+  const [localArgValues, setLocalArgValues] = React.useState<unknown[]>(() =>
+    parsePropValue(value)
+  );
+
+  // Track the last function to detect when user selects a different function
+  const lastFunctionRef = React.useRef(functionValue);
+
+  // Sync from prop only when function changes (user selected different function)
+  React.useEffect(() => {
+    if (functionValue !== lastFunctionRef.current) {
+      // Function changed - reset to prop value (which should be empty for new function)
+      setLocalArgValues(parsePropValue(value));
+      lastFunctionRef.current = functionValue;
+    }
+  }, [functionValue, value, parsePropValue]);
+
+  // Handle individual arg change - update local state and propagate to parent
   const handleArgChange = (index: number, newValue: string) => {
-    const newArgs = [...argValues];
+    const newArgs = [...localArgValues];
     // Ensure array is long enough
     while (newArgs.length <= index) {
       newArgs.push("");
     }
     newArgs[index] = newValue;
+    // Update local state
+    setLocalArgValues(newArgs);
+    // Propagate to parent (outside of setState to avoid render-phase updates)
     onChange(JSON.stringify(newArgs));
   };
 
@@ -335,7 +355,7 @@ function AbiFunctionArgsField({
               id={`${field.key}-${index}`}
               onChange={(val) => handleArgChange(index, val as string)}
               placeholder={`Enter ${input.type} value or {{NodeName.value}}`}
-              value={(argValues[index] as string) || ""}
+              value={(localArgValues[index] as string) || ""}
             />
           </div>
         )

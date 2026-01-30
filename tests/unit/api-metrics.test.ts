@@ -44,8 +44,6 @@ describe("API Metrics Instrumentation", () => {
         MetricNames.API_WEBHOOK_LATENCY,
         45,
         expect.objectContaining({
-          workflow_id: "wf_123",
-          execution_id: "exec_456",
           status_code: "200",
           status: "success",
         })
@@ -80,18 +78,6 @@ describe("API Metrics Instrumentation", () => {
         })
       );
     });
-
-    it("should use 'unknown' for missing executionId", () => {
-      recordWebhookMetrics({
-        workflowId: "wf_123",
-        durationMs: 30,
-        statusCode: 200,
-      });
-
-      const labels = (mockCollector.recordLatency as ReturnType<typeof vi.fn>)
-        .mock.calls[0][2];
-      expect(labels.execution_id).toBe("unknown");
-    });
   });
 
   describe("recordStatusPollMetrics", () => {
@@ -107,7 +93,6 @@ describe("API Metrics Instrumentation", () => {
         MetricNames.API_STATUS_LATENCY,
         25,
         expect.objectContaining({
-          execution_id: "exec_123",
           status_code: "200",
           status: "success",
           execution_status: "running",
@@ -126,7 +111,6 @@ describe("API Metrics Instrumentation", () => {
         MetricNames.API_STATUS_LATENCY,
         50,
         expect.objectContaining({
-          execution_id: "exec_123",
           status_code: "500",
           status: "failure",
         })

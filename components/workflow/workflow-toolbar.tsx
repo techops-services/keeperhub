@@ -995,9 +995,14 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
       return;
     }
 
-    // When enabling, check if user is logged in
-    if (!session?.user) {
-      toast.error("Please login to activate your workflow");
+    // When enabling, check if user is logged in (not anonymous)
+    const isAnonymous =
+      !session?.user ||
+      session.user.name === "Anonymous" ||
+      session.user.email?.startsWith("temp-");
+
+    if (isAnonymous) {
+      toast.error("Please sign in to activate your workflow");
       return;
     }
 
