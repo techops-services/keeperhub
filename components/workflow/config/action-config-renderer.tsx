@@ -13,7 +13,10 @@ import {
 } from "@/components/ui/select";
 import { TemplateBadgeInput } from "@/components/ui/template-badge-input";
 import { TemplateBadgeTextarea } from "@/components/ui/template-badge-textarea";
+// start custom keeperhub code //
 import { SaveAddressBookmark } from "@/keeperhub/components/address-book/save-address-bookmark";
+import { parseAddressBookSelection } from "@/keeperhub/lib/address-book-selection";
+// end keeperhub code //
 import { getCustomFieldRenderer } from "@/lib/extension-registry";
 import {
   type ActionConfigField,
@@ -27,10 +30,21 @@ type FieldProps = {
   value: string;
   onChange: (value: unknown) => void;
   disabled?: boolean;
+  // start custom keeperhub code //
+  config?: Record<string, unknown>;
+  nodeId?: string;
 };
+// end keeperhub code //
 
-function TemplateInputField({ field, value, onChange, disabled }: FieldProps) {
-  // start custom keeperhub code
+function TemplateInputField({
+  field,
+  value,
+  onChange,
+  disabled,
+  config,
+  nodeId,
+}: FieldProps) {
+  // start custom keeperhub code //
   const isAddressField =
     field.key === "contractAddress" ||
     field.key === "recipientAddress" ||
@@ -48,11 +62,21 @@ function TemplateInputField({ field, value, onChange, disabled }: FieldProps) {
   );
 
   if (isAddressField) {
-    return <SaveAddressBookmark>{input}</SaveAddressBookmark>;
+    const selectionMap = config ? parseAddressBookSelection(config) : {};
+    const selectedBookmarkId = selectionMap[field.key];
+    return (
+      <SaveAddressBookmark
+        fieldKey={field.key}
+        nodeId={nodeId}
+        selectedBookmarkId={selectedBookmarkId}
+      >
+        {input}
+      </SaveAddressBookmark>
+    );
   }
 
   return input;
-  // end custom keeperhub code
+  // end keeperhub code //
 }
 
 function TemplateTextareaField({
@@ -419,7 +443,10 @@ function renderField(
   field: ActionConfigFieldBase,
   config: Record<string, unknown>,
   onUpdateConfig: (key: string, value: unknown) => void,
-  disabled?: boolean
+  disabled?: boolean,
+  // start custom keeperhub code //
+  nodeId?: string
+  // end keeperhub code //
 ) {
   // Check conditional rendering
   if (field.showWhen) {
@@ -470,6 +497,10 @@ function renderField(
         field={field}
         onChange={(val: unknown) => onUpdateConfig(field.key, val)}
         value={value}
+        // start custom keeperhub code //
+        nodeId={nodeId}
+        config={config}
+        // end keeperhub code //
       />
     </div>
   );
@@ -485,6 +516,8 @@ function FieldGroup({
   onUpdateConfig,
   disabled,
   defaultExpanded = false,
+  // start custom keeperhub code //
+  nodeId,
 }: {
   label: string;
   fields: ActionConfigFieldBase[];
@@ -492,7 +525,9 @@ function FieldGroup({
   onUpdateConfig: (key: string, value: unknown) => void;
   disabled?: boolean;
   defaultExpanded?: boolean;
+  nodeId?: string;
 }) {
+  // end keeperhub code //
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   return (
@@ -512,7 +547,7 @@ function FieldGroup({
       {isExpanded && (
         <div className="ml-1 space-y-4 border-primary/50 border-l-2 py-2 pl-3">
           {fields.map((field) =>
-            renderField(field, config, onUpdateConfig, disabled)
+            renderField(field, config, onUpdateConfig, disabled, nodeId)
           )}
         </div>
       )}
@@ -525,6 +560,9 @@ type ActionConfigRendererProps = {
   config: Record<string, unknown>;
   onUpdateConfig: (key: string, value: unknown) => void;
   disabled?: boolean;
+  // start custom keeperhub code //
+  nodeId?: string;
+  // end keeperhub code //
 };
 
 /**
@@ -536,6 +574,9 @@ export function ActionConfigRenderer({
   config,
   onUpdateConfig,
   disabled,
+  // start custom keeperhub code //
+  nodeId,
+  // end keeperhub code //
 }: ActionConfigRendererProps) {
   return (
     <>
@@ -549,12 +590,23 @@ export function ActionConfigRenderer({
               fields={field.fields}
               key={`group-${field.label}`}
               label={field.label}
+              // start custom keeperhub code //
+              nodeId={nodeId}
+              // end keeperhub code //
               onUpdateConfig={onUpdateConfig}
             />
           );
         }
 
-        return renderField(field, config, onUpdateConfig, disabled);
+        return renderField(
+          field,
+          config,
+          onUpdateConfig,
+          disabled,
+          // start custom keeperhub code //
+          nodeId
+          // end keeperhub code //
+        );
       })}
     </>
   );

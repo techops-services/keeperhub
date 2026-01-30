@@ -679,6 +679,7 @@ export function ConfigurationOverlay({ overlayId }: ConfigurationOverlayProps) {
                   config={selectedNode.data.config || {}}
                   disabled={isGenerating || !isOwner}
                   isOwner={isOwner}
+                  nodeId={selectedNode.id}
                   onUpdateConfig={handleUpdateConfig}
                 />
               )}

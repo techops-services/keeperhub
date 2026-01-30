@@ -23,23 +23,26 @@ import { useSession } from "@/lib/auth-client";
 
 type AddressSelectPopoverProps = {
   children: React.ReactElement;
-  currentAddress: string;
   isOpen: boolean;
-  onAddressSelect: (address: string) => void;
+  onAddressSelect: (address: string, bookmarkId: string) => void;
   onClose: () => void;
+  selectedBookmarkId?: string;
 };
 
 function AddressSelectItem({
   entry,
-  currentAddress,
+  selectedBookmarkId,
   onSelect,
 }: {
   entry: AddressBookEntry;
-  currentAddress: string;
-  onSelect: (address: string) => void;
+  selectedBookmarkId?: string;
+  onSelect: (address: string, bookmarkId: string) => void;
 }) {
   return (
-    <CommandItem key={entry.id} onSelect={() => onSelect(entry.address)}>
+    <CommandItem
+      key={entry.id}
+      onSelect={() => onSelect(entry.address, entry.id)}
+    >
       <div className="flex w-full items-center justify-between gap-2">
         <div className="flex flex-col">
           <div className="flex items-center gap-1">
@@ -50,7 +53,7 @@ function AddressSelectItem({
             {truncateAddress(entry.address)}
           </span>
         </div>
-        {currentAddress === entry.address && (
+        {selectedBookmarkId === entry.id && (
           <Check className="h-4 w-4 text-primary" />
         )}
       </div>
@@ -60,10 +63,10 @@ function AddressSelectItem({
 
 export function AddressSelectPopover({
   children,
-  currentAddress,
   isOpen,
   onAddressSelect,
   onClose,
+  selectedBookmarkId,
 }: AddressSelectPopoverProps) {
   const { data: session } = useSession();
   const [addressBookEntries, setAddressBookEntries] = useState<
@@ -123,8 +126,8 @@ export function AddressSelectPopover({
     }
   }, [shouldOpen]);
 
-  const handleSelect = (address: string) => {
-    onAddressSelect(address);
+  const handleSelect = (address: string, bookmarkId: string) => {
+    onAddressSelect(address, bookmarkId);
     onClose();
   };
 
@@ -161,10 +164,10 @@ export function AddressSelectPopover({
               <CommandGroup heading="Saved Addresses">
                 {addressBookEntries.map((entry) => (
                   <AddressSelectItem
-                    currentAddress={currentAddress}
                     entry={entry}
                     key={entry.id}
                     onSelect={handleSelect}
+                    selectedBookmarkId={selectedBookmarkId}
                   />
                 ))}
               </CommandGroup>
