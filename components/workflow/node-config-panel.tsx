@@ -215,7 +215,8 @@ export const PanelInner = () => {
     const openCannotDeleteWarning = () => {
       openOverlay(ConfirmOverlay, {
         title: "Cannot delete workflow",
-        message: `This workflow has run history. Run history may contain sensitive data you want to save before deleting. Delete all executions from the Runs tab first, then you can delete the workflow.`,
+        message:
+          "This workflow has run history. Run history may contain sensitive data you want to save before deleting. Delete all executions from the Runs tab first, then you can delete the workflow.",
         confirmLabel: "View runs",
         cancelLabel: "Cancel",
         destructive: false,
