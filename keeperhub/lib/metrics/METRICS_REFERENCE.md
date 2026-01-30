@@ -207,18 +207,26 @@ Metrics can be exported via different collectors based on `METRICS_COLLECTOR` en
 | Collector | Environment Variable | Description |
 |-----------|---------------------|-------------|
 | Console (default) | `METRICS_COLLECTOR=console` | Structured JSON logs (CloudWatch/Datadog compatible) |
-| Prometheus | `METRICS_COLLECTOR=prometheus` | Exposes `/api/metrics` endpoint for Prometheus scraping |
+| Prometheus | `METRICS_COLLECTOR=prometheus` | Exposes `/api/metrics`, `/api/metrics/db`, `/api/metrics/api` endpoints |
 | Noop | `METRICS_COLLECTOR=noop` | Silent collector (for testing) |
 
 ---
 
 ## Prometheus Configuration
 
-When using Prometheus collector, metrics are exposed at `/api/metrics` in Prometheus text format.
+Metrics are split across three endpoints to enable per-pod vs single-pod scraping:
+
+| Endpoint | Content | Scrape Strategy |
+|----------|---------|-----------------|
+| `/api/metrics` | All metrics (backward compat) | Not scraped by default |
+| `/api/metrics/db` | DB-sourced gauges only | One pod (hashmod in prod) |
+| `/api/metrics/api` | API-process histograms/counters | All pods |
+
+DB-sourced metrics are identical across pods (same database), so only one pod needs to be scraped. API-process metrics accumulate in-memory per pod and must be scraped from all pods.
 
 ### DB-Sourced Metrics
 
-Before returning metrics, the endpoint queries the database to populate workflow/step metrics. This is necessary because workflow runner jobs (Kubernetes Jobs) exit before Prometheus can scrape them.
+Before returning metrics, the `/api/metrics/db` endpoint queries the database to populate workflow/step metrics. This is necessary because workflow runner jobs (Kubernetes Jobs) exit before Prometheus can scrape them.
 
 The following tables are queried:
 - `workflow_executions` - execution counts by status, duration histogram
@@ -356,18 +364,36 @@ sum(max by (step_type) (keeperhub_workflow_step_errors_total{...}))
 
 ### ServiceMonitor (Prometheus Operator)
 
-Prometheus scraping is configured via the Helm chart's built-in ServiceMonitor support in values.yaml:
+Scraping is configured via two ServiceMonitors in the Helm chart values:
 
 ```yaml
 serviceMonitors:
   enabled: true
   monitors:
-    - name: metrics
+    # API-process metrics: scrape all pods
+    - name: api-metrics
       port: http
-      path: /api/metrics
+      path: /api/metrics/api
       interval: 30s
       scrapeTimeout: 10s
+    # DB-sourced metrics: scrape one pod (prod uses hashmod)
+    - name: db-metrics
+      port: http
+      path: /api/metrics/db
+      interval: 30s
+      scrapeTimeout: 10s
+      relabelings:
+        # hashmod on __address__ to select 1 of N pods
+        - sourceLabels: [__address__]
+          modulus: 2
+          targetLabel: __tmp_hash
+          action: hashmod
+        - sourceLabels: [__tmp_hash]
+          regex: "0"
+          action: keep
 ```
+
+The hashmod target relabeling prevents the scrape entirely for non-selected pods, so only one pod serves DB metrics to Grafana Cloud. Staging (1 replica) omits the hashmod since there is no duplication.
 
 ### Prometheus Metric Names
 

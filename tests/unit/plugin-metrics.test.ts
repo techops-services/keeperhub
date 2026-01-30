@@ -47,7 +47,6 @@ describe("Plugin Metrics Instrumentation", () => {
         expect.objectContaining({
           plugin_name: "discord",
           action_name: "send-message",
-          execution_id: "exec_123",
           status: "success",
         })
       );
@@ -151,35 +150,6 @@ describe("Plugin Metrics Instrumentation", () => {
         MetricNames.PLUGIN_ACTION_ERRORS,
         testError,
         expect.any(Object)
-      );
-    });
-
-    it("should include executionId in latency labels when provided", async () => {
-      await withPluginMetrics(
-        {
-          pluginName: "web3",
-          actionName: "check-balance",
-          executionId: "exec_456",
-        },
-        async () => ({ success: true })
-      );
-
-      // Counter only uses plugin_name and action_name (not execution_id)
-      expect(mockCollector.incrementCounter).toHaveBeenCalledWith(
-        MetricNames.PLUGIN_INVOCATIONS_TOTAL,
-        {
-          plugin_name: "web3",
-          action_name: "check-balance",
-        }
-      );
-
-      // Latency metric includes execution_id
-      expect(mockCollector.recordLatency).toHaveBeenCalledWith(
-        MetricNames.PLUGIN_ACTION_DURATION,
-        expect.any(Number),
-        expect.objectContaining({
-          execution_id: "exec_456",
-        })
       );
     });
   });

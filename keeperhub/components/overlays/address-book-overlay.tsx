@@ -113,7 +113,7 @@ function AddAddressOverlay({
             disabled={saving}
             id="new-label"
             onChange={(e) => setNewLabel(e.target.value)}
-            placeholder="e.g., Treasury Wallet"
+            placeholder="e.g. Treasury Wallet"
             value={newLabel}
           />
         </div>

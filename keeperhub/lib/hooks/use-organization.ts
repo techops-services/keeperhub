@@ -1,9 +1,12 @@
 "use client";
 
+import { getDefaultStore } from "jotai";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { registerOrganizationRefetch } from "@/keeperhub/lib/refetch-organizations";
+import { api } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
+import { resetWorkflowStateForOrgSwitchAtom } from "@/lib/workflow-store";
 
 export function useOrganization() {
   const {
@@ -26,7 +29,24 @@ export function useOrganization() {
 
   const switchOrganization = async (orgId: string) => {
     await authClient.organization.setActive({ organizationId: orgId });
-    router.refresh();
+    // Reset workflow state only after org switch succeeds (safe in hook context)
+    getDefaultStore().set(resetWorkflowStateForOrgSwitchAtom);
+    try {
+      const list = await api.workflow.getAll();
+      // Sort by createdAt descending to get the most recent workflow
+      const mostRecent = list.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )[0];
+      if (mostRecent) {
+        router.replace(`/workflows/${mostRecent.id}`);
+      } else {
+        router.replace("/");
+      }
+    } catch (fetchError) {
+      console.error("Failed to fetch workflows after org switch:", fetchError);
+      router.replace("/");
+    }
   };
 
   return {

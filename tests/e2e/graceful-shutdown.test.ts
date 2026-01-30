@@ -113,6 +113,45 @@ function waitForExit(
 }
 
 /**
+ * Wait for a specific message in stdout, then send signal
+ * Returns immediately after sending signal, caller should use waitForExit
+ */
+function sendSignalOnMessage(
+  proc: ChildProcess,
+  message: string,
+  signal: NodeJS.Signals,
+  timeout = 10_000
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let resolved = false;
+
+    const timer = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        reject(new Error(`Message "${message}" not seen within ${timeout}ms`));
+      }
+    }, timeout);
+
+    proc.stdout?.on("data", (data) => {
+      if (!resolved && data.toString().includes(message)) {
+        resolved = true;
+        clearTimeout(timer);
+        proc.kill(signal);
+        resolve();
+      }
+    });
+
+    proc.on("exit", () => {
+      if (!resolved) {
+        resolved = true;
+        clearTimeout(timer);
+        reject(new Error("Process exited before message was seen"));
+      }
+    });
+  });
+}
+
+/**
  * Spawn workflow-runner with real database
  */
 function spawnWorkflowRunner(
@@ -265,14 +304,20 @@ describe.skipIf(shouldSkip)("Graceful Shutdown E2E", () => {
       // Spawn workflow-runner
       testProcess = spawnWorkflowRunner(workflowId, executionId);
 
-      // Wait for process to initialize and register signal handlers
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      testProcess.kill("SIGTERM");
+      // Send SIGTERM after workflow is loaded but before execution completes
+      // This triggers after DB fetch but during workflow processing
+      await sendSignalOnMessage(
+        testProcess,
+        "[Runner] Loaded workflow:",
+        "SIGTERM"
+      );
 
       // Wait for graceful shutdown
       const result = await waitForExit(testProcess, 10_000);
 
       // Exit code 1 = system termination (SIGTERM)
+      // Note: If workflow completes before signal handler runs, exit code may be 0
+      // This is a race condition inherent to testing signal handling of fast workflows
       expect(result.exitCode).toBe(1);
 
       // Verify execution status was updated to error
@@ -358,9 +403,12 @@ describe.skipIf(shouldSkip)("Graceful Shutdown E2E", () => {
         scheduleId,
       });
 
-      // Wait for process to initialize
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      testProcess.kill("SIGTERM");
+      // Send SIGTERM after workflow is loaded but before execution completes
+      await sendSignalOnMessage(
+        testProcess,
+        "[Runner] Loaded workflow:",
+        "SIGTERM"
+      );
 
       // Wait for graceful shutdown
       const result = await waitForExit(testProcess, 10_000);
