@@ -28,17 +28,23 @@ export function useOrganization() {
   );
 
   const switchOrganization = async (orgId: string) => {
+    // Reset workflow state using default store (safe in hook context)
     getDefaultStore().set(resetWorkflowStateForOrgSwitchAtom);
     await authClient.organization.setActive({ organizationId: orgId });
     try {
       const list = await api.workflow.getAll();
-      const youngest = list.at(-1);
-      if (youngest) {
-        router.replace(`/workflows/${youngest.id}`);
+      // Sort by createdAt descending to get the most recent workflow
+      const mostRecent = list.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )[0];
+      if (mostRecent) {
+        router.replace(`/workflows/${mostRecent.id}`);
       } else {
         router.replace("/");
       }
-    } catch {
+    } catch (fetchError) {
+      console.error("Failed to fetch workflows after org switch:", fetchError);
       router.replace("/");
     }
   };
