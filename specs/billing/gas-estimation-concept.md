@@ -68,38 +68,43 @@ When a user creates or modifies a workflow, we dynamically calculate and display
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 2. Explicit User Acknowledgment for Recurring Workflows
+### 2. Sensible Defaults - No Required Input
 
-For workflows with recurring triggers (cron, event-based, block-based), users MUST acknowledge price volatility before enabling:
+> **Design principle:** Users should be able to create and enable a workflow with minimal friction. All settings have sensible defaults - no checkboxes, acknowledgments, or configuration required during workflow creation.
+
+When enabling a workflow, the user simply sees the cost estimate and clicks "Enable":
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│              ENABLE RECURRING WORKFLOW                           │
+│              ENABLE WORKFLOW                                     │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  You are about to enable a workflow that runs automatically.    │
+│  Workflow: Weekly USDC Transfer                                 │
+│  Schedule: Every Monday at 9:00 AM                              │
 │                                                                  │
-│  Estimated cost per execution: ~687 credits ($6.87)          │
-│  Schedule: Every Monday at 9:00 AM                           │
-│  Estimated monthly cost: ~2,748 credits (~$27.48)            │
+│  ─────────────────────────────────────                          │
+│  Estimated cost per execution: ~687 credits ($6.87)             │
+│  Estimated monthly cost: ~2,748 credits (~$27.48)               │
+│  ─────────────────────────────────────                          │
 │                                                                  │
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │ ☑️  I understand that:                                      │ │
-│  │                                                              │ │
-│  │    • The credit cost is NOT fixed and depends on ETH       │ │
-│  │      price and network gas prices at execution time        │ │
-│  │                                                              │ │
-│  │    • If ETH or gas prices increase significantly, my       │ │
-│  │      executions will cost more credits                     │ │
-│  │                                                              │ │
-│  │    • I am responsible for maintaining sufficient credit    │ │
-│  │      balance in my organization wallet                     │ │
-│  └────────────────────────────────────────────────────────────┘ │
+│  ℹ️  Actual cost depends on network conditions at execution     │
+│     time. You'll be notified if costs increase significantly.   │
 │                                                                  │
 │           [Cancel]                    [Enable Workflow]          │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+**Default settings (configured at org level, not per-workflow):**
+
+| Setting | Default Value | Location |
+|---------|---------------|----------|
+| Cost spike notification threshold | 20% | Org Settings |
+| Email notifications enabled | Yes | Org Settings |
+| Spending ceiling per workflow | No limit | Org Settings |
+| Spending ceiling per org/month | No limit | Org Settings |
+
+Users who want to customize these can do so in **Organization Settings** - not during workflow creation. This reduces friction while still providing control for those who want it.
 
 ### 3. Cost Spike Notifications (Optional - Needs Team Confirmation)
 
@@ -149,25 +154,34 @@ We take a percentage of each execution as platform revenue:
 | Component        | Description                                             |
 | ---------------- | ------------------------------------------------------- |
 | **Gas Cost**     | Actual network gas × ETH price (passed through to user) |
-| **Platform Fee** | 1% of total execution cost                              |
+| **Platform Fee** | Configurable percentage of total execution cost         |
 
-**Example:**
+**Configuration:**
+
+The platform fee percentage is configurable via environment variable:
+
+```bash
+PLATFORM_FEE_PERCENT=1  # Default: 1%
+```
+
+This allows adjusting the fee without code changes, enabling:
+- Easy A/B testing of different fee levels
+- Quick adjustments based on market conditions
+- Different fees for different environments (dev/staging/prod)
+
+**Example (with default 1% fee):**
 
 - Gas cost: $6.80 (680 credits)
 - Platform fee: $0.07 (7 credits)
 - **Total charged: 687 credits**
 
-The 1% fee provides:
+The platform fee provides:
 
 - Revenue for platform sustainability
 - Incentive alignment (we benefit when users run more workflows)
 - Simple, transparent pricing
 
-**Open Questions:**
-
-- Is 1% the right percentage? Too low? Too high?
-- Should we have tiered pricing for high-volume users?
-- Should the fee be a flat rate per execution instead?
+**Note:** 1% may be too low for sustainability. The exact percentage can be discussed and adjusted later via the env var without requiring code changes.
 
 ### 5. Execution History & Cost Transparency
 
@@ -247,34 +261,37 @@ ALTER TABLE workflow_executions ADD COLUMN total_credits_charged INTEGER;
 
 -- Store original estimate for comparison
 ALTER TABLE workflows ADD COLUMN estimated_credits_per_execution INTEGER;
-ALTER TABLE workflows ADD COLUMN cost_acknowledgment_accepted BOOLEAN DEFAULT FALSE;
-ALTER TABLE workflows ADD COLUMN cost_notification_threshold DECIMAL(5, 2) DEFAULT 0.20;
+
+-- Org-level settings (defaults for all workflows in org)
+ALTER TABLE organizations ADD COLUMN cost_notification_threshold DECIMAL(5, 2) DEFAULT 0.20;
+ALTER TABLE organizations ADD COLUMN cost_notifications_enabled BOOLEAN DEFAULT TRUE;
+ALTER TABLE organizations ADD COLUMN spending_ceiling_per_workflow INTEGER DEFAULT NULL;
+ALTER TABLE organizations ADD COLUMN spending_ceiling_per_month INTEGER DEFAULT NULL;
 ```
 
 ---
 
 ## User Flow Diagrams
 
-### Flow 1: Creating a New Workflow
+### Flow 1: Creating a New Workflow (Simplified - No Required Input)
 
 ```mermaid
 flowchart TD
     A[User Starts] --> B[Build Workflow<br/>add actions]
     B --> C[See Dynamic<br/>Cost Estimate]
-    C --> D{Recurring?<br/>cron/event/block}
-    D -->|YES| E[Show Checkbox<br/>Acknowledgment]
-    E --> F[User Clicks<br/>Checkbox]
-    F --> G[Save Workflow<br/>store estimate]
-    D -->|NO| G
+    C --> D[Click Enable]
+    D --> E[Save Workflow<br/>with defaults]
+    E --> F[Workflow Active]
 
     style A fill:#dbeafe,stroke:#3b82f6
     style B fill:#dbeafe,stroke:#3b82f6
     style C fill:#dcfce7,stroke:#22c55e
-    style D fill:#fef3c7,stroke:#f59e0b
-    style E fill:#fef3c7,stroke:#f59e0b
-    style F fill:#fef3c7,stroke:#f59e0b
-    style G fill:#dcfce7,stroke:#22c55e
+    style D fill:#dcfce7,stroke:#22c55e
+    style E fill:#dcfce7,stroke:#22c55e
+    style F fill:#dcfce7,stroke:#22c55e
 ```
+
+> **Note:** No acknowledgment checkbox or configuration required. All settings use org-level defaults.
 
 ### Flow 2: Execution & Cost Tracking
 
@@ -385,8 +402,8 @@ flowchart TD
 ## Open Questions for Team Discussion
 
 1. **Platform Fee Percentage**
-   - Is 1% appropriate? Should it be higher for sustainability?
-   - Should we have volume discounts?
+   - ~~Is 1% appropriate? Should it be higher for sustainability?~~ → **Resolved:** Fee is configurable via `PLATFORM_FEE_PERCENT` env var. Can be adjusted without code changes.
+   - Should we have volume discounts? (Future consideration)
 
 2. **Cost Spike Notifications**
    - What threshold triggers a notification? (20% suggested)
@@ -461,6 +478,11 @@ flowchart TD
 - Gas limit multipliers for L1 vs L2 networks
 - Retry escalation with 1.5x factor (up to 2.25x)
 - The billing layer should wrap existing infrastructure, not duplicate it
+
+**Team Feedback (2026-01-30):**
+
+- 1% platform fee sounds quite low, but can be discussed and adjusted later → **Resolved:** Make configurable via `PLATFORM_FEE_PERCENT` env var
+- Should have sound defaults for all options (notification preferences, acknowledgements, spending ceilings) - no input from user required when creating a workflow besides enabling it → **Resolved:** Settings moved to org-level defaults, workflow creation simplified
 
 ---
 
