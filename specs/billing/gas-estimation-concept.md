@@ -297,6 +297,91 @@ flowchart TD
 
 ---
 
+## Integration with Gas Estimation Infrastructure
+
+> **Jacob's feedback:** _"The infrastructure for dynamic estimation exists. The billing layer wraps it."_
+
+The Credit System (billing layer) does **NOT** plan to implement its own gas price caching or volatility analysis. Instead, it will consume data from Jacob's existing gas estimation infrastructure, which already handles:
+
+- 40-block volatility analysis (CV calculation)
+- Trigger-based gas price strategy (event/webhook = conservative, scheduled = volatility-based)
+- Gas limit multipliers (L1 vs L2)
+- Retry escalation (1.5x factor, up to 2.25x)
+
+### Architecture: Billing Layer Wraps Gas Infrastructure
+
+```mermaid
+flowchart TB
+    subgraph BillingLayer["Credit System (Billing Layer)"]
+        UI[Workflow Builder UI]
+        Calc[Cost Calculator]
+        DB[(Credits DB)]
+    end
+
+    subgraph GasInfra["Gas Estimation Infrastructure (Jacob)"]
+        VA[Volatility Analyzer]
+        GP[Gas Price Service]
+        GL[Gas Limit Estimator]
+    end
+
+    subgraph External["External Data"]
+        PF[Price Feed<br/>ETH/USD]
+    end
+
+    UI --> |"get estimate"| Calc
+    Calc --> |"get gas price"| GP
+    Calc --> |"get gas limit"| GL
+    Calc --> |"get ETH price"| PF
+    Calc --> |"deduct credits"| DB
+    VA --> GP
+
+    style BillingLayer fill:#dcfce7,stroke:#22c55e
+    style GasInfra fill:#dbeafe,stroke:#3b82f6
+    style External fill:#fef3c7,stroke:#f59e0b
+```
+
+### What the Billing Layer Needs from Gas Infrastructure
+
+| Data Required | Source | Used For |
+|---------------|--------|----------|
+| Gas price (gwei) | Jacob's infra | USD cost calculation |
+| Gas limit estimate | Jacob's infra | USD cost calculation |
+| Volatility indicator | Jacob's infra | UI warning (high/low volatility) |
+| ETH price (USD) | Price feed (TBD) | USD cost calculation |
+
+### What the Billing Layer Computes
+
+| Computation | Formula |
+|-------------|---------|
+| Gas cost (USD) | `gasLimit × gasPrice × ethPrice` |
+| Platform fee (USD) | `gasCost × 0.01` (1%) |
+| Total cost (USD) | `gasCost + platformFee` |
+| Credits required | `Math.ceil(totalCost × 100)` |
+
+### Billing Layer Flow
+
+```mermaid
+flowchart TD
+    A[User creates/modifies workflow] --> B[Call Gas Infrastructure]
+    B --> C[Get gas price + limit]
+    C --> D[Fetch ETH price]
+    D --> E[Calculate USD cost]
+    E --> F[Add platform fee 1%]
+    F --> G[Convert to credits]
+    G --> H[Display estimate to user]
+
+    style A fill:#dbeafe,stroke:#3b82f6
+    style B fill:#dbeafe,stroke:#3b82f6
+    style C fill:#dbeafe,stroke:#3b82f6
+    style D fill:#fef3c7,stroke:#f59e0b
+    style E fill:#dcfce7,stroke:#22c55e
+    style F fill:#dcfce7,stroke:#22c55e
+    style G fill:#dcfce7,stroke:#22c55e
+    style H fill:#dcfce7,stroke:#22c55e
+```
+
+---
+
 ## Open Questions for Team Discussion
 
 1. **Platform Fee Percentage**
@@ -308,9 +393,27 @@ flowchart TD
    - Should it be user-configurable?
    - Should we EVER pause workflows due to cost? (Consensus seems to be NO)
 
-3. **Gas Estimation Timing**
-   - Should Jacob's gas estimation work align with this credit system?
-   - Need to confirm current state and avoid duplicate work
+3. **Gas Infrastructure Integration (Question for Jacob)**
+
+   > Reference: _"The infrastructure for dynamic estimation exists. The billing layer wraps it."_
+
+   **@Jacob:** The Credit System needs to consume gas estimation data from your infrastructure. Please document how the billing layer should access this data:
+
+   - **Access method:** Internal API? Redis keys? Direct function import?
+   - **Available data:** What exactly is exposed? (gas price, gas limit, volatility CV, percentile?)
+   - **Data format:** TypeScript interface / response schema?
+   - **Refresh rate:** How often is the data updated?
+   - **Example usage:** Code snippet showing how to call your infrastructure?
+
+   Please add your response below or in a separate section of this document.
+
+   ---
+
+   **Jacob's Response:**
+
+   _[Pending - please fill in]_
+
+   ---
 
 4. **Email Notifications**
    - Do we have email infrastructure ready?
@@ -349,6 +452,15 @@ flowchart TD
 
 - Concerns about displaying raw org names (could be inappropriate)
 - Internal dashboards for monitoring usage
+
+**Jacob:**
+
+- The infrastructure for dynamic gas estimation already exists
+- 40-block volatility analysis for fee selection (CV-based percentile)
+- Trigger-based strategy: event/webhook = always conservative, scheduled = volatility-based
+- Gas limit multipliers for L1 vs L2 networks
+- Retry escalation with 1.5x factor (up to 2.25x)
+- The billing layer should wrap existing infrastructure, not duplicate it
 
 ---
 
