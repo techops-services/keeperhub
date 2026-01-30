@@ -174,8 +174,9 @@ export const PanelInner = () => {
   const clearNodeStatuses = useSetAtom(clearNodeStatusesAtom);
   const clearWorkflow = useSetAtom(clearWorkflowAtom);
   const { open: openOverlay } = useOverlay();
+  const setPropertiesPanelActiveTab = useSetAtom(propertiesPanelActiveTabAtom);
 
-  // Watch showDeleteDialog atom: check for executions first, then open delete overlay
+  // Watch showDeleteDialog atom: check for executions first, then open delete overlay or warn and switch to runs
   useEffect(() => {
     if (!showDeleteDialog) {
       return;
@@ -211,59 +212,44 @@ export const PanelInner = () => {
       });
     };
 
+    const openCannotDeleteWarning = () => {
+      openOverlay(ConfirmOverlay, {
+        title: "Cannot delete workflow",
+        message: `This workflow has run history. Run history may contain sensitive data you want to save before deleting. Delete all executions from the Runs tab first, then you can delete the workflow.`,
+        confirmLabel: "View runs",
+        cancelLabel: "Cancel",
+        destructive: false,
+        onConfirm: () => {
+          setPropertiesPanelActiveTab("runs");
+        },
+      });
+    };
+
     let cancelled = false;
-    (async () => {
+    const handleCheckError = () => {
+      if (!cancelled) {
+        setShowDeleteDialog(false);
+        toast.error("Could not check workflow run history. Please try again.");
+      }
+    };
+    const checkExecutionsAndOpenOverlay = async () => {
       try {
         const executions = await api.workflow.getExecutions(currentWorkflowId);
         if (cancelled) {
           return;
         }
         setShowDeleteDialog(false);
-        const hasExecutions =
-          Array.isArray(executions) && executions.length > 0;
-        if (hasExecutions) {
-          const openDeleteWorkflowOverlayAfterExecutions = () => {
-            setTimeout(() => openDeleteWorkflowOverlay(), 0);
-          };
-          // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: delete-executions-then-open-overlay flow
-          const deleteExecutionsThenOpenDeleteWorkflow = async () => {
-            if (!currentWorkflowId) {
-              return;
-            }
-            try {
-              await api.workflow.deleteExecutions(currentWorkflowId);
-              clearNodeStatuses();
-              toast.success("Executions deleted");
-              openDeleteWorkflowOverlayAfterExecutions();
-            } catch (error) {
-              const msg =
-                error instanceof Error
-                  ? error.message
-                  : "Failed to delete executions";
-              toast.error(msg);
-            }
-          };
-          openOverlay(ConfirmOverlay, {
-            title: "Delete Workflow Executions",
-            message:
-              "This workflow has run history. Delete all executions first, then you can delete the workflow. Delete all executions now?",
-            confirmLabel: "Delete all executions",
-            confirmVariant: "destructive" as const,
-            destructive: true,
-            onConfirm: deleteExecutionsThenOpenDeleteWorkflow,
-          });
+        const executionList = Array.isArray(executions) ? executions : [];
+        if (executionList.length > 0) {
+          openCannotDeleteWarning();
           return;
         }
         openDeleteWorkflowOverlay();
       } catch (_e) {
-        if (!cancelled) {
-          setShowDeleteDialog(false);
-          toast.error(
-            "Could not check workflow run history. Please try again."
-          );
-        }
+        handleCheckError();
       }
-    })();
+    };
+    checkExecutionsAndOpenOverlay();
 
     return () => {
       cancelled = true;
@@ -274,7 +260,7 @@ export const PanelInner = () => {
     currentWorkflowName,
     openOverlay,
     setShowDeleteDialog,
-    clearNodeStatuses,
+    setPropertiesPanelActiveTab,
   ]);
 
   // Watch showClearDialog atom and open overlay when it becomes true
