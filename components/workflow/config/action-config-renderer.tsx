@@ -493,14 +493,16 @@ function renderField(
         {field.required && <span className="text-red-500">*</span>}
       </Label>
       <FieldRenderer
+        // start custom keeperhub code //
+        config={config}
+        // end custom keeperhub code //
         disabled={disabled}
         field={field}
-        onChange={(val: unknown) => onUpdateConfig(field.key, val)}
-        value={value}
         // start custom keeperhub code //
         nodeId={nodeId}
-        config={config}
-        // end keeperhub code //
+        // end custom keeperhub code //
+        onChange={(val: unknown) => onUpdateConfig(field.key, val)}
+        value={value}
       />
     </div>
   );
