@@ -466,6 +466,28 @@ export const clearWorkflowAtom = atom(null, (get, set) => {
   set(hasUnsavedChangesAtom, true);
 });
 
+// start custom keeperhub code //
+// Reset all workflow state for org switch (no history push; used by use-organization)
+export const resetWorkflowStateForOrgSwitchAtom = atom(null, (_get, set) => {
+  set(nodesAtom, []);
+  set(edgesAtom, []);
+  set(selectedNodeAtom, null);
+  set(selectedEdgeAtom, null);
+  set(currentWorkflowIdAtom, null);
+  set(currentWorkflowNameAtom, "");
+  set(currentWorkflowDescriptionAtom, "");
+  set(currentWorkflowVisibilityAtom, "private");
+  set(isWorkflowOwnerAtom, true);
+  set(isWorkflowEnabled, false);
+  set(workflowNotFoundAtom, false);
+  set(selectedExecutionIdAtom, null);
+  set(executionLogsAtom, {});
+  set(hasUnsavedChangesAtom, false);
+  set(historyAtom, []);
+  set(futureAtom, []);
+});
+// end custom keeperhub code //
+
 // Load workflow from database
 export const loadWorkflowAtom = atom(null, async (_get, set) => {
   try {
