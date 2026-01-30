@@ -1544,6 +1544,8 @@ function WorkflowMenuComponent({
   // start custom KeeperHub code
   const pathname = usePathname();
   const isHubPage = pathname === "/hub";
+  const isWorkflowRoute =
+    pathname === "/workflows" || pathname.startsWith("/workflows/");
 
   // validate against route workflow id as the state can be out of date
   const { workflowId: routeWorkflowId } = useParams();
@@ -1646,7 +1648,7 @@ function WorkflowMenuComponent({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      {workflowId && !state.isOwner && (
+      {isWorkflowRoute && workflowId && !state.isOwner && (
         <span className="text-muted-foreground text-xs uppercase lg:hidden">
           Read-only
         </span>
@@ -1705,7 +1707,7 @@ export const WorkflowToolbar = ({
             state={state}
             workflowId={effectiveWorkflowId}
           />
-          {effectiveWorkflowId && !state.isOwner && (
+          {isWorkflowRoute && effectiveWorkflowId && !state.isOwner && (
             <span className="hidden text-muted-foreground text-xs uppercase lg:inline">
               Read-only
             </span>
@@ -1723,7 +1725,7 @@ export const WorkflowToolbar = ({
               />
             )}
             <div className="flex items-center gap-2">
-              {effectiveWorkflowId && !state.isOwner && (
+              {isWorkflowRoute && effectiveWorkflowId && !state.isOwner && (
                 <DuplicateButton
                   isDuplicating={state.isDuplicating}
                   onDuplicate={actions.handleDuplicate}
@@ -1761,7 +1763,7 @@ export const WorkflowToolbar = ({
             state={state}
             workflowId={effectiveWorkflowId}
           />
-          {effectiveWorkflowId && !state.isOwner && (
+          {isWorkflowRoute && effectiveWorkflowId && !state.isOwner && (
             <span className="hidden text-muted-foreground text-xs uppercase lg:inline">
               Read-only
             </span>
@@ -1779,7 +1781,7 @@ export const WorkflowToolbar = ({
             />
           )}
           <div className="flex items-center gap-2">
-            {effectiveWorkflowId && !state.isOwner && (
+            {isWorkflowRoute && effectiveWorkflowId && !state.isOwner && (
               <DuplicateButton
                 isDuplicating={state.isDuplicating}
                 onDuplicate={actions.handleDuplicate}
