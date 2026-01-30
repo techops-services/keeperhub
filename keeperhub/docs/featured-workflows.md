@@ -65,3 +65,7 @@ curl -X POST https://app.keeperhub.com/api/hub/featured -H "Content-Type: applic
   }
 }
 ```
+
+## Helper Script
+
+A batch script for featuring multiple workflows is available at `keeperhub/scripts/feature-workflows.sh`. It automatically fetches the API key from SSM if not set.
