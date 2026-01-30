@@ -934,6 +934,9 @@ export const PanelInner = () => {
                   config={selectedNode.data.config || {}}
                   disabled={isGenerating || !isOwner}
                   isOwner={isOwner}
+                  // start custom keeperhub code //
+                  nodeId={selectedNode.id}
+                  // end custom keeperhub code //
                   onUpdateConfig={handleUpdateConfig}
                 />
               ) : null}

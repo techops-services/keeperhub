@@ -49,6 +49,9 @@ type ActionConfigProps = {
   onUpdateConfig: (key: string, value: string) => void;
   disabled: boolean;
   isOwner?: boolean;
+  // start custom keeperhub code //
+  nodeId?: string;
+  // end keeperhub code //
 };
 
 // Database Query fields component
@@ -370,6 +373,9 @@ export function ActionConfig({
   onUpdateConfig,
   disabled,
   isOwner = true,
+  // start custom keeperhub code //
+  nodeId,
+  // end keeperhub code //
 }: ActionConfigProps) {
   const actionType = (config?.actionType as string) || "";
   const categories = useCategoryData();
@@ -626,6 +632,9 @@ export function ActionConfig({
             config={config}
             disabled={disabled}
             fields={pluginAction.configFields}
+            // start custom keeperhub code //
+            nodeId={nodeId}
+            // end keeperhub code //
             onUpdateConfig={handlePluginUpdateConfig}
           />
         )}
