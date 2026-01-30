@@ -13,6 +13,9 @@ import { OverlayProvider } from "@/components/overlays/overlay-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { KeeperHubExtensionLoader } from "@/keeperhub/components/extension-loader";
+// start custom keeperhub code //
+import { MobileWarningDialog } from "@/keeperhub/components/mobile-warning-dialog";
+// end keeperhub code //
 import { mono, sans } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 
@@ -60,6 +63,9 @@ const RootLayout = ({ children }: RootLayoutProps) => (
               </Suspense>
               <Toaster />
               <GlobalModals />
+              {/* start custom keeperhub code */}
+              <MobileWarningDialog />
+              {/* end keeperhub code */}
             </OverlayProvider>
           </AuthProvider>
         </Provider>
