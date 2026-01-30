@@ -81,7 +81,7 @@ export function SaveAddressForm({
             disabled={saving}
             id="save-label"
             onChange={(e) => setLabel(e.target.value)}
-            placeholder="e.g., Treasury Wallet"
+            placeholder="e.g. Treasury Wallet"
             value={label}
           />
         </div>

@@ -2,7 +2,6 @@
 
 import { Bookmark, Check } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
 import {
   Command,
   CommandEmpty,
@@ -94,7 +93,6 @@ export function AddressSelectPopover({
       setAddressBookEntries(entries);
     } catch (error) {
       console.error("Failed to load address book entries:", error);
-      toast.error("Failed to load address book");
     } finally {
       setLoadingEntries(false);
     }
