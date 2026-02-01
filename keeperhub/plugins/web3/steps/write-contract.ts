@@ -16,7 +16,7 @@ import {
 import { getOrganizationIdFromExecution } from "@/keeperhub/lib/workflow-helpers";
 import { db } from "@/lib/db";
 import { explorerConfigs, workflowExecutions } from "@/lib/db/schema";
-import { getTransactionUrl } from "@/lib/explorer";
+import { getAddressUrl, getTransactionUrl } from "@/lib/explorer";
 import { getChainIdFromNetwork, resolveRpcConfig } from "@/lib/rpc";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
@@ -347,11 +347,31 @@ async function stepHandler(
  * Write Contract Step
  * Writes data to a smart contract using state-changing functions
  */
-// biome-ignore lint/suspicious/useAwait: "use step" directive requires async
 export async function writeContractStep(
   input: WriteContractInput
 ): Promise<WriteContractResult> {
   "use step";
+
+  // Enrich input with contract address explorer link for the execution log
+  let enrichedInput: WriteContractInput & { contractAddressLink?: string } =
+    input;
+  try {
+    const chainId = getChainIdFromNetwork(input.network);
+    const explorerConfig = await db.query.explorerConfigs.findFirst({
+      where: eq(explorerConfigs.chainId, chainId),
+    });
+    if (explorerConfig) {
+      const contractAddressLink = getAddressUrl(
+        explorerConfig,
+        input.contractAddress
+      );
+      if (contractAddressLink) {
+        enrichedInput = { ...input, contractAddressLink };
+      }
+    }
+  } catch {
+    // Non-critical: if lookup fails, input logs without the link
+  }
 
   return withPluginMetrics(
     {
@@ -359,7 +379,7 @@ export async function writeContractStep(
       actionName: "write-contract",
       executionId: input._context?.executionId,
     },
-    () => withStepLogging(input, () => stepHandler(input))
+    () => withStepLogging(enrichedInput, () => stepHandler(input))
   );
 }
 

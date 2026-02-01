@@ -28,15 +28,15 @@ export function MobileWarningDialog() {
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
         className="fixed inset-0 bg-black/50"
-        role="presentation"
         onClick={handleContinue}
+        role="presentation"
       />
-      <div className="bg-background relative z-50 grid w-full max-w-[calc(100%-2rem)] gap-4 rounded-lg border p-6 shadow-lg sm:max-w-md">
+      <div className="relative z-50 grid w-full max-w-[calc(100%-2rem)] gap-4 rounded-lg border bg-background p-6 shadow-lg sm:max-w-md">
         <div className="flex flex-col items-center gap-2 text-center">
-          <div className="bg-muted mb-2 flex size-12 items-center justify-center rounded-full">
-            <Monitor className="text-muted-foreground size-6" />
+          <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-muted">
+            <Monitor className="size-6 text-muted-foreground" />
           </div>
-          <h2 className="text-lg font-semibold leading-none">
+          <h2 className="font-semibold text-lg leading-none">
             Desktop Optimized
           </h2>
           <p className="text-muted-foreground text-sm">
@@ -45,7 +45,7 @@ export function MobileWarningDialog() {
           </p>
         </div>
         <div className="flex justify-center">
-          <Button onClick={handleContinue} className="w-full sm:w-auto">
+          <Button className="w-full sm:w-auto" onClick={handleContinue}>
             Continue Anyway
           </Button>
         </div>

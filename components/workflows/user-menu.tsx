@@ -39,10 +39,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 // start custom keeperhub code //
 import { ManageOrgsModal } from "@/keeperhub/components/organization/manage-orgs-modal";
-import { useOrganization } from "@/keeperhub/lib/hooks/use-organization";
 import { AddressBookOverlay } from "@/keeperhub/components/overlays/address-book-overlay";
 import { FeedbackOverlay } from "@/keeperhub/components/overlays/feedback-overlay";
 import { WalletOverlay } from "@/keeperhub/components/overlays/wallet-overlay";
+import { useOrganization } from "@/keeperhub/lib/hooks/use-organization";
 // end keeperhub code //
 import { api } from "@/lib/api-client";
 import { signOut, useSession } from "@/lib/auth-client";
