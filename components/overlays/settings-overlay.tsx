@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AccountSettings } from "@/components/settings/account-settings";
+import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
+// start custom keeperhub code //
+import { ChangePasswordSection } from "@/keeperhub/components/settings/change-password-section";
+import { DeactivateAccountSection } from "@/keeperhub/components/settings/delete-account-section";
+// end keeperhub code //
 import { api } from "@/lib/api-client";
 import { Overlay } from "./overlay";
 import { useOverlay } from "./overlay-provider";
@@ -20,12 +25,18 @@ export function SettingsOverlay({ overlayId }: SettingsOverlayProps) {
   // Account state
   const [accountName, setAccountName] = useState("");
   const [accountEmail, setAccountEmail] = useState("");
+  // start custom keeperhub code //
+  const [providerId, setProviderId] = useState<string | null>(null);
+  // end keeperhub code //
 
   const loadAccount = useCallback(async () => {
     try {
       const data = await api.user.get();
       setAccountName(data.name || "");
       setAccountEmail(data.email || "");
+      // start custom keeperhub code //
+      setProviderId(data.providerId ?? null);
+      // end keeperhub code //
     } catch (error) {
       console.error("Failed to load account:", error);
     }
@@ -82,12 +93,30 @@ export function SettingsOverlay({ overlayId }: SettingsOverlayProps) {
           <Spinner />
         </div>
       ) : (
-        <AccountSettings
-          accountEmail={accountEmail}
-          accountName={accountName}
-          onEmailChange={setAccountEmail}
-          onNameChange={setAccountName}
-        />
+        <div className="space-y-6">
+          <AccountSettings
+            accountEmail={accountEmail}
+            accountName={accountName}
+            onEmailChange={setAccountEmail}
+            onNameChange={setAccountName}
+          />
+
+          {/* start custom keeperhub code */}
+          <Separator />
+
+          <div>
+            <h3 className="mb-3 font-medium text-sm">Security</h3>
+            <ChangePasswordSection providerId={providerId} />
+          </div>
+
+          <Separator />
+
+          <div>
+            <h3 className="mb-3 font-medium text-sm">Danger Zone</h3>
+            <DeactivateAccountSection />
+          </div>
+          {/* end keeperhub code */}
+        </div>
       )}
     </Overlay>
   );
