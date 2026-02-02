@@ -12,7 +12,7 @@ export const metadata = {
     default: "KeeperHub Docs",
     template: "%s - KeeperHub Docs",
   },
-  description: "KeeperHub Documentation - Blockchain automation without code",
+  description: "KeeperHub Documentation - Automate anything onchain",
   icons: {
     icon: "/favicon.ico",
   },
@@ -21,7 +21,7 @@ export const metadata = {
 // Hidden sections that should not appear in sidebar
 const HIDDEN_SECTIONS = ["api", "plans-features"];
 
-// Filter out hidden sections from page map and reorder items
+// Filter and reorder page map items
 function filterPageMap(
   items: Awaited<ReturnType<typeof getPageMap>>
 ): typeof items {
