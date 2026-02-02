@@ -2,7 +2,10 @@ import { Environment, Para as ParaServer } from "@getpara/server-sdk";
 import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
-import { normalizeAddressForStorage, truncateAddress } from "@/keeperhub/lib/address-utils";
+import {
+  normalizeAddressForStorage,
+  truncateAddress,
+} from "@/keeperhub/lib/address-utils";
 import { apiError } from "@/keeperhub/lib/api-error";
 import { encryptUserShare } from "@/keeperhub/lib/encryption";
 import {
