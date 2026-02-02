@@ -17,7 +17,9 @@ export function MobileWarningDialog() {
     }
   }, []);
 
-  if (!open) return null;
+  if (!open) {
+    return null;
+  }
 
   const handleContinue = () => {
     localStorage.setItem(STORAGE_KEY, "true");
@@ -26,10 +28,10 @@ export function MobileWarningDialog() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div
+      <button
         className="fixed inset-0 bg-black/50"
         onClick={handleContinue}
-        role="presentation"
+        type="button"
       />
       <div className="relative z-50 grid w-full max-w-[calc(100%-2rem)] gap-4 rounded-lg border bg-background p-6 shadow-lg sm:max-w-md">
         <div className="flex flex-col items-center gap-2 text-center">
