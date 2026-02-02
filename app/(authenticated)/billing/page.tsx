@@ -81,7 +81,9 @@ export default function BillingPage() {
       <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-8">
         <div className="flex items-center justify-between">
           <div>
-            <p className="mb-1 text-muted-foreground text-sm">Current Balance</p>
+            <p className="mb-1 text-muted-foreground text-sm">
+              Current Balance
+            </p>
             <p className="font-bold text-5xl">
               {balance?.creditBalance?.toLocaleString() ?? 0}
             </p>
