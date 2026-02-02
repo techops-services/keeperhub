@@ -626,6 +626,14 @@ export function TemplateBadgeInput({
     document.execCommand("insertText", false, text);
   };
 
+  // start custom keeperhub code //
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && showAutocomplete) {
+      e.preventDefault();
+    }
+  };
+  // end keeperhub code //
+
   // Update display only when needed (not while typing)
   useEffect(() => {
     if (shouldUpdateDisplay.current) {
@@ -649,6 +657,7 @@ export function TemplateBadgeInput({
           onBlur={handleBlur}
           onFocus={handleFocus}
           onInput={handleInput}
+          onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           ref={contentRef}
           role="textbox"
