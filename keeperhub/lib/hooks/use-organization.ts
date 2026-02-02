@@ -2,7 +2,7 @@
 
 import { getDefaultStore } from "jotai";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { registerOrganizationRefetch } from "@/keeperhub/lib/refetch-organizations";
 import { api } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
@@ -58,23 +58,53 @@ export function useOrganization() {
   };
 }
 
+export type OrganizationWithRole = {
+  id: string;
+  name: string;
+  slug: string;
+  logo: string | null;
+  createdAt: string;
+  metadata: string | null;
+  role: string;
+};
+
 export function useOrganizations() {
-  const { data: orgs, isPending, refetch } = authClient.useListOrganizations();
+  const [organizations, setOrganizations] = useState<OrganizationWithRole[]>(
+    []
+  );
+  const [isLoading, setIsLoading] = useState(true);
+
+  const refetch = useCallback(async () => {
+    try {
+      const response = await fetch("/api/organizations");
+      if (response.ok) {
+        const data = (await response.json()) as OrganizationWithRole[];
+        setOrganizations(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch organizations:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
 
   // Register this hook's refetch callback so it can be triggered externally
   useEffect(
     () =>
       registerOrganizationRefetch(() => {
-        console.log("[useOrganizations] Refetching organization list...");
         refetch();
       }),
     [refetch]
   );
 
   return {
-    organizations: orgs || [],
-    isLoading: isPending,
-    refetch, // Keep exposing refetch for direct use
+    organizations,
+    isLoading,
+    refetch,
   };
 }
 
