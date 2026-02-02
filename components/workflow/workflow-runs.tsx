@@ -221,8 +221,9 @@ function JsonWithLinks({ data }: { data: unknown }) {
 
   // Split by quoted strings to preserve structure
   // Capture URLs, hex hashes/addresses (0x + 40+ hex chars), and other quoted strings
+  // Uses (?:[^"\\]|\\.)* to correctly skip escaped quotes inside JSON values
   const parts = jsonString.split(
-    /("https?:\/\/[^"]+"|"0x[a-fA-F0-9]{40,}"|"[^"]*")/g
+    /("https?:\/\/(?:[^"\\]|\\.)+"|"0x[a-fA-F0-9]{40,}"|"(?:[^"\\]|\\.)*")/g
   );
 
   return (
