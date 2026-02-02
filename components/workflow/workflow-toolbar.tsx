@@ -24,6 +24,7 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 // end custom KeeperHub code
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import {
@@ -41,6 +42,7 @@ import { authClient, useSession } from "@/lib/auth-client";
 import { getCustomLogo } from "@/lib/extension-registry";
 import { integrationsAtom } from "@/lib/integrations-store";
 import type { IntegrationType } from "@/lib/types/integration";
+import { cn } from "@/lib/utils";
 import {
   addNodeAtom,
   canRedoAtom,
@@ -1504,6 +1506,21 @@ function RunButtonGroup({
   // end custom keeperhub code //
 }
 
+// Read-only badge - pill with a live green accent on the toolbar
+function ReadOnlyBadge({ className }: { className?: string }) {
+  return (
+    <Badge
+      className={cn(
+        "border-keeperhub-green/60 bg-keeperhub-green/10 font-medium text-foreground/90 uppercase backdrop-blur-sm dark:border-keeperhub-green/50 dark:bg-transparent",
+        className
+      )}
+      variant="outline"
+    >
+      Preview
+    </Badge>
+  );
+}
+
 // Duplicate Button Component - placed next to Sign In for non-owners
 function DuplicateButton({
   isDuplicating,
@@ -1544,6 +1561,8 @@ function WorkflowMenuComponent({
   // start custom KeeperHub code
   const pathname = usePathname();
   const isHubPage = pathname === "/hub";
+  const isWorkflowRoute =
+    pathname === "/workflows" || pathname.startsWith("/workflows/");
 
   // validate against route workflow id as the state can be out of date
   const { workflowId: routeWorkflowId } = useParams();
@@ -1646,10 +1665,8 @@ function WorkflowMenuComponent({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      {workflowId && !state.isOwner && (
-        <span className="text-muted-foreground text-xs uppercase lg:hidden">
-          Read-only
-        </span>
+      {isWorkflowRoute && workflowId && !state.isOwner && (
+        <ReadOnlyBadge className="lg:hidden" />
       )}
     </div>
   );
@@ -1705,10 +1722,8 @@ export const WorkflowToolbar = ({
             state={state}
             workflowId={effectiveWorkflowId}
           />
-          {effectiveWorkflowId && !state.isOwner && (
-            <span className="hidden text-muted-foreground text-xs uppercase lg:inline">
-              Read-only
-            </span>
+          {isWorkflowRoute && effectiveWorkflowId && !state.isOwner && (
+            <ReadOnlyBadge className="hidden lg:inline-flex" />
           )}
         </div>
 
@@ -1723,14 +1738,16 @@ export const WorkflowToolbar = ({
               />
             )}
             <div className="flex items-center gap-2">
-              {effectiveWorkflowId && !state.isOwner && (
+              {isWorkflowRoute && effectiveWorkflowId && !state.isOwner && (
                 <DuplicateButton
                   isDuplicating={state.isDuplicating}
                   onDuplicate={actions.handleDuplicate}
                 />
               )}
               {/* start custom keeperhub code // */}
-              <OrgSwitcher />
+              <div className="hidden lg:block">
+                <OrgSwitcher />
+              </div>
               {/* end keeperhub code // */}
               <UserMenu />
             </div>
@@ -1761,10 +1778,8 @@ export const WorkflowToolbar = ({
             state={state}
             workflowId={effectiveWorkflowId}
           />
-          {effectiveWorkflowId && !state.isOwner && (
-            <span className="hidden text-muted-foreground text-xs uppercase lg:inline">
-              Read-only
-            </span>
+          {isWorkflowRoute && effectiveWorkflowId && !state.isOwner && (
+            <ReadOnlyBadge className="hidden lg:inline-flex" />
           )}
         </div>
       </Panel>
@@ -1779,14 +1794,16 @@ export const WorkflowToolbar = ({
             />
           )}
           <div className="flex items-center gap-2">
-            {effectiveWorkflowId && !state.isOwner && (
+            {isWorkflowRoute && effectiveWorkflowId && !state.isOwner && (
               <DuplicateButton
                 isDuplicating={state.isDuplicating}
                 onDuplicate={actions.handleDuplicate}
               />
             )}
             {/* start custom keeperhub code // */}
-            <OrgSwitcher />
+            <div className="hidden lg:block">
+              <OrgSwitcher />
+            </div>
             {/* end keeperhub code // */}
             <UserMenu />
           </div>

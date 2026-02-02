@@ -174,10 +174,19 @@ export const PanelInner = () => {
   const clearNodeStatuses = useSetAtom(clearNodeStatusesAtom);
   const clearWorkflow = useSetAtom(clearWorkflowAtom);
   const { open: openOverlay } = useOverlay();
+  const setPropertiesPanelActiveTab = useSetAtom(propertiesPanelActiveTabAtom);
 
-  // Watch showDeleteDialog atom and open overlay when it becomes true
+  // Watch showDeleteDialog atom: check for executions first, then open delete overlay or warn and switch to runs
   useEffect(() => {
-    if (showDeleteDialog) {
+    if (!showDeleteDialog) {
+      return;
+    }
+    if (!currentWorkflowId) {
+      setShowDeleteDialog(false);
+      return;
+    }
+
+    const openDeleteWorkflowOverlay = () => {
       openOverlay(ConfirmOverlay, {
         title: "Delete Workflow",
         message: `Are you sure you want to delete "${currentWorkflowName}"? This will permanently delete the workflow. This cannot be undone.`,
@@ -192,19 +201,67 @@ export const PanelInner = () => {
             await api.workflow.delete(currentWorkflowId);
             toast.success("Workflow deleted successfully");
             window.location.href = "/";
-          } catch (_error) {
-            toast.error("Failed to delete workflow. Please try again.");
+          } catch (error) {
+            const msg =
+              error instanceof Error
+                ? error.message
+                : "Failed to delete workflow. Please try again.";
+            toast.error(msg);
           }
         },
       });
-      setShowDeleteDialog(false);
-    }
+    };
+
+    const openCannotDeleteWarning = () => {
+      openOverlay(ConfirmOverlay, {
+        title: "Cannot delete workflow",
+        message:
+          "This workflow has run history. Run history may contain sensitive data you want to save before deleting. Delete all executions from the Runs tab first, then you can delete the workflow.",
+        confirmLabel: "View runs",
+        cancelLabel: "Cancel",
+        destructive: false,
+        onConfirm: () => {
+          setPropertiesPanelActiveTab("runs");
+        },
+      });
+    };
+
+    let cancelled = false;
+    const handleCheckError = () => {
+      if (!cancelled) {
+        setShowDeleteDialog(false);
+        toast.error("Could not check workflow run history. Please try again.");
+      }
+    };
+    const checkExecutionsAndOpenOverlay = async () => {
+      try {
+        const executions = await api.workflow.getExecutions(currentWorkflowId);
+        if (cancelled) {
+          return;
+        }
+        setShowDeleteDialog(false);
+        const executionList = Array.isArray(executions) ? executions : [];
+        if (executionList.length > 0) {
+          openCannotDeleteWarning();
+          return;
+        }
+        openDeleteWorkflowOverlay();
+      } catch (_e) {
+        handleCheckError();
+      }
+    };
+    checkExecutionsAndOpenOverlay();
+
+    return () => {
+      cancelled = true;
+    };
   }, [
     showDeleteDialog,
     currentWorkflowId,
     currentWorkflowName,
     openOverlay,
     setShowDeleteDialog,
+    setPropertiesPanelActiveTab,
   ]);
 
   // Watch showClearDialog atom and open overlay when it becomes true
@@ -934,6 +991,9 @@ export const PanelInner = () => {
                   config={selectedNode.data.config || {}}
                   disabled={isGenerating || !isOwner}
                   isOwner={isOwner}
+                  // start custom keeperhub code //
+                  nodeId={selectedNode.id}
+                  // end custom keeperhub code //
                   onUpdateConfig={handleUpdateConfig}
                 />
               ) : null}

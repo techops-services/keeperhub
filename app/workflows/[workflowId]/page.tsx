@@ -786,7 +786,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
       {/* Right panel overlay (desktop only) - only show if trigger exists */}
       {!isMobile && hasTriggerNode && (
         <div
-          className="pointer-events-auto absolute top-[60px] right-0 bottom-0 z-20 border-l bg-background transition-transform duration-300 ease-out"
+          className="pointer-events-auto absolute top-24 right-0 bottom-0 z-20 border-l bg-background transition-transform duration-300 ease-out lg:top-[60px]"
           style={{
             width: `${panelWidth}%`,
             transform:

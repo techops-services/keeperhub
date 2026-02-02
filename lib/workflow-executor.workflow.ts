@@ -71,8 +71,9 @@ export type WorkflowExecutionInput = {
 /**
  * Helper to replace template variables in conditions
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: KEEP-1284 validation requires checking multiple error conditions
 function replaceTemplateVariable(
-  match: string,
+  _match: string,
   nodeId: string,
   rest: string,
   outputs: NodeOutputs,
@@ -82,9 +83,11 @@ function replaceTemplateVariable(
   const sanitizedNodeId = nodeId.replace(/[^a-zA-Z0-9]/g, "_");
   const output = outputs[sanitizedNodeId];
 
+  // KEEP-1284: Throw error when referenced node output doesn't exist
   if (!output) {
-    console.log("[Condition] Output not found for node:", sanitizedNodeId);
-    return match;
+    throw new Error(
+      `Condition references node "${nodeId}" but no output was found. The referenced node may not have executed or produced output.`
+    );
   }
 
   const dotIndex = rest.indexOf(".");
@@ -93,7 +96,10 @@ function replaceTemplateVariable(
   if (dotIndex === -1) {
     value = output.data;
   } else if (output.data === null || output.data === undefined) {
-    value = undefined;
+    // KEEP-1284: Throw error when node data is null/undefined
+    throw new Error(
+      `Condition references "${rest}" but the node output data is ${output.data === null ? "null" : "undefined"}. Ensure the referenced node produces valid output.`
+    );
   } else {
     const fieldPath = rest.substring(dotIndex + 1);
     const fields = fieldPath.split(".");
@@ -102,16 +108,21 @@ function replaceTemplateVariable(
 
     for (const field of fields) {
       if (current && typeof current === "object") {
+        // KEEP-1284: Check if field exists before accessing
+        if (!(field in current)) {
+          throw new Error(
+            `Condition references field "${fieldPath}" but "${field}" does not exist on the data. Available fields: ${Object.keys(current).join(", ") || "(none)"}`
+          );
+        }
         current = current[field];
       } else {
-        console.log("[Condition] Field access failed:", fieldPath);
-        value = undefined;
-        break;
+        // KEEP-1284: Throw error when field access fails
+        throw new Error(
+          `Condition references field "${fieldPath}" but it could not be resolved. Check that the field path is correct.`
+        );
       }
     }
-    if (value === undefined && current !== undefined) {
-      value = current;
-    }
+    value = current;
   }
 
   const varName = `__v${varCounter.value}`;
@@ -132,11 +143,20 @@ type ConditionEvalResult = {
  * Security: Expressions are validated before evaluation to prevent code injection.
  * Only comparison operators, logical operators, and whitelisted methods are allowed.
  */
-function evaluateConditionExpression(
+// Exported for testing - KEEP-1284
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: KEEP-1284 validation requires comprehensive error checking
+export function evaluateConditionExpression(
   conditionExpression: unknown,
   outputs: NodeOutputs
 ): ConditionEvalResult {
   console.log("[Condition] Original expression:", conditionExpression);
+
+  // KEEP-1284: Throw error when condition is not configured
+  if (conditionExpression === undefined || conditionExpression === null) {
+    throw new Error(
+      "Condition node has no expression configured. Please add a condition expression."
+    );
+  }
 
   if (typeof conditionExpression === "boolean") {
     return { result: conditionExpression, resolvedValues: {} };
@@ -144,11 +164,12 @@ function evaluateConditionExpression(
 
   if (typeof conditionExpression === "string") {
     // Pre-validate the expression before any processing
+    // KEEP-1284: Throw error when condition is empty/invalid instead of silently returning false
     const preValidation = preValidateConditionExpression(conditionExpression);
     if (!preValidation.valid) {
-      console.error("[Condition] Pre-validation failed:", preValidation.error);
-      console.error("[Condition] Expression was:", conditionExpression);
-      return { result: false, resolvedValues: {} };
+      throw new Error(
+        `Condition expression is invalid: ${preValidation.error}. Expression: "${conditionExpression}"`
+      );
     }
 
     try {
@@ -176,15 +197,12 @@ function evaluateConditionExpression(
       );
 
       // Validate the transformed expression before evaluation
+      // KEEP-1284: Throw error when validation fails instead of silently returning false
       const validation = validateConditionExpression(transformedExpression);
       if (!validation.valid) {
-        console.error("[Condition] Validation failed:", validation.error);
-        console.error("[Condition] Original expression:", conditionExpression);
-        console.error(
-          "[Condition] Transformed expression:",
-          transformedExpression
+        throw new Error(
+          `Condition expression validation failed: ${validation.error}. Original: "${conditionExpression}"`
         );
-        return { result: false, resolvedValues };
       }
 
       const varNames = Object.keys(evalContext);
@@ -199,13 +217,26 @@ function evaluateConditionExpression(
       const result = evalFunc(...varValues);
       return { result: Boolean(result), resolvedValues };
     } catch (error) {
+      // KEEP-1284: Re-throw errors about missing data - these should not be silently swallowed
+      if (
+        error instanceof Error &&
+        error.message.includes("Condition references")
+      ) {
+        throw error;
+      }
+      // Other errors (syntax errors, etc.) should still fail loudly
       console.error("[Condition] Failed to evaluate condition:", error);
       console.error("[Condition] Expression was:", conditionExpression);
-      return { result: false, resolvedValues: {} };
+      throw new Error(
+        `Failed to evaluate condition expression: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
-  return { result: Boolean(conditionExpression), resolvedValues: {} };
+  // KEEP-1284: Throw error for unexpected expression types (number, object, etc.)
+  throw new Error(
+    `Condition expression must be a string or boolean, got ${typeof conditionExpression}`
+  );
 }
 
 /**
@@ -232,8 +263,20 @@ async function executeActionStep(input: {
     const systemAction = SYSTEM_ACTIONS.Condition;
     const module = await systemAction.importer();
     const originalExpression = stepInput.condition;
-    const { result: evaluatedCondition, resolvedValues } =
-      evaluateConditionExpression(originalExpression, outputs);
+
+    // KEEP-1284: Catch evaluation errors and pass to step so it gets logged
+    let evaluatedCondition = false;
+    let resolvedValues: Record<string, unknown> = {};
+    let evaluationError: string | undefined;
+
+    try {
+      const result = evaluateConditionExpression(originalExpression, outputs);
+      evaluatedCondition = result.result;
+      resolvedValues = result.resolvedValues;
+    } catch (error) {
+      evaluationError = error instanceof Error ? error.message : String(error);
+    }
+
     console.log("[Condition] Final result:", evaluatedCondition);
 
     return await module[systemAction.stepFunction]({
@@ -243,6 +286,7 @@ async function executeActionStep(input: {
         typeof originalExpression === "string" ? originalExpression : undefined,
       values:
         Object.keys(resolvedValues).length > 0 ? resolvedValues : undefined,
+      _evaluationError: evaluationError,
       _context: context,
     });
   }

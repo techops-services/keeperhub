@@ -9,7 +9,6 @@ import {
   Plus,
   Settings,
   Trash2,
-  UserPlus,
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -52,21 +51,6 @@ import {
 import { refetchOrganizations } from "@/keeperhub/lib/refetch-organizations";
 import { api } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
-
-// Helper function to get status color based on invitation status
-function getStatusColor(status: string): string {
-  switch (status) {
-    case "accepted":
-      return "text-green-600";
-    case "rejected":
-    case "cancelled":
-      return "text-red-600";
-    case "expired":
-      return "text-orange-600";
-    default:
-      return "text-muted-foreground";
-  }
-}
 
 // Helper function to get status badge classes
 function getStatusBadgeClasses(status: string): string {
@@ -160,61 +144,6 @@ function ReceivedInvitationItem({
   );
 }
 
-// Separate component to render sent invitation items
-type SentInvitationItemProps = {
-  invitation: {
-    id: string;
-    email: string;
-    role?: string;
-    status: string;
-    expiresAt?: Date | string;
-  };
-  cancellingInvite: string | null;
-  onCancel: (invitationId: string) => void;
-  canManageInvitations: boolean;
-};
-
-function SentInvitationItem({
-  invitation,
-  cancellingInvite,
-  onCancel,
-  canManageInvitations,
-}: SentInvitationItemProps) {
-  const isExpired = invitation.expiresAt
-    ? new Date(invitation.expiresAt) < new Date()
-    : false;
-  const statusDisplay =
-    invitation.status === "pending" && isExpired
-      ? "expired"
-      : invitation.status;
-  const statusColor = getStatusColor(statusDisplay);
-  const canCancel =
-    canManageInvitations && invitation.status === "pending" && !isExpired;
-
-  return (
-    <div className="flex items-center justify-between rounded-lg border p-3">
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-medium text-sm">{invitation.email}</p>
-        <p className="text-muted-foreground text-xs">
-          Role: {invitation.role || "member"} •{" "}
-          <span className={statusColor}>{statusDisplay}</span>
-        </p>
-      </div>
-      {canCancel && (
-        <Button
-          disabled={cancellingInvite === invitation.id}
-          onClick={() => onCancel(invitation.id)}
-          size="sm"
-          variant="ghost"
-        >
-          <X className="h-4 w-4" />
-          <span className="sr-only">Cancel invitation</span>
-        </Button>
-      )}
-    </div>
-  );
-}
-
 type ManageOrgsModalProps = {
   triggerText?: string;
   defaultShowCreateForm?: boolean;
@@ -235,7 +164,6 @@ export function ManageOrgsModal({
   const open = externalOpen !== undefined ? externalOpen : internalOpen;
   const setOpen = externalOnOpenChange || setInternalOpen;
   const [showCreateForm, setShowCreateForm] = useState(defaultShowCreateForm);
-  const [showInviteForm, setShowInviteForm] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
 
@@ -244,8 +172,7 @@ export function ManageOrgsModal({
 
   const { organization, switchOrganization } = useOrganization();
   const { organizations } = useOrganizations();
-  const { isOwner: isActiveOrgOwner, isAdmin: isActiveOrgAdmin } =
-    useActiveMember();
+  const { isOwner: isActiveOrgOwner } = useActiveMember();
   const router = useRouter();
   const { data: session } = authClient.useSession();
 
@@ -308,9 +235,11 @@ export function ManageOrgsModal({
     id: string;
     userId: string;
     role: string;
+    createdAt?: Date;
     user: {
       name?: string;
       email?: string;
+      image?: string;
     };
   };
   const [members, setMembers] = useState<Member[]>([]);
@@ -326,9 +255,7 @@ export function ManageOrgsModal({
   const isOwner = isManagedOrgActive
     ? isActiveOrgOwner
     : managedOrgRole === "owner";
-  const isAdmin = isManagedOrgActive
-    ? isActiveOrgAdmin
-    : managedOrgRole === "admin" || managedOrgRole === "owner";
+  const canInvite = managedOrgRole === "owner" || managedOrgRole === "admin";
 
   const fetchInvitations = useCallback(async () => {
     setLoadingInvitations(true);
@@ -457,7 +384,6 @@ export function ManageOrgsModal({
   useEffect(() => {
     if (!open) {
       setManagedOrgId(null);
-      setShowInviteForm(false);
       setInviteId(null);
     }
   }, [open]);
@@ -645,6 +571,7 @@ export function ManageOrgsModal({
         }
       }
 
+      refetchOrganizations();
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "An error occurred");
@@ -844,7 +771,7 @@ export function ManageOrgsModal({
                                 )}
                               </div>
                               <p className="text-muted-foreground text-xs capitalize">
-                                {(org as { role?: string }).role || "Member"}
+                                {org.role || "member"}
                               </p>
                             </div>
                             <Button
@@ -875,7 +802,6 @@ export function ManageOrgsModal({
                     className="gap-2"
                     onClick={() => {
                       setManagedOrgId(null);
-                      setShowInviteForm(false);
                       setInviteId(null);
                     }}
                     size="sm"
@@ -959,140 +885,116 @@ export function ManageOrgsModal({
                           </span>
                         )}
                       </div>
-                      <p className="text-muted-foreground text-sm">
-                        {managedOrgRole || "Member"}
-                      </p>
                     </div>
 
-                    {/* Pending Invitations Section */}
-                    {sentInvitations.filter((inv) => inv.status === "pending")
-                      .length > 0 && (
-                      <div className="space-y-3">
-                        <h4 className="font-medium text-muted-foreground text-sm">
-                          Pending Invitations
-                        </h4>
-                        <div className="space-y-2">
-                          {sentInvitations
-                            .filter((inv) => inv.status === "pending")
-                            .map((invitation) => (
-                              <SentInvitationItem
-                                cancellingInvite={cancellingInvite}
-                                canManageInvitations={isAdmin}
-                                invitation={invitation}
-                                key={invitation.id}
-                                onCancel={handleCancelInvitation}
-                              />
-                            ))}
+                    {/* Invite Members - Inline Form */}
+                    {canInvite && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            className="flex-1"
+                            disabled={inviteLoading}
+                            onChange={(e) => {
+                              setInviteEmail(e.target.value);
+                              if (inviteId) {
+                                setInviteId(null);
+                              }
+                            }}
+                            placeholder="colleague@example.com"
+                            type="email"
+                            value={inviteEmail}
+                          />
+                          <Select
+                            onValueChange={(v) =>
+                              setInviteRole(v as "member" | "admin")
+                            }
+                            value={inviteRole}
+                          >
+                            <SelectTrigger className="w-[130px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="member">Member</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            disabled={inviteLoading || !inviteEmail}
+                            onClick={handleInviteMember}
+                            size="default"
+                          >
+                            <Mail className="mr-2 h-4 w-4" />
+                            {inviteLoading ? "Sending..." : "Invite"}
+                          </Button>
                         </div>
                       </div>
                     )}
 
-                    {/* Members Section */}
-                    {members.length > 0 && (
+                    {/* Members & Pending Invitations (merged) */}
+                    {(members.length > 0 ||
+                      sentInvitations.some(
+                        (inv) => inv.status === "pending"
+                      )) && (
                       <div className="space-y-3">
                         <h4 className="font-medium text-muted-foreground text-sm">
                           Members
                         </h4>
                         <div className="space-y-2">
-                          {members.map((member, index) => (
-                            <div
-                              className="flex items-center justify-between rounded-lg border p-3"
-                              key={member.id || `member-${index}`}
-                            >
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate font-medium text-sm">
-                                  {member.user?.email || "Unknown"}
-                                </p>
-                                <p className="text-muted-foreground text-xs">
-                                  {member.role}
-                                </p>
+                          {[
+                            ...members.map((m) => ({
+                              kind: "member" as const,
+                              email: m.user?.email || "Unknown",
+                              role: m.role,
+                              id: m.id,
+                            })),
+                            ...sentInvitations
+                              .filter((inv) => inv.status === "pending")
+                              .map((inv) => ({
+                                kind: "invite" as const,
+                                email: inv.email,
+                                role: inv.role || "member",
+                                id: inv.id,
+                              })),
+                          ]
+                            .sort((a, b) =>
+                              a.email.localeCompare(b.email, undefined, {
+                                sensitivity: "base",
+                              })
+                            )
+                            .map((entry) => (
+                              <div
+                                className="flex items-center justify-between rounded-lg border p-3"
+                                key={entry.id}
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <p
+                                    className={`truncate font-medium text-sm ${entry.kind === "invite" ? "text-muted-foreground" : ""}`}
+                                  >
+                                    {entry.email}
+                                  </p>
+                                  <p className="text-muted-foreground text-xs">
+                                    {entry.role}
+                                    {entry.kind === "invite" && " - invited"}
+                                  </p>
+                                </div>
+                                {entry.kind === "invite" && canInvite && (
+                                  <Button
+                                    disabled={cancellingInvite === entry.id}
+                                    onClick={() =>
+                                      handleCancelInvitation(entry.id)
+                                    }
+                                    size="sm"
+                                    variant="ghost"
+                                  >
+                                    <X className="mr-1 h-4 w-4" />
+                                    Remove
+                                  </Button>
+                                )}
                               </div>
-                            </div>
-                          ))}
+                            ))}
                         </div>
                       </div>
                     )}
-
-                    {/* Invite Members Section */}
-                    <div className="space-y-3">
-                      {showInviteForm ? (
-                        <div className="space-y-3">
-                          <div className="space-y-2">
-                            <Label htmlFor="invite-email">Email Address</Label>
-                            <Input
-                              disabled={inviteLoading}
-                              id="invite-email"
-                              onChange={(e) => {
-                                setInviteEmail(e.target.value);
-                                if (inviteId) {
-                                  setInviteId(null);
-                                }
-                              }}
-                              placeholder="colleague@example.com"
-                              type="email"
-                              value={inviteEmail}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="invite-role">Role</Label>
-                            <Select
-                              onValueChange={(v) =>
-                                setInviteRole(v as "member" | "admin")
-                              }
-                              value={inviteRole}
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="member">
-                                  Member - Can create workflows
-                                </SelectItem>
-                                <SelectItem value="admin">
-                                  Admin - Can manage members and wallets
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              className="flex-1"
-                              disabled={inviteLoading}
-                              onClick={() => {
-                                setShowInviteForm(false);
-                                setInviteEmail("");
-                                setInviteId(null);
-                              }}
-                              variant="outline"
-                            >
-                              Close
-                            </Button>
-                            <Button
-                              className="flex-1"
-                              disabled={inviteLoading || !inviteEmail}
-                              onClick={handleInviteMember}
-                            >
-                              <Mail className="mr-2 h-4 w-4" />
-                              {inviteLoading ? "Sending..." : "Send Invitation"}
-                            </Button>
-                          </div>
-                          {inviteId && (
-                            <div className="rounded-md bg-green-50 px-3 py-2 text-center text-green-700 text-sm">
-                              Invitation sent
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <Button
-                          className="w-full"
-                          onClick={() => setShowInviteForm(true)}
-                          variant="outline"
-                        >
-                          <UserPlus className="mr-2 h-4 w-4" />
-                          Invite Members
-                        </Button>
-                      )}
-                    </div>
 
                     {/* Leave/Delete Organization */}
                     <div className="space-y-2 border-t pt-3">

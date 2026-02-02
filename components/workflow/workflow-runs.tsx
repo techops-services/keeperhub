@@ -132,6 +132,9 @@ function createExecutionLogsMap(logs: ExecutionLog[]): Record<
   return logsMap;
 }
 
+// Regex for Ethereum addresses (40 hex chars) and tx hashes (64 hex chars)
+const ETH_HEX_REGEX = /^0x[a-fA-F0-9]{40,}$/;
+
 // Helper to check if a string is a URL
 function isUrl(str: string): boolean {
   try {
@@ -142,53 +145,149 @@ function isUrl(str: string): boolean {
   }
 }
 
-// Helper to extract explorer link from step output
-// Returns transactionLink for tx steps, addressLink for balance steps
-function getExplorerLink(output: unknown): string | null {
-  if (typeof output !== "object" || output === null) {
-    return null;
-  }
-  const out = output as Record<string, unknown>;
-  // Transaction link for transfer/write-contract steps
-  if (typeof out.transactionLink === "string" && out.transactionLink) {
-    return out.transactionLink;
-  }
-  // Address link for check-balance steps
-  if (typeof out.addressLink === "string" && out.addressLink) {
-    return out.addressLink;
-  }
-  return null;
+// Inline copy button for use inside JSON output
+function InlineCopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <button
+      className="ml-1 inline-flex align-middle text-muted-foreground hover:text-foreground"
+      onClick={async (e) => {
+        e.stopPropagation();
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }}
+      title="Copy"
+      type="button"
+    >
+      {copied ? (
+        <Check className="h-3 w-3 text-green-600" />
+      ) : (
+        <Copy className="h-3 w-3" />
+      )}
+    </button>
+  );
 }
 
-// Component to render JSON with clickable links
+// Known link field to value field pairings.
+// When both fields exist, the link field is hidden from display
+// and its URL is shown as an icon next to the value field.
+const LINK_FIELD_PAIRS: Record<string, string> = {
+  transactionLink: "transactionHash",
+  addressLink: "address",
+  contractAddressLink: "contractAddress",
+  recipientAddressLink: "recipientAddress",
+};
+
+// Pre-process output data: strip link fields and build a value-to-URL map
+function processDataForDisplay(data: unknown): {
+  displayData: unknown;
+  linkMap: Map<string, string>;
+} {
+  const linkMap = new Map<string, string>();
+
+  if (typeof data !== "object" || data === null) {
+    return { displayData: data, linkMap };
+  }
+
+  const obj = data as Record<string, unknown>;
+
+  // Collect link URLs for paired fields
+  for (const [linkField, valueField] of Object.entries(LINK_FIELD_PAIRS)) {
+    const linkValue = obj[linkField];
+    const fieldValue = obj[valueField];
+    if (typeof linkValue === "string" && typeof fieldValue === "string") {
+      linkMap.set(fieldValue, linkValue);
+    }
+  }
+
+  // Build filtered data: always strip known link fields from display
+  const filtered: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (key in LINK_FIELD_PAIRS) {
+      continue;
+    }
+    filtered[key] = value;
+  }
+
+  return { displayData: filtered, linkMap };
+}
+
+// Component to render JSON with clickable links and inline action icons
 function JsonWithLinks({ data }: { data: unknown }) {
-  // Use regex to find and replace URLs in the JSON string
-  const jsonString = JSON.stringify(data, null, 2);
+  const { displayData, linkMap } = processDataForDisplay(data);
+  const jsonString = JSON.stringify(displayData, null, 2);
 
   // Split by quoted strings to preserve structure
-  const parts = jsonString.split(/("https?:\/\/[^"]+"|"[^"]*")/g);
+  // Capture URLs, hex hashes/addresses (0x + 40+ hex chars), and other quoted strings
+  // Uses (?:[^"\\]|\\.)* to correctly skip escaped quotes inside JSON values
+  const parts = jsonString.split(
+    /("https?:\/\/(?:[^"\\]|\\.)+"|"0x[a-fA-F0-9]{40,}"|"(?:[^"\\]|\\.)*")/g
+  );
 
   return (
     <>
       {parts.map((part) => {
-        // Check if this part is a quoted URL string
         if (part.startsWith('"') && part.endsWith('"')) {
           const innerValue = part.slice(1, -1);
+
+          // URL values: clickable link + copy + external link icons
           if (isUrl(innerValue)) {
             return (
-              <a
-                className="text-blue-500 underline hover:text-blue-400"
-                href={innerValue}
-                key={innerValue}
-                rel="noopener noreferrer"
-                target="_blank"
+              <span
+                className="inline-flex items-center"
+                key={`u-${innerValue}`}
               >
-                {part}
-              </a>
+                <a
+                  className="text-blue-500 underline hover:text-blue-400"
+                  href={innerValue}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  {part}
+                </a>
+                <InlineCopyButton text={innerValue} />
+                <a
+                  className="ml-1 inline-flex align-middle text-muted-foreground hover:text-foreground"
+                  href={innerValue}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                  title="View on explorer"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </span>
+            );
+          }
+
+          // Ethereum addresses (40 hex) or tx hashes (64 hex): copy + optional link icons
+          if (ETH_HEX_REGEX.test(innerValue)) {
+            const explorerUrl = linkMap.get(innerValue);
+            // Truncate: 0x + first 6 hex chars + ... + last 6 hex chars
+            const truncated = `${innerValue.slice(0, 8)}...${innerValue.slice(-6)}`;
+            return (
+              <span
+                className="inline-flex items-center"
+                key={`h-${innerValue}`}
+              >
+                {`"${truncated}"`}
+                <InlineCopyButton text={innerValue} />
+                {explorerUrl && (
+                  <a
+                    className="ml-1 inline-flex align-middle text-muted-foreground hover:text-foreground"
+                    href={explorerUrl}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                    title="View on explorer"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                )}
+              </span>
             );
           }
         }
-        // For non-URL parts, just render as text (no key needed for text nodes)
         return part;
       })}
     </>
@@ -480,8 +579,6 @@ function ExecutionLogEntry({
   isFirst: boolean;
   isLast: boolean;
 }) {
-  const explorerLink = getExplorerLink(log.output);
-
   return (
     <div className="relative flex gap-3" key={log.id}>
       {/* Timeline connector */}
@@ -521,39 +618,6 @@ function ExecutionLogEntry({
                 <span className="truncate font-medium text-sm transition-colors group-hover:text-foreground">
                   {log.nodeName || log.nodeType}
                 </span>
-                {explorerLink && (
-                  <>
-                    {/* biome-ignore lint/a11y/useSemanticElements: Using span with role=button to avoid nested button hydration error */}
-                    <span
-                      className="cursor-pointer text-muted-foreground hover:text-foreground"
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        await navigator.clipboard.writeText(explorerLink);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.stopPropagation();
-                          navigator.clipboard.writeText(explorerLink);
-                        }
-                      }}
-                      role="button"
-                      tabIndex={0}
-                      title="Copy link"
-                    >
-                      <Copy className="h-3 w-3" />
-                    </span>
-                    <a
-                      className="text-muted-foreground hover:text-foreground"
-                      href={explorerLink}
-                      onClick={(e) => e.stopPropagation()}
-                      rel="noopener noreferrer"
-                      target="_blank"
-                      title="View on explorer"
-                    >
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </>
-                )}
               </div>
             </div>
 

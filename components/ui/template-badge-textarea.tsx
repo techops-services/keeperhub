@@ -696,6 +696,13 @@ export function TemplateBadgeTextarea({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     // Handle Enter key to insert line breaks
     if (e.key === "Enter") {
+      // start custom keeperhub code //
+      // prevent Enter key from inserting line breaks if autocomplete is open
+      if (showAutocomplete) {
+        e.preventDefault();
+        return;
+      }
+      // end keeperhub code //
       e.preventDefault();
       document.execCommand("insertLineBreak");
     }

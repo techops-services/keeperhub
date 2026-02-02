@@ -375,7 +375,7 @@ export function ConfigurationOverlay({ overlayId }: ConfigurationOverlayProps) {
   };
 
   // Generate full workflow code
-  const workflowCode = (() => {
+  const { workflowCode, workflowValidationErrors } = (() => {
     const baseName = currentWorkflowName
       .replace(NON_ALPHANUMERIC_REGEX, "")
       .split(WORD_SPLIT_REGEX)
@@ -386,8 +386,10 @@ export function ConfigurationOverlay({ overlayId }: ConfigurationOverlayProps) {
       )
       .join("");
     const functionName = `${baseName}Workflow`;
-    const { code } = generateWorkflowCode(nodes, edges, { functionName });
-    return code;
+    const { code, validationErrors } = generateWorkflowCode(nodes, edges, {
+      functionName,
+    });
+    return { workflowCode: code, workflowValidationErrors: validationErrors };
   })();
 
   // Handle copy workflow code
@@ -543,6 +545,19 @@ export function ConfigurationOverlay({ overlayId }: ConfigurationOverlayProps) {
                   Copy
                 </Button>
               </div>
+              {workflowValidationErrors &&
+                workflowValidationErrors.length > 0 && (
+                  <div className="border-amber-500/30 border-b bg-amber-500/10 px-3 py-2">
+                    <p className="font-medium text-amber-600 text-xs dark:text-amber-400">
+                      Workflow has configuration issues:
+                    </p>
+                    <ul className="mt-1 list-inside list-disc text-amber-600/80 text-xs dark:text-amber-400/80">
+                      {workflowValidationErrors.map((error) => (
+                        <li key={error}>{error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               <div className="h-[400px]">
                 <CodeEditor
                   defaultLanguage="typescript"
@@ -679,6 +694,7 @@ export function ConfigurationOverlay({ overlayId }: ConfigurationOverlayProps) {
                   config={selectedNode.data.config || {}}
                   disabled={isGenerating || !isOwner}
                   isOwner={isOwner}
+                  nodeId={selectedNode.id}
                   onUpdateConfig={handleUpdateConfig}
                 />
               )}

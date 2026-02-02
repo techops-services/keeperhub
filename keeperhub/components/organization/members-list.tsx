@@ -47,10 +47,19 @@ type Member = {
 type MembersListProps = {
   members: Member[];
   onUpdate: () => void;
+  /** Override admin status (for managing non-active orgs) */
+  canManage?: boolean;
 };
 
-export function MembersList({ members, onUpdate }: MembersListProps) {
-  const { isAdmin, member: currentMember } = useActiveMember();
+export function MembersList({
+  members,
+  onUpdate,
+  canManage,
+}: MembersListProps) {
+  const { isAdmin: isActiveOrgAdmin, member: currentMember } =
+    useActiveMember();
+  // Use prop if provided, otherwise fall back to hook result
+  const isAdmin = canManage ?? isActiveOrgAdmin;
   const [updating, setUpdating] = useState<string | null>(null);
 
   const handleRoleChange = async (memberId: string, newRole: string) => {
