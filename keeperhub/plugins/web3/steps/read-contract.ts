@@ -277,11 +277,31 @@ async function stepHandler(
  * Read Contract Step
  * Reads data from a smart contract using view/pure functions
  */
-// biome-ignore lint/suspicious/useAwait: "use step" directive requires async
 export async function readContractStep(
   input: ReadContractInput
 ): Promise<ReadContractResult> {
   "use step";
+
+  // Enrich input with contract address explorer link for the execution log
+  let enrichedInput: ReadContractInput & { contractAddressLink?: string } =
+    input;
+  try {
+    const chainId = getChainIdFromNetwork(input.network);
+    const explorerConfig = await db.query.explorerConfigs.findFirst({
+      where: eq(explorerConfigs.chainId, chainId),
+    });
+    if (explorerConfig) {
+      const contractAddressLink = getAddressUrl(
+        explorerConfig,
+        input.contractAddress
+      );
+      if (contractAddressLink) {
+        enrichedInput = { ...input, contractAddressLink };
+      }
+    }
+  } catch {
+    // Non-critical: if lookup fails, input logs without the link
+  }
 
   return withPluginMetrics(
     {
@@ -289,7 +309,7 @@ export async function readContractStep(
       actionName: "read-contract",
       executionId: input._context?.executionId,
     },
-    () => withStepLogging(input, () => stepHandler(input))
+    () => withStepLogging(enrichedInput, () => stepHandler(input))
   );
 }
 

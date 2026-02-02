@@ -16,7 +16,7 @@ import {
 import { getOrganizationIdFromExecution } from "@/keeperhub/lib/workflow-helpers";
 import { db } from "@/lib/db";
 import { explorerConfigs, workflowExecutions } from "@/lib/db/schema";
-import { getTransactionUrl } from "@/lib/explorer";
+import { getAddressUrl, getTransactionUrl } from "@/lib/explorer";
 import { getChainIdFromNetwork, resolveRpcConfig } from "@/lib/rpc";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
@@ -304,11 +304,31 @@ async function stepHandler(
  * Transfer Funds Step
  * Transfers ETH from the user's wallet to a recipient address
  */
-// biome-ignore lint/suspicious/useAwait: "use step" directive requires async
 export async function transferFundsStep(
   input: TransferFundsInput
 ): Promise<TransferFundsResult> {
   "use step";
+
+  // Enrich input with recipient address explorer link for the execution log
+  let enrichedInput: TransferFundsInput & { recipientAddressLink?: string } =
+    input;
+  try {
+    const chainId = getChainIdFromNetwork(input.network);
+    const explorerConfig = await db.query.explorerConfigs.findFirst({
+      where: eq(explorerConfigs.chainId, chainId),
+    });
+    if (explorerConfig) {
+      const recipientAddressLink = getAddressUrl(
+        explorerConfig,
+        input.recipientAddress
+      );
+      if (recipientAddressLink) {
+        enrichedInput = { ...input, recipientAddressLink };
+      }
+    }
+  } catch {
+    // Non-critical: if lookup fails, input logs without the link
+  }
 
   return withPluginMetrics(
     {
@@ -316,7 +336,7 @@ export async function transferFundsStep(
       actionName: "transfer-funds",
       executionId: input._context?.executionId,
     },
-    () => withStepLogging(input, () => stepHandler(input))
+    () => withStepLogging(enrichedInput, () => stepHandler(input))
   );
 }
 

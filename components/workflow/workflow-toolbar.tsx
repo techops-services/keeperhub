@@ -1730,7 +1730,9 @@ export const WorkflowToolbar = ({
                 />
               )}
               {/* start custom keeperhub code // */}
-              <OrgSwitcher />
+              <div className="hidden lg:block">
+                <OrgSwitcher />
+              </div>
               {/* end keeperhub code // */}
               <UserMenu />
             </div>
@@ -1786,7 +1788,9 @@ export const WorkflowToolbar = ({
               />
             )}
             {/* start custom keeperhub code // */}
-            <OrgSwitcher />
+            <div className="hidden lg:block">
+              <OrgSwitcher />
+            </div>
             {/* end keeperhub code // */}
             <UserMenu />
           </div>

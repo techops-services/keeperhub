@@ -9,6 +9,7 @@ import {
   Plug,
   Settings,
   Sun,
+  Users,
   Wallet,
 } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -41,6 +42,7 @@ import { ManageOrgsModal } from "@/keeperhub/components/organization/manage-orgs
 import { AddressBookOverlay } from "@/keeperhub/components/overlays/address-book-overlay";
 import { FeedbackOverlay } from "@/keeperhub/components/overlays/feedback-overlay";
 import { WalletOverlay } from "@/keeperhub/components/overlays/wallet-overlay";
+import { useOrganization } from "@/keeperhub/lib/hooks/use-organization";
 // end keeperhub code //
 import { api } from "@/lib/api-client";
 import { signOut, useSession } from "@/lib/auth-client";
@@ -51,6 +53,9 @@ export const UserMenu = () => {
   const { open: openOverlay } = useOverlay();
   const [providerId, setProviderId] = useState<string | null>(null);
   const [orgModalOpen, setOrgModalOpen] = useState(false);
+  // start custom keeperhub code //
+  const { organization } = useOrganization();
+  // end keeperhub code //
 
   // Fetch provider info when session is available
   useEffect(() => {
@@ -160,6 +165,15 @@ export const UserMenu = () => {
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           {/* start custom keeperhub code */}
+          <div className="lg:hidden">
+            <DropdownMenuItem onClick={() => setOrgModalOpen(true)}>
+              <Users className="size-4" />
+              <span className="truncate">
+                {organization?.name ?? "Organization"}
+              </span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </div>
           <DropdownMenuItem onClick={() => openOverlay(FeedbackOverlay)}>
             <Github className="size-4" />
             <span>Report an issue</span>
