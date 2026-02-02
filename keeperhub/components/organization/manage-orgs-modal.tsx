@@ -52,6 +52,7 @@ import {
 import { refetchOrganizations } from "@/keeperhub/lib/refetch-organizations";
 import { api } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
+import { MembersList } from "./members-list";
 
 // Helper function to get status color based on invitation status
 function getStatusColor(status: string): string {
@@ -308,9 +309,11 @@ export function ManageOrgsModal({
     id: string;
     userId: string;
     role: string;
+    createdAt?: Date;
     user: {
       name?: string;
       email?: string;
+      image?: string;
     };
   };
   const [members, setMembers] = useState<Member[]>([]);
@@ -994,23 +997,20 @@ export function ManageOrgsModal({
                         <h4 className="font-medium text-muted-foreground text-sm">
                           Members
                         </h4>
-                        <div className="space-y-2">
-                          {members.map((member, index) => (
-                            <div
-                              className="flex items-center justify-between rounded-lg border p-3"
-                              key={member.id || `member-${index}`}
-                            >
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate font-medium text-sm">
-                                  {member.user?.email || "Unknown"}
-                                </p>
-                                <p className="text-muted-foreground text-xs">
-                                  {member.role}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                        <MembersList
+                          canManage={isAdmin}
+                          members={members.map((m) => ({
+                            id: m.id,
+                            user: {
+                              name: m.user?.name ?? m.user?.email ?? "Unknown",
+                              email: m.user?.email ?? "",
+                              image: m.user?.image,
+                            },
+                            role: m.role,
+                            createdAt: m.createdAt ?? new Date(),
+                          }))}
+                          onUpdate={fetchMembers}
+                        />
                       </div>
                     )}
 
