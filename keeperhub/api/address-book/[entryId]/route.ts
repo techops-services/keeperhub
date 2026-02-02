@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { ethers } from "ethers";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
+import { normalizeAddressForStorage } from "@/keeperhub/lib/address-utils";
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -106,7 +107,7 @@ function buildUpdateObject(body: { label?: string; address?: string }) {
       };
     }
 
-    updates.address = address;
+    updates.address = normalizeAddressForStorage(address);
   }
 
   return { updates };
