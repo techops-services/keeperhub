@@ -20,6 +20,7 @@ type GeneratedCode = {
   code: string;
   functionName: string;
   imports: string[];
+  validationErrors?: string[];
 };
 
 // Local constants not shared
@@ -28,12 +29,16 @@ const CONST_ASSIGNMENT_PATTERN = /^(\s*)(const\s+\w+\s*=\s*)(.*)$/;
 /**
  * Generate TypeScript code from workflow JSON with "use workflow" directive
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: large function with many nested helpers, refactoring is out of scope
 export function generateWorkflowCode(
   nodes: WorkflowNode[],
   edges: WorkflowEdge[],
   options: CodeGenOptions = {}
 ): GeneratedCode {
   const { functionName = "executeWorkflow" } = options;
+
+  // KEEP-1284: Collect validation errors instead of throwing
+  const validationErrors: string[] = [];
 
   // Analyze which node outputs are actually used
   const usedNodeOutputs = analyzeNodeUsage(nodes);
@@ -852,9 +857,16 @@ export function generateWorkflowCode(
       const falseNode = nextNodes[1];
 
       // Convert template references in condition to JavaScript expressions (not template literal syntax)
-      const convertedCondition = condition
-        ? convertConditionToJS(condition)
-        : "true";
+      // KEEP-1284: Collect validation error when condition is empty/unconfigured.
+      // Conditions must have an explicit expression to be valid.
+      let convertedCondition: string;
+      if (condition) {
+        convertedCondition = convertConditionToJS(condition);
+      } else {
+        const errorMsg = `Condition node "${node.data.label || node.id}" has no condition expression configured`;
+        validationErrors.push(errorMsg);
+        convertedCondition = `false /* ERROR: ${errorMsg} */`;
+      }
 
       lines.push(`${indent}if (${convertedCondition}) {`);
       if (trueNode) {
@@ -962,9 +974,16 @@ export function generateWorkflowCode(
     const nextNodes = edgesBySource.get(nodeId) || [];
 
     if (nextNodes.length > 0) {
-      const convertedCondition = condition
-        ? convertConditionToJS(condition)
-        : "true";
+      // KEEP-1284: Collect validation error when condition is empty/unconfigured.
+      // Conditions must have an explicit expression to be valid.
+      let convertedCondition: string;
+      if (condition) {
+        convertedCondition = convertConditionToJS(condition);
+      } else {
+        const errorMsg = `Condition node "${node.data.label || nodeId}" has no condition expression configured`;
+        validationErrors.push(errorMsg);
+        convertedCondition = `false /* ERROR: ${errorMsg} */`;
+      }
 
       lines.push(`${indent}if (${convertedCondition}) {`);
       if (nextNodes[0]) {
@@ -1290,6 +1309,8 @@ export function generateWorkflowCode(
     code,
     functionName,
     imports: Array.from(imports),
+    validationErrors:
+      validationErrors.length > 0 ? validationErrors : undefined,
   };
 }
 
