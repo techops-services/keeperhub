@@ -17,6 +17,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SaveAddressBookmark } from "@/keeperhub/components/address-book/save-address-bookmark";
+import {
+  toChecksumAddress,
+  truncateAddress,
+} from "@/keeperhub/lib/address-utils";
 
 export type WithdrawableAsset = {
   type: "native" | "token";
@@ -138,7 +142,7 @@ export function WithdrawModal({
             {amount} {selectedAsset?.symbol} sent
           </p>
           <p className="mb-4 text-muted-foreground text-sm">
-            To: {recipient.slice(0, 6)}...{recipient.slice(-4)}
+            To: {truncateAddress(recipient)}
           </p>
         </div>
       </Overlay>
@@ -262,7 +266,7 @@ export function WithdrawModal({
             <Input
               onChange={(e) => setRecipient(e.target.value)}
               placeholder="0x..."
-              value={recipient}
+              value={toChecksumAddress(recipient)}
             />
           </SaveAddressBookmark>
           {recipient && !ethers.isAddress(recipient) && (

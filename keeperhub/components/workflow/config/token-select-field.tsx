@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { toChecksumAddress } from "@/keeperhub/lib/address-utils";
 import type {
   CustomToken,
   SupportedToken,
@@ -185,9 +186,9 @@ export function TokenSelectField({
     ? tokens.find((t) => t.id === currentValue.supportedTokenId)
     : null;
 
-  // Copy token address to clipboard
+  // Copy token address to clipboard (checksummed for user safety)
   const copyTokenAddress = (address: string) => {
-    navigator.clipboard.writeText(address);
+    navigator.clipboard.writeText(toChecksumAddress(address));
     toast.success("Token address copied");
   };
 
@@ -208,8 +209,12 @@ export function TokenSelectField({
           )}
           <span className="font-medium">{selectedSupportedToken.symbol}</span>
           <span className="truncate font-mono text-muted-foreground text-xs">
-            {selectedSupportedToken.tokenAddress.slice(0, 10)}...
-            {selectedSupportedToken.tokenAddress.slice(-8)}
+            {toChecksumAddress(selectedSupportedToken.tokenAddress).slice(
+              0,
+              10
+            )}
+            ...
+            {toChecksumAddress(selectedSupportedToken.tokenAddress).slice(-8)}
           </span>
           <div className="ml-auto flex items-center gap-1">
             <button
@@ -245,8 +250,8 @@ export function TokenSelectField({
         <div className="mt-2 flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-sm">
           <span className="font-medium">{customToken.symbol}</span>
           <span className="truncate font-mono text-muted-foreground text-xs">
-            {customToken.address.slice(0, 10)}...
-            {customToken.address.slice(-8)}
+            {toChecksumAddress(customToken.address).slice(0, 10)}...
+            {toChecksumAddress(customToken.address).slice(-8)}
           </span>
           <div className="ml-auto flex items-center gap-1">
             <button
