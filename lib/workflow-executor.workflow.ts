@@ -263,8 +263,20 @@ async function executeActionStep(input: {
     const systemAction = SYSTEM_ACTIONS.Condition;
     const module = await systemAction.importer();
     const originalExpression = stepInput.condition;
-    const { result: evaluatedCondition, resolvedValues } =
-      evaluateConditionExpression(originalExpression, outputs);
+
+    // KEEP-1284: Catch evaluation errors and pass to step so it gets logged
+    let evaluatedCondition = false;
+    let resolvedValues: Record<string, unknown> = {};
+    let evaluationError: string | undefined;
+
+    try {
+      const result = evaluateConditionExpression(originalExpression, outputs);
+      evaluatedCondition = result.result;
+      resolvedValues = result.resolvedValues;
+    } catch (error) {
+      evaluationError = error instanceof Error ? error.message : String(error);
+    }
+
     console.log("[Condition] Final result:", evaluatedCondition);
 
     return await module[systemAction.stepFunction]({
@@ -274,6 +286,7 @@ async function executeActionStep(input: {
         typeof originalExpression === "string" ? originalExpression : undefined,
       values:
         Object.keys(resolvedValues).length > 0 ? resolvedValues : undefined,
+      _evaluationError: evaluationError,
       _context: context,
     });
   }
