@@ -165,12 +165,13 @@ describe.skipIf(SKIP_INFRA_TESTS)(
         };
 
         const scriptPath = join(
-          __dirname,
+          // biome-ignore lint/correctness/noGlobalDirnameFilename: This is a test, so we can use __dirname. Updating to import.meta.dirname breaks the test.
+          import.meta.dirname,
           "../../scripts/workflow-runner-bootstrap.cjs"
         );
         const child = spawn("node", [scriptPath], {
           env,
-          cwd: join(__dirname, "../.."),
+          cwd: join(import.meta.dirname, "../.."),
         });
 
         let stdout = "";
