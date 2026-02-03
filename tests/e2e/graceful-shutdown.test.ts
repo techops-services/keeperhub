@@ -42,8 +42,8 @@ const DATABASE_URL =
   process.env.DATABASE_URL ||
   "postgresql://postgres:postgres@localhost:5433/workflow_builder";
 
-// biome-ignore-all lint/correctness/noGlobalDirnameFilename: E2E tests rely on Node CJS behavior
-const PROJECT_ROOT = path.resolve(import.meta.dirname, "../..");
+// biome-ignore lint/correctness/noGlobalDirnameFilename: E2E tests rely on Node CJS behavior
+const PROJECT_ROOT = path.resolve(__dirname, "../..");
 
 // Test data prefixes
 const TEST_PREFIX = "test_graceful_e2e_";
