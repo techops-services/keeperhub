@@ -279,13 +279,15 @@ describe.skipIf(SKIP_INFRA_TESTS)("Full Pipeline E2E", () => {
         ...(options.scheduleId && { SCHEDULE_ID: options.scheduleId }),
       };
 
-      const scriptPath = join(
-        __dirname,
-        "../../scripts/workflow-runner-bootstrap.cjs"
-      );
+      // biome-ignore lint/correctness/noGlobalDirnameFilename: This is a test, so we can use __dirname. Updating to import.meta.dirname breaks the test.
+      const scriptPath = join(__dirname, "../../scripts/workflow-runner-bootstrap.cjs");
       const child = spawn("node", [scriptPath], {
         env,
-        cwd: join(__dirname, "../.."),
+        cwd: join(
+          // biome-ignore lint/correctness/noGlobalDirnameFilename: This is a test, so we can use __dirname. Updating to import.meta.dirname breaks the test
+          __dirname,
+          "../.."
+        ),
       });
 
       let stdout = "";
