@@ -5,7 +5,10 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { TableCell, TableRow } from "@/components/ui/table";
-import { truncateAddress } from "@/keeperhub/lib/address-utils";
+import {
+  toChecksumAddress,
+  truncateAddress,
+} from "@/keeperhub/lib/address-utils";
 import type { AddressBookEntry } from "@/lib/api-client";
 
 type AddressBookRowProps = {
@@ -36,7 +39,7 @@ export function AddressBookRow({
             {truncateAddress(entry.address, 12)}
           </code>
           <Button
-            onClick={() => copyToClipboard(entry.address)}
+            onClick={() => copyToClipboard(toChecksumAddress(entry.address))}
             size="sm"
             variant="ghost"
           >

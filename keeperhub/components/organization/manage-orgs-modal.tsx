@@ -42,6 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   useActiveMember,
@@ -169,6 +170,8 @@ export function ManageOrgsModal({
 
   // Track which org is being managed (null = list view, string = detail view)
   const [managedOrgId, setManagedOrgId] = useState<string | null>(null);
+  const managedOrgIdRef = useRef<string | null>(managedOrgId);
+  managedOrgIdRef.current = managedOrgId;
 
   const { organization, switchOrganization } = useOrganization();
   const { organizations } = useOrganizations();
@@ -227,7 +230,7 @@ export function ManageOrgsModal({
     expiresAt?: Date | string;
   };
   const [sentInvitations, setSentInvitations] = useState<SentInvitation[]>([]);
-  const [, setLoadingSentInvitations] = useState(false);
+  const [loadingSentInvitations, setLoadingSentInvitations] = useState(false);
   const [cancellingInvite, setCancellingInvite] = useState<string | null>(null);
 
   // Organization members state
@@ -243,7 +246,7 @@ export function ManageOrgsModal({
     };
   };
   const [members, setMembers] = useState<Member[]>([]);
-  const [, setLoadingMembers] = useState(false);
+  const [loadingMembers, setLoadingMembers] = useState(false);
 
   // Compute user's role in the managed org from fetched members
   const currentUserMember = members.find((m) => m.userId === session?.user?.id);
@@ -297,15 +300,20 @@ export function ManageOrgsModal({
 
   // Fetch sent invitations for the managed organization (for admins)
   const organizationId = managedOrgId;
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: stale-check + fetch + state branches
   const fetchSentInvitations = useCallback(async () => {
     if (!organizationId) {
       return;
     }
+    const orgIdWeAreFetching = organizationId;
     setLoadingSentInvitations(true);
     try {
       const result = await authClient.organization.listInvitations({
         query: { organizationId },
       });
+      if (managedOrgIdRef.current !== orgIdWeAreFetching) {
+        return;
+      }
       if (result.data) {
         const invitations = Array.isArray(result.data)
           ? result.data
@@ -314,22 +322,31 @@ export function ManageOrgsModal({
       }
     } catch (error) {
       console.error("Failed to fetch sent invitations:", error);
-      setSentInvitations([]);
+      if (managedOrgIdRef.current === orgIdWeAreFetching) {
+        setSentInvitations([]);
+      }
     } finally {
-      setLoadingSentInvitations(false);
+      if (managedOrgIdRef.current === orgIdWeAreFetching) {
+        setLoadingSentInvitations(false);
+      }
     }
   }, [organizationId]);
 
   // Fetch organization members
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: stale-check + fetch + state branches
   const fetchMembers = useCallback(async () => {
     if (!organizationId) {
       return;
     }
+    const orgIdWeAreFetching = organizationId;
     setLoadingMembers(true);
     try {
       const result = await authClient.organization.listMembers({
         query: { organizationId },
       });
+      if (managedOrgIdRef.current !== orgIdWeAreFetching) {
+        return;
+      }
       if (result.data) {
         // API returns { members: [...], total: number }
         const data = result.data as { members?: Member[] } | Member[];
@@ -338,9 +355,13 @@ export function ManageOrgsModal({
       }
     } catch (error) {
       console.error("Failed to fetch members:", error);
-      setMembers([]);
+      if (managedOrgIdRef.current === orgIdWeAreFetching) {
+        setMembers([]);
+      }
     } finally {
-      setLoadingMembers(false);
+      if (managedOrgIdRef.current === orgIdWeAreFetching) {
+        setLoadingMembers(false);
+      }
     }
   }, [organizationId]);
 
@@ -354,6 +375,8 @@ export function ManageOrgsModal({
   // Fetch org-specific data when managed org changes
   useEffect(() => {
     if (open && managedOrgId) {
+      setMembers([]);
+      setSentInvitations([]);
       fetchSentInvitations();
       fetchMembers();
     }
@@ -425,6 +448,7 @@ export function ManageOrgsModal({
         setOrgSlug("");
         setOrgSlugManuallyEdited(false);
         setShowCreateForm(false);
+        refetchOrganizations();
         router.refresh();
       }
     } catch (err) {
@@ -931,70 +955,85 @@ export function ManageOrgsModal({
                     )}
 
                     {/* Members & Pending Invitations (merged) */}
-                    {(members.length > 0 ||
-                      sentInvitations.some(
-                        (inv) => inv.status === "pending"
-                      )) && (
-                      <div className="space-y-3">
-                        <h4 className="font-medium text-muted-foreground text-sm">
-                          Members
-                        </h4>
-                        <div className="space-y-2">
-                          {[
-                            ...members.map((m) => ({
-                              kind: "member" as const,
-                              email: m.user?.email || "Unknown",
-                              role: m.role,
-                              id: m.id,
-                            })),
-                            ...sentInvitations
-                              .filter((inv) => inv.status === "pending")
-                              .map((inv) => ({
-                                kind: "invite" as const,
-                                email: inv.email,
-                                role: inv.role || "member",
-                                id: inv.id,
-                              })),
-                          ]
-                            .sort((a, b) =>
-                              a.email.localeCompare(b.email, undefined, {
-                                sensitivity: "base",
-                              })
-                            )
-                            .map((entry) => (
-                              <div
-                                className="flex items-center justify-between rounded-lg border p-3"
-                                key={entry.id}
-                              >
-                                <div className="min-w-0 flex-1">
-                                  <p
-                                    className={`truncate font-medium text-sm ${entry.kind === "invite" ? "text-muted-foreground" : ""}`}
+                    <div className="space-y-3">
+                      <h4 className="font-medium text-muted-foreground text-sm">
+                        Members
+                      </h4>
+                      {(() => {
+                        if (loadingMembers || loadingSentInvitations) {
+                          return (
+                            <div className="flex items-center justify-center py-8">
+                              <Spinner className="h-6 w-6" />
+                            </div>
+                          );
+                        }
+                        if (
+                          members.length > 0 ||
+                          sentInvitations.some(
+                            (inv) => inv.status === "pending"
+                          )
+                        ) {
+                          return (
+                            <div className="space-y-2">
+                              {[
+                                ...members.map((m) => ({
+                                  kind: "member" as const,
+                                  email: m.user?.email || "Unknown",
+                                  role: m.role,
+                                  id: m.id,
+                                })),
+                                ...sentInvitations
+                                  .filter((inv) => inv.status === "pending")
+                                  .map((inv) => ({
+                                    kind: "invite" as const,
+                                    email: inv.email,
+                                    role: inv.role || "member",
+                                    id: inv.id,
+                                  })),
+                              ]
+                                .sort((a, b) =>
+                                  a.email.localeCompare(b.email, undefined, {
+                                    sensitivity: "base",
+                                  })
+                                )
+                                .map((entry) => (
+                                  <div
+                                    className="flex items-center justify-between rounded-lg border p-3"
+                                    key={entry.id}
                                   >
-                                    {entry.email}
-                                  </p>
-                                  <p className="text-muted-foreground text-xs">
-                                    {entry.role}
-                                    {entry.kind === "invite" && " - invited"}
-                                  </p>
-                                </div>
-                                {entry.kind === "invite" && canInvite && (
-                                  <Button
-                                    disabled={cancellingInvite === entry.id}
-                                    onClick={() =>
-                                      handleCancelInvitation(entry.id)
-                                    }
-                                    size="sm"
-                                    variant="ghost"
-                                  >
-                                    <X className="mr-1 h-4 w-4" />
-                                    Remove
-                                  </Button>
-                                )}
-                              </div>
-                            ))}
-                        </div>
-                      </div>
-                    )}
+                                    <div className="min-w-0 flex-1">
+                                      <p
+                                        className={`truncate font-medium text-sm ${entry.kind === "invite" ? "text-muted-foreground" : ""}`}
+                                      >
+                                        {entry.email}
+                                      </p>
+                                      <p className="text-muted-foreground text-xs">
+                                        {entry.role}
+                                        {entry.kind === "invite" &&
+                                          " - invited"}
+                                      </p>
+                                    </div>
+                                    {entry.kind === "invite" && canInvite && (
+                                      <Button
+                                        disabled={cancellingInvite === entry.id}
+                                        onClick={() =>
+                                          handleCancelInvitation(entry.id)
+                                        }
+                                        size="sm"
+                                        variant="ghost"
+                                      >
+                                        <X className="mr-1 h-4 w-4" />
+                                        Remove
+                                      </Button>
+                                    )}
+                                  </div>
+                                ))}
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
 
                     {/* Leave/Delete Organization */}
                     <div className="space-y-2 border-t pt-3">

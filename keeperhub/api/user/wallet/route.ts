@@ -2,6 +2,10 @@ import { Environment, Para as ParaServer } from "@getpara/server-sdk";
 import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
+import {
+  normalizeAddressForStorage,
+  truncateAddress,
+} from "@/keeperhub/lib/address-utils";
 import { apiError } from "@/keeperhub/lib/api-error";
 import { encryptUserShare } from "@/keeperhub/lib/encryption";
 import {
@@ -185,22 +189,24 @@ async function storeWalletAndIntegration(options: {
   const { userId, organizationId, email, walletId, walletAddress, userShare } =
     options;
 
-  // Store wallet in para_wallets table
+  const normalizedWalletAddress = normalizeAddressForStorage(walletAddress);
+
+  // Store wallet in para_wallets table (lowercase for consistency)
   await db.insert(paraWallets).values({
     userId,
     organizationId,
     email,
     walletId,
-    walletAddress,
+    walletAddress: normalizedWalletAddress,
     userShare: encryptUserShare(userShare),
   });
 
   console.log(
-    `[Para] ✓ Wallet created for organization ${organizationId}: ${walletAddress}`
+    `[Para] ✓ Wallet created for organization ${organizationId}: ${normalizedWalletAddress}`
   );
 
   // Create Web3 integration record with truncated address as name
-  const truncatedAddress = `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
+  const truncatedAddress = truncateAddress(normalizedWalletAddress);
 
   await createIntegration({
     userId,
@@ -212,7 +218,11 @@ async function storeWalletAndIntegration(options: {
 
   console.log(`[Para] ✓ Web3 integration created: ${truncatedAddress}`);
 
-  return { walletAddress, walletId, truncatedAddress };
+  return {
+    walletAddress: normalizedWalletAddress,
+    walletId,
+    truncatedAddress,
+  };
 }
 
 export async function GET(request: Request) {
@@ -306,8 +316,8 @@ export async function POST(request: Request) {
     const walletId = wallet.id as string;
     const walletAddress = wallet.address as string;
 
-    // 5. Store wallet and create integration
-    await storeWalletAndIntegration({
+    // 5. Store wallet and create integration (returns normalized lowercase address)
+    const { walletAddress: storedAddress } = await storeWalletAndIntegration({
       userId: user.id,
       organizationId,
       email: walletEmail,
@@ -316,11 +326,11 @@ export async function POST(request: Request) {
       userShare,
     });
 
-    // 6. Return success
+    // 6. Return success (return stored lowercase address for consistency)
     return NextResponse.json({
       success: true,
       wallet: {
-        address: walletAddress,
+        address: storedAddress,
         walletId,
         email: walletEmail,
         organizationId,

@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { ethers } from "ethers";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
+import { normalizeAddressForStorage } from "@/keeperhub/lib/address-utils";
 import { apiError } from "@/keeperhub/lib/api-error";
 import { organizationHasWallet } from "@/keeperhub/lib/para/wallet-helpers";
 import { auth } from "@/lib/auth";
@@ -130,6 +131,8 @@ export async function POST(request: Request) {
       );
     }
 
+    const normalizedTokenAddress = normalizeAddressForStorage(tokenAddress);
+
     // Check if token is already tracked by the organization
     const existing = await db
       .select()
@@ -138,7 +141,7 @@ export async function POST(request: Request) {
         and(
           eq(organizationTokens.organizationId, activeOrgId),
           eq(organizationTokens.chainId, chainId),
-          eq(organizationTokens.tokenAddress, tokenAddress.toLowerCase())
+          eq(organizationTokens.tokenAddress, normalizedTokenAddress)
         )
       )
       .limit(1);
@@ -157,7 +160,7 @@ export async function POST(request: Request) {
       .where(
         and(
           eq(supportedTokens.chainId, chainId),
-          eq(supportedTokens.tokenAddress, tokenAddress.toLowerCase())
+          eq(supportedTokens.tokenAddress, normalizedTokenAddress)
         )
       )
       .limit(1);
@@ -199,7 +202,7 @@ export async function POST(request: Request) {
       .values({
         organizationId: activeOrgId,
         chainId,
-        tokenAddress: tokenAddress.toLowerCase(),
+        tokenAddress: normalizedTokenAddress,
         symbol,
         name,
         decimals,

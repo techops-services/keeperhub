@@ -2,6 +2,7 @@ import { desc, eq, inArray } from "drizzle-orm";
 import { ethers } from "ethers";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
+import { normalizeAddressForStorage } from "@/keeperhub/lib/address-utils";
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -132,13 +133,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create new entry
+    // Create new entry (store lowercase for consistency)
     const [newEntry] = await db
       .insert(addressBookEntry)
       .values({
         organizationId: activeOrgId,
         label,
-        address,
+        address: normalizeAddressForStorage(address),
         createdBy: session.user.id,
       })
       .returning({

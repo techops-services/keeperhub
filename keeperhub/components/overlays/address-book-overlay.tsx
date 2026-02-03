@@ -26,6 +26,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AddressBookRow } from "@/keeperhub/components/address-book/address-book-row";
+import { toChecksumAddress } from "@/keeperhub/lib/address-utils";
 import { useDebounce } from "@/keeperhub/lib/hooks/use-debounce";
 import { usePagination } from "@/keeperhub/lib/hooks/use-pagination";
 import type { AddressBookEntry } from "@/lib/api-client";
@@ -51,9 +52,15 @@ export function AddAddressOverlay({
 }: AddAddressOverlayProps) {
   const { pop } = useOverlay();
   const [newLabel, setNewLabel] = useState(entry?.label ?? "");
-  const [newAddress, setNewAddress] = useState(
-    entry?.address ?? initialAddress ?? ""
-  );
+  const [newAddress, setNewAddress] = useState(() => {
+    if (entry) {
+      return toChecksumAddress(entry.address);
+    }
+    if (initialAddress) {
+      return toChecksumAddress(initialAddress);
+    }
+    return "";
+  });
   const [saving, setSaving] = useState(false);
 
   const isEditing = !!entry;
