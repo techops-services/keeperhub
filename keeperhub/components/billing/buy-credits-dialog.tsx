@@ -39,22 +39,8 @@ import {
   usdToTokenAmount,
 } from "@/keeperhub/lib/billing/contracts";
 import { api } from "@/lib/api-client";
-import { getRpcUrlByChainId } from "@/lib/rpc/rpc-config";
 
 const CREDITS_CONTRACT = process.env.NEXT_PUBLIC_CREDITS_CONTRACT_ADDRESS || "";
-const SEPOLIA_CHAIN_ID = 11_155_111;
-
-// Get RPC URL from centralized CHAIN_RPC_CONFIG at module initialization
-function getSepoliaRpcUrl(): string {
-  try {
-    return getRpcUrlByChainId(SEPOLIA_CHAIN_ID, "primary");
-  } catch {
-    // Fallback to public Sepolia RPC
-    return "https://ethereum-sepolia-rpc.publicnode.com";
-  }
-}
-
-const SEPOLIA_RPC_URL = getSepoliaRpcUrl();
 
 type Step =
   | "input"
@@ -92,6 +78,28 @@ export function BuyCreditsDialog({
   const [estimatedCredits, setEstimatedCredits] = useState<number | null>(null);
   const [depositTxHash, setDepositTxHash] = useState<string | null>(null);
   const [isCalculating, setIsCalculating] = useState(skipInput);
+  const [billingRpcUrl, setBillingRpcUrl] = useState<string | null>(null);
+
+  // Fetch billing network RPC URL from /api/chains on mount
+  useEffect(() => {
+    async function fetchBillingRpc() {
+      try {
+        const response = await fetch("/api/chains");
+        if (response.ok) {
+          const chains = await response.json();
+          const billingChain = chains.find(
+            (c: { chainId: number }) => c.chainId === CHAIN_CONFIG.chainId
+          );
+          if (billingChain?.defaultPrimaryRpc) {
+            setBillingRpcUrl(billingChain.defaultPrimaryRpc);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch chain config:", error);
+      }
+    }
+    fetchBillingRpc();
+  }, []);
 
   const isStablecoinPayment = paymentMethod === "stablecoin";
   const selectedTokenInfo = SUPPORTED_TOKENS.find(
@@ -152,7 +160,7 @@ export function BuyCreditsDialog({
   const hasInsufficientBalance =
     isStablecoinPayment && tokenBalance < tokenAmount;
 
-  const isOnSepoliaNetwork = chain?.id === SEPOLIA_CHAIN_ID;
+  const isOnBillingNetwork = chain?.id === CHAIN_CONFIG.chainId;
 
   // Calculate ETH amount and credits when USD amount changes
   const calculateEthAmount = useCallback(async () => {
@@ -162,11 +170,16 @@ export function BuyCreditsDialog({
       return;
     }
 
+    if (!billingRpcUrl) {
+      toast.error("Chain configuration not loaded. Please try again.");
+      return;
+    }
+
     try {
       const usdInCents = Math.floor(Number.parseFloat(usdAmount) * 1_000_000);
 
       // Call contract to get ETH amount needed
-      const response = await fetch(SEPOLIA_RPC_URL, {
+      const response = await fetch(billingRpcUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -184,6 +197,9 @@ export function BuyCreditsDialog({
       });
 
       const result = await response.json();
+      if (!result.result) {
+        throw new Error("RPC call returned no result");
+      }
       const ethWei = BigInt(result.result);
       setEthAmount(formatEther(ethWei));
 
@@ -202,7 +218,7 @@ export function BuyCreditsDialog({
       console.error("Failed to calculate ETH amount:", error);
       toast.error("Failed to calculate ETH amount. Please try again.");
     }
-  }, [usdAmount]);
+  }, [usdAmount, billingRpcUrl]);
 
   // Auto-calculate when dialog opens with pre-selected package
   useEffect(() => {
@@ -237,7 +253,7 @@ export function BuyCreditsDialog({
           abi: ERC20_ABI,
           functionName: "approve",
           args: [CREDITS_CONTRACT as `0x${string}`, tokenAmount],
-          chainId: SEPOLIA_CHAIN_ID,
+          chainId: CHAIN_CONFIG.chainId,
         },
         {
           onSuccess: () => {
@@ -279,7 +295,7 @@ export function BuyCreditsDialog({
             abi: CREDITS_ABI,
             functionName: "depositStable",
             args: [orgIdHash as `0x${string}`, stablecoinAddress, tokenAmount],
-            chainId: SEPOLIA_CHAIN_ID,
+            chainId: CHAIN_CONFIG.chainId,
           },
           {
             onSuccess: (hash) => {
@@ -306,7 +322,7 @@ export function BuyCreditsDialog({
             functionName: "depositETH",
             args: [orgIdHash as `0x${string}`],
             value: parseEther(ethAmount),
-            chainId: SEPOLIA_CHAIN_ID,
+            chainId: CHAIN_CONFIG.chainId,
           },
           {
             onSuccess: (hash) => {
@@ -469,8 +485,7 @@ export function BuyCreditsDialog({
                     {SUPPORTED_TOKENS.map((token) => (
                       <SelectItem
                         disabled={
-                          token.disabledOnSepolia &&
-                          SEPOLIA_CHAIN_ID === 11_155_111
+                          token.disabledOnSepolia && CHAIN_CONFIG.chainId !== 1
                         }
                         key={token.symbol}
                         value={token.symbol}
@@ -588,9 +603,10 @@ export function BuyCreditsDialog({
               </div>
             )}
 
-            {!isOnSepoliaNetwork && (
+            {!isOnBillingNetwork && (
               <div className="rounded-md bg-yellow-500/10 p-3 text-sm text-yellow-600 dark:text-yellow-400">
-                ⚠️ Please switch to Sepolia network
+                ⚠️ Please switch to the correct network (Chain ID:{" "}
+                {CHAIN_CONFIG.chainId})
               </div>
             )}
 
@@ -599,7 +615,7 @@ export function BuyCreditsDialog({
                 <Button
                   className="w-full"
                   disabled={
-                    isSendingTx || hasInsufficientBalance || !isOnSepoliaNetwork
+                    isSendingTx || hasInsufficientBalance || !isOnBillingNetwork
                   }
                   onClick={handleApprove}
                   variant="outline"
@@ -617,7 +633,7 @@ export function BuyCreditsDialog({
               disabled={
                 isSendingTx ||
                 hasInsufficientBalance ||
-                !isOnSepoliaNetwork ||
+                !isOnBillingNetwork ||
                 (isStablecoinPayment && needsApproval)
               }
               onClick={handleBuy}

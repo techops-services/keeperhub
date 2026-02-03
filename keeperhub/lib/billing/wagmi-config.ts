@@ -7,7 +7,8 @@ import { getRpcUrlByChainId } from "@/lib/rpc/rpc-config";
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "";
 
-// Get RPC URLs from centralized CHAIN_RPC_CONFIG
+// Get RPC URLs from CHAIN_RPC_CONFIG (available during SSR)
+// Falls back to wagmi's public RPC on client-side if not available
 function getSepoliaRpcUrl(): string | undefined {
   try {
     return getRpcUrlByChainId(11_155_111, "primary"); // Sepolia chain ID
