@@ -28,6 +28,23 @@ type WorkflowNodeLike = {
 };
 
 // start custom keeperhub code //
+/** Recursively rewrite a single value (string, object, or array) using old->new node ID map */
+function remapTemplateRefsInValue(
+  value: unknown,
+  idMap: Map<string, string>
+): unknown {
+  if (typeof value === "string") {
+    return remapTemplateRefsInString(value, idMap);
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => remapTemplateRefsInValue(item, idMap));
+  }
+  if (typeof value === "object" && value !== null) {
+    return remapTemplateRefsInConfig(value as Record<string, unknown>, idMap);
+  }
+  return value;
+}
+
 /** Recursively rewrite {{@nodeId:...}} template refs in config using old->new node ID map */
 function remapTemplateRefsInConfig(
   config: Record<string, unknown> | undefined,
@@ -38,20 +55,7 @@ function remapTemplateRefsInConfig(
   }
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(config)) {
-    if (typeof value === "string") {
-      result[key] = remapTemplateRefsInString(value, idMap);
-    } else if (
-      typeof value === "object" &&
-      value !== null &&
-      !Array.isArray(value)
-    ) {
-      result[key] = remapTemplateRefsInConfig(
-        value as Record<string, unknown>,
-        idMap
-      );
-    } else {
-      result[key] = value;
-    }
+    result[key] = remapTemplateRefsInValue(value, idMap);
   }
   return result;
 }
