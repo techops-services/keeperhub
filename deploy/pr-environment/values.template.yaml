@@ -236,6 +236,19 @@ env:
   NEXT_PUBLIC_CHAIN_ID:
     type: kv
     value: "11155111"
+  # Billing Cost Configuration
+  BILLING_BLOCK_CALL:
+    type: kv
+    value: "1"
+  BILLING_FUNCTION_CALL:
+    type: kv
+    value: "1"
+  BILLING_OVERALL_FEE:
+    type: kv
+    value: "1"
+  VOLATILITY_INDICATOR:
+    type: kv
+    value: "true"
   # PR-specific SQS configuration (using LocalStack)
   AWS_REGION:
     type: kv
