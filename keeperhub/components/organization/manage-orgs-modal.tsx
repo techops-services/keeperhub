@@ -169,9 +169,22 @@ export function ManageOrgsModal({
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
 
   // Track which org is being managed (null = list view, string = detail view)
-  const [managedOrgId, setManagedOrgId] = useState<string | null>(null);
+  const [managedOrgId, setManagedOrgIdRaw] = useState<string | null>(null);
   const managedOrgIdRef = useRef<string | null>(managedOrgId);
   managedOrgIdRef.current = managedOrgId;
+
+  // Loading states for org-specific data (declared early for setManagedOrgId wrapper)
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [loadingSentInvitations, setLoadingSentInvitations] = useState(false);
+
+  // Wrapper to set loading states immediately when switching orgs
+  const setManagedOrgId = useCallback((orgId: string | null) => {
+    if (orgId !== null) {
+      setLoadingMembers(true);
+      setLoadingSentInvitations(true);
+    }
+    setManagedOrgIdRaw(orgId);
+  }, []);
 
   const { organization, switchOrganization } = useOrganization();
   const { organizations } = useOrganizations();
@@ -230,7 +243,6 @@ export function ManageOrgsModal({
     expiresAt?: Date | string;
   };
   const [sentInvitations, setSentInvitations] = useState<SentInvitation[]>([]);
-  const [loadingSentInvitations, setLoadingSentInvitations] = useState(false);
   const [cancellingInvite, setCancellingInvite] = useState<string | null>(null);
 
   // Organization members state
@@ -246,7 +258,6 @@ export function ManageOrgsModal({
     };
   };
   const [members, setMembers] = useState<Member[]>([]);
-  const [loadingMembers, setLoadingMembers] = useState(false);
 
   // Compute user's role in the managed org from fetched members
   const currentUserMember = members.find((m) => m.userId === session?.user?.id);
@@ -409,7 +420,7 @@ export function ManageOrgsModal({
       setManagedOrgId(null);
       setInviteId(null);
     }
-  }, [open]);
+  }, [open, setManagedOrgId]);
 
   const handleOrgNameChange = (value: string) => {
     setOrgName(value);
