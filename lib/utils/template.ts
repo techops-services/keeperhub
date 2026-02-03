@@ -8,6 +8,28 @@
 const TEMPLATE_PATTERN = /\{\{([^}]+)\}\}/g;
 const ARRAY_ACCESS_PATTERN = /^([^[]+)\[(\d+)\]$/;
 
+// start custom keeperhub code //
+/** Pattern for {{@nodeId:DisplayName.field}} template references */
+const TEMPLATE_REF_PATTERN = /\{\{@([^:]+):([^}]+)\}\}/g;
+
+/**
+ * Remap template reference node IDs in a string (e.g. after workflow duplication).
+ * Replaces {{@oldId:...}} with {{@newId:...}} using the provided map.
+ */
+export function remapTemplateRefsInString(
+  value: string,
+  idMap: Map<string, string>
+): string {
+  if (typeof value !== "string") {
+    return value;
+  }
+  return value.replace(TEMPLATE_REF_PATTERN, (_, nodeId, rest) => {
+    const newId = idMap.get(nodeId) ?? nodeId;
+    return `{{@${newId}:${rest}}}`;
+  });
+}
+// end custom keeperhub code //
+
 export type NodeOutputs = {
   [nodeId: string]: {
     label: string;
