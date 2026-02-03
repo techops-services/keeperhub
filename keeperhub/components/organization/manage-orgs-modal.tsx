@@ -448,6 +448,7 @@ export function ManageOrgsModal({
         setOrgSlug("");
         setOrgSlugManuallyEdited(false);
         setShowCreateForm(false);
+        refetchOrganizations();
         router.refresh();
       }
     } catch (err) {
