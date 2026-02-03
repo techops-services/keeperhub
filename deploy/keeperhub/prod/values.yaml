@@ -150,8 +150,8 @@ env:
     parameter_name: /eks/maker-prod/keeperhub/github-client-secret
   NEXT_PUBLIC_GITHUB_CLIENT_ID:
     type: parameterStore
-    name: next-public-github-client-id
-    parameter_name: /eks/maker-prod/keeperhub/next-public-github-client-id
+    name: github-client-id
+    parameter_name: /eks/maker-prod/keeperhub/github-client-id
   GOOGLE_CLIENT_ID:
     type: parameterStore
     name: google-client-id
@@ -162,8 +162,8 @@ env:
     parameter_name: /eks/maker-prod/keeperhub/google-client-secret
   NEXT_PUBLIC_GOOGLE_CLIENT_ID:
     type: parameterStore
-    name: next-public-google-client-id
-    parameter_name: /eks/maker-prod/keeperhub/next-public-google-client-id
+    name: google-client-id
+    parameter_name: /eks/maker-prod/keeperhub/google-client-id
   OPENAI_API_KEY:
     type: parameterStore
     name: openai-api-key
