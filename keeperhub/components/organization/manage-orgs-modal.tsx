@@ -409,70 +409,75 @@ export function ManageOrgsModal({
 
   // Fetch sent invitations for the managed organization (for admins)
   const organizationId = managedOrgId;
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: stale-check + fetch + state branches
+  const isStaleRequest = useCallback(
+    (orgIdAtStart: string) => managedOrgIdRef.current !== orgIdAtStart,
+    []
+  );
+
   const fetchSentInvitations = useCallback(async () => {
     if (!organizationId) {
       return;
     }
-    const orgIdWeAreFetching = organizationId;
+
+    const orgIdAtStart = organizationId;
     setLoadingSentInvitations(true);
+
     try {
       const result = await authClient.organization.listInvitations({
         query: { organizationId },
       });
-      if (managedOrgIdRef.current !== orgIdWeAreFetching) {
+      if (isStaleRequest(orgIdAtStart)) {
         return;
       }
-      if (result.data) {
-        const invitations = Array.isArray(result.data)
-          ? result.data
-          : [result.data];
-        setSentInvitations(invitations.filter(Boolean) as SentInvitation[]);
-      }
+
+      const invitations = Array.isArray(result.data)
+        ? result.data
+        : [result.data].filter(Boolean);
+      setSentInvitations(invitations.filter(Boolean) as SentInvitation[]);
     } catch (error) {
       console.error("Failed to fetch sent invitations:", error);
-      if (managedOrgIdRef.current === orgIdWeAreFetching) {
+      if (!isStaleRequest(orgIdAtStart)) {
         setSentInvitations([]);
       }
     } finally {
-      if (managedOrgIdRef.current === orgIdWeAreFetching) {
+      if (!isStaleRequest(orgIdAtStart)) {
         setLoadingSentInvitations(false);
       }
     }
-  }, [organizationId]);
+  }, [organizationId, isStaleRequest]);
 
   // Fetch organization members
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: stale-check + fetch + state branches
   const fetchMembers = useCallback(async () => {
     if (!organizationId) {
       return;
     }
-    const orgIdWeAreFetching = organizationId;
+
+    const orgIdAtStart = organizationId;
     setLoadingMembers(true);
+
     try {
       const result = await authClient.organization.listMembers({
         query: { organizationId },
       });
-      if (managedOrgIdRef.current !== orgIdWeAreFetching) {
+      if (isStaleRequest(orgIdAtStart)) {
         return;
       }
-      if (result.data) {
-        // API returns { members: [...], total: number }
-        const data = result.data as { members?: Member[] } | Member[];
-        const membersList = Array.isArray(data) ? data : data.members || [];
-        setMembers(membersList.filter(Boolean) as Member[]);
-      }
+
+      // API returns { members: [...], total: number } or Member[]
+      const data = result.data as { members?: Member[] } | Member[];
+      const membersList = Array.isArray(data) ? data : (data.members ?? []);
+      setMembers(membersList.filter(Boolean) as Member[]);
     } catch (error) {
       console.error("Failed to fetch members:", error);
-      if (managedOrgIdRef.current === orgIdWeAreFetching) {
+      if (!isStaleRequest(orgIdAtStart)) {
         setMembers([]);
       }
     } finally {
-      if (managedOrgIdRef.current === orgIdWeAreFetching) {
+      if (!isStaleRequest(orgIdAtStart)) {
         setLoadingMembers(false);
       }
     }
-  }, [organizationId]);
+  }, [organizationId, isStaleRequest]);
 
   // Fetch invitations when modal opens
   useEffect(() => {
