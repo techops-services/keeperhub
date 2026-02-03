@@ -98,24 +98,20 @@ export function SettingsOverlay({ overlayId }: SettingsOverlayProps) {
           <TabsList className="mb-4 w-full">
             <TabsTrigger value="account">Account</TabsTrigger>
             <TabsTrigger value="security">Security</TabsTrigger>
-            <TabsTrigger value="danger">Danger Zone</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="account">
+          <TabsContent className="space-y-6" value="account">
             <AccountSettings
               accountEmail={accountEmail}
               accountName={accountName}
               onEmailChange={setAccountEmail}
               onNameChange={setAccountName}
             />
+            <DeactivateAccountSection />
           </TabsContent>
 
           <TabsContent value="security">
             <ChangePasswordSection providerId={providerId} />
-          </TabsContent>
-
-          <TabsContent value="danger">
-            <DeactivateAccountSection />
           </TabsContent>
         </Tabs>
         // end keeperhub code //
