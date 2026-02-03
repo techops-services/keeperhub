@@ -1,0 +1,349 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main, staging, production]
+  pull_request:
+    types: [labeled, synchronize]
+  # Run after PR environment deployment completes
+  workflow_run:
+    workflows: ["Deploy PR Environment"]
+    types: [completed]
+
+jobs:
+  # Check if E2E tests should run
+  should-run:
+    runs-on: ubuntu-latest
+    outputs:
+      run-e2e: ${{ steps.check.outputs.run-e2e }}
+      run-deployed: ${{ steps.check.outputs.run-deployed }}
+      pr-number: ${{ steps.check.outputs.pr-number }}
+    steps:
+      - name: Check trigger conditions
+        id: check
+        run: |
+          # Default values
+          echo "run-e2e=false" >> $GITHUB_OUTPUT
+          echo "run-deployed=false" >> $GITHUB_OUTPUT
+          echo "pr-number=" >> $GITHUB_OUTPUT
+
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "run-e2e=true" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            if [[ "${{ contains(github.event.pull_request.labels.*.name, 'run-e2e-tests') }}" == "true" ]] || \
+               [[ "${{ contains(github.event.pull_request.labels.*.name, 'deploy-pr-environment') }}" == "true" ]]; then
+              echo "run-e2e=true" >> $GITHUB_OUTPUT
+            fi
+          elif [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            # Triggered by Deploy PR Environment workflow
+            if [[ "${{ github.event.workflow_run.conclusion }}" == "success" ]]; then
+              echo "run-deployed=true" >> $GITHUB_OUTPUT
+              # Extract PR number from the workflow run
+              PR_NUMBER=$(echo '${{ github.event.workflow_run.head_branch }}' | grep -oP 'pr-\K\d+' || echo "")
+              if [[ -z "$PR_NUMBER" ]]; then
+                # Try to get from pull_requests array
+                PR_NUMBER="${{ github.event.workflow_run.pull_requests[0].number }}"
+              fi
+              echo "pr-number=$PR_NUMBER" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+  # Vitest E2E tests (schedule-pipeline, workflow-runner)
+  e2e-vitest:
+    needs: should-run
+    if: needs.should-run.outputs.run-e2e == 'true'
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: keeperhub_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      localstack:
+        image: localstack/localstack:latest
+        ports:
+          - 4566:4566
+        env:
+          SERVICES: sqs,scheduler
+          DEBUG: 0
+          EAGER_SERVICE_LOADING: 1
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate plugin registry
+        run: pnpm discover-plugins
+
+      - name: Wait for services
+        run: |
+          # Wait for PostgreSQL
+          until pg_isready -h localhost -p 5432 -U postgres; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+
+          # Wait for LocalStack
+          until curl -s http://localhost:4566/_localstack/health | grep -q '"sqs": "available"'; do
+            echo "Waiting for LocalStack..."
+            sleep 2
+          done
+
+      - name: Run database migrations
+        run: pnpm db:push
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/keeperhub_test
+
+      - name: Run E2E Vitest tests
+        run: pnpm test:e2e:schedule && pnpm test:e2e:runner
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/keeperhub_test
+          AWS_ENDPOINT_URL: http://localhost:4566
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_REGION: us-east-1
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-e2e-results
+          path: |
+            test-results/
+            coverage/
+          retention-days: 7
+
+  # Playwright E2E tests (browser-based)
+  # Only runs after Vitest E2E tests pass
+  e2e-playwright:
+    needs: [should-run, e2e-vitest]
+    if: needs.should-run.outputs.run-e2e == 'true'
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: keeperhub_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Generate plugin registry
+        run: pnpm discover-plugins
+
+      - name: Run database migrations
+        run: pnpm db:push
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/keeperhub_test
+
+      - name: Build application
+        run: pnpm build
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/keeperhub_test
+
+      - name: Run Playwright tests
+        run: pnpm test:e2e
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/keeperhub_test
+          CI: true
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+      - name: Upload screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-screenshots
+          path: test-results/**/*.png
+          retention-days: 7
+
+  # Playwright E2E tests against deployed PR environment
+  e2e-playwright-deployed:
+    needs: should-run
+    if: needs.should-run.outputs.run-deployed == 'true' && needs.should-run.outputs.pr-number != ''
+    runs-on: ubuntu-latest
+    env:
+      PR_NUMBER: ${{ needs.should-run.outputs.pr-number }}
+      BASE_URL: https://app-pr-${{ needs.should-run.outputs.pr-number }}.keeperhub.com
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Wait for PR environment to be ready
+        run: |
+          echo "Waiting for ${{ env.BASE_URL }} to be ready..."
+          for i in {1..30}; do
+            if curl -s -o /dev/null -w "%{http_code}" "${{ env.BASE_URL }}" | grep -q "200\|301\|302"; then
+              echo "PR environment is ready!"
+              exit 0
+            fi
+            echo "Attempt $i/30: Not ready yet, waiting 10s..."
+            sleep 10
+          done
+          echo "PR environment did not become ready in time"
+          exit 1
+
+      - name: Run Playwright tests against deployed environment
+        run: pnpm exec playwright test --grep-invert "happy-paths"
+        env:
+          BASE_URL: ${{ env.BASE_URL }}
+          CI: true
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-deployed-report-pr-${{ env.PR_NUMBER }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+      - name: Comment test results on PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = parseInt('${{ env.PR_NUMBER }}');
+            if (!prNumber) {
+              console.log('No PR number found, skipping comment');
+              return;
+            }
+
+            const status = '${{ job.status }}';
+            const emoji = status === 'success' ? '✅' : '❌';
+            const title = status === 'success' ? 'E2E Tests Passed' : 'E2E Tests Failed';
+
+            const comment = `## ${emoji} ${title}
+
+            E2E tests have been run against the deployed PR environment.
+
+            **Environment:** [app-pr-${prNumber}.keeperhub.com](https://app-pr-${prNumber}.keeperhub.com)
+            **Status:** ${status}
+            **Workflow Run:** [View Details](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+            ${status !== 'success' ? '⚠️ Check the workflow run for test failure details and screenshots.' : ''}
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: prNumber,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
