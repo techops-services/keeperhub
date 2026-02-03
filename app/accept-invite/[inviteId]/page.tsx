@@ -802,21 +802,10 @@ export default function AcceptInvitePage() {
     router.push("/workflows");
   };
 
-  if (pageState === "loading") {
-    return <LoadingState />;
-  }
-
-  if (pageState === "error" && inviteError) {
-    return <ErrorState inviteError={inviteError} />;
-  }
-
-  if (pageState === "not-found" || !invitation) {
-    return <NotFoundState />;
-  }
-
-  // Show verification form if we're in the middle of verification flow
-  // This takes priority over pageState to prevent losing state on session changes
-  if (verificationData.showVerification) {
+  // Show verification form before any other state checks so that session
+  // transitions (e.g. sessionPending flickering to true after signIn) do not
+  // unmount the form and reset its local state (OTP field, submitting flag).
+  if (verificationData.showVerification && invitation) {
     return (
       <VerificationFormState
         invitation={invitation}
@@ -827,6 +816,18 @@ export default function AcceptInvitePage() {
         storedPassword={verificationData.storedPassword}
       />
     );
+  }
+
+  if (pageState === "loading") {
+    return <LoadingState />;
+  }
+
+  if (pageState === "error" && inviteError) {
+    return <ErrorState inviteError={inviteError} />;
+  }
+
+  if (pageState === "not-found" || !invitation) {
+    return <NotFoundState />;
   }
 
   if (pageState === "logged-in-match") {
