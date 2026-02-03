@@ -264,8 +264,8 @@ function JsonWithLinks({ data }: { data: unknown }) {
 
           // Ethereum addresses (40 hex) or tx hashes (64 hex): copy + optional link icons
           if (ETH_HEX_REGEX.test(innerValue)) {
-            const isAddress = innerValue.length === 42;
-            const displayValue = isAddress
+            const looksLikeAddress = innerValue.length === 42;
+            const displayValue = looksLikeAddress
               ? toChecksumAddress(innerValue)
               : innerValue;
             const explorerUrl = linkMap.get(innerValue);
