@@ -6,6 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { TableCell, TableRow } from "@/components/ui/table";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   toChecksumAddress,
   truncateAddress,
 } from "@/keeperhub/lib/address-utils";
@@ -32,7 +38,18 @@ export function AddressBookRow({
 
   return (
     <TableRow>
-      <TableCell className="font-medium">{entry.label}</TableCell>
+      <TableCell className="max-w-40 truncate font-medium">
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="max-w-40 truncate">{entry.label}</span>
+            </TooltipTrigger>
+            <TooltipContent align="center" side="left">
+              {entry.label}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </TableCell>
       <TableCell>
         <div className="flex items-center gap-2">
           <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
