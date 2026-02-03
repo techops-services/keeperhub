@@ -1,3 +1,6 @@
+/* biome-ignore-all lint/correctness/noGlobalDirnameFilename: E2E tests rely on Node CJS behavior */
+// Added global ignore as this test uses __dirname. Updating to import.meta.dirname breaks the test.
+
 /**
  * Full Pipeline E2E Tests
  *
@@ -279,15 +282,13 @@ describe.skipIf(SKIP_INFRA_TESTS)("Full Pipeline E2E", () => {
         ...(options.scheduleId && { SCHEDULE_ID: options.scheduleId }),
       };
 
-      // biome-ignore lint/correctness/noGlobalDirnameFilename: This is a test, so we can use __dirname. Updating to import.meta.dirname breaks the test.
-      const scriptPath = join(__dirname, "../../scripts/workflow-runner-bootstrap.cjs");
+      const scriptPath = join(
+        __dirname,
+        "../../scripts/workflow-runner-bootstrap.cjs"
+      );
       const child = spawn("node", [scriptPath], {
         env,
-        cwd: join(
-          // biome-ignore lint/correctness/noGlobalDirnameFilename: This is a test, so we can use __dirname. Updating to import.meta.dirname breaks the test
-          __dirname,
-          "../.."
-        ),
+        cwd: join(__dirname, "../.."),
       });
 
       let stdout = "";
