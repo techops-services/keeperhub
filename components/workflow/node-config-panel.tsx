@@ -27,6 +27,8 @@ import { CodeEditor } from "@/components/ui/code-editor";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+// start custom keeperhub code //
+import { WorkflowCostEstimate } from "@/keeperhub/components/billing/workflow-cost-estimate";
 import { api } from "@/lib/api-client";
 import { integrationsAtom } from "@/lib/integrations-store";
 import type { IntegrationType } from "@/lib/types/integration";
@@ -58,10 +60,11 @@ import { findActionById } from "@/plugins";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { ActionConfig } from "./config/action-config";
 import { ActionGrid } from "./config/action-grid";
-
 import { TriggerConfig } from "./config/trigger-config";
 import { generateNodeCode } from "./utils/code-generators";
 import { WorkflowRuns } from "./workflow-runs";
+
+// end keeperhub code //
 
 // Regex constants
 const NON_ALPHANUMERIC_REGEX = /[^a-zA-Z0-9\s]/g;
@@ -759,6 +762,9 @@ export const PanelInner = () => {
                   value={currentWorkflowId || "Not saved"}
                 />
               </div>
+              {/* start custom keeperhub code */}
+              <WorkflowCostEstimate edges={edges} nodes={nodes} />
+              {/* end keeperhub code */}
               {!isOwner && (
                 <div className="rounded-lg border border-muted bg-muted/30 p-3">
                   <p className="text-muted-foreground text-sm">
@@ -1073,6 +1079,9 @@ export const PanelInner = () => {
                   </div>
                 </div>
               )}
+              {/* start custom keeperhub code */}
+              <WorkflowCostEstimate edges={edges} nodes={nodes} />
+              {/* end keeperhub code */}
             </div>
           )}
         </TabsContent>
