@@ -505,10 +505,12 @@ function AuthFormState({
   invitation,
   onSuccess,
   onShowVerification,
+  onAccepting,
 }: {
   invitation: InvitationData;
   onSuccess: () => void;
   onShowVerification: (password: string) => void;
+  onAccepting: () => void;
 }) {
   const [authMode, setAuthMode] = useState<"signin" | "signup">(
     invitation.userExists ? "signin" : "signup"
@@ -553,6 +555,8 @@ function AuthFormState({
   };
 
   const handleSigninSubmit = async () => {
+    onAccepting();
+
     const signInResult = await trySignIn(invitation.email, password);
 
     if (!signInResult.success) {
@@ -755,6 +759,7 @@ export default function AcceptInvitePage() {
     showVerification: boolean;
     storedPassword: string;
   }>({ showVerification: false, storedPassword: "" });
+  const [isAcceptingViaAuth, setIsAcceptingViaAuth] = useState(false);
 
   useEffect(() => {
     async function fetchInvitation() {
@@ -831,6 +836,28 @@ export default function AcceptInvitePage() {
   }
 
   if (pageState === "logged-in-match") {
+    // When signing in via the auth form, the session update causes pageState to
+    // flip to "logged-in-match" before handleSigninSubmit finishes accepting the
+    // invitation. Show a transitional state instead of the AcceptDirectState
+    // button that would flash and auto-resolve.
+    if (isAcceptingViaAuth) {
+      return (
+        <div className="flex min-h-screen items-center justify-center p-4">
+          <div className="w-full max-w-md space-y-6 rounded-lg border bg-card p-8 text-center">
+            <Spinner className="mx-auto size-8" />
+            <div className="space-y-2">
+              <h1 className="font-semibold text-xl">
+                Joining {invitation.organizationName}
+              </h1>
+              <p className="text-muted-foreground text-sm">
+                Setting up your account...
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <AcceptDirectState invitation={invitation} onSuccess={handleSuccess} />
     );
@@ -848,6 +875,7 @@ export default function AcceptInvitePage() {
   return (
     <AuthFormState
       invitation={invitation}
+      onAccepting={() => setIsAcceptingViaAuth(true)}
       onShowVerification={(password) =>
         setVerificationData({
           showVerification: true,
