@@ -198,6 +198,96 @@ KeeperHub - Blockchain Workflow Automation
   return success;
 }
 
+type OAuthPasswordResetData = {
+  email: string;
+  providerName: string;
+};
+
+/**
+ * Send email to OAuth users who try to reset password
+ * Informs them to sign in using their OAuth provider instead
+ */
+export async function sendOAuthPasswordResetEmail(
+  data: OAuthPasswordResetData
+): Promise<boolean> {
+  const { email, providerName } = data;
+
+  const logoUrl =
+    "https://raw.githubusercontent.com/techops-services/keeperhub/staging/public/keeperhub_logo.png";
+
+  const subject = "Password Reset Request - KeeperHub";
+
+  const text = `
+Hi there,
+
+We received a password reset request for your KeeperHub account.
+
+Your account is linked to ${providerName} for sign-in. You don't have a password set with KeeperHub - your authentication is managed by ${providerName}.
+
+To sign in, please use the "Continue with ${providerName}" option on our sign-in page.
+
+If you didn't request this, you can safely ignore this email.
+
+---
+KeeperHub - Blockchain Workflow Automation
+`.trim();
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+    <img src="${logoUrl}" alt="KeeperHub" style="max-width: 200px; height: auto;" />
+  </div>
+
+  <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e5e5; border-top: none; border-radius: 0 0 12px 12px;">
+    <h2 style="color: #1a1a2e; margin-top: 0;">Password Reset Request</h2>
+
+    <p>We received a password reset request for your KeeperHub account.</p>
+
+    <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <p style="margin: 0; color: #0369a1;">
+        <strong>Your account uses ${providerName} for sign-in.</strong><br>
+        You don't have a password set with KeeperHub - your authentication is managed by ${providerName}.
+      </p>
+    </div>
+
+    <p>To sign in, please use the <strong>"Continue with ${providerName}"</strong> option on our sign-in page.</p>
+
+    <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
+
+    <p style="color: #999; font-size: 12px; margin-bottom: 0;">
+      If you didn't request this, you can safely ignore this email.
+    </p>
+  </div>
+
+  <div style="text-align: center; padding: 20px; color: #999; font-size: 12px;">
+    <p style="margin: 0;">KeeperHub - Blockchain Workflow Automation</p>
+  </div>
+</body>
+</html>
+`.trim();
+
+  const success = await sendEmail({
+    to: email,
+    subject,
+    text,
+    html,
+  });
+
+  if (success) {
+    console.log(`[Email] OAuth password reset info sent to ${email}`);
+  } else {
+    console.error(`[Email] Failed to send OAuth info to ${email}`);
+  }
+
+  return success;
+}
+
 export async function sendInvitationEmail(
   data: InvitationEmailData
 ): Promise<boolean> {
