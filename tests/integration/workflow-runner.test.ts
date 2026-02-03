@@ -14,7 +14,7 @@ import { afterEach, describe, expect, it } from "vitest";
  * Some tests require a test database, others use a test harness.
  */
 
-const PROJECT_ROOT = path.resolve(__dirname, "../..");
+const PROJECT_ROOT = path.resolve(import.meta.dirname, "../..");
 const WORKFLOW_RUNNER_PATH = path.join(
   PROJECT_ROOT,
   "scripts/workflow-runner.ts"
