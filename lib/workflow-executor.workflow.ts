@@ -60,6 +60,9 @@ type ExecutionResult = {
 
 type NodeOutputs = Record<string, { label: string; data: unknown }>;
 
+/** Matches path segment like "carts[0]" for array index access (same as template.ts) */
+const ARRAY_ACCESS_PATTERN = /^([^[]+)\[(\d+)\]$/;
+
 export type WorkflowExecutionInput = {
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
@@ -106,20 +109,46 @@ function replaceTemplateVariable(
     // biome-ignore lint/suspicious/noExplicitAny: Dynamic data traversal
     let current: any = output.data;
 
-    for (const field of fields) {
-      if (current && typeof current === "object") {
-        // KEEP-1284: Check if field exists before accessing
-        if (!(field in current)) {
-          throw new Error(
-            `Condition references field "${fieldPath}" but "${field}" does not exist on the data. Available fields: ${Object.keys(current).join(", ") || "(none)"}`
-          );
-        }
-        current = current[field];
-      } else {
-        // KEEP-1284: Throw error when field access fails
+    for (const segment of fields) {
+      if (current === null || current === undefined) {
         throw new Error(
           `Condition references field "${fieldPath}" but it could not be resolved. Check that the field path is correct.`
         );
+      }
+      if (typeof current !== "object") {
+        throw new Error(
+          `Condition references field "${fieldPath}" but it could not be resolved. Check that the field path is correct.`
+        );
+      }
+
+      const arrayMatch = segment.match(ARRAY_ACCESS_PATTERN);
+      if (arrayMatch) {
+        const [, key, indexStr] = arrayMatch;
+        const index = Number.parseInt(indexStr, 10);
+        if (!(key in current)) {
+          throw new Error(
+            `Condition references field "${fieldPath}" but "${key}" does not exist on the data. Available fields: ${Object.keys(current).join(", ") || "(none)"}`
+          );
+        }
+        const arr = current[key];
+        if (!Array.isArray(arr)) {
+          throw new Error(
+            `Condition references field "${fieldPath}" but "${key}" is not an array. Cannot access [${index}].`
+          );
+        }
+        if (index < 0 || index >= arr.length) {
+          throw new Error(
+            `Condition references field "${fieldPath}" but "${segment}" is out of range (array length ${arr.length}). Use index 0 to ${arr.length - 1}.`
+          );
+        }
+        current = arr[index];
+      } else {
+        if (!(segment in current)) {
+          throw new Error(
+            `Condition references field "${fieldPath}" but "${segment}" does not exist on the data. Available fields: ${Object.keys(current).join(", ") || "(none)"}`
+          );
+        }
+        current = current[segment];
       }
     }
     value = current;
