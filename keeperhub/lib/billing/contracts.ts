@@ -51,11 +51,9 @@ export const SUPPORTED_TOKENS = [
   },
 ] as const;
 
-// Chain configuration
-// Billing contracts are currently deployed on Sepolia testnet
-// In production, update contract addresses to mainnet and this will automatically use chainId 1
+// Chain configuration - uses NEXT_PUBLIC_CHAIN_ID to determine billing network
 export const CHAIN_CONFIG = {
-  chainId: 11_155_111, // Sepolia - where billing contracts are deployed
+  chainId: Number(process.env.NEXT_PUBLIC_CHAIN_ID) || 11_155_111,
   get rpcUrl() {
     // Use centralized RPC config from CHAIN_RPC_CONFIG
     try {

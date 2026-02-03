@@ -233,6 +233,9 @@ env:
   NEXT_PUBLIC_TIERS_CONTRACT_ADDRESS:
     type: kv
     value: "0x4B899Cc652944994741169875010E5a3C607975B"
+  NEXT_PUBLIC_CHAIN_ID:
+    type: kv
+    value: "11155111"
   # PR-specific SQS configuration (using LocalStack)
   AWS_REGION:
     type: kv
