@@ -196,6 +196,9 @@ export function TokenSelectField({
   const renderSelectedTokenInfo = () => {
     // For supported tokens mode
     if (!isCustomMode && selectedSupportedToken) {
+      const displayAddress = toChecksumAddress(
+        selectedSupportedToken.tokenAddress
+      );
       return (
         <div className="mt-2 flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-sm">
           {selectedSupportedToken.logoUrl && (
@@ -209,12 +212,7 @@ export function TokenSelectField({
           )}
           <span className="font-medium">{selectedSupportedToken.symbol}</span>
           <span className="truncate font-mono text-muted-foreground text-xs">
-            {toChecksumAddress(selectedSupportedToken.tokenAddress).slice(
-              0,
-              10
-            )}
-            ...
-            {toChecksumAddress(selectedSupportedToken.tokenAddress).slice(-8)}
+            {displayAddress.slice(0, 10)}...{displayAddress.slice(-8)}
           </span>
           <div className="ml-auto flex items-center gap-1">
             <button
@@ -246,12 +244,12 @@ export function TokenSelectField({
     // For custom token mode
     if (isCustomMode && currentValue.customToken) {
       const customToken = currentValue.customToken;
+      const displayAddress = toChecksumAddress(customToken.address);
       return (
         <div className="mt-2 flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-sm">
           <span className="font-medium">{customToken.symbol}</span>
           <span className="truncate font-mono text-muted-foreground text-xs">
-            {toChecksumAddress(customToken.address).slice(0, 10)}...
-            {toChecksumAddress(customToken.address).slice(-8)}
+            {displayAddress.slice(0, 10)}...{displayAddress.slice(-8)}
           </span>
           <div className="ml-auto flex items-center gap-1">
             <button
