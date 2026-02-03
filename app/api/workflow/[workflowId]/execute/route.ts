@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { start } from "workflow/api";
 // start custom keeperhub code //
 import { authenticateApiKey } from "@/keeperhub/lib/api-key-auth";
+import { deductCredit } from "@/keeperhub/lib/billing/credit-service";
 import { authenticateInternalService } from "@/keeperhub/lib/internal-service-auth";
 import {
   getMetricsCollector,
@@ -242,73 +243,37 @@ export async function POST(
     // start custom keeperhub code //
     // Deduct 1 credit before executing workflow (if workflow has an organizationId)
     if (workflow.organizationId) {
-      try {
-        const deductResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/billing/deduct-credit`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Service-Key":
-                process.env.WORKFLOW_EXECUTOR_SERVICE_API_KEY || "",
-            },
-            body: JSON.stringify({
-              organizationId: workflow.organizationId,
-              workflowId,
-              executionId,
-            }),
-          }
-        );
+      const deductResult = await deductCredit({
+        organizationId: workflow.organizationId,
+        workflowId,
+        executionId,
+      });
 
-        if (!deductResponse.ok) {
-          const errorData = await deductResponse.json().catch(() => ({
-            error: "Failed to deduct credit",
-          }));
+      if (!deductResult.success) {
+        const errorMessage =
+          deductResult.error === "Insufficient credits"
+            ? "Insufficient credits. Please purchase more credits to continue."
+            : deductResult.error;
 
-          // Update execution status to failed
-          await db
-            .update(workflowExecutions)
-            .set({
-              status: "error",
-              error:
-                errorData.error === "Insufficient credits"
-                  ? "Insufficient credits. Please purchase more credits to continue."
-                  : errorData.error || "Failed to deduct credit",
-              completedAt: new Date(),
-            })
-            .where(eq(workflowExecutions.id, executionId));
-
-          return NextResponse.json(
-            {
-              error:
-                errorData.error === "Insufficient credits"
-                  ? "Insufficient credits. Please purchase more credits to continue."
-                  : errorData.error || "Failed to deduct credit",
-              currentBalance: errorData.currentBalance,
-            },
-            { status: deductResponse.status }
-          );
-        }
-
-        const deductResult = await deductResponse.json();
-        console.log(
-          `[Workflow Execute] Credit deducted for org ${workflow.organizationId}. New balance: ${deductResult.newBalance}`
-        );
-      } catch (error) {
-        console.error("[Workflow Execute] Failed to deduct credit:", error);
         // Update execution status to failed
         await db
           .update(workflowExecutions)
           .set({
             status: "error",
-            error: "Failed to deduct credit for workflow execution",
+            error: errorMessage,
             completedAt: new Date(),
           })
           .where(eq(workflowExecutions.id, executionId));
 
         return NextResponse.json(
-          { error: "Failed to deduct credit for workflow execution" },
-          { status: 500 }
+          {
+            error: errorMessage,
+            currentBalance:
+              "currentBalance" in deductResult
+                ? deductResult.currentBalance
+                : undefined,
+          },
+          { status: deductResult.error === "Insufficient credits" ? 402 : 500 }
         );
       }
     }
