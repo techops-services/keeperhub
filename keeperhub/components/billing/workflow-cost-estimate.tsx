@@ -30,6 +30,8 @@ type GasEstimateResponse = {
   ethPriceUsd: number;
   gasStrategy: "conservative" | "optimized";
   volatilityWarning: boolean;
+  configuredWriteFunctions: number;
+  writeFunctions: number;
 };
 
 type ClientCostEstimate = {
@@ -146,7 +148,8 @@ function isWriteFunction(node: WorkflowNode): boolean {
   }
 
   // Check ABI for write state mutability
-  const abiFunction = config.function as string | undefined;
+  // Note: Plugin uses "abiFunction" field name, not "function"
+  const abiFunction = config.abiFunction as string | undefined;
   const abi = config.abi as string | undefined;
 
   if (abiFunction && abi) {
@@ -179,10 +182,12 @@ function GasCostDisplay({
   isLoading,
   error,
   gasEstimate,
+  totalWriteFunctions,
 }: {
   isLoading: boolean;
   error: Error | null;
   gasEstimate: GasEstimateResponse | undefined;
+  totalWriteFunctions: number;
 }) {
   if (isLoading) {
     return <span className="text-muted-foreground">estimating...</span>;
@@ -196,11 +201,32 @@ function GasCostDisplay({
     return <span className="text-muted-foreground">-</span>;
   }
 
+  // Check if any write functions are unconfigured
+  const unconfigured =
+    totalWriteFunctions - gasEstimate.configuredWriteFunctions;
+
+  if (gasEstimate.configuredWriteFunctions === 0) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="cursor-help text-amber-600 underline decoration-dotted dark:text-amber-400">
+            configure function
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs text-xs" side="left">
+          Select a contract, function, and fill in arguments to estimate gas
+          cost.
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <span className="cursor-help underline decoration-dotted">
           {formatCredits(gasEstimate.gasCostCredits)} credits
+          {unconfigured > 0 && <span className="text-amber-500">*</span>}
         </span>
       </TooltipTrigger>
       <TooltipContent className="text-xs" side="left">
@@ -211,6 +237,12 @@ function GasCostDisplay({
           </div>
           <div>Gas price: {formatGwei(gasEstimate.gasPriceWei)}</div>
           <div>ETH price: ${gasEstimate.ethPriceUsd.toFixed(2)}</div>
+          {unconfigured > 0 && (
+            <div className="text-amber-500">
+              *{unconfigured} function{unconfigured > 1 ? "s" : ""} not yet
+              configured
+            </div>
+          )}
         </div>
       </TooltipContent>
     </Tooltip>
@@ -293,6 +325,7 @@ export function WorkflowCostEstimate({
   const baseEstimate = useMemo(() => calculateBaseCostEstimate(nodes), [nodes]);
 
   // Create query key for gas estimation (only relevant parts)
+  // Uses correct field names: abiFunction, functionArgs, network (not function, args, chainId)
   const gasQueryKey = useMemo(() => {
     if (baseEstimate.writeFunctions === 0) {
       return null;
@@ -301,9 +334,11 @@ export function WorkflowCostEstimate({
       id: n.id,
       type: n.data.type,
       actionType: n.data.config?.actionType,
-      function: n.data.config?.function,
-      chainId: n.data.config?.chainId,
+      abiFunction: n.data.config?.abiFunction,
+      functionArgs: n.data.config?.functionArgs,
+      network: n.data.config?.network,
       contractAddress: n.data.config?.contractAddress,
+      abi: n.data.config?.abi,
     }));
     return ["workflow-gas-estimate", JSON.stringify(nodeData)];
   }, [nodes, baseEstimate.writeFunctions]);
@@ -334,6 +369,8 @@ export function WorkflowCostEstimate({
         ethPriceUsd: data.ethPriceUsd,
         gasStrategy: data.gasStrategy,
         volatilityWarning: data.volatilityWarning,
+        configuredWriteFunctions: data.configuredWriteFunctions,
+        writeFunctions: data.writeFunctions,
       };
     },
     enabled: gasQueryKey !== null,
@@ -432,6 +469,7 @@ export function WorkflowCostEstimate({
                 error={gasError}
                 gasEstimate={gasEstimate}
                 isLoading={isLoadingGas}
+                totalWriteFunctions={baseEstimate.writeFunctions}
               />
             </div>
           )}

@@ -38,6 +38,7 @@ export type WorkflowCostEstimate = {
 
   // Gas costs (write functions only)
   writeFunctions: number;
+  configuredWriteFunctions: number;
   gasCostCredits: number;
   gasEstimateWei: bigint;
   gasPriceWei: bigint;
@@ -127,7 +128,8 @@ function isWriteFunction(node: WorkflowNode): boolean {
   }
 
   // Check for ABI function with write state mutability
-  const abiFunction = config.function as string | undefined;
+  // Note: Plugin uses "abiFunction" field name, not "function"
+  const abiFunction = config.abiFunction as string | undefined;
   const abi = config.abi as string | undefined;
 
   if (abiFunction && abi) {
@@ -209,28 +211,199 @@ function extractChainId(nodes: WorkflowNode[]): number | undefined {
   return;
 }
 
-/**
- * Estimate gas for write functions
- * Returns total estimated gas across all write functions
- */
-function estimateWriteFunctionGas(
-  nodes: WorkflowNode[],
-  _chainId: number
-): bigint {
-  // Default gas estimate per write function (reasonable for simple transfers)
-  const DEFAULT_GAS_PER_WRITE = BigInt(100_000);
+type WriteNodeConfig = {
+  contractAddress: string;
+  abi: string;
+  functionName: string;
+  args: unknown[];
+  chainId: number;
+};
 
+/**
+ * Validate contract address format (0x prefix, 42 chars)
+ */
+function isValidContractAddress(address: string): boolean {
+  return address.startsWith("0x") && address.length === 42;
+}
+
+/**
+ * Safely parse JSON, returning null on failure
+ */
+function safeJsonParse(json: string): unknown {
+  try {
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Parse function arguments from JSON string
+ */
+function parseFunctionArgs(argsStr: string | undefined): unknown[] {
+  if (!argsStr) {
+    return [];
+  }
+  const parsed = safeJsonParse(argsStr);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+/**
+ * Parse chain ID from string or number
+ */
+function parseChainId(chainId: number | string | undefined): number {
+  if (!chainId) {
+    return 1; // Default to mainnet
+  }
+  return typeof chainId === "string" ? Number.parseInt(chainId, 10) : chainId;
+}
+
+/**
+ * Get the expected input count for a function from the ABI
+ */
+function getExpectedArgCount(abi: string, functionName: string): number | null {
+  const parsedAbi = safeJsonParse(abi);
+  if (!Array.isArray(parsedAbi)) {
+    return null;
+  }
+
+  const func = parsedAbi.find(
+    (item: { type?: string; name?: string }) =>
+      item.type === "function" && item.name === functionName
+  ) as { inputs?: unknown[] } | undefined;
+
+  if (!func) {
+    return null;
+  }
+
+  return func.inputs?.length ?? 0;
+}
+
+/**
+ * Check if a write function node is fully configured for gas estimation
+ */
+function getWriteNodeConfig(node: WorkflowNode): WriteNodeConfig | null {
+  const config = node.data.config ?? {};
+
+  const contractAddress = config.contractAddress as string | undefined;
+  const abi = config.abi as string | undefined;
+  // Plugin uses "abiFunction" field name, not "function"
+  const functionName = config.abiFunction as string | undefined;
+  // Plugin uses "functionArgs" as JSON string, not "args" as array
+  const functionArgsStr = config.functionArgs as string | undefined;
+  // Plugin uses "network" field name for chainId
+  const chainId = (config.chainId ?? config.network) as
+    | number
+    | string
+    | undefined;
+
+  // All required fields must be present
+  if (!(contractAddress && abi && functionName)) {
+    return null;
+  }
+
+  // Validate contract address format
+  if (!isValidContractAddress(contractAddress)) {
+    return null;
+  }
+
+  // Validate ABI is parseable
+  if (!safeJsonParse(abi)) {
+    return null;
+  }
+
+  // Parse args and validate count matches function signature
+  const args = parseFunctionArgs(functionArgsStr);
+  const expectedArgCount = getExpectedArgCount(abi, functionName);
+
+  // If we can't determine expected count or args don't match, not configured
+  if (expectedArgCount === null || args.length !== expectedArgCount) {
+    return null;
+  }
+
+  return {
+    contractAddress,
+    abi,
+    functionName,
+    args,
+    chainId: parseChainId(chainId),
+  };
+}
+
+/**
+ * Estimate gas for a single write function using eth_estimateGas
+ */
+async function estimateSingleFunctionGas(
+  provider: ethers.Provider,
+  config: WriteNodeConfig
+): Promise<bigint> {
+  try {
+    const contract = new ethers.Contract(
+      config.contractAddress,
+      config.abi,
+      provider
+    );
+
+    // Get the function fragment to encode call data
+    const fragment = contract.interface.getFunction(config.functionName);
+    if (!fragment) {
+      throw new Error(`Function ${config.functionName} not found in ABI`);
+    }
+
+    // Encode the function call
+    const data = contract.interface.encodeFunctionData(
+      config.functionName,
+      config.args
+    );
+
+    // Estimate gas using eth_estimateGas
+    const gasEstimate = await provider.estimateGas({
+      to: config.contractAddress,
+      data,
+    });
+
+    // Add 20% buffer for safety
+    return (gasEstimate * BigInt(120)) / BigInt(100);
+  } catch (error) {
+    console.error(
+      `[CostCalculator] Failed to estimate gas for ${config.functionName}:`,
+      error
+    );
+    // Return a conservative default on error
+    return BigInt(150_000);
+  }
+}
+
+/**
+ * Estimate gas for write functions using actual eth_estimateGas
+ * Only estimates for fully configured nodes
+ */
+async function estimateWriteFunctionGas(
+  nodes: WorkflowNode[],
+  provider: ethers.Provider
+): Promise<{ totalGas: bigint; configuredCount: number }> {
   const writeNodes = nodes.filter(
     (n) => n.data.type === "action" && isWriteFunction(n)
   );
 
   if (writeNodes.length === 0) {
-    return BigInt(0);
+    return { totalGas: BigInt(0), configuredCount: 0 };
   }
 
-  // For now, use a default estimate per write function
-  // In the future, we could do actual contract simulation
-  return DEFAULT_GAS_PER_WRITE * BigInt(writeNodes.length);
+  let totalGas = BigInt(0);
+  let configuredCount = 0;
+
+  for (const node of writeNodes) {
+    const config = getWriteNodeConfig(node);
+
+    if (config) {
+      const gas = await estimateSingleFunctionGas(provider, config);
+      totalGas += gas;
+      configuredCount++;
+    }
+  }
+
+  return { totalGas, configuredCount };
 }
 
 /**
@@ -269,8 +442,9 @@ export async function estimateWorkflowCost(
   let ethPriceUsd = 0;
   let gasStrategy: GasStrategy = "optimized";
   let volatilityWarning = false;
+  let configuredWriteFunctions = 0;
 
-  // Calculate gas costs for write functions
+  // Calculate gas costs for write functions (only if configured)
   if (writeFunctions > 0 && VOLATILITY_INDICATOR) {
     const detectedChainId = chainId ?? extractChainId(nodes) ?? 1; // Default to mainnet
 
@@ -279,39 +453,43 @@ export async function estimateWorkflowCost(
       const rpcUrl = getRpcUrlByChainId(detectedChainId, "primary");
       const provider = new ethers.JsonRpcProvider(rpcUrl);
 
-      // Estimate gas for write functions
-      gasEstimateWei = estimateWriteFunctionGas(nodes, detectedChainId);
+      // Estimate gas for configured write functions using eth_estimateGas
+      const gasResult = await estimateWriteFunctionGas(nodes, provider);
+      gasEstimateWei = gasResult.totalGas;
+      configuredWriteFunctions = gasResult.configuredCount;
 
-      // Get gas configuration from AdaptiveGasStrategy
-      const strategy = getGasStrategy();
-      const gasConfig = await strategy.getGasConfig(
-        provider,
-        triggerType,
-        gasEstimateWei,
-        detectedChainId
-      );
+      // Only proceed with pricing if we have configured functions
+      if (configuredWriteFunctions > 0) {
+        // Get gas configuration from AdaptiveGasStrategy
+        const strategy = getGasStrategy();
+        const gasConfig = await strategy.getGasConfig(
+          provider,
+          triggerType,
+          gasEstimateWei,
+          detectedChainId
+        );
 
-      gasPriceWei = gasConfig.maxFeePerGas;
+        gasPriceWei = gasConfig.maxFeePerGas;
 
-      // Determine if conservative strategy was used
-      // Time-sensitive triggers or high volatility = conservative
-      const isTimeSensitive =
-        triggerType === "event" || triggerType === "webhook";
-      gasStrategy = isTimeSensitive ? "conservative" : "optimized";
+        // Determine if conservative strategy was used
+        // Time-sensitive triggers or high volatility = conservative
+        const isTimeSensitive =
+          triggerType === "event" || triggerType === "webhook";
+        gasStrategy = isTimeSensitive ? "conservative" : "optimized";
 
-      // Get ETH price
-      ethPriceUsd = await getEthPriceUsd();
+        // Get ETH price
+        ethPriceUsd = await getEthPriceUsd();
 
-      // Convert gas to credits
-      gasCostCredits = gasToCredits(gasEstimateWei, gasPriceWei, ethPriceUsd);
+        // Convert gas to credits
+        gasCostCredits = gasToCredits(gasEstimateWei, gasPriceWei, ethPriceUsd);
 
-      // Set volatility warning (we can't access internal volatility from strategy,
-      // but we can infer from strategy type)
-      volatilityWarning = gasStrategy === "conservative" && !isTimeSensitive;
+        // Set volatility warning (we can't access internal volatility from strategy,
+        // but we can infer from strategy type)
+        volatilityWarning = gasStrategy === "conservative" && !isTimeSensitive;
+      }
     } catch (error) {
       console.error("[CostCalculator] Failed to estimate gas:", error);
-      // Use default fallback
-      gasCostCredits = writeFunctions * 100; // 100 credits per write function as fallback
+      // No fallback - if estimation fails, show 0 until configured
     }
   }
 
@@ -330,6 +508,7 @@ export async function estimateWorkflowCost(
     functionCalls,
     functionCost,
     writeFunctions,
+    configuredWriteFunctions,
     gasCostCredits,
     gasEstimateWei,
     gasPriceWei,
