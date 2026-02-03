@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AccountSettings } from "@/components/settings/account-settings";
-import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 // start custom keeperhub code //
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChangePasswordSection } from "@/keeperhub/components/settings/change-password-section";
 import { DeactivateAccountSection } from "@/keeperhub/components/settings/delete-account-section";
 // end keeperhub code //
@@ -93,30 +93,32 @@ export function SettingsOverlay({ overlayId }: SettingsOverlayProps) {
           <Spinner />
         </div>
       ) : (
-        <div className="space-y-6">
-          <AccountSettings
-            accountEmail={accountEmail}
-            accountName={accountName}
-            onEmailChange={setAccountEmail}
-            onNameChange={setAccountName}
-          />
+        // start custom keeperhub code //
+        <Tabs className="w-full" defaultValue="account">
+          <TabsList className="mb-4 w-full">
+            <TabsTrigger value="account">Account</TabsTrigger>
+            <TabsTrigger value="security">Security</TabsTrigger>
+            <TabsTrigger value="danger">Danger Zone</TabsTrigger>
+          </TabsList>
 
-          {/* start custom keeperhub code */}
-          <Separator />
+          <TabsContent value="account">
+            <AccountSettings
+              accountEmail={accountEmail}
+              accountName={accountName}
+              onEmailChange={setAccountEmail}
+              onNameChange={setAccountName}
+            />
+          </TabsContent>
 
-          <div>
-            <h3 className="mb-3 font-medium text-sm">Security</h3>
+          <TabsContent value="security">
             <ChangePasswordSection providerId={providerId} />
-          </div>
+          </TabsContent>
 
-          <Separator />
-
-          <div>
-            <h3 className="mb-3 font-medium text-sm">Danger Zone</h3>
+          <TabsContent value="danger">
             <DeactivateAccountSection />
-          </div>
-          {/* end keeperhub code */}
-        </div>
+          </TabsContent>
+        </Tabs>
+        // end keeperhub code //
       )}
     </Overlay>
   );
