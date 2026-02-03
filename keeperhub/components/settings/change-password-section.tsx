@@ -1,12 +1,17 @@
 "use client";
 
+import { AlertTriangle } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useOverlay } from "@/components/overlays/overlay-provider";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
+import { authClient } from "@/lib/auth-client";
 
 type ChangePasswordSectionProps = {
   providerId: string | null;
@@ -15,6 +20,8 @@ type ChangePasswordSectionProps = {
 export function ChangePasswordSection({
   providerId,
 }: ChangePasswordSectionProps) {
+  const router = useRouter();
+  const { closeAll: closeOverlays } = useOverlay();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -49,10 +56,11 @@ export function ChangePasswordSection({
         throw new Error(data.error ?? "Failed to change password");
       }
 
-      toast.success("Password changed successfully");
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
+      // Sign out user after password change for security
+      await authClient.signOut();
+      toast.success("Password changed successfully. Please sign in again.");
+      closeOverlays();
+      router.push("/");
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to change password"
@@ -84,6 +92,14 @@ export function ChangePasswordSection({
     <Card className="border-0 py-0 shadow-none">
       <CardContent className="p-0">
         <form className="space-y-4" onSubmit={handleSubmit}>
+          <Alert variant="default">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              You will be signed out after changing your password and will need
+              to sign in again.
+            </AlertDescription>
+          </Alert>
+
           <div className="space-y-2">
             <Label className="ml-1" htmlFor="currentPassword">
               Current Password

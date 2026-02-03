@@ -2,7 +2,10 @@
 import { randomInt } from "node:crypto";
 import { and, eq, gt } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { sendVerificationOTP } from "@/keeperhub/lib/email";
+import {
+  sendOAuthPasswordResetEmail,
+  sendVerificationOTP,
+} from "@/keeperhub/lib/email";
 import { hashPassword } from "@/keeperhub/lib/password";
 import { db } from "@/lib/db";
 import { accounts, users, verifications } from "@/lib/db/schema";
@@ -87,14 +90,10 @@ async function handleRequest(email: string): Promise<NextResponse> {
     );
 
     if (oauthAccount) {
-      // Send email informing user to use OAuth
-      await sendVerificationOTP({
-        email,
-        otp: "N/A",
-        type: "forget-password",
-      });
-      // In a real implementation, you'd send a different email template
-      // For now, we just return success
+      const providerName =
+        oauthAccount.providerId.charAt(0).toUpperCase() +
+        oauthAccount.providerId.slice(1);
+      await sendOAuthPasswordResetEmail({ email, providerName });
     }
 
     return NextResponse.json({
