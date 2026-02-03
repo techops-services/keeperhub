@@ -145,6 +145,104 @@ function ReceivedInvitationItem({
   );
 }
 
+// Component to render the members list with loading state
+type MembersListContentProps = {
+  loadingMembers: boolean;
+  loadingSentInvitations: boolean;
+  members: {
+    id: string;
+    userId: string;
+    role: string;
+    user: { email?: string };
+  }[];
+  sentInvitations: {
+    id: string;
+    email: string;
+    role?: string;
+    status: string;
+  }[];
+  canInvite: boolean;
+  cancellingInvite: string | null;
+  onCancelInvitation: (invitationId: string) => void;
+};
+
+function MembersListContent({
+  loadingMembers,
+  loadingSentInvitations,
+  members,
+  sentInvitations,
+  canInvite,
+  cancellingInvite,
+  onCancelInvitation,
+}: MembersListContentProps) {
+  if (loadingMembers || loadingSentInvitations) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Spinner className="h-6 w-6" />
+      </div>
+    );
+  }
+
+  const pendingInvitations = sentInvitations.filter(
+    (inv) => inv.status === "pending"
+  );
+
+  if (members.length === 0 && pendingInvitations.length === 0) {
+    return null;
+  }
+
+  const entries = [
+    ...members.map((m) => ({
+      kind: "member" as const,
+      email: m.user?.email || "Unknown",
+      role: m.role,
+      id: m.id,
+    })),
+    ...pendingInvitations.map((inv) => ({
+      kind: "invite" as const,
+      email: inv.email,
+      role: inv.role || "member",
+      id: inv.id,
+    })),
+  ].sort((a, b) =>
+    a.email.localeCompare(b.email, undefined, { sensitivity: "base" })
+  );
+
+  return (
+    <div className="space-y-2">
+      {entries.map((entry) => (
+        <div
+          className="flex items-center justify-between rounded-lg border p-3"
+          key={entry.id}
+        >
+          <div className="min-w-0 flex-1">
+            <p
+              className={`truncate font-medium text-sm ${entry.kind === "invite" ? "text-muted-foreground" : ""}`}
+            >
+              {entry.email}
+            </p>
+            <p className="text-muted-foreground text-xs">
+              {entry.role}
+              {entry.kind === "invite" && " - invited"}
+            </p>
+          </div>
+          {entry.kind === "invite" && canInvite && (
+            <Button
+              disabled={cancellingInvite === entry.id}
+              onClick={() => onCancelInvitation(entry.id)}
+              size="sm"
+              variant="ghost"
+            >
+              <X className="mr-1 h-4 w-4" />
+              Remove
+            </Button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 type ManageOrgsModalProps = {
   triggerText?: string;
   defaultShowCreateForm?: boolean;
@@ -969,80 +1067,15 @@ export function ManageOrgsModal({
                       <h4 className="font-medium text-muted-foreground text-sm">
                         Members
                       </h4>
-                      {(() => {
-                        if (loadingMembers || loadingSentInvitations) {
-                          return (
-                            <div className="flex items-center justify-center py-8">
-                              <Spinner className="h-6 w-6" />
-                            </div>
-                          );
-                        }
-                        if (
-                          members.length > 0 ||
-                          sentInvitations.some(
-                            (inv) => inv.status === "pending"
-                          )
-                        ) {
-                          return (
-                            <div className="space-y-2">
-                              {[
-                                ...members.map((m) => ({
-                                  kind: "member" as const,
-                                  email: m.user?.email || "Unknown",
-                                  role: m.role,
-                                  id: m.id,
-                                })),
-                                ...sentInvitations
-                                  .filter((inv) => inv.status === "pending")
-                                  .map((inv) => ({
-                                    kind: "invite" as const,
-                                    email: inv.email,
-                                    role: inv.role || "member",
-                                    id: inv.id,
-                                  })),
-                              ]
-                                .sort((a, b) =>
-                                  a.email.localeCompare(b.email, undefined, {
-                                    sensitivity: "base",
-                                  })
-                                )
-                                .map((entry) => (
-                                  <div
-                                    className="flex items-center justify-between rounded-lg border p-3"
-                                    key={entry.id}
-                                  >
-                                    <div className="min-w-0 flex-1">
-                                      <p
-                                        className={`truncate font-medium text-sm ${entry.kind === "invite" ? "text-muted-foreground" : ""}`}
-                                      >
-                                        {entry.email}
-                                      </p>
-                                      <p className="text-muted-foreground text-xs">
-                                        {entry.role}
-                                        {entry.kind === "invite" &&
-                                          " - invited"}
-                                      </p>
-                                    </div>
-                                    {entry.kind === "invite" && canInvite && (
-                                      <Button
-                                        disabled={cancellingInvite === entry.id}
-                                        onClick={() =>
-                                          handleCancelInvitation(entry.id)
-                                        }
-                                        size="sm"
-                                        variant="ghost"
-                                      >
-                                        <X className="mr-1 h-4 w-4" />
-                                        Remove
-                                      </Button>
-                                    )}
-                                  </div>
-                                ))}
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
+                      <MembersListContent
+                        cancellingInvite={cancellingInvite}
+                        canInvite={canInvite}
+                        loadingMembers={loadingMembers}
+                        loadingSentInvitations={loadingSentInvitations}
+                        members={members}
+                        onCancelInvitation={handleCancelInvitation}
+                        sentInvitations={sentInvitations}
+                      />
                     </div>
 
                     {/* Leave/Delete Organization */}
