@@ -22,6 +22,10 @@ jobs:
       SERVICE_NAME: keeperhub
       AWS_ECR_NAME: keeperhub-${{ github.ref == 'refs/heads/prod' && 'prod' || 'staging' }}
       SERVICE_ACCOUNT_ROLE_ARN: ${{ vars.SERVICE_ACCOUNT_ROLE_ARN }}
+      # Auth provider build args (selected by deployment branch: prod vs staging)
+      NEXT_PUBLIC_AUTH_PROVIDERS: ${{ github.ref == 'refs/heads/prod' && vars.NEXT_PUBLIC_AUTH_PROVIDERS_PROD || vars.NEXT_PUBLIC_AUTH_PROVIDERS_STAGING }}
+      NEXT_PUBLIC_GITHUB_CLIENT_ID: ${{ github.ref == 'refs/heads/prod' && vars.NEXT_PUBLIC_GITHUB_CLIENT_ID_PROD || vars.NEXT_PUBLIC_GITHUB_CLIENT_ID_STAGING }}
+      NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ github.ref == 'refs/heads/prod' && vars.NEXT_PUBLIC_GOOGLE_CLIENT_ID_PROD || vars.NEXT_PUBLIC_GOOGLE_CLIENT_ID_STAGING }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,9 +64,9 @@ jobs:
           file: ./Dockerfile
           push: true
           build-args: |
-            NEXT_PUBLIC_AUTH_PROVIDERS=${{ vars.NEXT_PUBLIC_AUTH_PROVIDERS }}
-            NEXT_PUBLIC_GITHUB_CLIENT_ID=${{ vars.NEXT_PUBLIC_GITHUB_CLIENT_ID }}
-            NEXT_PUBLIC_GOOGLE_CLIENT_ID=${{ vars.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
+            NEXT_PUBLIC_AUTH_PROVIDERS=${{ env.NEXT_PUBLIC_AUTH_PROVIDERS }}
+            NEXT_PUBLIC_GITHUB_CLIENT_ID=${{ env.NEXT_PUBLIC_GITHUB_CLIENT_ID }}
+            NEXT_PUBLIC_GOOGLE_CLIENT_ID=${{ env.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:app-${{ steps.vars.outputs.sha_short }}
             ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:app-latest
