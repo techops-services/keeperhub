@@ -32,6 +32,7 @@ export async function POST(request: Request) {
       functionCalls: estimate.functionCalls,
       functionCost: estimate.functionCost,
       writeFunctions: estimate.writeFunctions,
+      configuredWriteFunctions: estimate.configuredWriteFunctions,
       gasCostCredits: estimate.gasCostCredits,
       gasEstimateWei: estimate.gasEstimateWei.toString(),
       gasPriceWei: estimate.gasPriceWei.toString(),

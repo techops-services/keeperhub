@@ -316,11 +316,13 @@ function AbiFunctionArgsField({
   // Sync from prop only when function changes (user selected different function)
   React.useEffect(() => {
     if (functionValue !== lastFunctionRef.current) {
-      // Function changed - reset to prop value (which should be empty for new function)
-      setLocalArgValues(parsePropValue(value));
+      // Function changed - clear args and reset local state
+      // This prevents stale args from being used with a new function
+      setLocalArgValues([]);
+      onChange("[]");
       lastFunctionRef.current = functionValue;
     }
-  }, [functionValue, value, parsePropValue]);
+  }, [functionValue, onChange]);
 
   // Handle individual arg change - update local state and propagate to parent
   const handleArgChange = (index: number, newValue: string) => {
