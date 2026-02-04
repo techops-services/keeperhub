@@ -89,6 +89,45 @@ vi.mock("@/keeperhub/lib/middleware/org-context", () => ({
 }));
 // end custom keeperhub code //
 
+const workflowWithArrayConfig = {
+  ...sourceWorkflow,
+  id: "source-wf-array",
+  nodes: [
+    {
+      id: "trigger-1",
+      type: "trigger",
+      position: { x: 0, y: 0 },
+      data: {
+        label: "Manual Trigger",
+        type: "trigger",
+        config: { triggerType: "Manual" },
+        status: "idle",
+      },
+    },
+    {
+      id: "action-1",
+      type: "action",
+      position: { x: 0, y: 100 },
+      data: {
+        label: "Multi Input",
+        type: "action",
+        config: {
+          actionType: "MultiInput",
+          inputs: [
+            "{{@trigger-1:Manual Trigger.value}}",
+            "static value",
+            "{{@trigger-1:Manual Trigger.other}}",
+          ],
+          nested: {
+            refs: ["{{@trigger-1:Manual Trigger.nested}}"],
+          },
+        },
+        status: "idle",
+      },
+    },
+  ],
+};
+
 describe("Workflow duplicate API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -132,5 +171,47 @@ describe("Workflow duplicate API", () => {
     expect(body.edges).toHaveLength(1);
     expect(nodeIds).toContain(body.edges[0].source);
     expect(nodeIds).toContain(body.edges[0].target);
+  });
+
+  it("remaps template references inside arrays in config", async () => {
+    mockDbQuery.workflows.findFirst.mockResolvedValue(workflowWithArrayConfig);
+
+    const { POST } = await import(
+      "@/app/api/workflows/[workflowId]/duplicate/route"
+    );
+    const request = new Request(
+      "http://localhost/api/workflows/source-wf-array/duplicate",
+      { method: "POST" }
+    );
+    const response = await POST(request, {
+      params: Promise.resolve({ workflowId: "source-wf-array" }),
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+
+    const triggerNode = body.nodes.find(
+      (n: { data?: { type: string } }) => n.data?.type === "trigger"
+    );
+    const actionNode = body.nodes.find(
+      (n: { data?: { label: string } }) => n.data?.label === "Multi Input"
+    );
+
+    expect(triggerNode).toBeDefined();
+    expect(actionNode).toBeDefined();
+
+    const { inputs, nested } = actionNode.data.config as {
+      inputs: string[];
+      nested: { refs: string[] };
+    };
+
+    expect(inputs[0]).toContain(triggerNode.id);
+    expect(inputs[0]).not.toContain("trigger-1");
+    expect(inputs[1]).toBe("static value");
+    expect(inputs[2]).toContain(triggerNode.id);
+    expect(inputs[2]).not.toContain("trigger-1");
+
+    expect(nested.refs[0]).toContain(triggerNode.id);
+    expect(nested.refs[0]).not.toContain("trigger-1");
   });
 });
