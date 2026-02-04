@@ -67,14 +67,13 @@ jobs:
             NEXT_PUBLIC_AUTH_PROVIDERS=${{ env.NEXT_PUBLIC_AUTH_PROVIDERS }}
             NEXT_PUBLIC_GITHUB_CLIENT_ID=${{ env.NEXT_PUBLIC_GITHUB_CLIENT_ID }}
             NEXT_PUBLIC_GOOGLE_CLIENT_ID=${{ env.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
+            NEXT_PUBLIC_CREDITS_CONTRACT_ADDRESS=${{ vars.NEXT_PUBLIC_CREDITS_CONTRACT_ADDRESS }}
+            NEXT_PUBLIC_TIERS_CONTRACT_ADDRESS=${{ vars.NEXT_PUBLIC_TIERS_CONTRACT_ADDRESS }}
+            NEXT_PUBLIC_CHAIN_ID=${{ vars.NEXT_PUBLIC_CHAIN_ID }}
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:app-${{ steps.vars.outputs.sha_short }}
             ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:app-latest
             ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:${{ env.ENVIRONMENT_TAG }}
-          build-args: |
-            NEXT_PUBLIC_CREDITS_CONTRACT_ADDRESS=${{ vars.NEXT_PUBLIC_CREDITS_CONTRACT_ADDRESS }}
-            NEXT_PUBLIC_TIERS_CONTRACT_ADDRESS=${{ vars.NEXT_PUBLIC_TIERS_CONTRACT_ADDRESS }}
-            NEXT_PUBLIC_CHAIN_ID=${{ vars.NEXT_PUBLIC_CHAIN_ID }}
           cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-app
           cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache-app,mode=max
 
