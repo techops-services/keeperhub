@@ -86,8 +86,8 @@ export function WorkflowTemplateGrid({
         const isDuplicating = duplicatingIds.has(workflow.id);
 
         return (
-          <Card className="flex flex-col overflow-hidden" key={workflow.id}>
-            <div className="-mt-6 flex aspect-video w-full items-center justify-center overflow-hidden bg-slate-100 dark:bg-slate-900">
+          <Card className="flex flex-col overflow-hidden bg-sidebar" key={workflow.id}>
+            <div className="-mt-6 flex aspect-video w-full items-center justify-center overflow-hidden">
               <WorkflowMiniMap
                 edges={workflow.edges}
                 height={160}
