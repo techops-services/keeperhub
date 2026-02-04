@@ -68,6 +68,46 @@ function getStatusBadgeClasses(status: string): string {
   }
 }
 
+// Helper to check invitation status before cancelling
+type InvitationCheckResult = {
+  canCancel: boolean;
+  errorMessage?: string;
+  shouldRefreshMembers?: boolean;
+};
+
+async function checkInvitationStatus(
+  invitationId: string
+): Promise<InvitationCheckResult> {
+  const response = await fetch(`/api/invitations/${invitationId}`);
+  const data = await response.json();
+
+  if (data.alreadyAccepted) {
+    return {
+      canCancel: false,
+      errorMessage:
+        "User already accepted invite. Please refresh for updated organization status.",
+      shouldRefreshMembers: true,
+    };
+  }
+
+  if (data.rejected || data.expired) {
+    return {
+      canCancel: false,
+      errorMessage: data.error || "Invitation is no longer valid",
+    };
+  }
+
+  if (!response.ok && response.status === 404) {
+    return {
+      canCancel: false,
+      errorMessage: "Invitation not found. It may have already been processed.",
+      shouldRefreshMembers: true,
+    };
+  }
+
+  return { canCancel: true };
+}
+
 // Component to render a received invitation item
 type ReceivedInvitationItemProps = {
   invitation: {
@@ -164,6 +204,9 @@ type MembersListContentProps = {
   canInvite: boolean;
   cancellingInvite: string | null;
   onCancelInvitation: (invitationId: string) => void;
+  removingMember: string | null;
+  onRemoveMember: (memberId: string, email: string) => void;
+  currentUserId?: string;
 };
 
 function MembersListContent({
@@ -174,6 +217,9 @@ function MembersListContent({
   canInvite,
   cancellingInvite,
   onCancelInvitation,
+  removingMember,
+  onRemoveMember,
+  currentUserId,
 }: MembersListContentProps) {
   if (loadingMembers || loadingSentInvitations) {
     return (
@@ -197,12 +243,14 @@ function MembersListContent({
       email: m.user?.email || "Unknown",
       role: m.role,
       id: m.id,
+      userId: m.userId,
     })),
     ...pendingInvitations.map((inv) => ({
       kind: "invite" as const,
       email: inv.email,
       role: inv.role || "member",
       id: inv.id,
+      userId: undefined as string | undefined,
     })),
   ].sort((a, b) =>
     a.email.localeCompare(b.email, undefined, { sensitivity: "base" })
@@ -234,9 +282,22 @@ function MembersListContent({
               variant="ghost"
             >
               <X className="mr-1 h-4 w-4" />
-              Remove
+              Revoke Invitation
             </Button>
           )}
+          {entry.kind === "member" &&
+            canInvite &&
+            entry.userId !== currentUserId && (
+              <Button
+                disabled={removingMember === entry.id}
+                onClick={() => onRemoveMember(entry.id, entry.email)}
+                size="sm"
+                variant="ghost"
+              >
+                <X className="mr-1 h-4 w-4" />
+                Remove
+              </Button>
+            )}
         </div>
       ))}
     </div>
@@ -342,6 +403,7 @@ export function ManageOrgsModal({
   };
   const [sentInvitations, setSentInvitations] = useState<SentInvitation[]>([]);
   const [cancellingInvite, setCancellingInvite] = useState<string | null>(null);
+  const [removingMember, setRemovingMember] = useState<string | null>(null);
 
   // Organization members state
   type Member = {
@@ -612,21 +674,55 @@ export function ManageOrgsModal({
   const handleCancelInvitation = async (invitationId: string) => {
     setCancellingInvite(invitationId);
     try {
+      // First check if the invitation is still pending
+      const statusCheck = await checkInvitationStatus(invitationId);
+
+      if (!statusCheck.canCancel) {
+        toast.error(statusCheck.errorMessage || "Cannot revoke invitation");
+        fetchSentInvitations();
+        if (statusCheck.shouldRefreshMembers) {
+          fetchMembers();
+        }
+        return;
+      }
+
       const { error } = await authClient.organization.cancelInvitation({
         invitationId,
       });
 
       if (error) {
-        toast.error(error.message || "Failed to cancel invitation");
+        toast.error(error.message || "Failed to revoke invitation");
+        fetchSentInvitations();
         return;
       }
 
-      toast.success("Invitation cancelled");
+      toast.success("Invitation revoked");
       fetchSentInvitations();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setCancellingInvite(null);
+    }
+  };
+
+  const handleRemoveMember = async (_memberId: string, email: string) => {
+    setRemovingMember(_memberId);
+    try {
+      const { error } = await authClient.organization.removeMember({
+        memberIdOrEmail: email,
+      });
+
+      if (error) {
+        toast.error(error.message || "Failed to remove member");
+        return;
+      }
+
+      toast.success("Member removed from organization");
+      fetchMembers();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setRemovingMember(null);
     }
   };
 
@@ -1076,10 +1172,13 @@ export function ManageOrgsModal({
                       <MembersListContent
                         cancellingInvite={cancellingInvite}
                         canInvite={canInvite}
+                        currentUserId={session?.user?.id}
                         loadingMembers={loadingMembers}
                         loadingSentInvitations={loadingSentInvitations}
                         members={members}
                         onCancelInvitation={handleCancelInvitation}
+                        onRemoveMember={handleRemoveMember}
+                        removingMember={removingMember}
                         sentInvitations={sentInvitations}
                       />
                     </div>
