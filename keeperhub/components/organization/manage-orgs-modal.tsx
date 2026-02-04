@@ -202,6 +202,7 @@ type MembersListContentProps = {
     status: string;
   }[];
   canInvite: boolean;
+  currentUserRole?: "owner" | "admin" | "member";
   cancellingInvite: string | null;
   onCancelInvitation: (invitationId: string) => void;
   removingMember: string | null;
@@ -215,6 +216,7 @@ function MembersListContent({
   members,
   sentInvitations,
   canInvite,
+  currentUserRole,
   cancellingInvite,
   onCancelInvitation,
   removingMember,
@@ -287,7 +289,8 @@ function MembersListContent({
           )}
           {entry.kind === "member" &&
             canInvite &&
-            entry.userId !== currentUserId && (
+            entry.userId !== currentUserId &&
+            (currentUserRole === "owner" || entry.role === "member") && (
               <Button
                 disabled={removingMember === entry.id}
                 onClick={() => onRemoveMember(entry.id, entry.email)}
@@ -347,7 +350,11 @@ export function ManageOrgsModal({
 
   const { organization, switchOrganization } = useOrganization();
   const { organizations } = useOrganizations();
-  const { isOwner: isActiveOrgOwner } = useActiveMember();
+  const {
+    isOwner: isActiveOrgOwner,
+    isAdmin: isActiveOrgAdmin,
+    role: activeOrgRole,
+  } = useActiveMember();
   const router = useRouter();
   const { data: session } = authClient.useSession();
 
@@ -429,7 +436,10 @@ export function ManageOrgsModal({
   const isOwner = isManagedOrgActive
     ? isActiveOrgOwner
     : managedOrgRole === "owner";
-  const canInvite = managedOrgRole === "owner" || managedOrgRole === "admin";
+  const canInvite = isManagedOrgActive
+    ? isActiveOrgOwner || isActiveOrgAdmin
+    : managedOrgRole === "owner" || managedOrgRole === "admin";
+  const currentUserRole = isManagedOrgActive ? activeOrgRole : managedOrgRole;
 
   const fetchInvitations = useCallback(async () => {
     setLoadingInvitations(true);
@@ -1173,6 +1183,7 @@ export function ManageOrgsModal({
                         cancellingInvite={cancellingInvite}
                         canInvite={canInvite}
                         currentUserId={session?.user?.id}
+                        currentUserRole={currentUserRole}
                         loadingMembers={loadingMembers}
                         loadingSentInvitations={loadingSentInvitations}
                         members={members}
