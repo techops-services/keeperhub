@@ -1,3 +1,6 @@
+// biome-ignore-all lint/correctness/noGlobalDirnameFilename: E2E tests rely on Node CJS behavior
+// Added global ignore as this test uses __dirname. Updating to import.meta.dirname breaks the test.
+
 /**
  * E2E Tests for Workflow Runner Graceful Shutdown (KEEP-1228)
  *
@@ -42,7 +45,7 @@ const DATABASE_URL =
   process.env.DATABASE_URL ||
   "postgresql://postgres:postgres@localhost:5433/workflow_builder";
 
-const PROJECT_ROOT = path.resolve(__dirname, "../..");
+const PROJECT_ROOT = path.resolve(import.meta.dirname, "../..");
 
 // Test data prefixes
 const TEST_PREFIX = "test_graceful_e2e_";

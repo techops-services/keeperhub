@@ -23,6 +23,9 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").notNull(),
   // Anonymous user tracking
   isAnonymous: boolean("is_anonymous").default(false),
+  // start custom keeperhub code //
+  deactivatedAt: timestamp("deactivated_at"),
+  // end keeperhub code //
 });
 
 export const sessions = pgTable("sessions", {

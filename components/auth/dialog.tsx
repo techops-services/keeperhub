@@ -33,7 +33,14 @@ type AuthDialogProps = {
   children?: ReactNode;
 };
 
-type ModalView = "signin" | "signup" | "verify";
+// start custom keeperhub code //
+type ModalView =
+  | "signin"
+  | "signup"
+  | "verify"
+  | "forgot-password"
+  | "reset-password";
+// end keeperhub code //
 
 const VercelIcon = ({ className = "mr-2 h-3 w-3" }: { className?: string }) => (
   <svg
@@ -179,6 +186,9 @@ type SignInFormProps = {
   onPasswordChange: (v: string) => void;
   onSubmit: (e: React.FormEvent) => void;
   onCreateAccount: () => void;
+  // start custom keeperhub code //
+  onForgotPassword: () => void;
+  // end keeperhub code //
 };
 
 const SignInForm = ({
@@ -190,6 +200,9 @@ const SignInForm = ({
   onPasswordChange,
   onSubmit,
   onCreateAccount,
+  // start custom keeperhub code //
+  onForgotPassword,
+  // end keeperhub code //
 }: SignInFormProps) => (
   <div className="space-y-4">
     <form className="space-y-4" onSubmit={onSubmit}>
@@ -207,9 +220,20 @@ const SignInForm = ({
         />
       </div>
       <div className="space-y-2">
-        <Label className="ml-1" htmlFor="password">
-          Password
-        </Label>
+        {/* start custom keeperhub code */}
+        <div className="flex items-center justify-between">
+          <Label className="ml-1" htmlFor="password">
+            Password
+          </Label>
+          <button
+            className="text-muted-foreground text-xs hover:text-foreground"
+            onClick={onForgotPassword}
+            type="button"
+          >
+            Forgot password?
+          </button>
+        </div>
+        {/* end keeperhub code */}
         <Input
           id="password"
           onChange={(e) => onPasswordChange(e.target.value)}
@@ -294,6 +318,12 @@ const getViewTitle = (view: ModalView) => {
       return "Create account";
     case "verify":
       return "Verify your email";
+    // start custom keeperhub code //
+    case "forgot-password":
+      return "Reset password";
+    case "reset-password":
+      return "Set new password";
+    // end keeperhub code //
     default:
       return "Sign in";
   }
@@ -309,6 +339,14 @@ const getViewDescription = (view: ModalView, email?: string) => {
       return email
         ? `Enter the 6-digit code sent to ${email}`
         : "Enter the verification code sent to your email.";
+    // start custom keeperhub code //
+    case "forgot-password":
+      return "Enter your email to receive a password reset code.";
+    case "reset-password":
+      return email
+        ? `Enter the 6-digit code sent to ${email} and your new password.`
+        : "Enter the reset code and your new password.";
+    // end keeperhub code //
     default:
       return null;
   }
@@ -332,6 +370,11 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // start custom keeperhub code //
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  // end keeperhub code //
   const [loadingProvider, setLoadingProvider] = useState<
     "github" | "google" | "vercel" | null
   >(null);
@@ -364,6 +407,11 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
     setVerifyPassword("");
     setOtp("");
     setError("");
+    // start custom keeperhub code //
+    setForgotEmail("");
+    setNewPassword("");
+    setConfirmNewPassword("");
+    // end keeperhub code //
   };
 
   // start custom keeperhub code //
@@ -692,6 +740,118 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
     }
   };
 
+  // start custom keeperhub code //
+  const handleForgotPasswordRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/user/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "request", email: forgotEmail }),
+      });
+
+      const data = (await response.json()) as {
+        error?: string;
+        message?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Failed to send reset code");
+      }
+
+      toast.success("If an account exists, a reset code has been sent.");
+      setView("reset-password");
+      setOtp("");
+    } catch (err) {
+      const errorMsg =
+        err instanceof Error ? err.message : "Failed to send reset code";
+      setError(errorMsg);
+      toast.error(errorMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (newPassword !== confirmNewPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/user/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "reset",
+          email: forgotEmail,
+          otp,
+          newPassword,
+        }),
+      });
+
+      const data = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Failed to reset password");
+      }
+
+      toast.success("Password reset successfully! Please sign in.");
+      setView("signin");
+      setEmail(forgotEmail);
+      resetForm();
+    } catch (err) {
+      const errorMsg =
+        err instanceof Error ? err.message : "Failed to reset password";
+      setError(errorMsg);
+      toast.error(errorMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendForgotOtp = async () => {
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/user/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "request", email: forgotEmail }),
+      });
+
+      const data = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Failed to resend code");
+      }
+
+      toast.success("New reset code sent!");
+    } catch (err) {
+      const errorMsg =
+        err instanceof Error ? err.message : "Failed to resend code";
+      setError(errorMsg);
+      toast.error(errorMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
+  // end keeperhub code //
+
   if (singleProvider && singleProvider !== "email") {
     return (
       <SingleProviderButton
@@ -760,6 +920,13 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
                     setError("");
                   }}
                   onEmailChange={setEmail}
+                  // start custom keeperhub code //
+                  onForgotPassword={() => {
+                    setForgotEmail(email);
+                    setView("forgot-password");
+                    setError("");
+                  }}
+                  // end keeperhub code //
                   onPasswordChange={setPassword}
                   onSubmit={handleSignIn}
                   password={password}
@@ -887,6 +1054,150 @@ export const AuthDialog = ({ children }: AuthDialogProps) => {
               </div>
             </div>
           )}
+
+          {/* start custom keeperhub code */}
+          {view === "forgot-password" && (
+            <div className="space-y-4">
+              <form
+                className="space-y-4"
+                onSubmit={handleForgotPasswordRequest}
+              >
+                <div className="space-y-2">
+                  <Label className="ml-1" htmlFor="forgot-email">
+                    Email
+                  </Label>
+                  <Input
+                    autoFocus
+                    id="forgot-email"
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    required
+                    type="email"
+                    value={forgotEmail}
+                  />
+                </div>
+                {error && (
+                  <div className="text-destructive text-sm">{error}</div>
+                )}
+                <Button className="w-full" disabled={loading} type="submit">
+                  {loading ? <Spinner className="mr-2 size-4" /> : null}
+                  Send Reset Code
+                </Button>
+              </form>
+              <div className="flex items-center justify-center gap-1 text-sm">
+                <button
+                  className="font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground/80"
+                  onClick={() => {
+                    setView("signin");
+                    setError("");
+                  }}
+                  type="button"
+                >
+                  Back to sign in
+                </button>
+              </div>
+            </div>
+          )}
+
+          {view === "reset-password" && (
+            <div className="space-y-4">
+              <form className="space-y-4" onSubmit={handlePasswordReset}>
+                <div className="space-y-2">
+                  <Label className="ml-1" htmlFor="reset-otp">
+                    Reset Code
+                  </Label>
+                  <Input
+                    autoComplete="one-time-code"
+                    autoFocus
+                    className="text-center font-mono text-2xl tracking-[0.5em]"
+                    id="reset-otp"
+                    inputMode="numeric"
+                    maxLength={6}
+                    onChange={(e) =>
+                      setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                    }
+                    pattern="[0-9]*"
+                    placeholder="000000"
+                    required
+                    value={otp}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="ml-1" htmlFor="new-password">
+                    New Password
+                  </Label>
+                  <Input
+                    autoComplete="new-password"
+                    id="new-password"
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Enter new password (min 8 characters)"
+                    required
+                    type="password"
+                    value={newPassword}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="ml-1" htmlFor="confirm-new-password">
+                    Confirm New Password
+                  </Label>
+                  <Input
+                    autoComplete="new-password"
+                    id="confirm-new-password"
+                    onChange={(e) => setConfirmNewPassword(e.target.value)}
+                    placeholder="Confirm new password"
+                    required
+                    type="password"
+                    value={confirmNewPassword}
+                  />
+                </div>
+                {error && (
+                  <div className="text-destructive text-sm">{error}</div>
+                )}
+                <Button
+                  className="w-full"
+                  disabled={
+                    loading ||
+                    otp.length !== 6 ||
+                    !newPassword ||
+                    !confirmNewPassword
+                  }
+                  type="submit"
+                >
+                  {loading ? <Spinner className="mr-2 size-4" /> : null}
+                  Reset Password
+                </Button>
+              </form>
+              <div className="flex items-center justify-center gap-1 text-sm">
+                <span className="text-muted-foreground">
+                  Didn't receive the code?
+                </span>
+                <button
+                  className="font-medium text-foreground underline underline-offset-2 hover:text-foreground/80"
+                  disabled={loading}
+                  onClick={handleResendForgotOtp}
+                  type="button"
+                >
+                  Resend
+                </button>
+              </div>
+              <div className="flex items-center justify-center gap-1 text-sm">
+                <button
+                  className="font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground/80"
+                  onClick={() => {
+                    setView("signin");
+                    setError("");
+                    setOtp("");
+                    setNewPassword("");
+                    setConfirmNewPassword("");
+                  }}
+                  type="button"
+                >
+                  Back to sign in
+                </button>
+              </div>
+            </div>
+          )}
+          {/* end keeperhub code */}
         </div>
       </DialogContent>
     </Dialog>

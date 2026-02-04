@@ -1,3 +1,5 @@
+/* biome-ignore-all lint/correctness/noGlobalDirnameFilename: vitest requires __dirname */
+
 /**
  * E2E Tests for User RPC Preferences → Workflow Execution Flow
  *
@@ -165,12 +167,12 @@ describe.skipIf(SKIP_INFRA_TESTS)(
         };
 
         const scriptPath = join(
-          __dirname,
+          import.meta.dirname,
           "../../scripts/workflow-runner-bootstrap.cjs"
         );
         const child = spawn("node", [scriptPath], {
           env,
-          cwd: join(__dirname, "../.."),
+          cwd: join(import.meta.dirname, "../.."),
         });
 
         let stdout = "";
