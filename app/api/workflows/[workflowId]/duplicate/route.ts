@@ -8,6 +8,10 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { workflows } from "@/lib/db/schema";
 import { generateId } from "@/lib/utils/id";
+// start custom keeperhub code //
+import { remapTemplateRefsInString } from "@/lib/utils/template";
+
+// end custom keeperhub code //
 
 // Node type for type-safe node manipulation
 type WorkflowNodeLike = {
@@ -23,23 +27,63 @@ type WorkflowNodeLike = {
   [key: string]: unknown;
 };
 
-// Helper to strip integration IDs from nodes when duplicating
-function stripIntegrationIds(nodes: WorkflowNodeLike[]): WorkflowNodeLike[] {
-  return nodes.map((node) => {
-    const newNode: WorkflowNodeLike = { ...node, id: nanoid() };
+// start custom keeperhub code //
+/** Recursively rewrite a single value (string, object, or array) using old->new node ID map */
+function remapTemplateRefsInValue(
+  value: unknown,
+  idMap: Map<string, string>
+): unknown {
+  if (typeof value === "string") {
+    return remapTemplateRefsInString(value, idMap);
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => remapTemplateRefsInValue(item, idMap));
+  }
+  if (typeof value === "object" && value !== null) {
+    return remapTemplateRefsInConfig(value as Record<string, unknown>, idMap);
+  }
+  return value;
+}
+
+/** Recursively rewrite {{@nodeId:...}} template refs in config using old->new node ID map */
+function remapTemplateRefsInConfig(
+  config: Record<string, unknown> | undefined,
+  idMap: Map<string, string>
+): Record<string, unknown> | undefined {
+  if (!config || typeof config !== "object") {
+    return config;
+  }
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(config)) {
+    result[key] = remapTemplateRefsInValue(value, idMap);
+  }
+  return result;
+}
+
+/** Duplicate nodes with new IDs, strip integration IDs, and remap template refs in config */
+function duplicateNodes(
+  oldNodes: WorkflowNodeLike[],
+  idMap: Map<string, string>
+): WorkflowNodeLike[] {
+  return oldNodes.map((node) => {
+    const newId = idMap.get(node.id) ?? nanoid();
+    const newNode: WorkflowNodeLike = { ...node, id: newId };
     if (newNode.data) {
       const data = { ...newNode.data };
       if (data.config) {
         const { integrationId: _, ...configWithoutIntegration } = data.config;
-        data.config = configWithoutIntegration;
+        data.config = remapTemplateRefsInConfig(
+          configWithoutIntegration,
+          idMap
+        );
       }
-      // Reset status to idle
       data.status = "idle";
       newNode.data = data;
     }
     return newNode;
   });
 }
+// end custom keeperhub code //
 
 // Edge type for type-safe edge manipulation
 type WorkflowEdgeLike = {
@@ -115,7 +159,13 @@ export async function POST(
 
     // Generate new IDs for nodes
     const oldNodes = sourceWorkflow.nodes as WorkflowNodeLike[];
-    const newNodes = stripIntegrationIds(oldNodes);
+    // start custom keeperhub code //
+    const idMap = new Map<string, string>();
+    for (const n of oldNodes) {
+      idMap.set(n.id, nanoid());
+    }
+    const newNodes = duplicateNodes(oldNodes, idMap);
+    // end custom keeperhub code //
     const newEdges = updateEdgeReferences(
       sourceWorkflow.edges as WorkflowEdgeLike[],
       oldNodes,
