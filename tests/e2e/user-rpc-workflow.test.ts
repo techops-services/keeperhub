@@ -1,3 +1,6 @@
+// biome-ignore-all lint/correctness/noGlobalDirnameFilename: E2E tests rely on Node CJS behavior
+// Added global ignore as this test uses __dirname. Updating to import.meta.dirname breaks the test.
+
 /**
  * E2E Tests for User RPC Preferences → Workflow Execution Flow
  *

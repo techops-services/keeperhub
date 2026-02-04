@@ -255,7 +255,7 @@ function DesktopOverlayContainer() {
               {/* end keeperhub code */}
               <LayoutGroup>
                 <motion.div
-                  className="relative overflow-hidden rounded-xl border bg-background shadow-2xl ring-1 ring-black/5"
+                  className="relative max-h-[85vh] overflow-hidden rounded-xl border bg-background shadow-2xl ring-1 ring-black/5"
                   layout={isOpen}
                   style={{ minHeight: minHeight > 0 ? minHeight : "auto" }}
                   transition={iosSpring}

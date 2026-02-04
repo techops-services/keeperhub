@@ -16,6 +16,7 @@ import { TemplateBadgeTextarea } from "@/components/ui/template-badge-textarea";
 // start custom keeperhub code //
 import { SaveAddressBookmark } from "@/keeperhub/components/address-book/save-address-bookmark";
 import { parseAddressBookSelection } from "@/keeperhub/lib/address-book-selection";
+import { toChecksumAddress } from "@/keeperhub/lib/address-utils";
 // end keeperhub code //
 import { getCustomFieldRenderer } from "@/lib/extension-registry";
 import {
@@ -51,13 +52,17 @@ function TemplateInputField({
     field.key === "address" ||
     field.key.toLowerCase().endsWith("address");
 
+  const displayValue = isAddressField
+    ? toChecksumAddress(value ?? "")
+    : (value ?? "");
+
   const input = (
     <TemplateBadgeInput
       disabled={disabled}
       id={field.key}
       onChange={onChange}
       placeholder={field.placeholder}
-      value={value}
+      value={displayValue}
     />
   );
 

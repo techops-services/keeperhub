@@ -24,6 +24,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  toChecksumAddress,
+  truncateAddress,
+} from "@/keeperhub/lib/address-utils";
 import { useActiveMember } from "@/keeperhub/lib/hooks/use-organization";
 import { fetchAllSupportedTokenBalances } from "@/keeperhub/lib/wallet/fetch-balances";
 import type {
@@ -42,17 +46,6 @@ import { type WithdrawableAsset, WithdrawModal } from "./withdraw-modal";
 type WalletOverlayProps = {
   overlayId: string;
 };
-
-// ============================================================================
-// Utility Functions
-// ============================================================================
-
-function truncateAddress(address: string): string {
-  if (address.length <= 13) {
-    return address;
-  }
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
-}
 
 // TEMPO testnet uses stablecoins for gas, so we display stablecoins only (no native token)
 const TEMPO_CHAIN_ID = 42_429;
@@ -828,7 +821,7 @@ function AccountDetailsSection({
   };
 
   const copyAddress = () => {
-    navigator.clipboard.writeText(walletAddress);
+    navigator.clipboard.writeText(toChecksumAddress(walletAddress));
     toast.success("Address copied to clipboard");
   };
 

@@ -15,6 +15,7 @@ import {
 import Image from "next/image";
 import type { JSX } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toChecksumAddress } from "@/keeperhub/lib/address-utils";
 import { api } from "@/lib/api-client";
 import {
   OUTPUT_DISPLAY_CONFIGS,
@@ -263,16 +264,20 @@ function JsonWithLinks({ data }: { data: unknown }) {
 
           // Ethereum addresses (40 hex) or tx hashes (64 hex): copy + optional link icons
           if (ETH_HEX_REGEX.test(innerValue)) {
+            const looksLikeAddress = innerValue.length === 42;
+            const displayValue = looksLikeAddress
+              ? toChecksumAddress(innerValue)
+              : innerValue;
             const explorerUrl = linkMap.get(innerValue);
             // Truncate: 0x + first 6 hex chars + ... + last 6 hex chars
-            const truncated = `${innerValue.slice(0, 8)}...${innerValue.slice(-6)}`;
+            const truncated = `${displayValue.slice(0, 8)}...${displayValue.slice(-6)}`;
             return (
               <span
                 className="inline-flex items-center"
                 key={`h-${innerValue}`}
               >
                 {`"${truncated}"`}
-                <InlineCopyButton text={innerValue} />
+                <InlineCopyButton text={displayValue} />
                 {explorerUrl && (
                   <a
                     className="ml-1 inline-flex align-middle text-muted-foreground hover:text-foreground"

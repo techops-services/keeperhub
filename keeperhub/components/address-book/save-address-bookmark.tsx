@@ -11,6 +11,7 @@ import {
   ADDRESS_BOOK_SELECTION_KEY,
   parseAddressBookSelection,
 } from "@/keeperhub/lib/address-book-selection";
+import { normalizeAddressForStorage } from "@/keeperhub/lib/address-utils";
 import { addressBookApi, api } from "@/lib/api-client";
 import { useSession } from "@/lib/auth-client";
 import {
@@ -127,10 +128,12 @@ export function SaveAddressBookmark({
 
   useEffect(() => {
     const childValue = children.props.value;
-    if (childValue !== undefined) {
-      setCurrentAddress(childValue);
-    } else if (addressProp !== undefined) {
-      setCurrentAddress(addressProp);
+    const raw = childValue !== undefined ? childValue : addressProp;
+    if (raw !== undefined) {
+      const stored = ethers.isAddress(raw)
+        ? normalizeAddressForStorage(raw)
+        : raw;
+      setCurrentAddress(stored);
     }
   }, [children.props.value, addressProp]);
 
@@ -149,8 +152,11 @@ export function SaveAddressBookmark({
 
   const childWithInterception = React.cloneElement(children, {
     onChange: (value: string) => {
-      setCurrentAddress(value);
-      children.props.onChange?.(value);
+      const stored = ethers.isAddress(value)
+        ? normalizeAddressForStorage(value)
+        : value;
+      setCurrentAddress(stored);
+      children.props.onChange?.(stored);
     },
     onFocus: (e: React.FocusEvent) => {
       if (!isTemporalAccount) {
@@ -188,8 +194,11 @@ export function SaveAddressBookmark({
   }, [isTemporalAccount, scheduleClosePopoverIfBlurred]);
 
   const handleAddressSelect = (selectedAddress: string, bookmarkId: string) => {
-    children.props.onChange?.(selectedAddress);
-    setCurrentAddress(selectedAddress);
+    const stored = ethers.isAddress(selectedAddress)
+      ? normalizeAddressForStorage(selectedAddress)
+      : selectedAddress;
+    children.props.onChange?.(stored);
+    setCurrentAddress(stored);
     setIsInputFocused(false);
     setOptimisticBookmarkId(bookmarkId);
 

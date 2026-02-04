@@ -1,5 +1,6 @@
 import { ethers } from "ethers";
 import { NextResponse } from "next/server";
+import { normalizeAddressForStorage } from "@/keeperhub/lib/address-utils";
 import { ERC20_ABI } from "@/lib/contracts";
 import { getChainIdFromNetwork, resolveRpcConfig } from "@/lib/rpc";
 
@@ -65,7 +66,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       valid: true,
       token: {
-        address: address.toLowerCase(),
+        address: normalizeAddressForStorage(address),
         symbol,
         name,
         decimals: Number(decimals),

@@ -4,6 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AccountSettings } from "@/components/settings/account-settings";
 import { Spinner } from "@/components/ui/spinner";
+// start custom keeperhub code //
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ChangePasswordSection } from "@/keeperhub/components/settings/change-password-section";
+import { DeactivateAccountSection } from "@/keeperhub/components/settings/delete-account-section";
+// end keeperhub code //
 import { api } from "@/lib/api-client";
 import { Overlay } from "./overlay";
 import { useOverlay } from "./overlay-provider";
@@ -20,12 +25,18 @@ export function SettingsOverlay({ overlayId }: SettingsOverlayProps) {
   // Account state
   const [accountName, setAccountName] = useState("");
   const [accountEmail, setAccountEmail] = useState("");
+  // start custom keeperhub code //
+  const [providerId, setProviderId] = useState<string | null>(null);
+  // end keeperhub code //
 
   const loadAccount = useCallback(async () => {
     try {
       const data = await api.user.get();
       setAccountName(data.name || "");
       setAccountEmail(data.email || "");
+      // start custom keeperhub code //
+      setProviderId(data.providerId ?? null);
+      // end keeperhub code //
     } catch (error) {
       console.error("Failed to load account:", error);
     }
@@ -82,12 +93,28 @@ export function SettingsOverlay({ overlayId }: SettingsOverlayProps) {
           <Spinner />
         </div>
       ) : (
-        <AccountSettings
-          accountEmail={accountEmail}
-          accountName={accountName}
-          onEmailChange={setAccountEmail}
-          onNameChange={setAccountName}
-        />
+        // start custom keeperhub code //
+        <Tabs className="w-full" defaultValue="account">
+          <TabsList className="mb-4 w-full">
+            <TabsTrigger value="account">Account</TabsTrigger>
+            <TabsTrigger value="security">Security</TabsTrigger>
+          </TabsList>
+
+          <TabsContent className="space-y-6" value="account">
+            <AccountSettings
+              accountEmail={accountEmail}
+              accountName={accountName}
+              onEmailChange={setAccountEmail}
+              onNameChange={setAccountName}
+            />
+            <DeactivateAccountSection />
+          </TabsContent>
+
+          <TabsContent value="security">
+            <ChangePasswordSection providerId={providerId} />
+          </TabsContent>
+        </Tabs>
+        // end keeperhub code //
       )}
     </Overlay>
   );
