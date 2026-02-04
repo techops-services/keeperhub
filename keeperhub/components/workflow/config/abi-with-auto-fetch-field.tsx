@@ -184,6 +184,19 @@ export function AbiWithAutoFetchField({
   // Use a ref to track the last synced toggle state to avoid infinite loops
   const lastUseProxyAbiRef = useRef<boolean | null>(null);
 
+  // Track last fetched (contract, network) so we only auto-fetch when they change
+  const lastFetchedRef = useRef<{
+    contractAddress: string;
+    network: string;
+  } | null>(null);
+  const currentTargetRef = useRef<{ contractAddress: string; network: string }>(
+    {
+      contractAddress: "",
+      network: "",
+    }
+  );
+  const performAbiFetchRef = useRef<(() => Promise<void>) | null>(null);
+
   const abiToString = useCallback((abi: string | null): string | null => {
     if (!abi) {
       return null;
@@ -348,6 +361,41 @@ export function AbiWithAutoFetchField({
     await performAbiFetch();
   }, [isValidAddress, network, performAbiFetch]);
 
+  // Auto-fetch ABI when contract address or network changes (debounced, once per pair)
+  // stored performAbiFetch in a ref to avoid stale function references
+  performAbiFetchRef.current = performAbiFetch;
+  useEffect(() => {
+    const TIMEOUT_BEFORE_FETCH_DELAY = 600;
+
+    if (!(isValidAddress && network) || useManualAbi) {
+      return;
+    }
+
+    currentTargetRef.current = { contractAddress, network };
+    const last = lastFetchedRef.current;
+
+    if (
+      last?.contractAddress === contractAddress &&
+      last?.network === network
+    ) {
+      return;
+    }
+    const timeoutId = setTimeout(() => {
+      lastFetchedRef.current = { ...currentTargetRef.current };
+      const fn = performAbiFetchRef.current;
+      if (fn) {
+        fn().catch((err: unknown) => {
+          const message =
+            err instanceof Error ? err.message : "Failed to fetch ABI";
+          setError(message);
+        });
+      }
+    }, TIMEOUT_BEFORE_FETCH_DELAY);
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [contractAddress, network, isValidAddress, useManualAbi]);
+
   const fetchProxyAbi = useCallback(async (): Promise<string> => {
     if (!proxyAddress) {
       throw new Error("Proxy address not available");
@@ -472,10 +520,6 @@ export function AbiWithAutoFetchField({
         id={field.key}
         key={`${field.key}-${value?.length || 0}-${useProxyAbi ? "proxy" : "impl"}`}
         onChange={(val) => {
-          console.log(
-            "[ABI Field] Textarea onChange called with length:",
-            val?.toString().length || 0
-          );
           onChange(val);
           setError(null);
         }}

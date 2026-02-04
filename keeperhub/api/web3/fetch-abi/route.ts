@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
 import { NextResponse } from "next/server";
+import { toChecksumAddress } from "@/keeperhub/lib/address-utils";
 import { apiError } from "@/keeperhub/lib/api-error";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -1128,10 +1129,38 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log("[Etherscan] Fetching ABI for:", { contractAddress, network });
+    if (!ethers.isAddress(contractAddress)) {
+      return NextResponse.json(
+        { error: `Invalid contract address: ${contractAddress}` },
+        { status: 400 }
+      );
+    }
+
+    const checksummedAddress = toChecksumAddress(contractAddress);
+
+    const chainId = getChainIdFromNetwork(network);
+    const rpcConfig = await resolveRpcConfig(chainId);
+    if (rpcConfig) {
+      const provider = new ethers.JsonRpcProvider(rpcConfig.primaryRpcUrl);
+      const code = await provider.getCode(checksummedAddress);
+      if (!code || code === "0x") {
+        return NextResponse.json(
+          {
+            error:
+              "Address has no contract code (EOA or not deployed on this network).",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    console.log("[Etherscan] Fetching ABI for:", {
+      contractAddress: checksummedAddress,
+      network,
+    });
 
     // Fetch ABI from Etherscan with proxy detection
-    const result = await fetchAbiFromEtherscan(contractAddress, network);
+    const result = await fetchAbiFromEtherscan(checksummedAddress, network);
 
     return NextResponse.json({
       success: true,
