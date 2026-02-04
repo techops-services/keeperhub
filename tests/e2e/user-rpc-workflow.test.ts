@@ -1,3 +1,5 @@
+/* biome-ignore-all lint/correctness/noGlobalDirnameFilename: vitest requires __dirname */
+
 /**
  * E2E Tests for User RPC Preferences → Workflow Execution Flow
  *

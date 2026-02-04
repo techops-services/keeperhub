@@ -45,7 +45,7 @@ const DATABASE_URL =
   process.env.DATABASE_URL ||
   "postgresql://postgres:postgres@localhost:5433/workflow_builder";
 
-const PROJECT_ROOT = path.resolve(__dirname, "../..");
+const PROJECT_ROOT = path.resolve(import.meta.dirname, "../..");
 
 // Test data prefixes
 const TEST_PREFIX = "test_graceful_e2e_";

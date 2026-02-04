@@ -1,3 +1,5 @@
+/* biome-ignore-all lint/correctness/noGlobalDirnameFilename: vitest requires __dirname */
+
 /**
  * Full Pipeline E2E Tests
  *
