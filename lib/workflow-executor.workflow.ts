@@ -350,75 +350,173 @@ async function executeActionStep(input: {
   };
 }
 
+// start custom keeperhub code //
 /**
- * Process template variables in config
+ * Resolve a field path (e.g. "data.recipes[0].tags[0]") into a value.
+ * Supports bracket notation for array indices.
+ */
+function resolveConfigFieldPath(data: unknown, fieldPath: string): unknown {
+  if (data === null || data === undefined) {
+    return;
+  }
+  const parts = fieldPath.split(".");
+  let current: unknown = data;
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (!trimmed) {
+      continue;
+    }
+    const arrayMatch = trimmed.match(ARRAY_ACCESS_PATTERN);
+    if (arrayMatch) {
+      const [, key, indexStr] = arrayMatch;
+      const obj = current as Record<string, unknown>;
+      const arr = obj?.[key];
+      if (!Array.isArray(arr)) {
+        return;
+      }
+      current = arr[Number.parseInt(indexStr, 10)];
+    } else {
+      current = (current as Record<string, unknown>)?.[trimmed];
+    }
+    if (current === undefined || current === null) {
+      return;
+    }
+  }
+  return current;
+}
+
+function formatConfigValue(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    return JSON.stringify(value);
+  }
+  if (typeof value === "object") {
+    return JSON.stringify(value);
+  }
+  return String(value);
+}
+
+/** True when output has shape { data: object } (e.g. HTTP step result). */
+function hasNestedDataShape(
+  data: unknown
+): data is Record<string, unknown> & { data: object } {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    "data" in data &&
+    typeof (data as Record<string, unknown>).data === "object"
+  );
+}
+
+/**
+ * Resolve from output.data, or from output.data.data when step wraps body in .data (e.g. HTTP).
+ */
+function resolveFromOutputData(data: unknown, fieldPath: string): unknown {
+  const fromTop = fieldPath ? resolveConfigFieldPath(data, fieldPath) : data;
+  if (fromTop !== undefined && fromTop !== null) {
+    return fromTop;
+  }
+  if (hasNestedDataShape(data)) {
+    const inner = data.data;
+    return fieldPath ? resolveConfigFieldPath(inner, fieldPath) : inner;
+  }
+  return;
+}
+
+function replaceConfigTemplate(
+  match: string,
+  nodeId: string,
+  rest: string,
+  outputs: NodeOutputs
+): string {
+  const trimmedNodeId = nodeId.trim();
+  const sanitizedNodeId = trimmedNodeId.replace(/[^a-zA-Z0-9]/g, "_");
+  const output = outputs[sanitizedNodeId] ?? outputs[trimmedNodeId];
+  const fieldPath = rest.includes(".")
+    ? rest.substring(rest.indexOf(".") + 1).trim()
+    : "";
+
+  console.log("[Template] Resolving:", {
+    template: match,
+    nodeId: trimmedNodeId,
+    sanitizedNodeId,
+    fieldPath: fieldPath || "(whole output)",
+    outputKeys: Object.keys(outputs),
+    foundOutput: !!output,
+  });
+
+  if (!output) {
+    console.log("[Template] No output for node, leaving template as-is");
+    return match;
+  }
+  const data = output.data;
+  if (data === null || data === undefined) {
+    console.log(
+      "[Template] Output data is null/undefined, leaving template as-is"
+    );
+    return match;
+  }
+
+  const dataKeys =
+    typeof data === "object" && data !== null
+      ? Object.keys(data as Record<string, unknown>)
+      : [];
+  console.log("[Template] Output data top-level keys:", dataKeys);
+
+  const resolved = resolveFromOutputData(data, fieldPath);
+  if (resolved === undefined || resolved === null) {
+    if (hasNestedDataShape(data)) {
+      const innerKeys = Object.keys(data.data as Record<string, unknown>);
+      console.log("[Template] Trying inner output.data, keys:", innerKeys);
+    }
+    console.log(
+      "[Template] Path not found, leaving template as-is. fieldPath:",
+      fieldPath
+    );
+    return match;
+  }
+
+  console.log(
+    "[Template] Resolved, type:",
+    typeof resolved,
+    Array.isArray(resolved) ? "array" : ""
+  );
+  return formatConfigValue(resolved);
+}
+
+/**
+ * Process template variables in config.
+ * Recurses into nested objects; supports array paths like data.recipes[0].
  */
 function processTemplates(
   config: Record<string, unknown>,
   outputs: NodeOutputs
 ): Record<string, unknown> {
   const processed: Record<string, unknown> = {};
+  const templatePattern = /\{\{@([^:]+):([^}]+)\}\}/g;
 
   for (const [key, value] of Object.entries(config)) {
     if (typeof value === "string") {
-      // Process template variables like {{@nodeId:Label.field}}
-      let processedValue = value;
-      const templatePattern = /\{\{@([^:]+):([^}]+)\}\}/g;
-      processedValue = processedValue.replace(
-        templatePattern,
-        // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Template processing requires nested logic
-        (match, nodeId, rest) => {
-          const sanitizedNodeId = nodeId.replace(/[^a-zA-Z0-9]/g, "_");
-          const output = outputs[sanitizedNodeId];
-          if (!output) {
-            return match;
-          }
-
-          const dotIndex = rest.indexOf(".");
-          if (dotIndex === -1) {
-            // No field path, return the entire output data
-            const data = output.data;
-            if (data === null || data === undefined) {
-              // Return empty string for null/undefined data (e.g., from disabled nodes)
-              return "";
-            }
-            if (typeof data === "object") {
-              return JSON.stringify(data);
-            }
-            return String(data);
-          }
-
-          // If data is null/undefined, return empty string instead of trying to access fields
-          if (output.data === null || output.data === undefined) {
-            return "";
-          }
-
-          const fieldPath = rest.substring(dotIndex + 1);
-          const fields = fieldPath.split(".");
-          // biome-ignore lint/suspicious/noExplicitAny: Dynamic output data traversal
-          let current: any = output.data;
-
-          for (const field of fields) {
-            if (current && typeof current === "object") {
-              current = current[field];
-            } else {
-              // Field access failed, return empty string
-              return "";
-            }
-          }
-
-          // Convert value to string, using JSON.stringify for objects/arrays
-          if (current === null || current === undefined) {
-            return "";
-          }
-          if (typeof current === "object") {
-            return JSON.stringify(current);
-          }
-          return String(current);
-        }
+      processed[key] = value.replace(templatePattern, (m, nodeId, rest) =>
+        replaceConfigTemplate(m, nodeId, rest, outputs)
       );
-
-      processed[key] = processedValue;
+    } else if (
+      typeof value === "object" &&
+      value !== null &&
+      !Array.isArray(value)
+    ) {
+      processed[key] = processTemplates(
+        value as Record<string, unknown>,
+        outputs
+      );
     } else {
       processed[key] = value;
     }
@@ -426,6 +524,7 @@ function processTemplates(
 
   return processed;
 }
+// end keeperhub code //
 
 /**
  * Main workflow executor function
