@@ -14,7 +14,6 @@ import { afterEach, describe, expect, it } from "vitest";
  * Some tests require a test database, others use a test harness.
  */
 
-// biome-ignore lint/correctness/noGlobalDirnameFilename: E2E tests rely on Node CJS behavior
 const PROJECT_ROOT = path.resolve(__dirname, "../..");
 const WORKFLOW_RUNNER_PATH = path.join(
   PROJECT_ROOT,

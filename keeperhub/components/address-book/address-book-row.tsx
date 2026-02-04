@@ -8,7 +8,6 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
@@ -38,17 +37,15 @@ export function AddressBookRow({
 
   return (
     <TableRow>
-      <TableCell className="max-w-40 truncate font-medium">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="max-w-40 truncate">{entry.label}</span>
-            </TooltipTrigger>
-            <TooltipContent align="center" side="left">
-              {entry.label}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+      <TableCell className="max-w-40 font-medium">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="block truncate">{entry.label}</span>
+          </TooltipTrigger>
+          <TooltipContent align="center" side="left">
+            {entry.label}
+          </TooltipContent>
+        </Tooltip>
       </TableCell>
       <TableCell>
         <div className="flex items-center gap-2">
