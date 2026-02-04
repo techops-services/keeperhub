@@ -45,7 +45,6 @@ const DATABASE_URL =
   process.env.DATABASE_URL ||
   "postgresql://postgres:postgres@localhost:5433/workflow_builder";
 
-// biome-ignore lint/correctness/noGlobalDirnameFilename: This is a test, so we can use __dirname. Updating to import.meta.dirname breaks the test.
 const PROJECT_ROOT = path.resolve(__dirname, "../..");
 
 // Test data prefixes

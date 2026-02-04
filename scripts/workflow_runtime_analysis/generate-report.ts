@@ -16,7 +16,6 @@ import { execSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-// biome-ignore lint/correctness/noGlobalDirnameFilename: This is a script, so we can use __dirname. Updating to import.meta.dirname breaks the script.
 const PROJECT_ROOT = join(__dirname, "..", "..");
 
 // ============================================================================
