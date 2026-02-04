@@ -55,7 +55,7 @@ import {
   useOrganizations,
 } from "@/keeperhub/lib/hooks/use-organization";
 import { refetchOrganizations } from "@/keeperhub/lib/refetch-organizations";
-import { api } from "@/lib/api-client";
+import { ApiError, api } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
 
 // Helper function to get status badge classes
@@ -74,11 +74,6 @@ function getStatusBadgeClasses(status: string): string {
 }
 
 type Role = "member" | "admin" | "owner";
-enum RoleEnum {
-  Member = "member",
-  Admin = "admin",
-  Owner = "owner",
-}
 
 // Helper to check invitation status before cancelling
 type InvitationCheckResult = {
@@ -257,7 +252,7 @@ function MembersListContent({
 
   const entries = [
     ...members.map((m) => ({
-      kind: RoleEnum.Member as const,
+      kind: "member" as const,
       email: m.user?.email || "Unknown",
       role: m.role,
       id: m.id,
@@ -266,7 +261,7 @@ function MembersListContent({
     ...pendingInvitations.map((inv) => ({
       kind: "invite" as const,
       email: inv.email,
-      role: inv.role || RoleEnum.Member,
+      role: inv.role || "member",
       id: inv.id,
       userId: undefined as string | undefined,
     })),
@@ -275,9 +270,9 @@ function MembersListContent({
   );
 
   const canChangeRole =
-    canInvite && onUpdateMemberRole && currentUserRole === RoleEnum.Owner;
+    canInvite && onUpdateMemberRole && currentUserRole === "owner";
   const canChangeRoleToMemberOrAdminOnly =
-    canInvite && onUpdateMemberRole && currentUserRole === RoleEnum.Admin;
+    canInvite && onUpdateMemberRole && currentUserRole === "admin";
 
   return (
     <div className="space-y-2">
@@ -298,11 +293,11 @@ function MembersListContent({
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            {entry.kind === RoleEnum.Member &&
+            {entry.kind === "member" &&
               entry.userId !== currentUserId &&
               (canChangeRole ||
                 (canChangeRoleToMemberOrAdminOnly &&
-                  entry.role !== RoleEnum.Owner)) && (
+                  entry.role !== "owner")) && (
                 <Select
                   disabled={updatingRoleMemberId === entry.id}
                   onValueChange={(role) => onUpdateMemberRole(entry.id, role)}
@@ -312,10 +307,10 @@ function MembersListContent({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={RoleEnum.Member}>Member</SelectItem>
-                    <SelectItem value={RoleEnum.Admin}>Admin</SelectItem>
+                    <SelectItem value={"member"}>Member</SelectItem>
+                    <SelectItem value={"admin"}>Admin</SelectItem>
                     {canChangeRole && (
-                      <SelectItem value={RoleEnum.Owner}>Owner</SelectItem>
+                      <SelectItem value={"owner"}>Owner</SelectItem>
                     )}
                   </SelectContent>
                 </Select>
@@ -331,10 +326,10 @@ function MembersListContent({
                 Revoke Invitation
               </Button>
             )}
-            {entry.kind === RoleEnum.Member &&
+            {entry.kind === "member" &&
               canInvite &&
               entry.userId !== currentUserId &&
-              (currentUserRole === RoleEnum.Owner || entry.role === RoleEnum.Member) && (
+              (currentUserRole === "owner" || entry.role === "member") && (
                 <Button
                   disabled={removingMember === entry.id}
                   onClick={() => onRemoveMember(entry.id, entry.email)}
@@ -428,9 +423,7 @@ export function ManageOrgsModal({
 
   // Invite state
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<Role>(
-    RoleEnum.Member
-  );
+  const [inviteRole, setInviteRole] = useState<Role>("member");
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteId, setInviteId] = useState<string | null>(null);
 
@@ -481,18 +474,17 @@ export function ManageOrgsModal({
 
   // Compute user's role in the managed org from fetched members
   const currentUserMember = members.find((m) => m.userId === session?.user?.id);
-  const managedOrgRole = currentUserMember?.role as
-    | Role
-    | undefined;
+  const managedOrgRole = currentUserMember?.role as Role | undefined;
   const isOwner = isManagedOrgActive
     ? isActiveOrgOwner
-    : managedOrgRole === RoleEnum.Owner;
+    : managedOrgRole === "owner";
   const canInvite = isManagedOrgActive
     ? isActiveOrgOwner || isActiveOrgAdmin
-    : managedOrgRole === RoleEnum.Owner || managedOrgRole === RoleEnum.Admin;
+    : managedOrgRole === "owner" || managedOrgRole === "admin";
   const currentUserRole = isManagedOrgActive ? activeOrgRole : managedOrgRole;
 
-  const ownerCount = members.filter((m) => m.role === RoleEnum.Owner).length;
+  const ownerCount = members.filter((m) => m.role === "owner").length;
+  // Only accepted members (from listMembers); pending invitations are not included
   const otherMembers = members.filter((m) => m.userId !== session?.user?.id);
   const isOnlyOwner = isOwner && ownerCount === 1;
   const canLeaveAsOwner = !isOnlyOwner || otherMembers.length > 0;
@@ -931,26 +923,52 @@ export function ManageOrgsModal({
   }, [isOwner, canLeaveAsOwner, isOnlyOwner, otherMembers]);
 
   const handleAssignOwnerAndLeave = useCallback(async () => {
-    if (!(managedOrgId && assignOwnerSelectedMemberId)) {
+    if (!(managedOrgId && assignOwnerSelectedMemberId && managedOrg)) {
+      return;
+    }
+    const isAcceptedMember = otherMembers.some(
+      (m) => m.id === assignOwnerSelectedMemberId
+    );
+    if (!isAcceptedMember) {
+      toast.error(
+        "Selected user must be an accepted member of this organization. Only members who have accepted their invitation can be assigned as owner."
+      );
       return;
     }
     try {
-      const { error } = await authClient.organization.updateMemberRole({
-        memberId: assignOwnerSelectedMemberId,
-        role: RoleEnum.Owner,
-        organizationId: managedOrgId,
+      await api.organization.leave(managedOrgId, {
+        newOwnerMemberId: assignOwnerSelectedMemberId,
       });
 
-      if (error) {
-        toast.error(error.message || "Failed to assign new owner");
-        return;
+      toast.success(`Left ${managedOrg.name}`);
+      setShowAssignOwnerDialog(false);
+      setManagedOrgId(null);
+
+      if (isManagedOrgActive) {
+        const otherOrg = organizations.find((org) => org.id !== managedOrg.id);
+        if (otherOrg) {
+          await switchOrganization(otherOrg.id);
+        }
       }
 
-      await performLeaveOrg();
+      refetchOrganizations();
+      router.refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "An error occurred");
+      const message =
+        err instanceof ApiError ? err.message : "An error occurred";
+      toast.error(message);
     }
-  }, [managedOrgId, assignOwnerSelectedMemberId, performLeaveOrg]);
+  }, [
+    managedOrgId,
+    assignOwnerSelectedMemberId,
+    managedOrg,
+    otherMembers,
+    isManagedOrgActive,
+    organizations,
+    setManagedOrgId,
+    switchOrganization,
+    router,
+  ]);
 
   const handleDeleteOrg = async () => {
     if (!managedOrg) {
@@ -1145,7 +1163,7 @@ export function ManageOrgsModal({
                                 )}
                               </div>
                               <p className="text-muted-foreground text-xs capitalize">
-                                {org.role || RoleEnum.Member}
+                                {org.role || "member"}
                               </p>
                             </div>
                             <Button
@@ -1279,19 +1297,17 @@ export function ManageOrgsModal({
                             value={inviteEmail}
                           />
                           <Select
-                            onValueChange={(v) =>
-                              setInviteRole(v as Role)
-                            }
+                            onValueChange={(v) => setInviteRole(v as Role)}
                             value={inviteRole}
                           >
                             <SelectTrigger className="w-[130px]">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value={RoleEnum.Member}>Member</SelectItem>
-                              <SelectItem value={RoleEnum.Admin}>Admin</SelectItem>
+                              <SelectItem value={"member"}>Member</SelectItem>
+                              <SelectItem value={"admin"}>Admin</SelectItem>
                               {isOwner && (
-                                <SelectItem value={RoleEnum.Owner}>Owner</SelectItem>
+                                <SelectItem value={"owner"}>Owner</SelectItem>
                               )}
                             </SelectContent>
                           </Select>
@@ -1446,8 +1462,8 @@ export function ManageOrgsModal({
           <AlertDialogHeader>
             <AlertDialogTitle>Assign new owner</AlertDialogTitle>
             <AlertDialogDescription>
-              You must assign another member as owner before leaving. Select the
-              member who will become the new owner.
+              You must assign another member as owner before leaving. Select an
+              accepted member (someone who has already joined the organization).
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="py-2">

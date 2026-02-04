@@ -436,6 +436,13 @@ export const organizationApi = {
         body: JSON.stringify(data),
       }
     ),
+
+  /** Leave organization. When sole owner, pass newOwnerMemberId for atomic transfer + leave. */
+  leave: (organizationId: string, body: { newOwnerMemberId?: string }) =>
+    apiCall<{ success: true }>(`/api/organizations/${organizationId}/leave`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 };
 
 // Address Book API
