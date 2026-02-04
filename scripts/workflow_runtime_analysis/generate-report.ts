@@ -16,8 +16,7 @@ import { execSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-// biome-ignore lint/correctness/noGlobalDirnameFilename: E2E tests rely on Node CJS behavior
-const PROJECT_ROOT = join(__dirname, "..", "..");
+const PROJECT_ROOT = join(import.meta.dirname, "..", "..");
 
 // ============================================================================
 // Constants

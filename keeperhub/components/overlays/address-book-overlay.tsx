@@ -25,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { AddressBookRow } from "@/keeperhub/components/address-book/address-book-row";
 import { toChecksumAddress } from "@/keeperhub/lib/address-utils";
 import { useDebounce } from "@/keeperhub/lib/hooks/use-debounce";
@@ -215,27 +216,29 @@ function AddressBookTable({
   onEdit,
 }: AddressBookTableProps) {
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Name</TableHead>
-          <TableHead>Address</TableHead>
-          <TableHead className="text-right">Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {entries.map((entry) => (
-          <AddressBookRow
-            deleting={deleting}
-            entry={entry}
-            key={entry.id}
-            onDelete={() => onDelete(entry)}
-            onEdit={() => onEdit(entry)}
-            onUpdate={onUpdate}
-          />
-        ))}
-      </TableBody>
-    </Table>
+    <TooltipProvider>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Address</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {entries.map((entry) => (
+            <AddressBookRow
+              deleting={deleting}
+              entry={entry}
+              key={entry.id}
+              onDelete={() => onDelete(entry)}
+              onEdit={() => onEdit(entry)}
+              onUpdate={onUpdate}
+            />
+          ))}
+        </TableBody>
+      </Table>
+    </TooltipProvider>
   );
 }
 

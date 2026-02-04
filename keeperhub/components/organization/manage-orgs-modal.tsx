@@ -68,6 +68,46 @@ function getStatusBadgeClasses(status: string): string {
   }
 }
 
+// Helper to check invitation status before cancelling
+type InvitationCheckResult = {
+  canCancel: boolean;
+  errorMessage?: string;
+  shouldRefreshMembers?: boolean;
+};
+
+async function checkInvitationStatus(
+  invitationId: string
+): Promise<InvitationCheckResult> {
+  const response = await fetch(`/api/invitations/${invitationId}`);
+  const data = await response.json();
+
+  if (data.alreadyAccepted) {
+    return {
+      canCancel: false,
+      errorMessage:
+        "User already accepted invite. Please refresh for updated organization status.",
+      shouldRefreshMembers: true,
+    };
+  }
+
+  if (data.rejected || data.expired) {
+    return {
+      canCancel: false,
+      errorMessage: data.error || "Invitation is no longer valid",
+    };
+  }
+
+  if (!response.ok && response.status === 404) {
+    return {
+      canCancel: false,
+      errorMessage: "Invitation not found. It may have already been processed.",
+      shouldRefreshMembers: true,
+    };
+  }
+
+  return { canCancel: true };
+}
+
 // Component to render a received invitation item
 type ReceivedInvitationItemProps = {
   invitation: {
@@ -145,6 +185,128 @@ function ReceivedInvitationItem({
   );
 }
 
+// Component to render the members list with loading state
+type MembersListContentProps = {
+  loadingMembers: boolean;
+  loadingSentInvitations: boolean;
+  members: {
+    id: string;
+    userId: string;
+    role: string;
+    user: { email?: string };
+  }[];
+  sentInvitations: {
+    id: string;
+    email: string;
+    role?: string;
+    status: string;
+  }[];
+  canInvite: boolean;
+  currentUserRole?: "owner" | "admin" | "member";
+  cancellingInvite: string | null;
+  onCancelInvitation: (invitationId: string) => void;
+  removingMember: string | null;
+  onRemoveMember: (memberId: string, email: string) => void;
+  currentUserId?: string;
+};
+
+function MembersListContent({
+  loadingMembers,
+  loadingSentInvitations,
+  members,
+  sentInvitations,
+  canInvite,
+  currentUserRole,
+  cancellingInvite,
+  onCancelInvitation,
+  removingMember,
+  onRemoveMember,
+  currentUserId,
+}: MembersListContentProps) {
+  if (loadingMembers || loadingSentInvitations) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Spinner className="h-6 w-6" />
+      </div>
+    );
+  }
+
+  const pendingInvitations = sentInvitations.filter(
+    (inv) => inv.status === "pending"
+  );
+
+  if (members.length === 0 && pendingInvitations.length === 0) {
+    return null;
+  }
+
+  const entries = [
+    ...members.map((m) => ({
+      kind: "member" as const,
+      email: m.user?.email || "Unknown",
+      role: m.role,
+      id: m.id,
+      userId: m.userId,
+    })),
+    ...pendingInvitations.map((inv) => ({
+      kind: "invite" as const,
+      email: inv.email,
+      role: inv.role || "member",
+      id: inv.id,
+      userId: undefined as string | undefined,
+    })),
+  ].sort((a, b) =>
+    a.email.localeCompare(b.email, undefined, { sensitivity: "base" })
+  );
+
+  return (
+    <div className="space-y-2">
+      {entries.map((entry) => (
+        <div
+          className="flex items-center justify-between rounded-lg border p-3"
+          key={entry.id}
+        >
+          <div className="min-w-0 flex-1">
+            <p
+              className={`truncate font-medium text-sm ${entry.kind === "invite" ? "text-muted-foreground" : ""}`}
+            >
+              {entry.email}
+            </p>
+            <p className="text-muted-foreground text-xs">
+              {entry.role}
+              {entry.kind === "invite" && " - invited"}
+            </p>
+          </div>
+          {entry.kind === "invite" && canInvite && (
+            <Button
+              disabled={cancellingInvite === entry.id}
+              onClick={() => onCancelInvitation(entry.id)}
+              size="sm"
+              variant="ghost"
+            >
+              <X className="mr-1 h-4 w-4" />
+              Revoke Invitation
+            </Button>
+          )}
+          {entry.kind === "member" &&
+            canInvite &&
+            entry.userId !== currentUserId &&
+            (currentUserRole === "owner" || entry.role === "member") && (
+              <Button
+                disabled={removingMember === entry.id}
+                onClick={() => onRemoveMember(entry.id, entry.email)}
+                size="sm"
+                variant="ghost"
+              >
+                <X className="mr-1 h-4 w-4" />
+                Remove
+              </Button>
+            )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 type ManageOrgsModalProps = {
   triggerText?: string;
   defaultShowCreateForm?: boolean;
@@ -169,13 +331,30 @@ export function ManageOrgsModal({
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
 
   // Track which org is being managed (null = list view, string = detail view)
-  const [managedOrgId, setManagedOrgId] = useState<string | null>(null);
+  const [managedOrgId, setManagedOrgIdRaw] = useState<string | null>(null);
   const managedOrgIdRef = useRef<string | null>(managedOrgId);
   managedOrgIdRef.current = managedOrgId;
 
+  // Loading states for org-specific data (declared early for setManagedOrgId wrapper)
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [loadingSentInvitations, setLoadingSentInvitations] = useState(false);
+
+  // Wrapper to set loading states immediately when switching orgs
+  const setManagedOrgId = useCallback((orgId: string | null) => {
+    if (orgId !== null) {
+      setLoadingMembers(true);
+      setLoadingSentInvitations(true);
+    }
+    setManagedOrgIdRaw(orgId);
+  }, []);
+
   const { organization, switchOrganization } = useOrganization();
   const { organizations } = useOrganizations();
-  const { isOwner: isActiveOrgOwner } = useActiveMember();
+  const {
+    isOwner: isActiveOrgOwner,
+    isAdmin: isActiveOrgAdmin,
+    role: activeOrgRole,
+  } = useActiveMember();
   const router = useRouter();
   const { data: session } = authClient.useSession();
 
@@ -230,8 +409,8 @@ export function ManageOrgsModal({
     expiresAt?: Date | string;
   };
   const [sentInvitations, setSentInvitations] = useState<SentInvitation[]>([]);
-  const [loadingSentInvitations, setLoadingSentInvitations] = useState(false);
   const [cancellingInvite, setCancellingInvite] = useState<string | null>(null);
+  const [removingMember, setRemovingMember] = useState<string | null>(null);
 
   // Organization members state
   type Member = {
@@ -246,7 +425,6 @@ export function ManageOrgsModal({
     };
   };
   const [members, setMembers] = useState<Member[]>([]);
-  const [loadingMembers, setLoadingMembers] = useState(false);
 
   // Compute user's role in the managed org from fetched members
   const currentUserMember = members.find((m) => m.userId === session?.user?.id);
@@ -258,7 +436,10 @@ export function ManageOrgsModal({
   const isOwner = isManagedOrgActive
     ? isActiveOrgOwner
     : managedOrgRole === "owner";
-  const canInvite = managedOrgRole === "owner" || managedOrgRole === "admin";
+  const canInvite = isManagedOrgActive
+    ? isActiveOrgOwner || isActiveOrgAdmin
+    : managedOrgRole === "owner" || managedOrgRole === "admin";
+  const currentUserRole = isManagedOrgActive ? activeOrgRole : managedOrgRole;
 
   const fetchInvitations = useCallback(async () => {
     setLoadingInvitations(true);
@@ -300,70 +481,75 @@ export function ManageOrgsModal({
 
   // Fetch sent invitations for the managed organization (for admins)
   const organizationId = managedOrgId;
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: stale-check + fetch + state branches
+  const isStaleRequest = useCallback(
+    (orgIdAtStart: string) => managedOrgIdRef.current !== orgIdAtStart,
+    []
+  );
+
   const fetchSentInvitations = useCallback(async () => {
     if (!organizationId) {
       return;
     }
-    const orgIdWeAreFetching = organizationId;
+
+    const orgIdAtStart = organizationId;
     setLoadingSentInvitations(true);
+
     try {
       const result = await authClient.organization.listInvitations({
         query: { organizationId },
       });
-      if (managedOrgIdRef.current !== orgIdWeAreFetching) {
+      if (isStaleRequest(orgIdAtStart)) {
         return;
       }
-      if (result.data) {
-        const invitations = Array.isArray(result.data)
-          ? result.data
-          : [result.data];
-        setSentInvitations(invitations.filter(Boolean) as SentInvitation[]);
-      }
+
+      const invitations = Array.isArray(result.data)
+        ? result.data
+        : [result.data].filter(Boolean);
+      setSentInvitations(invitations.filter(Boolean) as SentInvitation[]);
     } catch (error) {
       console.error("Failed to fetch sent invitations:", error);
-      if (managedOrgIdRef.current === orgIdWeAreFetching) {
+      if (!isStaleRequest(orgIdAtStart)) {
         setSentInvitations([]);
       }
     } finally {
-      if (managedOrgIdRef.current === orgIdWeAreFetching) {
+      if (!isStaleRequest(orgIdAtStart)) {
         setLoadingSentInvitations(false);
       }
     }
-  }, [organizationId]);
+  }, [organizationId, isStaleRequest]);
 
   // Fetch organization members
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: stale-check + fetch + state branches
   const fetchMembers = useCallback(async () => {
     if (!organizationId) {
       return;
     }
-    const orgIdWeAreFetching = organizationId;
+
+    const orgIdAtStart = organizationId;
     setLoadingMembers(true);
+
     try {
       const result = await authClient.organization.listMembers({
         query: { organizationId },
       });
-      if (managedOrgIdRef.current !== orgIdWeAreFetching) {
+      if (isStaleRequest(orgIdAtStart)) {
         return;
       }
-      if (result.data) {
-        // API returns { members: [...], total: number }
-        const data = result.data as { members?: Member[] } | Member[];
-        const membersList = Array.isArray(data) ? data : data.members || [];
-        setMembers(membersList.filter(Boolean) as Member[]);
-      }
+
+      // API returns { members: [...], total: number } or Member[]
+      const data = result.data as { members?: Member[] } | Member[];
+      const membersList = Array.isArray(data) ? data : (data.members ?? []);
+      setMembers(membersList.filter(Boolean) as Member[]);
     } catch (error) {
       console.error("Failed to fetch members:", error);
-      if (managedOrgIdRef.current === orgIdWeAreFetching) {
+      if (!isStaleRequest(orgIdAtStart)) {
         setMembers([]);
       }
     } finally {
-      if (managedOrgIdRef.current === orgIdWeAreFetching) {
+      if (!isStaleRequest(orgIdAtStart)) {
         setLoadingMembers(false);
       }
     }
-  }, [organizationId]);
+  }, [organizationId, isStaleRequest]);
 
   // Fetch invitations when modal opens
   useEffect(() => {
@@ -409,7 +595,7 @@ export function ManageOrgsModal({
       setManagedOrgId(null);
       setInviteId(null);
     }
-  }, [open]);
+  }, [open, setManagedOrgId]);
 
   const handleOrgNameChange = (value: string) => {
     setOrgName(value);
@@ -498,21 +684,55 @@ export function ManageOrgsModal({
   const handleCancelInvitation = async (invitationId: string) => {
     setCancellingInvite(invitationId);
     try {
+      // First check if the invitation is still pending
+      const statusCheck = await checkInvitationStatus(invitationId);
+
+      if (!statusCheck.canCancel) {
+        toast.error(statusCheck.errorMessage || "Cannot revoke invitation");
+        fetchSentInvitations();
+        if (statusCheck.shouldRefreshMembers) {
+          fetchMembers();
+        }
+        return;
+      }
+
       const { error } = await authClient.organization.cancelInvitation({
         invitationId,
       });
 
       if (error) {
-        toast.error(error.message || "Failed to cancel invitation");
+        toast.error(error.message || "Failed to revoke invitation");
+        fetchSentInvitations();
         return;
       }
 
-      toast.success("Invitation cancelled");
+      toast.success("Invitation revoked");
       fetchSentInvitations();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setCancellingInvite(null);
+    }
+  };
+
+  const handleRemoveMember = async (_memberId: string, email: string) => {
+    setRemovingMember(_memberId);
+    try {
+      const { error } = await authClient.organization.removeMember({
+        memberIdOrEmail: email,
+      });
+
+      if (error) {
+        toast.error(error.message || "Failed to remove member");
+        return;
+      }
+
+      toast.success("Member removed from organization");
+      fetchMembers();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setRemovingMember(null);
     }
   };
 
@@ -959,80 +1179,19 @@ export function ManageOrgsModal({
                       <h4 className="font-medium text-muted-foreground text-sm">
                         Members
                       </h4>
-                      {(() => {
-                        if (loadingMembers || loadingSentInvitations) {
-                          return (
-                            <div className="flex items-center justify-center py-8">
-                              <Spinner className="h-6 w-6" />
-                            </div>
-                          );
-                        }
-                        if (
-                          members.length > 0 ||
-                          sentInvitations.some(
-                            (inv) => inv.status === "pending"
-                          )
-                        ) {
-                          return (
-                            <div className="space-y-2">
-                              {[
-                                ...members.map((m) => ({
-                                  kind: "member" as const,
-                                  email: m.user?.email || "Unknown",
-                                  role: m.role,
-                                  id: m.id,
-                                })),
-                                ...sentInvitations
-                                  .filter((inv) => inv.status === "pending")
-                                  .map((inv) => ({
-                                    kind: "invite" as const,
-                                    email: inv.email,
-                                    role: inv.role || "member",
-                                    id: inv.id,
-                                  })),
-                              ]
-                                .sort((a, b) =>
-                                  a.email.localeCompare(b.email, undefined, {
-                                    sensitivity: "base",
-                                  })
-                                )
-                                .map((entry) => (
-                                  <div
-                                    className="flex items-center justify-between rounded-lg border p-3"
-                                    key={entry.id}
-                                  >
-                                    <div className="min-w-0 flex-1">
-                                      <p
-                                        className={`truncate font-medium text-sm ${entry.kind === "invite" ? "text-muted-foreground" : ""}`}
-                                      >
-                                        {entry.email}
-                                      </p>
-                                      <p className="text-muted-foreground text-xs">
-                                        {entry.role}
-                                        {entry.kind === "invite" &&
-                                          " - invited"}
-                                      </p>
-                                    </div>
-                                    {entry.kind === "invite" && canInvite && (
-                                      <Button
-                                        disabled={cancellingInvite === entry.id}
-                                        onClick={() =>
-                                          handleCancelInvitation(entry.id)
-                                        }
-                                        size="sm"
-                                        variant="ghost"
-                                      >
-                                        <X className="mr-1 h-4 w-4" />
-                                        Remove
-                                      </Button>
-                                    )}
-                                  </div>
-                                ))}
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
+                      <MembersListContent
+                        cancellingInvite={cancellingInvite}
+                        canInvite={canInvite}
+                        currentUserId={session?.user?.id}
+                        currentUserRole={currentUserRole}
+                        loadingMembers={loadingMembers}
+                        loadingSentInvitations={loadingSentInvitations}
+                        members={members}
+                        onCancelInvitation={handleCancelInvitation}
+                        onRemoveMember={handleRemoveMember}
+                        removingMember={removingMember}
+                        sentInvitations={sentInvitations}
+                      />
                     </div>
 
                     {/* Leave/Delete Organization */}
