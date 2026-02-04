@@ -77,21 +77,53 @@ function rewardRate() external view returns (uint256)
 function totalSupply() external view returns (uint256)
 ```
 
+## Authorization Model
+
+The workflow engine sends transactions from the **Para org wallet**, but the staking position is owned by the **user's personal wallet** (the address they used to stake SKY on sky.money). These are two different addresses.
+
+The LockStakeEngine requires that any address calling write functions on a position must be either:
+- The position owner (the personal wallet), or
+- An address explicitly granted permission via `hope()`
+
+Since the Para wallet is not the position owner, it needs to be authorized before the workflow can claim rewards.
+
+### One-Time Setup (Manual, Outside the Workflow)
+
+The user must call `hope()` on the LockStakeEngine from their personal wallet to grant the Para org wallet permission to act on their staking position:
+
+```solidity
+// Called from the user's personal wallet (e.g. MetaMask)
+// On LockStakeEngine: 0xCe01C90dE7FD1bcFa39e237FE6D8D9F569e8A6a3
+function hope(address usr) external
+```
+
+- `usr`: the Para org wallet address
+
+This only needs to be done once. After this, the Para wallet can call `getReward()` on behalf of the user.
+
+### Address Roles in the Workflow
+
+| Role | Address | Used In |
+|------|---------|---------|
+| **Position Owner** | User's personal wallet (staked SKY on sky.money) | Read steps: lookups and reward queries |
+| **Transaction Sender** | Para org wallet (sends the on-chain tx) | Write steps: the `msg.sender` of the claim tx |
+| **Reward Recipient** | User's personal wallet OR Para wallet (configurable via `to` arg) | Where claimed USDS lands |
+
 ## Workflow Template (v1: Claim + Notify)
 
 ```
 [Schedule Trigger: Weekly Cron (0 0 * * 1)]
     |
-[Read Contract: LockStakeEngine.ownerUrns(wallet, 0)]
+[Read Contract: LockStakeEngine.ownerUrns(personalWallet, 0)]
     --> outputs: urn address
     |
 [Read Contract: RewardsFarm.earned({{urnAddress}})]
-    --> outputs: pending USDS amount
+    --> outputs: pending USDS amount (wei)
     |
-[Write Contract: LockStakeEngine.getReward(wallet, 0, farm, wallet)]
-    --> claims USDS rewards to wallet
+[Write Contract: LockStakeEngine.getReward(personalWallet, 0, farm, recipientAddress)]
+    --> sent by Para wallet, claims USDS rewards
     |
-[Check Token Balance: USDS on wallet]
+[Check Token Balance: USDS on recipient]
     --> confirms receipt
     |
 [Send Notification: "Claimed {{balance}} USDS from Sky staking"]
@@ -103,7 +135,8 @@ function totalSupply() external view returns (uint256)
 - Network: Ethereum Mainnet
 - Contract: `0xCe01C90dE7FD1bcFa39e237FE6D8D9F569e8A6a3`
 - Function: `ownerUrns(address,uint256)`
-- Args: `[walletAddress, 0]`
+- Args: `[personalWalletAddress, 0]`
+- Note: `personalWalletAddress` is the user's own wallet that owns the Sky staking position, NOT the Para org wallet
 
 **Step 2 -- Check Pending Rewards (Read Contract)**
 - Network: Ethereum Mainnet
@@ -115,21 +148,27 @@ function totalSupply() external view returns (uint256)
 - Network: Ethereum Mainnet
 - Contract: `0xCe01C90dE7FD1bcFa39e237FE6D8D9F569e8A6a3`
 - Function: `getReward(address,uint256,address,address)`
-- Args: `[walletAddress, 0, "0x38E4254bD82ED5Ee97CD1C4278FAae748d998865", walletAddress]`
+- Args:
+  - `owner`: `personalWalletAddress` (position owner, NOT the Para wallet)
+  - `index`: `0`
+  - `farm`: `0x38E4254bD82ED5Ee97CD1C4278FAae748d998865`
+  - `to`: recipient address for USDS (can be the personal wallet or the Para wallet)
+- Transaction sent by: Para org wallet (must have `hope()` authorization)
 
 **Step 4 -- Verify Balance (Check Token Balance)**
 - Network: Ethereum Mainnet
 - Token: USDS (`0xdC035D45d973E3EC169d2276DDab16f1e407384F`)
-- Address: walletAddress
+- Address: same address used as `to` in Step 3
 
 **Step 5 -- Notify (Discord/Telegram/Email)**
-- Message: "Claimed {{Step4.balance}} USDS from Sky.money staking. Tx: {{Step3.transactionLink}}"
+- Message: "Claimed {{Step3.result}} USDS from Sky.money staking. Tx: {{Step3.transactionLink}}"
 
 ## Prerequisites
 
 - SKY token needs to be added to the seeded token registry
 - User must have an existing SKY staking position (urn) on Sky.money
-- Org wallet (via Para) must be authorized on the user's urn, OR the org wallet must be the urn owner
+- User must call `hope(paraWalletAddress)` on the LockStakeEngine from their personal wallet (one-time setup to authorize the Para wallet)
+- The workflow needs the user's personal wallet address as an input/config value
 
 ## Future Enhancement (v2: Full Compound)
 
