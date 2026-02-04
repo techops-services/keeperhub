@@ -1,5 +1,4 @@
-// biome-ignore-all lint/correctness/noGlobalDirnameFilename: E2E tests rely on Node CJS behavior
-// Added global ignore as this test uses __dirname. Updating to import.meta.dirname breaks the test.
+/* biome-ignore-all lint/correctness/noGlobalDirnameFilename: vitest requires __dirname */
 
 /**
  * Full Pipeline E2E Tests
