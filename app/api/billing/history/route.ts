@@ -1,10 +1,10 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { creditTransactions, member } from "@/lib/db/schema";
+import { creditTransactions, member, workflows } from "@/lib/db/schema";
 
-export async function GET(req: Request) {
+export async function GET(req: Request): Promise<Response> {
   try {
     // Authenticate user
     const session = await auth.api.getSession({ headers: await headers() });
@@ -39,7 +39,9 @@ export async function GET(req: Request) {
       );
     }
 
-    // Fetch transaction history
+    // start custom keeperhub code //
+    // Fetch transaction history excluding refunded transactions
+    // LEFT JOIN workflows to get workflow names for display
     const transactions = await db
       .select({
         id: creditTransactions.id,
@@ -54,11 +56,18 @@ export async function GET(req: Request) {
         executionId: creditTransactions.executionId,
         note: creditTransactions.note,
         createdAt: creditTransactions.createdAt,
+        workflowName: workflows.name,
       })
       .from(creditTransactions)
-      .where(eq(creditTransactions.organizationId, orgId))
-      .orderBy(desc(creditTransactions.createdAt))
-      .limit(100);
+      .leftJoin(workflows, eq(creditTransactions.workflowId, workflows.id))
+      .where(
+        and(
+          eq(creditTransactions.organizationId, orgId),
+          ne(creditTransactions.status, "refunded")
+        )
+      )
+      .orderBy(desc(creditTransactions.createdAt));
+    // end keeperhub code //
 
     return Response.json({ transactions });
   } catch (error) {
