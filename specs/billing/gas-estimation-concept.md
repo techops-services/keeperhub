@@ -9,6 +9,23 @@
 
 ---
 
+## Implementation Status
+
+> **This document is a proposal for future work.** The billing/credit system described here does not yet exist in the codebase.
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Gas estimation infrastructure | **Implemented** | `lib/web3/gas-strategy.ts` - production ready |
+| Volatility analysis | **Implemented** | 10-block CV calculation (configurable) |
+| Chain-specific configs | **Implemented** | Hardcoded + DB overridable |
+| Credit/billing tables | **Not implemented** | Schema changes required |
+| `PLATFORM_FEE_PERCENT` env var | **Not implemented** | Needs to be added |
+| ETH price feed integration | **Not implemented** | Provider TBD (Chainlink, CoinGecko) |
+| Cost tracking columns | **Not implemented** | `workflow_executions` schema update needed |
+| Org spending settings | **Not implemented** | `organization` schema update needed |
+
+---
+
 ## Executive Summary
 
 This document outlines the proposed approach for dynamic gas estimation and credit pricing in KeeperHub. The goal is to provide users with transparent, real-time cost information while protecting both users and the platform from unexpected expenses due to ETH/gas price volatility.
@@ -320,7 +337,7 @@ flowchart TD
 
 The Credit System (billing layer) does **NOT** plan to implement its own gas price caching or volatility analysis. Instead, it will consume data from Jacob's existing gas estimation infrastructure, which already handles:
 
-- 40-block volatility analysis (CV calculation)
+- 10-block volatility analysis (CV calculation, configurable via `volatilitySampleBlocks`)
 - Trigger-based gas price strategy (event/webhook = conservative, scheduled = volatility-based)
 - Gas limit multipliers (L1 vs L2)
 - Retry escalation (1.5x factor, up to 2.25x)
@@ -428,7 +445,152 @@ flowchart TD
 
    **Jacob's Response:**
 
-   _[Pending - please fill in]_
+   ### Access Method
+
+   **Direct function import** from the `lib/web3` module:
+
+   ```typescript
+   import {
+     getGasStrategy,
+     type GasConfig,
+     type VolatilityMetrics
+   } from "@/lib/web3";
+   ```
+
+   The gas strategy uses a **singleton pattern**—`getGasStrategy()` returns the shared instance. No Redis, no API calls between services. The billing layer imports and calls directly.
+
+   ### Available Data
+
+   | Data | Method | Returns | Status |
+   |------|--------|---------|--------|
+   | Gas config (limit + fees) | `gasStrategy.getGasConfig(provider, triggerType, estimatedGas, chainId)` | `GasConfig` | Public |
+   | Volatility metrics | `gasStrategy.measureVolatility(provider, sampleBlocks?)` | `VolatilityMetrics` | **Private** |
+   | Chain-specific config | `gasStrategy.getChainConfig(chainId)` | `GasStrategyConfig` | **Private** |
+
+   > **Action Required:** `measureVolatility()` and `getChainConfig()` are currently private methods in `AdaptiveGasStrategy`. For the billing layer to access volatility data for UI warnings, these methods need to be made publicly accessible. This is a small change to `lib/web3/gas-strategy.ts`.
+
+   **Note:** ETH/USD price is **not** provided by gas infrastructure. The billing layer must fetch this separately (Chainlink price feed, CoinGecko API, etc.).
+
+   ### Data Format (TypeScript Interfaces)
+
+   ```typescript
+   // What you get from getGasConfig()
+   type GasConfig = {
+     gasLimit: bigint;
+     maxFeePerGas: bigint;
+     maxPriorityFeePerGas: bigint;
+   };
+
+   // What you get from measureVolatility()
+   type VolatilityMetrics = {
+     baseFees: bigint[];              // Recent base fees from blocks
+     mean: bigint;                    // Mean base fee
+     stdDev: bigint;                  // Standard deviation
+     coefficientOfVariation: number;  // CV = stdDev / mean (0.0 - 1.0+)
+     isVolatile: boolean;             // true if CV >= 0.3
+   };
+
+   // Trigger types affect gas strategy
+   type TriggerType = "event" | "webhook" | "scheduled" | "manual";
+   ```
+
+   ### Refresh Rate
+
+   **No caching**—fees are calculated fresh on each call via `eth_feeHistory` RPC. This is intentional: gas prices can change block-to-block, and stale data leads to failed transactions.
+
+   For the billing layer's **UI estimates**, you may want to add your own short-lived cache (e.g., 15-30 seconds) to avoid hammering the RPC on every keystroke in the workflow builder.
+
+   ### Example Usage
+
+   ```typescript
+   import { getGasStrategy } from "@/lib/web3";
+   import { ethers } from "ethers";
+
+   async function estimateCreditCost(
+     provider: ethers.JsonRpcProvider,
+     contract: ethers.Contract,
+     method: string,
+     args: unknown[],
+     triggerType: TriggerType,
+     chainId: number,
+     ethPriceUsd: number,        // Billing layer fetches this
+     platformFeePercent: number  // From env var
+   ): Promise<{
+     gasLimit: bigint;
+     gasPriceGwei: number;
+     gasCostUsd: number;
+     platformFeeUsd: number;
+     totalCredits: number;
+     volatility: VolatilityMetrics;
+   }> {
+     const gasStrategy = getGasStrategy();
+
+     // 1. Estimate gas for the specific contract call
+     const estimatedGas = await contract[method].estimateGas(...args);
+
+     // 2. Get gas config (limit + fees) from infrastructure
+     const gasConfig = await gasStrategy.getGasConfig(
+       provider,
+       triggerType,
+       estimatedGas,
+       chainId
+     );
+
+     // 3. Get volatility for UI warning
+     // NOTE: measureVolatility() is currently private - needs to be made public first
+     const volatility = await gasStrategy.measureVolatility(provider);
+
+     // 4. Calculate USD cost (billing layer logic)
+     const gasPriceGwei = Number(gasConfig.maxFeePerGas) / 1e9;
+     const gasInEth = Number(gasConfig.gasLimit * gasConfig.maxFeePerGas) / 1e18;
+     const gasCostUsd = gasInEth * ethPriceUsd;
+
+     // 5. Add platform fee
+     const platformFeeUsd = gasCostUsd * (platformFeePercent / 100);
+     const totalUsd = gasCostUsd + platformFeeUsd;
+
+     // 6. Convert to credits (1 credit = $0.01)
+     const totalCredits = Math.ceil(totalUsd * 100);
+
+     return {
+       gasLimit: gasConfig.gasLimit,
+       gasPriceGwei,
+       gasCostUsd,
+       platformFeeUsd,
+       totalCredits,
+       volatility,
+     };
+   }
+   ```
+
+   ### Important Notes for Billing Layer
+
+   1. **Gas limit multipliers are already applied** by `getGasConfig()`. Don't double-multiply.
+
+   2. **Trigger type matters:**
+      - `event`/`webhook` → Always conservative (higher fees, faster inclusion)
+      - `scheduled`/`manual` → Volatility-based optimization (can be cheaper)
+
+   3. **Chain-specific behavior:** L2s (Arbitrum, Base) use lower multipliers (1.5x vs 2.0x) because their gas estimates are more accurate.
+
+   4. **The estimate is a ceiling, not exact cost.** Actual execution typically uses less gas than `gasLimit`. For historical cost tracking, use `receipt.gasUsed * receipt.effectiveGasPrice`.
+
+   5. **Volatility UI hint:** If `volatility.isVolatile === true` (CV >= 0.3), show a warning in the UI that costs may vary significantly.
+
+   ### What's NOT Provided
+
+   | Data | Reason | Billing Layer Must |
+   |------|--------|-------------------|
+   | ETH/USD price | Out of scope for gas infra | Fetch from price feed |
+   | Historical gas prices | No caching | Query execution records from DB |
+   | Cost in USD/credits | Business logic | Calculate using formula above |
+
+   ### Source Files
+
+   - `keeperhub/lib/web3/gas-strategy.ts` — Core implementation (663 lines)
+   - `keeperhub/lib/web3/transaction-manager.ts` — Transaction execution wrapper
+   - `tests/unit/gas-strategy.test.ts` — Unit tests (632 lines)
+   - `tests/e2e/gas-strategy.test.ts` — Live network tests (443 lines)
 
    ---
 
