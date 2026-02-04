@@ -280,12 +280,12 @@ describe.skipIf(SKIP_INFRA_TESTS)("Full Pipeline E2E", () => {
       };
 
       const scriptPath = join(
-        __dirname,
+        import.meta.dirname,
         "../../scripts/workflow-runner-bootstrap.cjs"
       );
       const child = spawn("node", [scriptPath], {
         env,
-        cwd: join(__dirname, "../.."),
+        cwd: join(import.meta.dirname, "../.."),
       });
 
       let stdout = "";

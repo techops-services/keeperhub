@@ -16,7 +16,7 @@ import { execSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const PROJECT_ROOT = join(__dirname, "..", "..");
+const PROJECT_ROOT = join(import.meta.dirname, "..", "..");
 
 // ============================================================================
 // Constants
