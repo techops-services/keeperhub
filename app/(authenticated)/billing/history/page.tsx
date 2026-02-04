@@ -246,37 +246,27 @@ function DatePickerButton({
 }) {
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          className="w-[160px] justify-start gap-2 text-left font-normal text-sm data-[empty=true]:text-muted-foreground"
-          data-empty={!date}
-          variant="outline"
-        >
-          <CalendarIcon className="size-3.5" />
-          {date ? format(date, "MMM d, yyyy") : placeholder}
-          {date && (
-            <span
-              className="ml-auto text-muted-foreground hover:text-foreground cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                onClear();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  onClear();
-                }
-              }}
-              role="button"
-              tabIndex={0}
-            >
-              <X className="size-3" />
-            </span>
-          )}
-        </Button>
-      </PopoverTrigger>
+      <div className="flex w-[160px] items-center rounded-md border border-input bg-background text-sm shadow-xs">
+        <PopoverTrigger asChild>
+          <button
+            className="flex flex-1 items-center gap-2 px-3 py-2 text-left font-normal data-[empty=true]:text-muted-foreground"
+            data-empty={!date}
+            type="button"
+          >
+            <CalendarIcon className="size-3.5" />
+            {date ? format(date, "MMM d, yyyy") : placeholder}
+          </button>
+        </PopoverTrigger>
+        {date && (
+          <button
+            className="px-2 text-muted-foreground hover:text-foreground"
+            onClick={onClear}
+            type="button"
+          >
+            <X className="size-3" />
+          </button>
+        )}
+      </div>
       <PopoverContent align="start" className="w-auto p-0">
         <Calendar mode="single" onSelect={onSelect} selected={date} />
       </PopoverContent>
