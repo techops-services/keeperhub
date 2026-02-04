@@ -195,7 +195,7 @@ export default function BillingPage() {
             </div>
             <h4 className="font-medium">Pay with crypto</h4>
             <p className="text-muted-foreground text-sm">
-              Connect your wallet and complete payment with ETH
+              Connect your wallet and complete payment with ETH or stablecoins
             </p>
           </div>
           <div className="space-y-2">

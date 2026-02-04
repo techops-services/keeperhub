@@ -751,6 +751,7 @@ export type CreditTransaction = {
   executionId: string | null;
   note: string | null;
   createdAt: string;
+  workflowName: string | null;
 };
 
 export type BillingBalance = {

@@ -331,12 +331,14 @@ function getWriteNodeConfig(node: WorkflowNode): WriteNodeConfig | null {
 }
 
 /**
- * Estimate gas for a single write function using eth_estimateGas
+ * Estimate gas for a single write function using eth_estimateGas.
+ * Returns the raw estimate - gas limit multipliers are applied by
+ * AdaptiveGasStrategy.getGasConfig() (chain-specific: 2.0x L1, 1.5x L2).
  */
 async function estimateSingleFunctionGas(
   provider: ethers.Provider,
   config: WriteNodeConfig
-): Promise<bigint> {
+): Promise<bigint | null> {
   try {
     const contract = new ethers.Contract(
       config.contractAddress,
@@ -356,21 +358,17 @@ async function estimateSingleFunctionGas(
       config.args
     );
 
-    // Estimate gas using eth_estimateGas
-    const gasEstimate = await provider.estimateGas({
+    // Return raw eth_estimateGas result
+    return await provider.estimateGas({
       to: config.contractAddress,
       data,
     });
-
-    // Add 20% buffer for safety
-    return (gasEstimate * BigInt(120)) / BigInt(100);
   } catch (error) {
     console.error(
       `[CostCalculator] Failed to estimate gas for ${config.functionName}:`,
       error
     );
-    // Return a conservative default on error
-    return BigInt(150_000);
+    return null;
   }
 }
 
@@ -398,8 +396,10 @@ async function estimateWriteFunctionGas(
 
     if (config) {
       const gas = await estimateSingleFunctionGas(provider, config);
-      totalGas += gas;
-      configuredCount++;
+      if (gas !== null) {
+        totalGas += gas;
+        configuredCount++;
+      }
     }
   }
 
@@ -453,22 +453,25 @@ export async function estimateWorkflowCost(
       const rpcUrl = getRpcUrlByChainId(detectedChainId, "primary");
       const provider = new ethers.JsonRpcProvider(rpcUrl);
 
-      // Estimate gas for configured write functions using eth_estimateGas
+      // Get raw gas estimates for configured write functions via eth_estimateGas
       const gasResult = await estimateWriteFunctionGas(nodes, provider);
-      gasEstimateWei = gasResult.totalGas;
       configuredWriteFunctions = gasResult.configuredCount;
 
       // Only proceed with pricing if we have configured functions
       if (configuredWriteFunctions > 0) {
-        // Get gas configuration from AdaptiveGasStrategy
+        // Pass raw estimate to AdaptiveGasStrategy which applies
+        // chain-specific gas limit multipliers (2.0x L1, 1.5x L2)
+        // and trigger/volatility-based fee pricing
         const strategy = getGasStrategy();
         const gasConfig = await strategy.getGasConfig(
           provider,
           triggerType,
-          gasEstimateWei,
+          gasResult.totalGas,
           detectedChainId
         );
 
+        // Use the strategy's gasLimit (includes chain-specific multiplier)
+        gasEstimateWei = gasConfig.gasLimit;
         gasPriceWei = gasConfig.maxFeePerGas;
 
         // Determine if conservative strategy was used
