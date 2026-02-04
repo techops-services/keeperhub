@@ -20,9 +20,6 @@ export function remapTemplateRefsInString(
   value: string,
   idMap: Map<string, string>
 ): string {
-  if (typeof value !== "string") {
-    return value;
-  }
   return value.replace(TEMPLATE_REF_PATTERN, (_, nodeId, rest) => {
     const newId = idMap.get(nodeId) ?? nodeId;
     return `{{@${newId}:${rest}}}`;
