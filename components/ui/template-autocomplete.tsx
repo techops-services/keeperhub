@@ -262,6 +262,7 @@ export function TemplateAutocomplete({
   // end custom keeperhub code //
   const [selectedIndex, setSelectedIndex] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
 
   // Ensure we're mounted before trying to use portal
@@ -421,15 +422,15 @@ export function TemplateAutocomplete({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, filteredOptions, selectedIndex, onSelect, onClose]);
 
-  // Scroll selected item into view
+  // Scroll selected item into view (options live inside the scrollable list, not menuRef)
   useEffect(() => {
-    if (menuRef.current) {
-      const selectedElement = menuRef.current.children[
-        selectedIndex
-      ] as HTMLElement;
-      if (selectedElement) {
-        selectedElement.scrollIntoView({ block: "nearest" });
-      }
+    const list = listRef.current;
+    if (!list) {
+      return
+    };
+    const selectedElement = list.children[selectedIndex] as HTMLElement;
+    if (selectedElement) {
+      selectedElement.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
   }, [selectedIndex]);
 
@@ -452,7 +453,7 @@ export function TemplateAutocomplete({
         left: `${adjustedPosition.left}px`,
       }}
     >
-      <div className="max-h-60 overflow-y-auto">
+      <div ref={listRef} className="max-h-60 overflow-y-auto">
         {filteredOptions.map((option, index) => (
           <div
             className={cn(
