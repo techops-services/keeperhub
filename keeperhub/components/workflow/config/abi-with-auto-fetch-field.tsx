@@ -12,6 +12,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { TemplateBadgeTextarea } from "@/components/ui/template-badge-textarea";
 import type { ActionConfigFieldBase } from "@/plugins";
 
+const AUTO_FETCH_DEBOUNCE_MS = 600;
+
 function DiamondUnsupportedAlert() {
   return (
     <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
@@ -184,6 +186,17 @@ export function AbiWithAutoFetchField({
   // Use a ref to track the last synced toggle state to avoid infinite loops
   const lastUseProxyAbiRef = useRef<boolean | null>(null);
 
+  // Track last fetched (contract, network) so we only auto-fetch when they change
+  const lastFetchedRef = useRef<{
+    contractAddress: string;
+    network: string;
+  } | null>(null);
+  const currentTargetRef = useRef<{
+    contractAddress: string;
+    network: string;
+  } | null>(null);
+  const performAbiFetchRef = useRef<(() => Promise<void>) | null>(null);
+
   const abiToString = useCallback((abi: string | null): string | null => {
     if (!abi) {
       return null;
@@ -348,6 +361,51 @@ export function AbiWithAutoFetchField({
     await performAbiFetch();
   }, [isValidAddress, network, performAbiFetch]);
 
+  // Auto-fetch ABI when contract address or network changes (debounced, once per pair).
+  // performAbiFetch is stored in a ref and accessed via performAbiFetchRef.current inside
+  // the effect. This avoids adding performAbiFetch to the dependency array, which would
+  // cause the effect to re-run on every render and defeat the debounce logic.
+  performAbiFetchRef.current = performAbiFetch;
+  useEffect(() => {
+    if (!(isValidAddress && network) || useManualAbi) {
+      return;
+    }
+
+    currentTargetRef.current = { contractAddress, network };
+    const last = lastFetchedRef.current;
+
+    if (
+      last?.contractAddress === contractAddress &&
+      last?.network === network
+    ) {
+      return;
+    }
+    const timeoutId = setTimeout(() => {
+      if (currentTargetRef.current) {
+        lastFetchedRef.current = { ...currentTargetRef.current };
+      }
+      const fetchTarget = { contractAddress, network };
+      const fn = performAbiFetchRef.current;
+      if (fn) {
+        fn().catch((err: unknown) => {
+          // Only set error if the target hasn't changed since fetch started
+          const current = currentTargetRef.current;
+          if (
+            current?.contractAddress === fetchTarget.contractAddress &&
+            current?.network === fetchTarget.network
+          ) {
+            const message =
+              err instanceof Error ? err.message : "Failed to fetch ABI";
+            setError(message);
+          }
+        });
+      }
+    }, AUTO_FETCH_DEBOUNCE_MS);
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [contractAddress, network, isValidAddress, useManualAbi]);
+
   const fetchProxyAbi = useCallback(async (): Promise<string> => {
     if (!proxyAddress) {
       throw new Error("Proxy address not available");
@@ -472,10 +530,6 @@ export function AbiWithAutoFetchField({
         id={field.key}
         key={`${field.key}-${value?.length || 0}-${useProxyAbi ? "proxy" : "impl"}`}
         onChange={(val) => {
-          console.log(
-            "[ABI Field] Textarea onChange called with length:",
-            val?.toString().length || 0
-          );
           onChange(val);
           setError(null);
         }}
