@@ -7,12 +7,12 @@ import "@/keeperhub/plugins";
 import { db } from "@/lib/db";
 import { chains, explorerConfigs } from "@/lib/db/schema";
 import {
-  getAllIntegrations,
-  flattenConfigFields,
+  type ActionConfigFieldBase,
   computeActionId,
+  flattenConfigFields,
+  getAllIntegrations,
   type IntegrationPlugin,
   type PluginAction,
-  type ActionConfigFieldBase,
 } from "@/plugins/registry";
 
 // =============================================================================
@@ -126,7 +126,8 @@ const TRIGGERS = {
     description:
       "Blockchain event trigger - listens for smart contract events on-chain",
     requiredFields: {
-      network: 'string - Chain ID to listen on (e.g., "1" for Ethereum, "11155111" for Sepolia)',
+      network:
+        'string - Chain ID to listen on (e.g., "1" for Ethereum, "11155111" for Sepolia)',
       contractAddress: "string - Contract address to watch for events",
       contractABI:
         "string - Contract ABI JSON (auto-fetched if contract is verified)",
@@ -156,7 +157,8 @@ const TEMPLATE_SYNTAX = {
   examples: [
     {
       template: "{{@check-balance:Check Balance.balance}}",
-      description: "Reference the 'balance' output from a node labeled 'Check Balance'",
+      description:
+        "Reference the 'balance' output from a node labeled 'Check Balance'",
     },
     {
       template: "{{@trigger:Trigger.body.amount}}",
@@ -257,42 +259,37 @@ function transformPluginAction(
 }
 
 /**
- * Derive platform capabilities from plugin definitions
- * This scans plugins to understand what features are available
+ * Check if a plugin has ABI auto-fetch field type
  */
-function derivePlatformCapabilities(plugins: IntegrationPlugin[]) {
-  let hasProxySupport = false;
-  let hasAbiAutoFetch = false;
-  let walletProvider: string | null = null;
-
-  for (const plugin of plugins) {
-    // Check for web3 plugin with wallet features
-    if (plugin.type === "web3") {
-      walletProvider = "Para"; // Derived from plugin description mentioning Para
-
-      for (const action of plugin.actions) {
-        const flatFields = flattenConfigFields(action.configFields);
-        for (const field of flatFields) {
-          // abi-with-auto-fetch indicates proxy detection and auto-fetch support
-          if (field.type === "abi-with-auto-fetch") {
-            hasProxySupport = true;
-            hasAbiAutoFetch = true;
-          }
-        }
-      }
+function pluginHasAbiAutoFetch(plugin: IntegrationPlugin): boolean {
+  for (const action of plugin.actions) {
+    const flatFields = flattenConfigFields(action.configFields);
+    if (flatFields.some((field) => field.type === "abi-with-auto-fetch")) {
+      return true;
     }
   }
+  return false;
+}
+
+/**
+ * Derive platform capabilities from plugin definitions
+ */
+function derivePlatformCapabilities(plugins: IntegrationPlugin[]) {
+  const web3Plugin = plugins.find((p) => p.type === "web3");
+  const hasAbiAutoFetch = web3Plugin
+    ? pluginHasAbiAutoFetch(web3Plugin)
+    : false;
 
   return {
-    wallet: walletProvider
+    wallet: web3Plugin
       ? {
-          provider: walletProvider,
+          provider: "Para",
           features: ["mpc", "non-custodial", "hosted"],
           description:
             "Para MPC wallet - keys are split between user and Para, neither party can sign alone",
         }
       : null,
-    proxyContracts: hasProxySupport
+    proxyContracts: hasAbiAutoFetch
       ? {
           supported: true,
           autoDetectImplementation: true,
@@ -423,7 +420,8 @@ export async function GET(request: Request) {
       nodeStructure: {
         id: "string - Unique node identifier",
         type: '"trigger" | "action"',
-        position: "{ x: number, y: number } - Optional, auto-laid out if omitted",
+        position:
+          "{ x: number, y: number } - Optional, auto-laid out if omitted",
         data: {
           label: "string - Human-readable node name",
           description: "string - Optional description",
