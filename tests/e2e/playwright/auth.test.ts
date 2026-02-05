@@ -33,7 +33,7 @@ test.describe("Authentication", () => {
       await expect(dialogTitle).toHaveText("Create account");
 
       // Fill in signup form
-      const testEmail = `jacob+local${Date.now()}@techops.services`;
+      const testEmail = `test+${Date.now()}@techops.services`;
       await dialog.locator("#signup-email").fill(testEmail);
       await dialog.locator("#signup-password").fill("TestPassword123!");
 
@@ -96,7 +96,7 @@ test.describe("Authentication", () => {
       await page.goto("/", { waitUntil: "domcontentloaded" });
 
       // First create an unverified account
-      const testEmail = `jacob+existing${Date.now()}@techops.services`;
+      const testEmail = `test+${Date.now()}@techops.services`;
 
       const signInButton = page.locator('button:has-text("Sign In")').first();
       await expect(signInButton).toBeVisible({ timeout: 15_000 });
@@ -155,7 +155,7 @@ test.describe("Authentication", () => {
       await createAccountLink.click();
 
       // Fill signup form
-      const testEmail = `jacob+local${Date.now()}@techops.services`;
+      const testEmail = `test+${Date.now()}@techops.services`;
       await dialog.locator("#signup-email").fill(testEmail);
       await dialog.locator("#signup-password").fill("TestPassword123!");
       await dialog
@@ -193,7 +193,7 @@ test.describe("Authentication", () => {
       );
       await createAccountLink.click();
 
-      const testEmail = `jacob+local${Date.now()}@techops.services`;
+      const testEmail = `test+${Date.now()}@techops.services`;
       await dialog.locator("#signup-email").fill(testEmail);
       await dialog.locator("#signup-password").fill("TestPassword123!");
       await dialog
@@ -267,7 +267,7 @@ test.describe("Authentication", () => {
       await page.goto("/", { waitUntil: "domcontentloaded" });
 
       // First create an unverified account
-      const testEmail = `jacob+local${Date.now()}@techops.services`;
+      const testEmail = `test+${Date.now()}@techops.services`;
       const testPassword = "TestPassword123!";
 
       const signInButton = page.locator('button:has-text("Sign In")').first();

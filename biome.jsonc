@@ -4,6 +4,7 @@
   "files": {
     "includes": [
       "**/*",
+      "!.worktrees",
       "!components/ui",
       "!components/ai-elements",
       "!lib/utils.ts",
