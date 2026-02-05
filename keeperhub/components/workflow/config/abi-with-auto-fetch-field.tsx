@@ -14,18 +14,207 @@ import type { ActionConfigFieldBase } from "@/plugins";
 
 const AUTO_FETCH_DEBOUNCE_MS = 600;
 
-function DiamondUnsupportedAlert() {
+type DiamondFacet = { address: string; name: string | null };
+
+type AbiFetchResponse = {
+  success?: boolean;
+  abi?: string;
+  diamondProxyAbi?: string;
+  isProxy?: boolean;
+  isDiamond?: boolean;
+  implementationAddress?: string;
+  implementationAbi?: string;
+  proxyAddress?: string;
+  proxyAbi?: string;
+  facets?: DiamondFacet[];
+  warning?: string;
+  error?: string;
+};
+
+type DiamondReadAsProxy = { address: string; abi: string };
+
+type AbiFetchCallbacks = {
+  onDiamondSuccess: (
+    abi: string,
+    facets: DiamondFacet[],
+    warning: string | null,
+    readAsProxy: DiamondReadAsProxy | null
+  ) => void;
+  onProxyContract: (data: {
+    implementationAddress: string;
+    proxyAddress?: string;
+    abi: string;
+    proxyAbi?: string;
+    warning?: string;
+  }) => void;
+  onChange: (value: unknown) => void;
+};
+
+function applyDiamondResponse(
+  data: AbiFetchResponse,
+  response: Response,
+  onDiamondSuccess: AbiFetchCallbacks["onDiamondSuccess"]
+): void {
+  const combinedAbi = data.abi ?? data.diamondProxyAbi;
+  if (!(response.ok && data.success && combinedAbi)) {
+    throw new Error(data.error || "Failed to fetch ABI from Etherscan");
+  }
+  const readAsProxy: DiamondReadAsProxy | null =
+    data.implementationAddress && data.implementationAbi
+      ? { address: data.implementationAddress, abi: data.implementationAbi }
+      : null;
+  onDiamondSuccess(
+    combinedAbi,
+    data.facets ?? [],
+    data.warning ?? null,
+    readAsProxy
+  );
+}
+
+function applyAbiFetchResponse(
+  data: AbiFetchResponse,
+  response: Response,
+  callbacks: AbiFetchCallbacks
+): void {
+  if (data.isDiamond) {
+    applyDiamondResponse(data, response, callbacks.onDiamondSuccess);
+    return;
+  }
+
+  if (!(response.ok && data.success && data.abi)) {
+    throw new Error(data.error || "Failed to fetch ABI from Etherscan");
+  }
+
+  if (data.isProxy && data.implementationAddress) {
+    callbacks.onProxyContract({
+      implementationAddress: data.implementationAddress,
+      proxyAddress: data.proxyAddress,
+      abi: data.abi,
+      proxyAbi: data.proxyAbi,
+      warning: data.warning,
+    });
+  } else {
+    callbacks.onChange(data.abi);
+  }
+}
+
+type DiamondAbiSourceChoiceProps = {
+  readAsProxy: DiamondReadAsProxy;
+  useDiamondAbi: boolean;
+  onToggle: (useDiamond: boolean) => void;
+  proxyOptionLabel: string;
+};
+
+function DiamondAbiSourceChoice({
+  readAsProxy,
+  useDiamondAbi,
+  onToggle,
+  proxyOptionLabel,
+}: DiamondAbiSourceChoiceProps) {
   return (
-    <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
-      <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-      <AlertTitle className="text-amber-900 dark:text-amber-100">
-        Diamond Proxy Contract Detected
+    <fieldset aria-label="ABI source" className="mt-2">
+      <legend className="sr-only">ABI source</legend>
+      <div className="flex flex-wrap gap-1 rounded-md border border-blue-200 bg-blue-100/50 p-1 dark:border-blue-800 dark:bg-blue-900/30">
+        <Button
+          aria-pressed={useDiamondAbi}
+          className="h-8 flex-1 text-sm"
+          onClick={() => onToggle(true)}
+          size="sm"
+          type="button"
+          variant={useDiamondAbi ? "default" : "ghost"}
+        >
+          Diamond Proxy
+        </Button>
+        <Button
+          aria-pressed={!useDiamondAbi}
+          className="h-8 flex-1 text-sm"
+          onClick={() => onToggle(false)}
+          size="sm"
+          title={`Implementation: ${readAsProxy.address}`}
+          type="button"
+          variant={useDiamondAbi ? "ghost" : "default"}
+        >
+          {proxyOptionLabel}
+        </Button>
+      </div>
+      <p className="mt-1 text-muted-foreground text-xs">
+        {useDiamondAbi
+          ? "Combined ABI from all facets."
+          : `Implementation contract at ${readAsProxy.address.slice(0, 10)}…`}
+      </p>
+    </fieldset>
+  );
+}
+
+function DiamonFaceItem({ facet }: { facet: DiamondFacet }) {
+  return (
+    <li className="rounded px-1.5 py-0.5 odd:bg-blue-100/50 dark:odd:bg-blue-900/20">
+      {facet.name}
+    </li>
+  );
+}
+
+function DiamondFacetsList({ facets }: { facets: DiamondFacet[] }) {
+  const named = facets.filter((f): f is DiamondFacet & { name: string } =>
+    Boolean(f.name)
+  );
+  return (
+    <div className="mt-3">
+      <span className="font-medium text-blue-900 text-sm dark:text-blue-100">
+        Facets
+      </span>
+      <ul className="mt-1 list-inside list-disc space-y-0.5 text-blue-800 text-sm dark:text-blue-200">
+        {named.map((facet) => (
+          <DiamonFaceItem key={facet.address} facet={facet} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+type DiamondContractAlertProps = {
+  facets: DiamondFacet[];
+  warning: string | null;
+  readAsProxy: DiamondReadAsProxy | null;
+  useDiamondAbi: boolean;
+  onToggle: (useDiamond: boolean) => void;
+  proxyOptionLabel: string;
+};
+
+function DiamondContractAlert({
+  facets,
+  warning,
+  readAsProxy,
+  useDiamondAbi,
+  onToggle,
+  proxyOptionLabel,
+}: DiamondContractAlertProps) {
+  return (
+    <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+      <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+      <AlertTitle className="text-blue-900 dark:text-blue-100">
+        Diamond Contract (EIP-2535) Detected
       </AlertTitle>
-      <AlertDescription className="text-amber-800 dark:text-amber-200">
-        <p className="text-sm">
-          Diamond proxy contracts (EIP-2535) are not currently supported. Please
-          use a regular contract or proxy contract instead.
-        </p>
+      <AlertDescription className="text-blue-800 dark:text-blue-200">
+        <p className="text-sm">Choose how to interact with this contract:</p>
+        {readAsProxy ? (
+          <DiamondAbiSourceChoice
+            onToggle={onToggle}
+            proxyOptionLabel={proxyOptionLabel}
+            readAsProxy={readAsProxy}
+            useDiamondAbi={useDiamondAbi}
+          />
+        ) : (
+          <p className="mt-2 text-sm">
+            Using combined ABI from all facets (Diamond Proxy).
+          </p>
+        )}
+        <DiamondFacetsList facets={facets} />
+        {warning && (
+          <p className="mt-2 text-amber-700 text-sm dark:text-amber-300">
+            {warning}
+          </p>
+        )}
       </AlertDescription>
     </Alert>
   );
@@ -133,16 +322,19 @@ type FieldProps = {
 
 type AbiWithAutoFetchProps = FieldProps & {
   contractAddressField?: string;
+  contractInteractionType?: "read" | "write";
   networkField?: string;
   config: Record<string, unknown>;
 };
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: ABI field handles proxy, diamond, and read/write-as-proxy states with toggles
 export function AbiWithAutoFetchField({
   field,
   value,
   onChange,
   disabled,
   contractAddressField = "contractAddress",
+  contractInteractionType,
   networkField = "network",
   config,
 }: AbiWithAutoFetchProps) {
@@ -162,7 +354,20 @@ export function AbiWithAutoFetchField({
   );
   // Diamond contract state
   const [isDiamond, setIsDiamond] = useState(false);
+  const [diamondFacets, setDiamondFacets] = useState<DiamondFacet[] | null>(
+    null
+  );
+  const [diamondWarning, setDiamondWarning] = useState<string | null>(null);
+  const [diamondCombinedAbi, setDiamondCombinedAbi] = useState<string | null>(
+    null
+  );
+  const [diamondReadAsProxy, setDiamondReadAsProxy] =
+    useState<DiamondReadAsProxy | null>(null);
+  const [useDiamondAbi, setUseDiamondAbi] = useState(true);
   const [chains, setChains] = useState<ChainResponse[]>([]);
+
+  const proxyOptionLabel =
+    contractInteractionType === "write" ? "Write as Proxy" : "Read as Proxy";
 
   const contractAddress = (config[contractAddressField] as string) || "";
   const network = (config[networkField] as string) || "";
@@ -183,8 +388,9 @@ export function AbiWithAutoFetchField({
   }, []);
 
   // Sync ABI when toggle state changes for regular proxies
-  // Use a ref to track the last synced toggle state to avoid infinite loops
   const lastUseProxyAbiRef = useRef<boolean | null>(null);
+  // Sync ABI when Diamond Proxy vs Read/Write as Proxy toggle changes
+  const lastUseDiamondAbiRef = useRef<boolean | null>(null);
 
   // Track last fetched (contract, network) so we only auto-fetch when they change
   const lastFetchedRef = useRef<{
@@ -236,6 +442,27 @@ export function AbiWithAutoFetchField({
     getAbiForToggle,
   ]);
 
+  useEffect(() => {
+    if (!(isDiamond && diamondCombinedAbi && diamondReadAsProxy)) {
+      return;
+    }
+    if (lastUseDiamondAbiRef.current === useDiamondAbi) {
+      return;
+    }
+    lastUseDiamondAbiRef.current = useDiamondAbi;
+    onChange(useDiamondAbi ? diamondCombinedAbi : diamondReadAsProxy.abi);
+  }, [
+    isDiamond,
+    useDiamondAbi,
+    diamondCombinedAbi,
+    diamondReadAsProxy,
+    onChange,
+  ]);
+
+  const handleDiamondToggle = useCallback((useDiamond: boolean) => {
+    setUseDiamondAbi(useDiamond);
+  }, []);
+
   // Validate contract address
   const isValidAddress = useMemo(() => {
     if (!contractAddress || contractAddress.trim() === "") {
@@ -257,11 +484,32 @@ export function AbiWithAutoFetchField({
     setProxyAbi(null);
     setImplementationAbi(null);
     setIsDiamond(false);
+    setDiamondFacets(null);
+    setDiamondWarning(null);
+    setDiamondCombinedAbi(null);
+    setDiamondReadAsProxy(null);
+    setUseDiamondAbi(true);
+    lastUseDiamondAbiRef.current = null;
   }, []);
 
-  const handleDiamondContract = useCallback(() => {
-    setIsDiamond(true);
-  }, []);
+  const handleDiamondSuccess = useCallback(
+    (
+      abi: string,
+      facets: DiamondFacet[],
+      warning: string | null,
+      readAsProxy: DiamondReadAsProxy | null
+    ) => {
+      setIsDiamond(true);
+      setDiamondFacets(facets);
+      setDiamondWarning(warning);
+      setDiamondCombinedAbi(abi);
+      setDiamondReadAsProxy(readAsProxy);
+      setUseDiamondAbi(true);
+      lastUseDiamondAbiRef.current = true;
+      onChange(abi);
+    },
+    [onChange]
+  );
 
   const handleProxyContract = useCallback(
     (data: {
@@ -302,40 +550,12 @@ export function AbiWithAutoFetchField({
         }),
       });
 
-      const data = (await response.json()) as {
-        success?: boolean;
-        abi?: string;
-        isProxy?: boolean;
-        isDiamond?: boolean;
-        implementationAddress?: string;
-        proxyAddress?: string;
-        proxyAbi?: string;
-        warning?: string;
-        error?: string;
-      };
-
-      if (data.isDiamond) {
-        handleDiamondContract();
-        return;
-      }
-
-      if (!(response.ok && data.success && data.abi)) {
-        const errorMessage = data.error || "Failed to fetch ABI from Etherscan";
-        throw new Error(errorMessage);
-      }
-
-      if (data.isProxy && data.implementationAddress) {
-        handleProxyContract({
-          implementationAddress: data.implementationAddress,
-          proxyAddress: data.proxyAddress,
-          abi: data.abi,
-          proxyAbi: data.proxyAbi,
-          warning: data.warning,
-        });
-      } else {
-        onChange(data.abi);
-      }
-
+      const data = (await response.json()) as AbiFetchResponse;
+      applyAbiFetchResponse(data, response, {
+        onDiamondSuccess: handleDiamondSuccess,
+        onProxyContract: handleProxyContract,
+        onChange,
+      });
       setError(null);
     } catch (err) {
       const errorMessage =
@@ -349,7 +569,7 @@ export function AbiWithAutoFetchField({
     network,
     onChange,
     resetProxyState,
-    handleDiamondContract,
+    handleDiamondSuccess,
     handleProxyContract,
   ]);
 
@@ -511,7 +731,16 @@ export function AbiWithAutoFetchField({
         </div>
       )}
 
-      {isDiamond && <DiamondUnsupportedAlert />}
+      {isDiamond && diamondFacets && (
+        <DiamondContractAlert
+          facets={diamondFacets}
+          onToggle={handleDiamondToggle}
+          proxyOptionLabel={proxyOptionLabel}
+          readAsProxy={diamondReadAsProxy}
+          useDiamondAbi={useDiamondAbi}
+          warning={diamondWarning}
+        />
+      )}
 
       {isProxy && !isDiamond && implementationAddress && (
         <ProxyContractAlert
@@ -528,7 +757,7 @@ export function AbiWithAutoFetchField({
       <TemplateBadgeTextarea
         disabled={disabled || isLoading || !useManualAbi}
         id={field.key}
-        key={`${field.key}-${value?.length || 0}-${useProxyAbi ? "proxy" : "impl"}`}
+        key={`${field.key}-${value?.length || 0}-${useProxyAbi ? "proxy" : "impl"}${isDiamond ? `-${useDiamondAbi ? "diamond" : "proxy"}` : ""}`}
         onChange={(val) => {
           onChange(val);
           setError(null);
