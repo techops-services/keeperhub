@@ -870,29 +870,28 @@ export function ManageOrgsModal({
       return;
     }
 
-    const { error } = await authClient.organization.leave({
-      organizationId: managedOrg.id,
-    });
+    try {
+      await api.organization.leave(managedOrg.id, {});
 
-    if (error) {
-      toast.error(error.message || "Failed to leave organization");
-      return;
-    }
+      toast.success(`Left ${managedOrg.name}`);
+      setShowLeaveDialog(false);
+      setShowAssignOwnerDialog(false);
+      setManagedOrgId(null);
 
-    toast.success(`Left ${managedOrg.name}`);
-    setShowLeaveDialog(false);
-    setShowAssignOwnerDialog(false);
-    setManagedOrgId(null);
-
-    if (isManagedOrgActive) {
-      const otherOrg = organizations.find((org) => org.id !== managedOrg.id);
-      if (otherOrg) {
-        await switchOrganization(otherOrg.id);
+      if (isManagedOrgActive) {
+        const otherOrg = organizations.find((org) => org.id !== managedOrg.id);
+        if (otherOrg) {
+          await switchOrganization(otherOrg.id);
+        }
       }
-    }
 
-    refetchOrganizations();
-    router.refresh();
+      refetchOrganizations();
+      router.refresh();
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : "Failed to leave organization";
+      toast.error(message);
+    }
   }, [
     managedOrg,
     isManagedOrgActive,
