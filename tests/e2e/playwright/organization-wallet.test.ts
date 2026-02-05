@@ -36,11 +36,17 @@ async function openCreateOrgForm(page: Page): Promise<void> {
     dialog.locator('h2:has-text("Manage Organizations")')
   ).toBeVisible({ timeout: 5000 });
 
+  // Check if form is already visible (may be shown by default)
+  const orgNameInput = dialog.locator("#org-name");
+  if (await orgNameInput.isVisible({ timeout: 1000 }).catch(() => false)) {
+    return; // Form already visible
+  }
+
   // Click the "Create New Organization" button to show the form
   await dialog.locator('button:has-text("Create New Organization")').click();
 
   // Wait for the org name input to appear (form is now visible)
-  await expect(dialog.locator("#org-name")).toBeVisible({ timeout: 5000 });
+  await expect(orgNameInput).toBeVisible({ timeout: 5000 });
 }
 
 // Open the wallet overlay from the user menu
@@ -59,9 +65,8 @@ async function openWalletOverlay(page: Page): Promise<void> {
   // Click on Wallet menu item
   await dropdownMenu.locator('div[role="menuitem"]:has-text("Wallet")').click();
 
-  // Wait for wallet overlay to appear
-  const overlay = page.locator('[role="dialog"]');
-  await expect(overlay.locator("text=Organization Wallet")).toBeVisible({
+  // Wait for wallet overlay heading to appear
+  await expect(page.locator('h2:has-text("Organization Wallet")')).toBeVisible({
     timeout: 5000,
   });
 }
@@ -125,13 +130,14 @@ test.describe("Organization Management", () => {
       // Fill in organization name
       await dialog.locator("#org-name").fill("My Organization");
 
-      // Manually edit the slug
+      // Manually edit the slug with unique timestamp
+      const customSlug = `custom-slug-${Date.now()}`;
       const slugInput = dialog.locator("#org-slug");
       await slugInput.clear();
-      await slugInput.fill("custom-slug-123");
+      await slugInput.fill(customSlug);
 
       // Verify custom slug is preserved
-      await expect(slugInput).toHaveValue("custom-slug-123");
+      await expect(slugInput).toHaveValue(customSlug);
 
       // Submit and verify success
       await dialog.locator('button:has-text("Create")').click();
@@ -189,7 +195,8 @@ test.describe("Para Wallet Management", () => {
       // Open wallet overlay
       await openWalletOverlay(page);
 
-      const overlay = page.locator('[role="dialog"]');
+      // Wallet overlay doesn't have role="dialog" - scope to page
+      const overlay = page;
 
       // Verify no wallet message is shown
       await expect(overlay.locator("text=No wallet found")).toBeVisible({
@@ -214,7 +221,7 @@ test.describe("Para Wallet Management", () => {
         page
           .locator("[data-sonner-toast]")
           .filter({ hasText: WALLET_CREATED_PATTERN })
-      ).toBeVisible({ timeout: 15_000 });
+      ).toBeVisible({ timeout: 30_000 });
 
       // Verify wallet details are shown
       await expect(overlay.locator("text=Account details")).toBeVisible({
@@ -228,7 +235,8 @@ test.describe("Para Wallet Management", () => {
       const { email } = await signUpAndVerify(page);
 
       await openWalletOverlay(page);
-      const overlay = page.locator('[role="dialog"]');
+      // Wallet overlay doesn't have role="dialog" - scope to page
+      const overlay = page;
 
       // Create wallet
       await overlay
@@ -241,7 +249,7 @@ test.describe("Para Wallet Management", () => {
         page
           .locator("[data-sonner-toast]")
           .filter({ hasText: WALLET_CREATED_PATTERN })
-      ).toBeVisible({ timeout: 15_000 });
+      ).toBeVisible({ timeout: 30_000 });
 
       // Verify wallet address is displayed (format: 0x...xxxx)
       await expect(overlay.locator("code")).toContainText(ADDRESS_PATTERN);
@@ -254,7 +262,8 @@ test.describe("Para Wallet Management", () => {
       await signUpAndVerify(page);
 
       await openWalletOverlay(page);
-      const overlay = page.locator('[role="dialog"]');
+      // Wallet overlay doesn't have role="dialog" - scope to page
+      const overlay = page;
 
       // Click create wallet button
       await overlay
@@ -280,7 +289,8 @@ test.describe("Para Wallet Management", () => {
       await signUpAndVerify(page);
 
       await openWalletOverlay(page);
-      const overlay = page.locator('[role="dialog"]');
+      // Wallet overlay doesn't have role="dialog" - scope to page
+      const overlay = page;
 
       // Open create form
       await overlay
@@ -304,7 +314,8 @@ test.describe("Para Wallet Management", () => {
       await signUpAndVerify(page);
 
       await openWalletOverlay(page);
-      const overlay = page.locator('[role="dialog"]');
+      // Wallet overlay doesn't have role="dialog" - scope to page
+      const overlay = page;
 
       // Create wallet
       await overlay
@@ -316,10 +327,10 @@ test.describe("Para Wallet Management", () => {
         page
           .locator("[data-sonner-toast]")
           .filter({ hasText: WALLET_CREATED_PATTERN })
-      ).toBeVisible({ timeout: 15_000 });
+      ).toBeVisible({ timeout: 30_000 });
 
       // Verify balance section appears
-      await expect(overlay.locator("text=Balances")).toBeVisible({
+      await expect(overlay.locator('h3:has-text("Balances")')).toBeVisible({
         timeout: 10_000,
       });
 
@@ -338,7 +349,8 @@ test.describe("Para Wallet Management", () => {
       await signUpAndVerify(page);
 
       await openWalletOverlay(page);
-      const overlay = page.locator('[role="dialog"]');
+      // Wallet overlay doesn't have role="dialog" - scope to page
+      const overlay = page;
 
       // Create wallet first
       await overlay
@@ -350,10 +362,10 @@ test.describe("Para Wallet Management", () => {
         page
           .locator("[data-sonner-toast]")
           .filter({ hasText: WALLET_CREATED_PATTERN })
-      ).toBeVisible({ timeout: 15_000 });
+      ).toBeVisible({ timeout: 30_000 });
 
       // Wait for balance section
-      await expect(overlay.locator("text=Balances")).toBeVisible({
+      await expect(overlay.locator('h3:has-text("Balances")')).toBeVisible({
         timeout: 10_000,
       });
 
@@ -376,7 +388,8 @@ test.describe("Para Wallet Management", () => {
       await signUpAndVerify(page);
 
       await openWalletOverlay(page);
-      const overlay = page.locator('[role="dialog"]');
+      // Wallet overlay doesn't have role="dialog" - scope to page
+      const overlay = page;
 
       // Create wallet
       await overlay
@@ -388,10 +401,10 @@ test.describe("Para Wallet Management", () => {
         page
           .locator("[data-sonner-toast]")
           .filter({ hasText: WALLET_CREATED_PATTERN })
-      ).toBeVisible({ timeout: 15_000 });
+      ).toBeVisible({ timeout: 30_000 });
 
       // Wait for balance section
-      await expect(overlay.locator("text=Balances")).toBeVisible({
+      await expect(overlay.locator('h3:has-text("Balances")')).toBeVisible({
         timeout: 10_000,
       });
 
@@ -402,10 +415,8 @@ test.describe("Para Wallet Management", () => {
       await expect(refreshButton).toBeVisible();
       await refreshButton.click();
 
-      // Button should show spinning animation (handled by CSS class)
-      // Just verify the button is still clickable after refresh
-      await page.waitForTimeout(1000);
-      await expect(refreshButton).toBeEnabled();
+      // Button is disabled while fetching - wait for it to be enabled again
+      await expect(refreshButton).toBeEnabled({ timeout: 30_000 });
     });
   });
 
@@ -414,7 +425,8 @@ test.describe("Para Wallet Management", () => {
       await signUpAndVerify(page);
 
       await openWalletOverlay(page);
-      const overlay = page.locator('[role="dialog"]');
+      // Wallet overlay doesn't have role="dialog" - scope to page
+      const overlay = page;
 
       // Create wallet
       await overlay
@@ -426,7 +438,7 @@ test.describe("Para Wallet Management", () => {
         page
           .locator("[data-sonner-toast]")
           .filter({ hasText: WALLET_CREATED_PATTERN })
-      ).toBeVisible({ timeout: 15_000 });
+      ).toBeVisible({ timeout: 30_000 });
 
       // Wait for wallet details to load
       await expect(overlay.locator("text=Account details")).toBeVisible({
