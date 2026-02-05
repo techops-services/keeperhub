@@ -12,6 +12,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { TemplateBadgeTextarea } from "@/components/ui/template-badge-textarea";
 import type { ActionConfigFieldBase } from "@/plugins";
 
+const AUTO_FETCH_DEBOUNCE_MS = 600;
+
 function DiamondUnsupportedAlert() {
   return (
     <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
@@ -365,8 +367,6 @@ export function AbiWithAutoFetchField({
   // stored performAbiFetch in a ref to avoid stale function references
   performAbiFetchRef.current = performAbiFetch;
   useEffect(() => {
-    const TIMEOUT_BEFORE_FETCH_DELAY = 600;
-
     if (!(isValidAddress && network) || useManualAbi) {
       return;
     }
@@ -390,7 +390,7 @@ export function AbiWithAutoFetchField({
           setError(message);
         });
       }
-    }, TIMEOUT_BEFORE_FETCH_DELAY);
+    }, AUTO_FETCH_DEBOUNCE_MS);
     return () => {
       clearTimeout(timeoutId);
     };
