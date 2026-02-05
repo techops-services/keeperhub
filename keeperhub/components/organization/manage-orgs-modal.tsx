@@ -865,7 +865,7 @@ export function ManageOrgsModal({
     }
   };
 
-  const performLeaveOrg = useCallback(async () => {
+  const handleLeaveOrg = useCallback(async () => {
     if (!managedOrg) {
       return;
     }
@@ -901,10 +901,6 @@ export function ManageOrgsModal({
     switchOrganization,
     router,
   ]);
-
-  const handleLeaveOrg = useCallback(async () => {
-    await performLeaveOrg();
-  }, [performLeaveOrg]);
 
   const handleLeaveClick = useCallback(() => {
     if (!isOwner) {
