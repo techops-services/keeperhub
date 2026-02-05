@@ -124,3 +124,8 @@ tailwindcss-*.log
 # Claude lint output cache (read instead of re-running commands)
 .claude/lint-output.txt
 .claude/typecheck-output.txt
+
+# Hardhat/Solidity artifacts (auto-generated during contract compilation)
+contracts/artifacts/
+contracts/cache/
+contracts/typechain-types/

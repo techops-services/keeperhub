@@ -7,6 +7,7 @@ import {
   truncateAddress,
 } from "@/keeperhub/lib/address-utils";
 import { apiError } from "@/keeperhub/lib/api-error";
+import { grantNewOrgBonus } from "@/keeperhub/lib/billing/grant-bonus";
 import { encryptUserShare } from "@/keeperhub/lib/encryption";
 import {
   getOrganizationWallet,
@@ -326,7 +327,19 @@ export async function POST(request: Request) {
       userShare,
     });
 
-    // 6. Return success (return stored lowercase address for consistency)
+    // 6. Grant new organization bonus (2,500 credits)
+    const bonusResult = await grantNewOrgBonus(organizationId);
+    if (bonusResult.success) {
+      console.log(
+        `[Billing] ✓ Granted 2,500 welcome credits to organization ${organizationId}`
+      );
+    } else {
+      console.warn(
+        `[Billing] Failed to grant welcome bonus to organization ${organizationId}: ${bonusResult.error}`
+      );
+    }
+
+    // 7. Return success
     return NextResponse.json({
       success: true,
       wallet: {

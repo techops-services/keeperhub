@@ -16,7 +16,12 @@
 
 import crypto from "node:crypto";
 
-export type InternalServiceName = "mcp" | "events" | "scheduler" | "hub";
+export type InternalServiceName =
+  | "mcp"
+  | "events"
+  | "scheduler"
+  | "hub"
+  | "workflow-executor";
 
 export type InternalServiceAuthResult = {
   authenticated: boolean;
@@ -30,6 +35,7 @@ const SERVICE_KEYS: Record<InternalServiceName, string | undefined> = {
   events: process.env.EVENTS_SERVICE_API_KEY,
   scheduler: process.env.SCHEDULER_SERVICE_API_KEY,
   hub: process.env.HUB_SERVICE_API_KEY,
+  "workflow-executor": process.env.WORKFLOW_EXECUTOR_SERVICE_API_KEY,
 };
 
 /**

@@ -12,6 +12,7 @@ import { LayoutContent } from "@/components/layout-content";
 import { OverlayProvider } from "@/components/overlays/overlay-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { WalletProvider } from "@/keeperhub/components/billing/wagmi-provider";
 import { KeeperHubExtensionLoader } from "@/keeperhub/components/extension-loader";
 // start custom keeperhub code //
 import { MobileWarningDialog } from "@/keeperhub/components/mobile-warning-dialog";
@@ -49,24 +50,26 @@ const RootLayout = ({ children }: RootLayoutProps) => (
       >
         <Provider>
           <AuthProvider>
-            <OverlayProvider>
-              <Suspense
-                fallback={
-                  <GitHubStarsProvider stars={null}>
+            <WalletProvider>
+              <OverlayProvider>
+                <Suspense
+                  fallback={
+                    <GitHubStarsProvider stars={null}>
+                      <LayoutContent>{children}</LayoutContent>
+                    </GitHubStarsProvider>
+                  }
+                >
+                  <GitHubStarsLoader>
                     <LayoutContent>{children}</LayoutContent>
-                  </GitHubStarsProvider>
-                }
-              >
-                <GitHubStarsLoader>
-                  <LayoutContent>{children}</LayoutContent>
-                </GitHubStarsLoader>
-              </Suspense>
-              <Toaster />
-              <GlobalModals />
-              {/* start custom keeperhub code */}
-              <MobileWarningDialog />
-              {/* end keeperhub code */}
-            </OverlayProvider>
+                  </GitHubStarsLoader>
+                </Suspense>
+                <Toaster />
+                <GlobalModals />
+                {/* start custom keeperhub code */}
+                <MobileWarningDialog />
+                {/* end keeperhub code */}
+              </OverlayProvider>
+            </WalletProvider>
           </AuthProvider>
         </Provider>
       </ThemeProvider>
