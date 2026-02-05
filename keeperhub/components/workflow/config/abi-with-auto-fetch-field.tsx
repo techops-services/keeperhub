@@ -873,9 +873,11 @@ export function AbiWithAutoFetchField({
       )}
 
       <TemplateBadgeTextarea
+        className="max-h-40 overflow-y-auto"
         disabled={disabled || isLoading || !useManualAbi}
         id={field.key}
         key={`${field.key}-${value?.length || 0}-${useProxyAbi ? "proxy" : "impl"}${isDiamond ? `-${useDiamondAbi ? "diamond" : "proxy"}` : ""}`}
+        maxRows={4}
         onChange={(val) => {
           onChange(val);
           setError(null);
@@ -885,7 +887,7 @@ export function AbiWithAutoFetchField({
             ? "Paste contract ABI JSON here"
             : "Click 'Fetch ABI from Etherscan' or enable 'Use manual ABI' to enter manually"
         }
-        rows={field.rows || 6}
+        rows={4}
         value={value}
       />
 
