@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { HubResults } from "@/keeperhub/components/hub/hub-results";
 import { WorkflowSearchFilter } from "@/keeperhub/components/hub/workflow-search-filter";
 import { useDebounce } from "@/keeperhub/lib/hooks/use-debounce";
@@ -102,7 +102,9 @@ export default function HubPage() {
   useEffect(() => {
     const container = scrollContainerRef.current;
     const gradient = gradientRef.current;
-    if (!container || !gradient) return;
+    if (!(container && gradient)) {
+      return;
+    }
 
     const handleScroll = () => {
       const scrollTop = container.scrollTop;
@@ -117,19 +119,17 @@ export default function HubPage() {
 
   return (
     <div
-      ref={scrollContainerRef}
       className="pointer-events-auto fixed inset-0 overflow-y-auto bg-sidebar [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      ref={scrollContainerRef}
     >
       {/* Fixed dot pattern behind */}
-      <div
-        className="pointer-events-none fixed inset-0 [background-image:radial-gradient(rgb(148_163_184_/_0.15)_1px,transparent_1px)] [background-size:24px_24px]"
-      />
+      <div className="pointer-events-none fixed inset-0 [background-image:radial-gradient(rgb(148_163_184_/_0.15)_1px,transparent_1px)] [background-size:24px_24px]" />
       {/* Fixed gradient overlay - fades as you scroll */}
       <div
+        className="pointer-events-none fixed inset-x-0 top-0 h-[80vh] bg-gradient-to-b from-60% from-sidebar to-transparent"
         ref={gradientRef}
-        className="pointer-events-none fixed inset-x-0 top-0 h-[80vh] bg-gradient-to-b from-sidebar from-60% to-transparent"
       />
-      <div className="relative container mx-auto px-4 py-4 pt-28 pb-12">
+      <div className="container relative mx-auto px-4 py-4 pt-28 pb-12">
         {/* start custom KeeperHub code */}
         {isLoading ? (
           <p className="text-muted-foreground">Loading workflows...</p>

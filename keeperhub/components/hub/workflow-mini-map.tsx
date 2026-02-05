@@ -314,7 +314,6 @@ export function WorkflowMiniMap({
       viewBox={`0 0 ${width} ${height}`}
       width="100%"
     >
-      
       {/* Render edges first (behind nodes) */}
       {edges.map((edge) => (
         <MiniEdge

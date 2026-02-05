@@ -82,7 +82,10 @@ export function WorkflowSearchFilter({
         {/* Search input with category chip */}
         <div className={searchWrapperVariants({ size })}>
           {selectedCategory && (
-            <Badge className="shrink-0 gap-1 border-0 bg-muted/50 pr-1" variant="outline">
+            <Badge
+              className="shrink-0 gap-1 border-0 bg-muted/50 pr-1"
+              variant="outline"
+            >
               {selectedCategory}
               <button
                 aria-label="Remove category filter"
