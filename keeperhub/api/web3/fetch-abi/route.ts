@@ -397,17 +397,75 @@ const DIAMOND_FACET_CHUNK_SIZE = 5;
 const DIAMOND_FACET_CHUNK_DELAY_MS = 1000;
 
 function chunk<T>(arr: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) {
-    out.push(arr.slice(i, i + size));
-  }
-  return out;
+  return Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
+    arr.slice(i * size, (i + 1) * size)
+  );
 }
 
 function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+type FacetFetchResult = {
+  address: string;
+  name: string | null;
+  abi?: string;
+  failed: boolean;
+};
+
+async function fetchOneFacet(
+  baseUrl: string,
+  chainId: number,
+  facetAddress: string
+): Promise<FacetFetchResult> {
+  let facetAbi: string | undefined;
+  try {
+    facetAbi = await fetchAbiFromAddress(baseUrl, chainId, facetAddress);
+  } catch (error) {
+    console.warn(
+      `[Diamond] Failed to fetch ABI for facet ${facetAddress}:`,
+      error instanceof Error ? error.message : "Unknown error"
+    );
+    return { address: facetAddress, name: null, failed: true };
+  }
+
+  let facetName: string | null = null;
+  try {
+    facetName = await fetchContractName(baseUrl, chainId, facetAddress);
+  } catch (error) {
+    console.log(
+      `[Diamond] Could not fetch name for facet ${facetAddress}:`,
+      error instanceof Error ? error.message : "Unknown error"
+    );
+  }
+
+  return {
+    address: facetAddress,
+    name: facetName,
+    abi: facetAbi,
+    failed: false,
+  };
+}
+
+function processFacetResult(result: FacetFetchResult): {
+  facetAbi: string | null;
+  facet: DiamondFacetResult;
+  failed: boolean;
+} {
+  const { address, name, abi, failed } = result;
+
+  if (failed) {
+    return {
+      facetAbi: null,
+      facet: { address, name },
+      failed: true,
+    };
+  }
+  return {
+    facetAbi: abi ?? null,
+    facet: { address, name, abi },
+    failed: false,
+  };
 }
 
 /**
@@ -428,57 +486,21 @@ async function fetchDiamondFacets(
   const facets: DiamondFacetResult[] = [];
   const chunks = chunk(facetAddresses, DIAMOND_FACET_CHUNK_SIZE);
 
-  for (let i = 0; i < chunks.length; i++) {
+  for (const [i, chunkAddresses] of chunks.entries()) {
     if (i > 0) {
       await delay(DIAMOND_FACET_CHUNK_DELAY_MS);
     }
-    const chunkAddresses = chunks[i];
     const results = await Promise.all(
-      chunkAddresses.map(async (facetAddress) => {
-        let facetName: string | null = null;
-        let facetAbi: string | undefined;
-
-        try {
-          facetAbi = await fetchAbiFromAddress(baseUrl, chainId, facetAddress);
-        } catch (error) {
-          console.warn(
-            `[Diamond] Failed to fetch ABI for facet ${facetAddress}:`,
-            error instanceof Error ? error.message : "Unknown error"
-          );
-          return {
-            address: facetAddress,
-            name: null,
-            abi: undefined,
-            failed: true,
-          };
-        }
-
-        try {
-          facetName = await fetchContractName(baseUrl, chainId, facetAddress);
-        } catch (error) {
-          console.log(
-            `[Diamond] Could not fetch name for facet ${facetAddress}:`,
-            error instanceof Error ? error.message : "Unknown error"
-          );
-        }
-
-        return {
-          address: facetAddress,
-          name: facetName,
-          abi: facetAbi,
-          failed: false,
-        };
-      })
+      chunkAddresses.map((addr) => fetchOneFacet(baseUrl, chainId, addr))
     );
-
     for (const r of results) {
-      if (r.failed) {
-        failedFacets.push(r.address);
-        facets.push({ address: r.address, name: r.name });
-      } else {
-        facetAbis.push(r.abi as string);
-        facets.push({ address: r.address, name: r.name, abi: r.abi });
+      const { facetAbi: abi, facet, failed } = processFacetResult(r);
+      if (failed) {
+        failedFacets.push(facet.address);
+      } else if (abi) {
+        facetAbis.push(abi);
       }
+      facets.push(facet);
     }
   }
 
