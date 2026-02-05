@@ -12,6 +12,14 @@ type LeaveRequestBody = {
   newOwnerMemberId?: string;
 };
 
+type LeaveError =
+  | "NOT_MEMBER"
+  | "NEW_OWNER_REQUIRED"
+  | "NEW_OWNER_NOT_ACCEPTED_MEMBER"
+  | "NEW_OWNER_SAME_AS_CURRENT";
+
+type LeaveResult = { success: true } | { success: false; error: LeaveError };
+
 /**
  * POST /api/organizations/:organizationId/leave
  *
@@ -48,8 +56,8 @@ export async function POST(
       );
     }
 
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: transaction steps are linear validation + updates
-    await db.transaction(async (tx) => {
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: linear validation steps within transaction
+    const result = await db.transaction(async (tx): Promise<LeaveResult> => {
       const [currentMember] = await tx
         .select({ id: member.id, role: member.role })
         .from(member)
@@ -62,7 +70,7 @@ export async function POST(
         .limit(1);
 
       if (!currentMember) {
-        throw new Error("NOT_MEMBER");
+        return { success: false, error: "NOT_MEMBER" };
       }
 
       const ownerCount = await tx
@@ -80,7 +88,7 @@ export async function POST(
 
       if (isOnlyOwner) {
         if (!newOwnerMemberId) {
-          throw new Error("NEW_OWNER_REQUIRED");
+          return { success: false, error: "NEW_OWNER_REQUIRED" };
         }
 
         const [newOwner] = await tx
@@ -94,13 +102,12 @@ export async function POST(
           )
           .limit(1);
 
-        // newOwner must exist in member table => accepted member (not pending invite)
         if (!newOwner) {
-          throw new Error("NEW_OWNER_NOT_ACCEPTED_MEMBER");
+          return { success: false, error: "NEW_OWNER_NOT_ACCEPTED_MEMBER" };
         }
 
         if (newOwner.id === currentMember.id) {
-          throw new Error("NEW_OWNER_SAME_AS_CURRENT");
+          return { success: false, error: "NEW_OWNER_SAME_AS_CURRENT" };
         }
 
         await tx
@@ -117,41 +124,41 @@ export async function POST(
           .set({ activeOrganizationId: null })
           .where(eq(sessions.token, sessionToken));
       }
+
+      return { success: true };
     });
+
+    if (!result.success) {
+      const errorMessages: Record<
+        LeaveError,
+        { message: string; status: number }
+      > = {
+        NOT_MEMBER: {
+          message: "You are not a member of this organization",
+          status: 403,
+        },
+        NEW_OWNER_REQUIRED: {
+          message:
+            "You must assign a new owner before leaving. Provide newOwnerMemberId.",
+          status: 400,
+        },
+        NEW_OWNER_NOT_ACCEPTED_MEMBER: {
+          message:
+            "Selected user is not an accepted member of this organization. Only members who have accepted their invitation can be assigned as owner.",
+          status: 400,
+        },
+        NEW_OWNER_SAME_AS_CURRENT: {
+          message: "Cannot assign yourself as the new owner",
+          status: 400,
+        },
+      };
+
+      const { message, status } = errorMessages[result.error];
+      return NextResponse.json({ error: message }, { status });
+    }
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "";
-    if (message === "NOT_MEMBER") {
-      return NextResponse.json(
-        { error: "You are not a member of this organization" },
-        { status: 403 }
-      );
-    }
-    if (message === "NEW_OWNER_REQUIRED") {
-      return NextResponse.json(
-        {
-          error:
-            "You must assign a new owner before leaving. Provide newOwnerMemberId.",
-        },
-        { status: 400 }
-      );
-    }
-    if (message === "NEW_OWNER_NOT_ACCEPTED_MEMBER") {
-      return NextResponse.json(
-        {
-          error:
-            "Selected user is not an accepted member of this organization. Only members who have accepted their invitation can be assigned as owner.",
-        },
-        { status: 400 }
-      );
-    }
-    if (message === "NEW_OWNER_SAME_AS_CURRENT") {
-      return NextResponse.json(
-        { error: "Cannot assign yourself as the new owner" },
-        { status: 400 }
-      );
-    }
     console.error("Leave organization failed:", err);
     return NextResponse.json(
       { error: "Failed to leave organization" },
