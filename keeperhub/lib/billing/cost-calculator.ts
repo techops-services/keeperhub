@@ -546,7 +546,7 @@ export function createCostBreakdown(
  */
 export function formatCostNote(estimate: WorkflowCostEstimate): string {
   const parts = [
-    `${estimate.blocks} blocks (${estimate.blockCost} credits)`,
+    `${estimate.blocks} actions (${estimate.blockCost} credits)`,
     `${estimate.functionCalls} functions (${estimate.functionCost} credits)`,
   ];
 

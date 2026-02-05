@@ -1,5 +1,7 @@
 "use client";
 
+import { AlertTriangle, Check } from "lucide-react";
+import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { formatEther, formatUnits, parseEther } from "viem";
@@ -29,6 +31,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   CHAIN_CONFIG,
   CREDITS_ABI,
@@ -263,7 +272,7 @@ export function BuyCreditsDialog({
           },
           onError: (error) => {
             console.error("Approval failed:", error);
-            toast.error(`Approval failed: ${error.message}`);
+            toast.error("Approval failed. Please try again.");
           },
         }
       );
@@ -304,7 +313,7 @@ export function BuyCreditsDialog({
             },
             onError: (error) => {
               console.error("Transaction failed:", error);
-              toast.error(`Transaction failed: ${error.message}`);
+              toast.error("Transaction failed. Please try again.");
               setStep("confirm");
             },
           }
@@ -331,7 +340,7 @@ export function BuyCreditsDialog({
             },
             onError: (error) => {
               console.error("Transaction failed:", error);
-              toast.error(`Transaction failed: ${error.message}`);
+              toast.error("Transaction failed. Please try again.");
               setStep("confirm");
             },
           }
@@ -413,7 +422,7 @@ export function BuyCreditsDialog({
 
         {isCalculating && (
           <div className="space-y-4 py-6 text-center">
-            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-primary border-b-2" />
+            <Spinner className="mx-auto h-8 w-8" />
             <p className="text-muted-foreground text-sm">Calculating...</p>
           </div>
         )}
@@ -491,7 +500,13 @@ export function BuyCreditsDialog({
                         value={token.symbol}
                       >
                         <span className="flex items-center gap-2">
-                          <span>{token.icon}</span>
+                          <Image
+                            alt={token.symbol}
+                            className="h-4 w-4 rounded-full"
+                            height={16}
+                            src={token.logoUrl}
+                            width={16}
+                          />
                           <span>{token.symbol}</span>
                         </span>
                       </SelectItem>
@@ -594,8 +609,9 @@ export function BuyCreditsDialog({
             </div>
 
             {hasInsufficientBalance && (
-              <div className="rounded-md bg-red-500/10 p-3 text-red-600 text-sm dark:text-red-400">
-                ⚠️ Insufficient balance. You need{" "}
+              <div className="flex items-center gap-2 rounded-md bg-red-500/10 p-3 text-red-600 text-sm dark:text-red-400">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                Insufficient balance. You need{" "}
                 {formatUnits(tokenAmount, selectedTokenInfo?.decimals || 6)}{" "}
                 {selectedToken} but only have{" "}
                 {formatUnits(tokenBalance, selectedTokenInfo?.decimals || 6)}{" "}
@@ -604,29 +620,60 @@ export function BuyCreditsDialog({
             )}
 
             {!isOnBillingNetwork && (
-              <div className="rounded-md bg-yellow-500/10 p-3 text-sm text-yellow-600 dark:text-yellow-400">
-                ⚠️ Please switch to the correct network (Chain ID:{" "}
+              <div className="flex items-center gap-2 rounded-md bg-amber-500/10 p-3 text-amber-600 text-sm dark:text-amber-400">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                Please switch to the correct network (Chain ID:{" "}
                 {CHAIN_CONFIG.chainId})
               </div>
             )}
 
-            {isStablecoinPayment && needsApproval && (
-              <>
-                <Button
-                  className="w-full"
-                  disabled={
-                    isSendingTx || hasInsufficientBalance || !isOnBillingNetwork
-                  }
-                  onClick={handleApprove}
-                  variant="outline"
-                >
-                  {isSendingTx ? "Approving..." : `Approve ${selectedToken}`}
-                </Button>
-                <p className="text-center text-muted-foreground text-xs">
-                  Step 1 of 2: Approve {selectedToken} spending
-                </p>
-              </>
-            )}
+            <TooltipProvider>
+              {isStablecoinPayment &&
+                (needsApproval ? (
+                  <>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          className="w-full"
+                          disabled={
+                            isSendingTx ||
+                            hasInsufficientBalance ||
+                            !isOnBillingNetwork
+                          }
+                          onClick={handleApprove}
+                          variant="outline"
+                        >
+                          {isSendingTx ? (
+                            <>
+                              <Spinner className="mr-2 h-4 w-4" />
+                              Approving...
+                            </>
+                          ) : (
+                            `Approve ${selectedToken}`
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs text-xs" side="top">
+                        Token approval allows the credits contract to transfer{" "}
+                        {selectedToken} on your behalf. This is a one-time
+                        permission for this amount.
+                      </TooltipContent>
+                    </Tooltip>
+                    <p className="text-center text-muted-foreground text-xs">
+                      Step 1 of 2: Approve {selectedToken} spending
+                    </p>
+                  </>
+                ) : (
+                  <Button
+                    className="w-full text-green-600 dark:text-green-400"
+                    disabled
+                    variant="outline"
+                  >
+                    <Check className="mr-2 h-4 w-4" />
+                    {selectedToken} Approved
+                  </Button>
+                ))}
+            </TooltipProvider>
 
             <Button
               className="w-full"
@@ -638,14 +685,15 @@ export function BuyCreditsDialog({
               }
               onClick={handleBuy}
             >
-              {isSendingTx ? "Confirming..." : "Confirm Purchase"}
+              {isSendingTx ? (
+                <>
+                  <Spinner className="mr-2 h-4 w-4" />
+                  Confirming...
+                </>
+              ) : (
+                "Confirm Purchase"
+              )}
             </Button>
-
-            {isStablecoinPayment && needsApproval && (
-              <p className="text-center text-muted-foreground text-xs">
-                Approve token first before purchasing
-              </p>
-            )}
 
             <div className="flex gap-2">
               <Button
@@ -668,7 +716,7 @@ export function BuyCreditsDialog({
 
         {!isCalculating && step === "processing" && (
           <div className="space-y-4 py-6 text-center">
-            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-primary border-b-2" />
+            <Spinner className="mx-auto h-8 w-8" />
             <p className="text-muted-foreground text-sm">
               {isConfirming
                 ? "Waiting for confirmation..."
@@ -689,7 +737,7 @@ export function BuyCreditsDialog({
 
         {step === "success" && (
           <div className="space-y-4 py-6 text-center">
-            <div className="text-6xl text-green-500">✓</div>
+            <Check className="mx-auto h-12 w-12 text-green-500" />
             <p className="font-semibold text-lg">Credits Added!</p>
             <p className="text-muted-foreground text-sm">
               {estimatedCredits?.toLocaleString()} credits have been added to

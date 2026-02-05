@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Info, Loader2, Zap } from "lucide-react";
+import { CircleDot, Coins, Info, Loader2 } from "lucide-react";
 import { useMemo } from "react";
 import {
   Tooltip,
@@ -41,9 +41,7 @@ type ClientCostEstimate = {
   functionCost: number;
   writeFunctions: number;
   platformFeePercent: number;
-  basePlatformFee: number;
   baseSubtotal: number;
-  baseTotalCredits: number;
   triggerType: string;
 };
 
@@ -206,19 +204,7 @@ function GasCostDisplay({
     totalWriteFunctions - gasEstimate.configuredWriteFunctions;
 
   if (gasEstimate.configuredWriteFunctions === 0) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="cursor-help text-amber-600 underline decoration-dotted dark:text-amber-400">
-            configure function
-          </span>
-        </TooltipTrigger>
-        <TooltipContent className="max-w-xs text-xs" side="left">
-          Select a contract, function, and fill in arguments to estimate gas
-          cost.
-        </TooltipContent>
-      </Tooltip>
-    );
+    return <span>0 credits</span>;
   }
 
   return (
@@ -293,14 +279,8 @@ function calculateBaseCostEstimate(nodes: WorkflowNode[]): ClientCostEstimate {
   // Count write functions
   const writeFunctions = actionNodes.filter((n) => isWriteFunction(n)).length;
 
-  // Calculate base subtotal (without gas)
+  // Calculate base subtotal (without gas - platform fee computed in component)
   const baseSubtotal = blockCost + functionCost;
-
-  // Platform fee on base (gas fee calculated separately)
-  const basePlatformFee = Math.ceil((baseSubtotal * BILLING_OVERALL_FEE) / 100);
-
-  // Base total
-  const baseTotalCredits = baseSubtotal + basePlatformFee;
 
   return {
     blocks,
@@ -309,9 +289,7 @@ function calculateBaseCostEstimate(nodes: WorkflowNode[]): ClientCostEstimate {
     functionCost,
     writeFunctions,
     platformFeePercent: BILLING_OVERALL_FEE,
-    basePlatformFee,
     baseSubtotal,
-    baseTotalCredits,
     triggerType,
   };
 }
@@ -385,15 +363,13 @@ export function WorkflowCostEstimate({
 
   const triggerLabel = getTriggerLabel(baseEstimate.triggerType);
 
-  // Calculate totals including gas
+  // Calculate totals including gas (single Math.ceil on full subtotal)
   const gasCostCredits = gasEstimate?.gasCostCredits ?? 0;
-  const gasPlatformFee =
-    gasCostCredits > 0
-      ? Math.ceil((gasCostCredits * BILLING_OVERALL_FEE) / 100)
-      : 0;
-  const totalPlatformFee = baseEstimate.basePlatformFee + gasPlatformFee;
-  const totalCredits =
-    baseEstimate.baseTotalCredits + gasCostCredits + gasPlatformFee;
+  const fullSubtotal = baseEstimate.baseSubtotal + gasCostCredits;
+  const totalPlatformFee = Math.ceil(
+    (fullSubtotal * BILLING_OVERALL_FEE) / 100
+  );
+  const totalCredits = fullSubtotal + totalPlatformFee;
 
   const strategyLabel =
     gasEstimate?.gasStrategy === "conservative" ? "Conservative" : "Optimized";
@@ -406,8 +382,8 @@ export function WorkflowCostEstimate({
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <Zap className="h-4 w-4 text-amber-500" />
-            <span className="font-medium text-sm">Estimated Cost</span>
+            <Coins className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium text-sm">Estimated Cost per Run</span>
           </div>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -430,7 +406,7 @@ export function WorkflowCostEstimate({
         {/* Total */}
         <div className="flex items-baseline justify-between">
           <span className="font-bold text-xl">
-            {formatCredits(totalCredits)}
+            {formatCredits(totalCredits)} credits
             {baseEstimate.writeFunctions > 0 && isLoadingGas && (
               <Loader2 className="ml-2 inline h-4 w-4 animate-spin text-muted-foreground" />
             )}
@@ -444,41 +420,80 @@ export function WorkflowCostEstimate({
         <div className="space-y-1 border-t pt-2 text-xs">
           {baseEstimate.blockCost > 0 && (
             <div className="flex justify-between">
-              <span className="text-muted-foreground">
-                Blocks ({baseEstimate.blocks})
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="flex cursor-help items-center gap-1 text-muted-foreground underline decoration-dotted">
+                    <CircleDot className="h-3 w-3" />
+                    Actions ({baseEstimate.blocks})
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs text-xs" side="left">
+                  Each workflow action node costs 1 credit per execution
+                </TooltipContent>
+              </Tooltip>
               <span>{baseEstimate.blockCost} credits</span>
             </div>
           )}
 
           {baseEstimate.functionCost > 0 && (
             <div className="flex justify-between">
-              <span className="text-muted-foreground">
-                Functions ({baseEstimate.functionCalls})
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="flex cursor-help items-center gap-1 text-muted-foreground underline decoration-dotted">
+                    <CircleDot className="h-3 w-3" />
+                    Functions ({baseEstimate.functionCalls})
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs text-xs" side="left">
+                  Each plugin function call costs 1 credit per execution
+                </TooltipContent>
+              </Tooltip>
               <span>{baseEstimate.functionCost} credits</span>
             </div>
           )}
 
-          {baseEstimate.writeFunctions > 0 && (
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">
-                Gas ({baseEstimate.writeFunctions} write tx)
-              </span>
-              <GasCostDisplay
-                error={gasError}
-                gasEstimate={gasEstimate}
-                isLoading={isLoadingGas}
-                totalWriteFunctions={baseEstimate.writeFunctions}
-              />
-            </div>
-          )}
+          {baseEstimate.writeFunctions > 0 &&
+            (isLoadingGas ||
+              (gasEstimate && gasEstimate.configuredWriteFunctions > 0)) && (
+              <div className="flex justify-between">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="flex cursor-help items-center gap-1 text-muted-foreground underline decoration-dotted">
+                      <CircleDot className="h-3 w-3" />
+                      Gas (
+                      {gasEstimate?.configuredWriteFunctions ??
+                        baseEstimate.writeFunctions}{" "}
+                      write tx)
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs text-xs" side="left">
+                    Blockchain gas fees for on-chain write transactions,
+                    converted to credits
+                  </TooltipContent>
+                </Tooltip>
+                <GasCostDisplay
+                  error={gasError}
+                  gasEstimate={gasEstimate}
+                  isLoading={isLoadingGas}
+                  totalWriteFunctions={baseEstimate.writeFunctions}
+                />
+              </div>
+            )}
 
           {totalPlatformFee > 0 && (
             <div className="flex justify-between">
-              <span className="text-muted-foreground">
-                Platform fee ({baseEstimate.platformFeePercent}%)
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="flex cursor-help items-center gap-1 text-muted-foreground underline decoration-dotted">
+                    <CircleDot className="h-3 w-3" />
+                    Platform fee ({baseEstimate.platformFeePercent}%)
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs text-xs" side="left">
+                  A {baseEstimate.platformFeePercent}% platform fee applied to
+                  the total cost
+                </TooltipContent>
+              </Tooltip>
               <span>{totalPlatformFee} credits</span>
             </div>
           )}
@@ -500,17 +515,6 @@ export function WorkflowCostEstimate({
             </span>
           )}
         </div>
-
-        {/* Volatility warning */}
-        {gasEstimate?.volatilityWarning && (
-          <div className="flex items-start gap-2 rounded bg-amber-50 p-2 text-amber-700 text-xs dark:bg-amber-900/20 dark:text-amber-400">
-            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>
-              High gas volatility detected. Using conservative pricing (+20%
-              buffer) to ensure transaction success.
-            </span>
-          </div>
-        )}
       </div>
     </TooltipProvider>
   );
