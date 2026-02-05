@@ -165,7 +165,7 @@ function DiamondFacetsList({ facets }: { facets: DiamondFacet[] }) {
       </span>
       <ul className="mt-1 list-inside list-disc space-y-0.5 text-blue-800 text-sm dark:text-blue-200">
         {named.map((facet) => (
-          <DiamonFaceItem key={facet.address} facet={facet} />
+          <DiamonFaceItem facet={facet} key={facet.address} />
         ))}
       </ul>
     </div>
