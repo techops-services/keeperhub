@@ -55,6 +55,7 @@ import {
   useOrganizations,
 } from "@/keeperhub/lib/hooks/use-organization";
 import { refetchOrganizations } from "@/keeperhub/lib/refetch-organizations";
+import type { MemberRole } from "@/keeperhub/lib/types/organization";
 import { ApiError, api } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
 
@@ -72,8 +73,6 @@ function getStatusBadgeClasses(status: string): string {
       return "bg-muted text-muted-foreground";
   }
 }
-
-type Role = "member" | "admin" | "owner";
 
 // Helper to check invitation status before cancelling
 type InvitationCheckResult = {
@@ -209,7 +208,7 @@ type MembersListContentProps = {
     status: string;
   }[];
   canInvite: boolean;
-  currentUserRole?: Role;
+  currentUserRole?: MemberRole;
   cancellingInvite: string | null;
   onCancelInvitation: (invitationId: string) => void;
   removingMember: string | null;
@@ -423,7 +422,7 @@ export function ManageOrgsModal({
 
   // Invite state
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<Role>("member");
+  const [inviteRole, setInviteRole] = useState<MemberRole>("member");
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteId, setInviteId] = useState<string | null>(null);
 
@@ -474,7 +473,7 @@ export function ManageOrgsModal({
 
   // Compute user's role in the managed org from fetched members
   const currentUserMember = members.find((m) => m.userId === session?.user?.id);
-  const managedOrgRole = currentUserMember?.role as Role | undefined;
+  const managedOrgRole = currentUserMember?.role as MemberRole | undefined;
   const isOwner = isManagedOrgActive
     ? isActiveOrgOwner
     : managedOrgRole === "owner";
@@ -1292,7 +1291,9 @@ export function ManageOrgsModal({
                             value={inviteEmail}
                           />
                           <Select
-                            onValueChange={(v) => setInviteRole(v as Role)}
+                            onValueChange={(v) =>
+                              setInviteRole(v as MemberRole)
+                            }
                             value={inviteRole}
                           >
                             <SelectTrigger className="w-[130px]">
