@@ -45,12 +45,18 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   useActiveMember,
   useOrganization,
   useOrganizations,
 } from "@/keeperhub/lib/hooks/use-organization";
 import { refetchOrganizations } from "@/keeperhub/lib/refetch-organizations";
-import { api } from "@/lib/api-client";
+import type { MemberRole } from "@/keeperhub/lib/types/organization";
+import { ApiError, api } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
 
 // Helper function to get status badge classes
@@ -202,12 +208,14 @@ type MembersListContentProps = {
     status: string;
   }[];
   canInvite: boolean;
-  currentUserRole?: "owner" | "admin" | "member";
+  currentUserRole?: MemberRole;
   cancellingInvite: string | null;
   onCancelInvitation: (invitationId: string) => void;
   removingMember: string | null;
   onRemoveMember: (memberId: string, email: string) => void;
   currentUserId?: string;
+  onUpdateMemberRole?: (memberId: string, role: string) => Promise<void>;
+  updatingRoleMemberId?: string | null;
 };
 
 function MembersListContent({
@@ -222,6 +230,8 @@ function MembersListContent({
   removingMember,
   onRemoveMember,
   currentUserId,
+  onUpdateMemberRole,
+  updatingRoleMemberId,
 }: MembersListContentProps) {
   if (loadingMembers || loadingSentInvitations) {
     return (
@@ -258,11 +268,16 @@ function MembersListContent({
     a.email.localeCompare(b.email, undefined, { sensitivity: "base" })
   );
 
+  const canChangeRole =
+    canInvite && onUpdateMemberRole && currentUserRole === "owner";
+  const canChangeRoleToMemberOrAdminOnly =
+    canInvite && onUpdateMemberRole && currentUserRole === "admin";
+
   return (
     <div className="space-y-2">
       {entries.map((entry) => (
         <div
-          className="flex items-center justify-between rounded-lg border p-3"
+          className="flex items-center justify-between gap-2 rounded-lg border p-3"
           key={entry.id}
         >
           <div className="min-w-0 flex-1">
@@ -276,31 +291,55 @@ function MembersListContent({
               {entry.kind === "invite" && " - invited"}
             </p>
           </div>
-          {entry.kind === "invite" && canInvite && (
-            <Button
-              disabled={cancellingInvite === entry.id}
-              onClick={() => onCancelInvitation(entry.id)}
-              size="sm"
-              variant="ghost"
-            >
-              <X className="mr-1 h-4 w-4" />
-              Revoke Invitation
-            </Button>
-          )}
-          {entry.kind === "member" &&
-            canInvite &&
-            entry.userId !== currentUserId &&
-            (currentUserRole === "owner" || entry.role === "member") && (
+          <div className="flex shrink-0 items-center gap-1">
+            {entry.kind === "member" &&
+              entry.userId !== currentUserId &&
+              (canChangeRole ||
+                (canChangeRoleToMemberOrAdminOnly &&
+                  entry.role !== "owner")) && (
+                <Select
+                  disabled={updatingRoleMemberId === entry.id}
+                  onValueChange={(role) => onUpdateMemberRole(entry.id, role)}
+                  value={entry.role}
+                >
+                  <SelectTrigger className="h-8 w-[120px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={"member"}>Member</SelectItem>
+                    <SelectItem value={"admin"}>Admin</SelectItem>
+                    {canChangeRole && (
+                      <SelectItem value={"owner"}>Owner</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
+            {entry.kind === "invite" && canInvite && (
               <Button
-                disabled={removingMember === entry.id}
-                onClick={() => onRemoveMember(entry.id, entry.email)}
+                disabled={cancellingInvite === entry.id}
+                onClick={() => onCancelInvitation(entry.id)}
                 size="sm"
                 variant="ghost"
               >
                 <X className="mr-1 h-4 w-4" />
-                Remove
+                Revoke Invitation
               </Button>
             )}
+            {entry.kind === "member" &&
+              canInvite &&
+              entry.userId !== currentUserId &&
+              (currentUserRole === "owner" || entry.role === "member") && (
+                <Button
+                  disabled={removingMember === entry.id}
+                  onClick={() => onRemoveMember(entry.id, entry.email)}
+                  size="sm"
+                  variant="ghost"
+                >
+                  <X className="mr-1 h-4 w-4" />
+                  Remove
+                </Button>
+              )}
+          </div>
         </div>
       ))}
     </div>
@@ -329,6 +368,9 @@ export function ManageOrgsModal({
   const [showCreateForm, setShowCreateForm] = useState(defaultShowCreateForm);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
+  const [showAssignOwnerDialog, setShowAssignOwnerDialog] = useState(false);
+  const [assignOwnerSelectedMemberId, setAssignOwnerSelectedMemberId] =
+    useState<string | null>(null);
 
   // Track which org is being managed (null = list view, string = detail view)
   const [managedOrgId, setManagedOrgIdRaw] = useState<string | null>(null);
@@ -380,7 +422,7 @@ export function ManageOrgsModal({
 
   // Invite state
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<"member" | "admin">("member");
+  const [inviteRole, setInviteRole] = useState<MemberRole>("member");
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteId, setInviteId] = useState<string | null>(null);
 
@@ -411,6 +453,9 @@ export function ManageOrgsModal({
   const [sentInvitations, setSentInvitations] = useState<SentInvitation[]>([]);
   const [cancellingInvite, setCancellingInvite] = useState<string | null>(null);
   const [removingMember, setRemovingMember] = useState<string | null>(null);
+  const [updatingRoleMemberId, setUpdatingRoleMemberId] = useState<
+    string | null
+  >(null);
 
   // Organization members state
   type Member = {
@@ -428,11 +473,7 @@ export function ManageOrgsModal({
 
   // Compute user's role in the managed org from fetched members
   const currentUserMember = members.find((m) => m.userId === session?.user?.id);
-  const managedOrgRole = currentUserMember?.role as
-    | "owner"
-    | "admin"
-    | "member"
-    | undefined;
+  const managedOrgRole = currentUserMember?.role as MemberRole | undefined;
   const isOwner = isManagedOrgActive
     ? isActiveOrgOwner
     : managedOrgRole === "owner";
@@ -440,6 +481,12 @@ export function ManageOrgsModal({
     ? isActiveOrgOwner || isActiveOrgAdmin
     : managedOrgRole === "owner" || managedOrgRole === "admin";
   const currentUserRole = isManagedOrgActive ? activeOrgRole : managedOrgRole;
+
+  const ownerCount = members.filter((m) => m.role === "owner").length;
+  // Only accepted members (from listMembers); pending invitations are not included
+  const otherMembers = members.filter((m) => m.userId !== session?.user?.id);
+  const isOnlyOwner = isOwner && ownerCount === 1;
+  const canLeaveAsOwner = !isOnlyOwner || otherMembers.length > 0;
 
   const fetchInvitations = useCallback(async () => {
     setLoadingInvitations(true);
@@ -736,6 +783,35 @@ export function ManageOrgsModal({
     }
   };
 
+  const handleUpdateMemberRole = useCallback(
+    async (memberId: string, role: string) => {
+      if (!managedOrgId) {
+        return;
+      }
+      setUpdatingRoleMemberId(memberId);
+      try {
+        const { error } = await authClient.organization.updateMemberRole({
+          memberId,
+          role,
+          organizationId: managedOrgId,
+        });
+
+        if (error) {
+          toast.error(error.message || "Failed to update role");
+          return;
+        }
+
+        toast.success("Role updated");
+        fetchMembers();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "An error occurred");
+      } finally {
+        setUpdatingRoleMemberId(null);
+      }
+    },
+    [managedOrgId, fetchMembers]
+  );
+
   const handleAcceptInvitation = async (invitationId: string) => {
     setProcessingInvite(invitationId);
     try {
@@ -788,26 +864,19 @@ export function ManageOrgsModal({
     }
   };
 
-  const handleLeaveOrg = async () => {
+  const handleLeaveOrg = useCallback(async () => {
     if (!managedOrg) {
       return;
     }
 
     try {
-      const { error } = await authClient.organization.leave({
-        organizationId: managedOrg.id,
-      });
-
-      if (error) {
-        toast.error(error.message || "Failed to leave organization");
-        return;
-      }
+      await api.organization.leave(managedOrg.id, {});
 
       toast.success(`Left ${managedOrg.name}`);
       setShowLeaveDialog(false);
+      setShowAssignOwnerDialog(false);
       setManagedOrgId(null);
 
-      // If we left the active org, switch to another org if available
       if (isManagedOrgActive) {
         const otherOrg = organizations.find((org) => org.id !== managedOrg.id);
         if (otherOrg) {
@@ -818,9 +887,82 @@ export function ManageOrgsModal({
       refetchOrganizations();
       router.refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "An error occurred");
+      const message =
+        err instanceof ApiError ? err.message : "Failed to leave organization";
+      toast.error(message);
     }
-  };
+  }, [
+    managedOrg,
+    isManagedOrgActive,
+    organizations,
+    setManagedOrgId,
+    switchOrganization,
+    router,
+  ]);
+
+  const handleLeaveClick = useCallback(() => {
+    if (!isOwner) {
+      setShowLeaveDialog(true);
+      return;
+    }
+    if (!canLeaveAsOwner) {
+      return;
+    }
+    if (isOnlyOwner && otherMembers.length > 0) {
+      setAssignOwnerSelectedMemberId(otherMembers[0]?.id ?? null);
+      setShowAssignOwnerDialog(true);
+    } else {
+      setShowLeaveDialog(true);
+    }
+  }, [isOwner, canLeaveAsOwner, isOnlyOwner, otherMembers]);
+
+  const handleAssignOwnerAndLeave = useCallback(async () => {
+    if (!(managedOrgId && assignOwnerSelectedMemberId && managedOrg)) {
+      return;
+    }
+    const isAcceptedMember = otherMembers.some(
+      (m) => m.id === assignOwnerSelectedMemberId
+    );
+    if (!isAcceptedMember) {
+      toast.error(
+        "Selected user must be an accepted member of this organization. Only members who have accepted their invitation can be assigned as owner."
+      );
+      return;
+    }
+    try {
+      await api.organization.leave(managedOrgId, {
+        newOwnerMemberId: assignOwnerSelectedMemberId,
+      });
+
+      toast.success(`Left ${managedOrg.name}`);
+      setShowAssignOwnerDialog(false);
+      setManagedOrgId(null);
+
+      if (isManagedOrgActive) {
+        const otherOrg = organizations.find((org) => org.id !== managedOrg.id);
+        if (otherOrg) {
+          await switchOrganization(otherOrg.id);
+        }
+      }
+
+      refetchOrganizations();
+      router.refresh();
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : "An error occurred";
+      toast.error(message);
+    }
+  }, [
+    managedOrgId,
+    assignOwnerSelectedMemberId,
+    managedOrg,
+    otherMembers,
+    isManagedOrgActive,
+    organizations,
+    setManagedOrgId,
+    switchOrganization,
+    router,
+  ]);
 
   const handleDeleteOrg = async () => {
     if (!managedOrg) {
@@ -1150,7 +1292,7 @@ export function ManageOrgsModal({
                           />
                           <Select
                             onValueChange={(v) =>
-                              setInviteRole(v as "member" | "admin")
+                              setInviteRole(v as MemberRole)
                             }
                             value={inviteRole}
                           >
@@ -1158,8 +1300,11 @@ export function ManageOrgsModal({
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="member">Member</SelectItem>
-                              <SelectItem value="admin">Admin</SelectItem>
+                              <SelectItem value={"member"}>Member</SelectItem>
+                              <SelectItem value={"admin"}>Admin</SelectItem>
+                              {isOwner && (
+                                <SelectItem value={"owner"}>Owner</SelectItem>
+                              )}
                             </SelectContent>
                           </Select>
                           <Button
@@ -1189,22 +1334,55 @@ export function ManageOrgsModal({
                         members={members}
                         onCancelInvitation={handleCancelInvitation}
                         onRemoveMember={handleRemoveMember}
+                        onUpdateMemberRole={handleUpdateMemberRole}
                         removingMember={removingMember}
                         sentInvitations={sentInvitations}
+                        updatingRoleMemberId={updatingRoleMemberId}
                       />
                     </div>
 
                     {/* Leave/Delete Organization */}
                     <div className="space-y-2 border-t pt-3">
                       {isOwner ? (
-                        <Button
-                          className="w-full text-destructive hover:text-destructive"
-                          onClick={() => setShowDeleteDialog(true)}
-                          variant="outline"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete Organization
-                        </Button>
+                        <>
+                          {canLeaveAsOwner ? (
+                            <Button
+                              className="w-full text-orange-600 hover:text-orange-700"
+                              onClick={handleLeaveClick}
+                              variant="outline"
+                            >
+                              <LogOut className="mr-2 h-4 w-4" />
+                              Leave Organization
+                            </Button>
+                          ) : (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-block w-full">
+                                  <Button
+                                    className="w-full text-orange-600 hover:text-orange-700"
+                                    disabled
+                                    variant="outline"
+                                  >
+                                    <LogOut className="mr-2 h-4 w-4" />
+                                    Leave Organization
+                                  </Button>
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                Add another member and assign them as owner
+                                first, or delete the organization.
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                          <Button
+                            className="w-full text-destructive hover:text-destructive"
+                            onClick={() => setShowDeleteDialog(true)}
+                            variant="outline"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete Organization
+                          </Button>
+                        </>
                       ) : (
                         <Button
                           className="w-full text-orange-600 hover:text-orange-700"
@@ -1261,6 +1439,55 @@ export function ManageOrgsModal({
               onClick={handleLeaveOrg}
             >
               Leave Organization
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Assign new owner and leave Dialog */}
+      <AlertDialog
+        onOpenChange={(isOpen) => {
+          setShowAssignOwnerDialog(isOpen);
+          if (!isOpen) {
+            setAssignOwnerSelectedMemberId(null);
+          }
+        }}
+        open={showAssignOwnerDialog}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Assign new owner</AlertDialogTitle>
+            <AlertDialogDescription>
+              You must assign another member as owner before leaving. Select an
+              accepted member (someone who has already joined the organization).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-2">
+            <Label className="text-muted-foreground text-sm">New owner</Label>
+            <Select
+              onValueChange={setAssignOwnerSelectedMemberId}
+              value={assignOwnerSelectedMemberId ?? undefined}
+            >
+              <SelectTrigger className="mt-1.5">
+                <SelectValue placeholder="Select a member" />
+              </SelectTrigger>
+              <SelectContent>
+                {otherMembers.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.user?.email ?? "Unknown"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-orange-600 hover:bg-orange-700"
+              disabled={!assignOwnerSelectedMemberId}
+              onClick={handleAssignOwnerAndLeave}
+            >
+              Assign and leave
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
