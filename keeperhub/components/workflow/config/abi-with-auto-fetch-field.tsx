@@ -384,12 +384,20 @@ export function AbiWithAutoFetchField({
       if (currentTargetRef.current) {
         lastFetchedRef.current = { ...currentTargetRef.current };
       }
+      const fetchTarget = { contractAddress, network };
       const fn = performAbiFetchRef.current;
       if (fn) {
         fn().catch((err: unknown) => {
-          const message =
-            err instanceof Error ? err.message : "Failed to fetch ABI";
-          setError(message);
+          // Only set error if the target hasn't changed since fetch started
+          const current = currentTargetRef.current;
+          if (
+            current?.contractAddress === fetchTarget.contractAddress &&
+            current?.network === fetchTarget.network
+          ) {
+            const message =
+              err instanceof Error ? err.message : "Failed to fetch ABI";
+            setError(message);
+          }
         });
       }
     }, AUTO_FETCH_DEBOUNCE_MS);
