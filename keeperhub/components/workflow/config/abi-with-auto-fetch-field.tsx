@@ -109,6 +109,7 @@ type DiamondAbiSourceChoiceProps = {
   useDiamondAbi: boolean;
   onToggle: (useDiamond: boolean) => void;
   proxyOptionLabel: string;
+  implementationExplorerUrl: string | null;
 };
 
 function DiamondAbiSourceChoice({
@@ -116,14 +117,18 @@ function DiamondAbiSourceChoice({
   useDiamondAbi,
   onToggle,
   proxyOptionLabel,
+  implementationExplorerUrl,
 }: DiamondAbiSourceChoiceProps) {
+  const checksummed = toChecksumAddress(readAsProxy.address);
+  const addressLabel = truncateAddress(readAsProxy.address);
+
   return (
     <fieldset aria-label="ABI source" className="mt-2">
       <legend className="sr-only">ABI source</legend>
-      <div className="flex flex-wrap gap-1 rounded-md border border-blue-200 bg-blue-100/50 p-1 dark:border-blue-800 dark:bg-blue-900/30">
+      <div className="grid grid-cols-2 gap-1 rounded-md border border-blue-200 bg-blue-100/50 p-1 dark:border-blue-800 dark:bg-blue-900/30">
         <Button
           aria-pressed={useDiamondAbi}
-          className="h-8 flex-1 text-sm"
+          className="h-8 min-w-0 text-sm"
           onClick={() => onToggle(true)}
           size="sm"
           type="button"
@@ -133,20 +138,46 @@ function DiamondAbiSourceChoice({
         </Button>
         <Button
           aria-pressed={!useDiamondAbi}
-          className="h-8 flex-1 text-sm"
+          className="h-8 min-w-0 text-sm"
           onClick={() => onToggle(false)}
           size="sm"
-          title={`Implementation: ${readAsProxy.address}`}
+          title={`Implementation: ${checksummed}`}
           type="button"
           variant={useDiamondAbi ? "ghost" : "default"}
         >
           {proxyOptionLabel}
         </Button>
       </div>
-      <p className="mt-1 text-muted-foreground text-xs">
-        {useDiamondAbi
-          ? "Combined ABI from all facets."
-          : `Implementation contract at ${readAsProxy.address.slice(0, 10)}…`}
+      <p className="mt-1 flex min-h-7 items-center gap-0.5 text-muted-foreground text-xs">
+        {useDiamondAbi ? (
+          <>
+            Combined ABI from all facets.
+            <span aria-hidden className="h-7 w-7 shrink-0" />
+          </>
+        ) : (
+          <>
+            Implementation contract at {addressLabel}
+            {implementationExplorerUrl ? (
+              <Button
+                asChild
+                className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                size="icon"
+                variant="ghost"
+              >
+                <a
+                  href={implementationExplorerUrl}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                  title={`View ${checksummed} on explorer`}
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </Button>
+            ) : (
+              <span aria-hidden className="h-7 w-7 shrink-0" />
+            )}
+          </>
+        )}
       </p>
     </fieldset>
   );
@@ -279,6 +310,11 @@ function DiamondContractAlert({
         <p className="text-sm">Choose how to interact with this contract:</p>
         {readAsProxy ? (
           <DiamondAbiSourceChoice
+            implementationExplorerUrl={getExplorerAddressUrl(
+              network,
+              chains,
+              readAsProxy.address
+            )}
             onToggle={onToggle}
             proxyOptionLabel={proxyOptionLabel}
             readAsProxy={readAsProxy}
