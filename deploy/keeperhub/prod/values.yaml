@@ -89,15 +89,6 @@ serviceMonitors:
       path: /api/metrics/db
       interval: 30s
       scrapeTimeout: 10s
-      relabelings:
-        # Scrape only 1 of 2 pods for DB metrics (identical across pods)
-        - sourceLabels: [__address__]
-          modulus: 2
-          targetLabel: __tmp_hash
-          action: hashmod
-        - sourceLabels: [__tmp_hash]
-          regex: "0"
-          action: keep
 
 resources:
   limits:
