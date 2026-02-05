@@ -315,5 +315,30 @@ describe("runtime condition evaluation", () => {
       const result = evaluateConditionExpression(expression, outputs);
       expect(result.result).toBe(true);
     });
+
+    it("should resolve nested array path (data.carts[0].products[0].id)", () => {
+      const expression =
+        "{{@node1:API.data.carts[0].products[0].id}} === 'prod-1'";
+      const outputs = {
+        node1: {
+          label: "API",
+          data: {
+            data: {
+              carts: [{ products: [{ id: "prod-1" }, { id: "prod-2" }] }],
+              total: 1,
+              skip: 0,
+              limit: 10,
+            },
+          },
+        },
+      };
+
+      const result = evaluateConditionExpression(expression, outputs);
+      expect(result.result).toBe(true);
+      expect(result.resolvedValues).toHaveProperty(
+        "API.data.carts[0].products[0].id",
+        "prod-1"
+      );
+    });
   });
 });

@@ -1,16 +1,26 @@
 "use client";
 
-import { useAtom } from "jotai";
+import { useAtom, useAtomValue } from "jotai";
 import { Check } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
-import { edgesAtom, nodesAtom, WorkflowTriggerEnum, type WorkflowNode } from "@/lib/workflow-store";
+import {
+  getAvailableFields,
+  type NodeOutputs,
+} from "@/lib/utils/template";
+import {
+  edgesAtom,
+  executionLogsAtom,
+  nodesAtom,
+  WorkflowTriggerEnum,
+  type WorkflowNode,
+} from "@/lib/workflow-store";
 import { findActionById } from "@/plugins";
 import { getTriggerOutputFields } from "@/keeperhub/lib/trigger-output-fields";
 // start custom keeperhub code //
 import { getReadContractOutputFields } from "@/keeperhub/lib/action-output-fields";
-// end keeperhub code //
+// end custom keeperhub code //
 
 type TemplateAutocompleteProps = {
   isOpen: boolean;
@@ -232,6 +242,11 @@ const getCommonFields = (node: WorkflowNode) => {
   return [{ field: "data", description: "Output data" }];
 };
 
+// Sanitize nodeId the same way as workflow executor for consistent lookup
+function sanitizeNodeId(nodeId: string): string {
+  return nodeId.replace(/[^a-zA-Z0-9]/g, "_");
+}
+
 export function TemplateAutocomplete({
   isOpen,
   position,
@@ -242,8 +257,12 @@ export function TemplateAutocomplete({
 }: TemplateAutocompleteProps) {
   const [nodes] = useAtom(nodesAtom);
   const [edges] = useAtom(edgesAtom);
+  // start custom keeperhub code //
+  const executionLogs = useAtomValue(executionLogsAtom);
+  // end custom keeperhub code //
   const [selectedIndex, setSelectedIndex] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
 
   // Ensure we're mounted before trying to use portal
@@ -293,26 +312,66 @@ export function TemplateAutocomplete({
 
   for (const node of upstreamNodes) {
     const nodeName = getNodeDisplayName(node);
-    const fields = getCommonFields(node);
+    // start custom keeperhub code //
+    // Prefer runtime-derived fields from execution log when available (nested JSON under data)
+    const logOutput = executionLogs[node.id]?.output;
+    const hasRuntimeOutput =
+      logOutput !== undefined && logOutput !== null;
 
-    // Add node itself
-    options.push({
-      type: "node",
-      nodeId: node.id,
-      nodeName,
-      template: `{{@${node.id}:${nodeName}}}`,
-    });
+    if (hasRuntimeOutput) {
+      const sanitizedId = sanitizeNodeId(node.id);
+      const nodeOutputs: NodeOutputs = {
+        [sanitizedId]: {
+          label: nodeName,
+          data: logOutput,
+        },
+      };
+      const runtimeFields = getAvailableFields(nodeOutputs);
 
-    // Add fields
-    for (const field of fields) {
       options.push({
-        type: "field",
+        type: "node",
         nodeId: node.id,
         nodeName,
-        field: field.field,
-        description: field.description,
-        template: `{{@${node.id}:${nodeName}.${field.field}}}`,
+        template: `{{@${node.id}:${nodeName}}}`,
       });
+
+      for (const entry of runtimeFields) {
+        if (entry.fieldPath === "" && entry.field === "") {
+          continue;
+        }
+        const fieldPath = entry.fieldPath || entry.field;
+        options.push({
+          type: "field",
+          nodeId: node.id,
+          nodeName,
+          field: fieldPath,
+          description: undefined,
+          template: `{{@${node.id}:${nodeName}.${fieldPath}}}`,
+        });
+      }
+      // end custom keeperhub code //
+    } else {
+      const fields = getCommonFields(node);
+
+      // Add node itself
+      options.push({
+        type: "node",
+        nodeId: node.id,
+        nodeName,
+        template: `{{@${node.id}:${nodeName}}}`,
+      });
+
+      // Add fields
+      for (const field of fields) {
+        options.push({
+          type: "field",
+          nodeId: node.id,
+          nodeName,
+          field: field.field,
+          description: field.description,
+          template: `{{@${node.id}:${nodeName}.${field.field}}}`,
+        });
+      }
     }
   }
 
@@ -363,15 +422,15 @@ export function TemplateAutocomplete({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, filteredOptions, selectedIndex, onSelect, onClose]);
 
-  // Scroll selected item into view
+  // Scroll selected item into view (options live inside the scrollable list, not menuRef)
   useEffect(() => {
-    if (menuRef.current) {
-      const selectedElement = menuRef.current.children[
-        selectedIndex
-      ] as HTMLElement;
-      if (selectedElement) {
-        selectedElement.scrollIntoView({ block: "nearest" });
-      }
+    const list = listRef.current;
+    if (!list) {
+      return
+    };
+    const selectedElement = list.children[selectedIndex] as HTMLElement;
+    if (selectedElement) {
+      selectedElement.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
   }, [selectedIndex]);
 
@@ -394,7 +453,7 @@ export function TemplateAutocomplete({
         left: `${adjustedPosition.left}px`,
       }}
     >
-      <div className="max-h-60 overflow-y-auto">
+      <div ref={listRef} className="max-h-60 overflow-y-auto">
         {filteredOptions.map((option, index) => (
           <div
             className={cn(
