@@ -1,8 +1,9 @@
 "use client";
 
 import { ethers } from "ethers";
-import { ExternalLink, Info } from "lucide-react";
+import { Copy, ExternalLink, Info } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import type { ChainResponse } from "@/app/api/chains/route";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { TemplateBadgeTextarea } from "@/components/ui/template-badge-textarea";
+import {
+  toChecksumAddress,
+  truncateAddress,
+} from "@/keeperhub/lib/address-utils";
+import { buildAddressUrl } from "@/keeperhub/lib/build-explorer-url";
 import type { ActionConfigFieldBase } from "@/plugins";
 
 const AUTO_FETCH_DEBOUNCE_MS = 600;
@@ -146,26 +152,96 @@ function DiamondAbiSourceChoice({
   );
 }
 
-function DiamonFaceItem({ facet }: { facet: DiamondFacet }) {
+type DiamonFaceItemProps = {
+  facet: DiamondFacet;
+  explorerUrl: string | null;
+};
+
+function DiamonFaceItem({ facet, explorerUrl }: DiamonFaceItemProps) {
+  const addressLabel = truncateAddress(facet.address);
+  const checksummed = toChecksumAddress(facet.address);
+
+  const copyAddress = () => {
+    navigator.clipboard.writeText(checksummed);
+    toast.success("Copied to clipboard");
+  };
+
   return (
-    <li className="rounded px-1.5 py-0.5 odd:bg-blue-100/50 dark:odd:bg-blue-900/20">
-      {facet.name}
+    <li className="flex w-full items-center gap-2 rounded px-1.5 py-0.5 odd:bg-blue-100/50 dark:odd:bg-blue-900/20">
+      <span>{facet.name ?? "Unnamed"}</span>
+      <div className="ml-auto flex shrink-0 items-center gap-0.5">
+        <span className="text-muted-foreground text-xs">({addressLabel})</span>
+        <Button
+          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+          onClick={copyAddress}
+          size="icon"
+          type="button"
+          variant="ghost"
+        >
+          <Copy className="h-3.5 w-3.5" />
+        </Button>
+        {explorerUrl && (
+          <Button
+            asChild
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            size="icon"
+            variant="ghost"
+          >
+            <a
+              href={explorerUrl}
+              rel="noopener noreferrer"
+              target="_blank"
+              title="View on explorer"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </Button>
+        )}
+      </div>
     </li>
   );
 }
 
-function DiamondFacetsList({ facets }: { facets: DiamondFacet[] }) {
-  const named = facets.filter((f): f is DiamondFacet & { name: string } =>
-    Boolean(f.name)
-  );
+function getExplorerAddressUrl(
+  network: string,
+  chains: ChainResponse[],
+  address: string
+): string | null {
+  const chainIdNum =
+    typeof network === "string" ? Number.parseInt(network, 10) : network;
+  if (Number.isNaN(chainIdNum) || chains.length === 0) {
+    return null;
+  }
+  const chain = chains.find((c) => c.chainId === chainIdNum);
+  if (!chain) {
+    return null;
+  }
+  return buildAddressUrl(chain.explorerUrl, chain.explorerAddressPath, address);
+}
+
+type DiamondFacetsListProps = {
+  facets: DiamondFacet[];
+  network: string;
+  chains: ChainResponse[];
+};
+
+function DiamondFacetsList({
+  facets,
+  network,
+  chains,
+}: DiamondFacetsListProps) {
   return (
-    <div className="mt-3">
+    <div className="mt-3 w-full">
       <span className="font-medium text-blue-900 text-sm dark:text-blue-100">
         Facets
       </span>
       <ul className="mt-1 list-inside list-disc space-y-0.5 text-blue-800 text-sm dark:text-blue-200">
-        {named.map((facet) => (
-          <DiamonFaceItem facet={facet} key={facet.address} />
+        {facets.map((facet) => (
+          <DiamonFaceItem
+            explorerUrl={getExplorerAddressUrl(network, chains, facet.address)}
+            facet={facet}
+            key={facet.address}
+          />
         ))}
       </ul>
     </div>
@@ -179,6 +255,8 @@ type DiamondContractAlertProps = {
   useDiamondAbi: boolean;
   onToggle: (useDiamond: boolean) => void;
   proxyOptionLabel: string;
+  network: string;
+  chains: ChainResponse[];
 };
 
 function DiamondContractAlert({
@@ -188,6 +266,8 @@ function DiamondContractAlert({
   useDiamondAbi,
   onToggle,
   proxyOptionLabel,
+  network,
+  chains,
 }: DiamondContractAlertProps) {
   return (
     <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
@@ -209,7 +289,7 @@ function DiamondContractAlert({
             Using combined ABI from all facets (Diamond Proxy).
           </p>
         )}
-        <DiamondFacetsList facets={facets} />
+        <DiamondFacetsList chains={chains} facets={facets} network={network} />
         {warning && (
           <p className="mt-2 text-amber-700 text-sm dark:text-amber-300">
             {warning}
@@ -733,7 +813,9 @@ export function AbiWithAutoFetchField({
 
       {isDiamond && diamondFacets && (
         <DiamondContractAlert
+          chains={chains}
           facets={diamondFacets}
+          network={network}
           onToggle={handleDiamondToggle}
           proxyOptionLabel={proxyOptionLabel}
           readAsProxy={diamondReadAsProxy}

@@ -393,9 +393,26 @@ type DiamondFacetResult = {
   abi?: string;
 };
 
+const DIAMOND_FACET_CHUNK_SIZE = 5;
+const DIAMOND_FACET_CHUNK_DELAY_MS = 1000;
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    out.push(arr.slice(i, i + size));
+  }
+  return out;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
 /**
- * Fetch ABIs and names for diamond facets in parallel (ABI first then name per facet).
- * Calls all facets; if Etherscan rate limit is hit, the request fails.
+ * Fetch ABIs and names for diamond facets in chunks (default 5 per chunk) with a delay between chunks
+ * to reduce Etherscan rate limit risk when there are many facets.
  */
 async function fetchDiamondFacets(
   facetAddresses: string[],
@@ -409,52 +426,59 @@ async function fetchDiamondFacets(
   const facetAbis: string[] = [];
   const failedFacets: string[] = [];
   const facets: DiamondFacetResult[] = [];
+  const chunks = chunk(facetAddresses, DIAMOND_FACET_CHUNK_SIZE);
 
-  const results = await Promise.all(
-    facetAddresses.map(async (facetAddress) => {
-      let facetName: string | null = null;
-      let facetAbi: string | undefined;
+  for (let i = 0; i < chunks.length; i++) {
+    if (i > 0) {
+      await delay(DIAMOND_FACET_CHUNK_DELAY_MS);
+    }
+    const chunkAddresses = chunks[i];
+    const results = await Promise.all(
+      chunkAddresses.map(async (facetAddress) => {
+        let facetName: string | null = null;
+        let facetAbi: string | undefined;
 
-      try {
-        facetAbi = await fetchAbiFromAddress(baseUrl, chainId, facetAddress);
-      } catch (error) {
-        console.warn(
-          `[Diamond] Failed to fetch ABI for facet ${facetAddress}:`,
-          error instanceof Error ? error.message : "Unknown error"
-        );
+        try {
+          facetAbi = await fetchAbiFromAddress(baseUrl, chainId, facetAddress);
+        } catch (error) {
+          console.warn(
+            `[Diamond] Failed to fetch ABI for facet ${facetAddress}:`,
+            error instanceof Error ? error.message : "Unknown error"
+          );
+          return {
+            address: facetAddress,
+            name: null,
+            abi: undefined,
+            failed: true,
+          };
+        }
+
+        try {
+          facetName = await fetchContractName(baseUrl, chainId, facetAddress);
+        } catch (error) {
+          console.log(
+            `[Diamond] Could not fetch name for facet ${facetAddress}:`,
+            error instanceof Error ? error.message : "Unknown error"
+          );
+        }
+
         return {
           address: facetAddress,
-          name: null,
-          abi: undefined,
-          failed: true,
+          name: facetName,
+          abi: facetAbi,
+          failed: false,
         };
+      })
+    );
+
+    for (const r of results) {
+      if (r.failed) {
+        failedFacets.push(r.address);
+        facets.push({ address: r.address, name: r.name });
+      } else {
+        facetAbis.push(r.abi as string);
+        facets.push({ address: r.address, name: r.name, abi: r.abi });
       }
-
-      try {
-        facetName = await fetchContractName(baseUrl, chainId, facetAddress);
-      } catch (error) {
-        console.log(
-          `[Diamond] Could not fetch name for facet ${facetAddress}:`,
-          error instanceof Error ? error.message : "Unknown error"
-        );
-      }
-
-      return {
-        address: facetAddress,
-        name: facetName,
-        abi: facetAbi,
-        failed: false,
-      };
-    })
-  );
-
-  for (const r of results) {
-    if (r.failed) {
-      failedFacets.push(r.address);
-      facets.push({ address: r.address, name: r.name });
-    } else {
-      facetAbis.push(r.abi as string);
-      facets.push({ address: r.address, name: r.name, abi: r.abi });
     }
   }
 
@@ -515,28 +539,35 @@ async function handleDiamondContract(
   warning?: string;
 }> {
   console.log("[Diamond] Diamond contract detected");
-  let facetAddresses = sourceCodeResult.facetAddresses || [];
+
+  // Prefer RPC loupe for the full facet list; Etherscan's Facets field may be truncated.
+  let facetAddresses: string[] = [];
+  try {
+    facetAddresses = await getDiamondFacets(contractAddress, chainId);
+    if (facetAddresses.length > 0) {
+      console.log(
+        "[Diamond] Using facet list from RPC loupe (full list from chain)"
+      );
+    }
+  } catch (error) {
+    console.warn(
+      "[Diamond] RPC loupe failed, using Etherscan facet list if available:",
+      error instanceof Error ? error.message : "Unknown error"
+    );
+  }
 
   if (facetAddresses.length === 0) {
-    console.log(
-      "[Diamond] No facets from Etherscan, trying RPC loupe calls..."
-    );
-    try {
-      facetAddresses = await getDiamondFacets(contractAddress, chainId);
-    } catch (error) {
-      console.warn(
-        "[Diamond] Failed to get facets via RPC:",
-        error instanceof Error ? error.message : "Unknown error"
-      );
-      throw new Error(
-        "Diamond contract detected but could not fetch facet addresses. Please ensure the Diamond contract implements the standard loupe interface (EIP-2535)."
+    facetAddresses = sourceCodeResult.facetAddresses || [];
+    if (facetAddresses.length > 0) {
+      console.log(
+        "[Diamond] Using facet list from Etherscan (RPC loupe unavailable)"
       );
     }
   }
 
   if (facetAddresses.length === 0) {
     throw new Error(
-      "Diamond contract detected but no facets found. Please provide ABI manually."
+      "Diamond contract detected but could not fetch facet addresses. Please ensure the Diamond contract implements the standard loupe interface (EIP-2535), or provide ABI manually."
     );
   }
 
