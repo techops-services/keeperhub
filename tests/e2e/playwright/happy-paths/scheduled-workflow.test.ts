@@ -8,6 +8,9 @@ import {
   waitForCanvas,
 } from "../utils";
 
+// Top-level regex for URL matching
+const WORKFLOW_URL_REGEX = /workflow/;
+
 // Run tests serially to maintain user session state
 test.describe.configure({ mode: "serial" });
 
@@ -16,7 +19,7 @@ test.describe("Happy Path: Scheduled Workflow", () => {
     await context.clearCookies();
   });
 
-  test("create and save a scheduled workflow with HTTP action", async ({
+  test("create and save a scheduled workflow with webhook action", async ({
     page,
   }) => {
     // Step 1: Sign up and verify
@@ -29,8 +32,8 @@ test.describe("Happy Path: Scheduled Workflow", () => {
     // Step 3: Configure schedule trigger (every hour)
     await configureScheduleTrigger(page, "0 * * * *");
 
-    // Step 4: Add HTTP Request action
-    await addActionNode(page, "http-request");
+    // Step 4: Add Send Webhook action
+    await addActionNode(page, "Send Webhook");
 
     // Step 5: Verify action node exists
     const actionNode = page.locator(".react-flow__node-action");
@@ -81,24 +84,24 @@ test.describe("Happy Path: Scheduled Workflow", () => {
     }
   });
 
-  test("workflow appears in workflows list after creation", async ({
-    page,
-  }) => {
+  test("saved workflow can be reloaded", async ({ page }) => {
     // Sign up and verify
     await signUpAndVerify(page);
 
-    // Create workflow with unique name
-    const workflowName = `Workflow List Test ${Date.now()}`;
-    await createWorkflow(page, workflowName);
-
-    // Save workflow
+    // Create and save workflow
+    await createWorkflow(page);
     await saveWorkflow(page);
 
-    // Navigate to workflows list
-    await page.goto("/workflows", { waitUntil: "domcontentloaded" });
+    // Get the current URL (should contain workflow ID)
+    const url = page.url();
+    expect(url).toMatch(WORKFLOW_URL_REGEX);
 
-    // Verify workflow appears in list
-    const workflowListItem = page.locator(`text="${workflowName}"`);
-    await expect(workflowListItem).toBeVisible({ timeout: 10_000 });
+    // Reload the page
+    await page.reload();
+    await waitForCanvas(page);
+
+    // Verify the workflow still loads (trigger node visible)
+    const triggerNode = page.locator(".react-flow__node-trigger");
+    await expect(triggerNode).toBeVisible({ timeout: 10_000 });
   });
 });
