@@ -1,16 +1,21 @@
 {
   "mcpServers": {
+    "atlassian": {
+      "type": "http",
+      "url": "https://mcp.atlassian.com/v1/mcp"
+    },
     "keeperhub": {
       "command": "docker",
       "args": [
         "run",
         "-i",
         "--rm",
+        "--pull=always",
         "-e",
         "KEEPERHUB_API_KEY",
         "-e",
         "KEEPERHUB_API_URL=https://app.keeperhub.com",
-        "ghcr.io/techops-services/keeperhub-mcp"
+        "ghcr.io/techops-services/keeperhub-mcp:latest"
       ]
     },
     "terraform": {
