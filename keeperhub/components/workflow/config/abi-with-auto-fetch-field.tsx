@@ -191,12 +191,10 @@ export function AbiWithAutoFetchField({
     contractAddress: string;
     network: string;
   } | null>(null);
-  const currentTargetRef = useRef<{ contractAddress: string; network: string }>(
-    {
-      contractAddress: "",
-      network: "",
-    }
-  );
+  const currentTargetRef = useRef<{
+    contractAddress: string;
+    network: string;
+  } | null>(null);
   const performAbiFetchRef = useRef<(() => Promise<void>) | null>(null);
 
   const abiToString = useCallback((abi: string | null): string | null => {
@@ -381,7 +379,9 @@ export function AbiWithAutoFetchField({
       return;
     }
     const timeoutId = setTimeout(() => {
-      lastFetchedRef.current = { ...currentTargetRef.current };
+      if (currentTargetRef.current) {
+        lastFetchedRef.current = { ...currentTargetRef.current };
+      }
       const fn = performAbiFetchRef.current;
       if (fn) {
         fn().catch((err: unknown) => {
