@@ -361,8 +361,10 @@ export function AbiWithAutoFetchField({
     await performAbiFetch();
   }, [isValidAddress, network, performAbiFetch]);
 
-  // Auto-fetch ABI when contract address or network changes (debounced, once per pair)
-  // stored performAbiFetch in a ref to avoid stale function references
+  // Auto-fetch ABI when contract address or network changes (debounced, once per pair).
+  // performAbiFetch is stored in a ref and accessed via performAbiFetchRef.current inside
+  // the effect. This avoids adding performAbiFetch to the dependency array, which would
+  // cause the effect to re-run on every render and defeat the debounce logic.
   performAbiFetchRef.current = performAbiFetch;
   useEffect(() => {
     if (!(isValidAddress && network) || useManualAbi) {
