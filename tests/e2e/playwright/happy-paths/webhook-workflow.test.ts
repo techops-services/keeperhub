@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   addActionNode,
+  configureWebhookTrigger,
   createWorkflow,
   getWebhookUrl,
   saveWorkflow,
@@ -27,17 +28,20 @@ test.describe("Happy Path: Webhook Workflow", () => {
     const workflowId = await createWorkflow(page, "Webhook Test Workflow");
     expect(workflowId).toBeTruthy();
 
-    // Step 3: Add HTTP Request action
-    await addActionNode(page, "http-request");
+    // Step 3: Configure trigger as webhook type
+    await configureWebhookTrigger(page);
 
-    // Step 4: Verify action node exists
+    // Step 4: Add Send Webhook action
+    await addActionNode(page, "Send Webhook");
+
+    // Step 5: Verify action node exists
     const actionNode = page.locator(".react-flow__node-action");
     await expect(actionNode).toBeVisible({ timeout: 5000 });
 
-    // Step 5: Save the workflow
+    // Step 6: Save the workflow
     await saveWorkflow(page);
 
-    // Step 6: Get webhook URL
+    // Step 7: Get webhook URL from trigger
     const webhookUrl = await getWebhookUrl(page);
     expect(webhookUrl).toMatch(URL_REGEX);
     expect(webhookUrl).toContain(workflowId);
@@ -50,13 +54,16 @@ test.describe("Happy Path: Webhook Workflow", () => {
     // Create workflow
     const workflowId = await createWorkflow(page, "Webhook Trigger Test");
 
+    // Configure trigger as webhook type
+    await configureWebhookTrigger(page);
+
     // Add action
-    await addActionNode(page, "http-request");
+    await addActionNode(page, "Send Webhook");
 
     // Save workflow
     await saveWorkflow(page);
 
-    // Get webhook URL
+    // Get webhook URL from trigger
     const webhookUrl = await getWebhookUrl(page);
 
     // Trigger webhook via API
@@ -81,15 +88,17 @@ test.describe("Happy Path: Webhook Workflow", () => {
     // Sign up and verify
     await signUpAndVerify(page);
 
-    // Create first workflow
+    // Create first workflow with webhook trigger
     await createWorkflow(page, "Webhook Workflow 1");
-    await addActionNode(page, "http-request");
+    await configureWebhookTrigger(page);
+    await addActionNode(page, "Send Webhook");
     await saveWorkflow(page);
     const webhookUrl1 = await getWebhookUrl(page);
 
-    // Create second workflow
+    // Create second workflow with webhook trigger
     await createWorkflow(page, "Webhook Workflow 2");
-    await addActionNode(page, "http-request");
+    await configureWebhookTrigger(page);
+    await addActionNode(page, "Send Webhook");
     await saveWorkflow(page);
     const webhookUrl2 = await getWebhookUrl(page);
 
@@ -101,14 +110,15 @@ test.describe("Happy Path: Webhook Workflow", () => {
     // Sign up and verify
     await signUpAndVerify(page);
 
-    // Create workflow
+    // Create workflow with webhook trigger
     await createWorkflow(page, "Webhook Persistence Test");
+    await configureWebhookTrigger(page);
 
     // Add action and save
-    await addActionNode(page, "http-request");
+    await addActionNode(page, "Send Webhook");
     await saveWorkflow(page);
 
-    // Get webhook URL
+    // Get webhook URL from trigger
     const webhookUrlBefore = await getWebhookUrl(page);
 
     // Reload page

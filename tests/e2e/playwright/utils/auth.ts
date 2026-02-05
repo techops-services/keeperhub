@@ -109,6 +109,9 @@ export async function signUpAndVerify(
   // Wait for dialog to close (successful verification)
   await expect(dialog).not.toBeVisible({ timeout: 15_000 });
 
+  // Wait for any post-auth redirects to settle
+  await page.waitForLoadState("networkidle");
+
   return { email, password };
 }
 

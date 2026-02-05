@@ -86,7 +86,7 @@ async function getOtpFromDb(email: string, maxRetries = 10): Promise<string> {
 
 // Sign up a user without verifying OTP (just creates the account in the DB)
 async function signUpOnly(page: Page): Promise<{ email: string }> {
-  const testEmail = `jacob+e2e${Date.now()}@techops.services`;
+  const testEmail = `test+${Date.now()}@techops.services`;
   const testPassword = "TestPassword123!";
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -122,7 +122,7 @@ async function signUpAndVerify(
   page: Page,
   opts?: { email?: string }
 ): Promise<{ email: string }> {
-  const testEmail = opts?.email ?? `jacob+e2e${Date.now()}@techops.services`;
+  const testEmail = opts?.email ?? `test+${Date.now()}@techops.services`;
   const testPassword = "TestPassword123!";
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -212,7 +212,7 @@ async function setupUserInTwoOrgs(
   page: Page,
   context: BrowserContext
 ): Promise<{ inviteeEmail: string }> {
-  const inviteeEmail = `jacob+e2einvitee${Date.now()}@techops.services`;
+  const inviteeEmail = `test+${Date.now()}@techops.services`;
 
   // Inviter sends invite
   await signUpAndVerify(page);
@@ -378,7 +378,7 @@ test.describe("Organization Invitations", () => {
       // Set up: inviter creates an invite for a new email
       await signUpAndVerify(page);
 
-      const inviteeEmail = `jacob+e2einvitee${Date.now()}@techops.services`;
+      const inviteeEmail = `test+${Date.now()}@techops.services`;
       const invitationId = await sendInvite(page, inviteeEmail);
 
       // Log out so we visit the accept page as a new user
@@ -432,7 +432,7 @@ test.describe("Organization Invitations", () => {
       context,
     }) => {
       // Create the invitee first (verified, existing user)
-      const inviteeEmail = `jacob+e2einvitee${Date.now()}@techops.services`;
+      const inviteeEmail = `test+${Date.now()}@techops.services`;
       await signUpAndVerify(page, { email: inviteeEmail });
       await context.clearCookies();
 
@@ -472,7 +472,7 @@ test.describe("Organization Invitations", () => {
     }) => {
       // Create inviter and send invite
       await signUpAndVerify(page);
-      const inviteeEmail = `jacob+e2einvitee${Date.now()}@techops.services`;
+      const inviteeEmail = `test+${Date.now()}@techops.services`;
       const invitationId = await sendInvite(page, inviteeEmail);
       await context.clearCookies();
 
@@ -510,7 +510,7 @@ test.describe("Organization Invitations", () => {
     }) => {
       // Create inviter and send invite to a specific email
       await signUpAndVerify(page);
-      const inviteeEmail = `jacob+e2einvitee${Date.now()}@techops.services`;
+      const inviteeEmail = `test+${Date.now()}@techops.services`;
       const invitationId = await sendInvite(page, inviteeEmail);
       await context.clearCookies();
 
@@ -581,7 +581,7 @@ test.describe("Organization Invitations", () => {
     }) => {
       // Create inviter and send invite
       await signUpAndVerify(page);
-      const inviteeEmail = `jacob+e2einvitee${Date.now()}@techops.services`;
+      const inviteeEmail = `test+${Date.now()}@techops.services`;
       const invitationId = await sendInvite(page, inviteeEmail);
       await context.clearCookies();
 

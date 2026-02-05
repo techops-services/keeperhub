@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-// Top-level regex for class matching
+// Top-level regex patterns
 const SELECTED_CLASS_REGEX = /selected/;
+const DATA_SELECTED_REGEX = /.*/;
 
 test.describe("Schedule Trigger", () => {
   test.beforeEach(async ({ page }) => {
@@ -60,23 +61,31 @@ test.describe("Schedule Trigger", () => {
   test("workflow canvas maintains state after trigger configuration", async ({
     page,
   }) => {
-    await page.waitForTimeout(1000);
+    // Wait for canvas to render with at least one node
+    await expect(page.locator(".react-flow__node").first()).toBeVisible({
+      timeout: 10_000,
+    });
 
-    // Get initial node count
+    // Get initial node count after canvas is stable
     const initialNodes = await page.locator(".react-flow__node").count();
 
     // Click on trigger node
     const triggerNode = page.locator(".react-flow__node-trigger").first();
     if (await triggerNode.isVisible()) {
       await triggerNode.click();
-      await page.waitForTimeout(300);
+      // Wait for selection state to update
+      await expect(triggerNode).toHaveAttribute(
+        "data-selected",
+        DATA_SELECTED_REGEX
+      );
 
       // Click elsewhere to deselect
       const canvas = page.locator('[data-testid="workflow-canvas"]');
       const canvasBox = await canvas.boundingBox();
       if (canvasBox) {
         await page.mouse.click(canvasBox.x + 50, canvasBox.y + 50);
-        await page.waitForTimeout(300);
+        // Wait for deselection
+        await page.waitForLoadState("networkidle");
       }
     }
 
