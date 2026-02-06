@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import postgres from "postgres";
 import { auth } from "@/lib/auth";
+import {
+  buildDatabaseUrlFromConfig,
+  getDatabaseErrorMessage,
+  getPostgresConnectionOptions,
+} from "@/lib/db/connection-utils";
 import type {
   IntegrationConfig,
   IntegrationType,
@@ -19,6 +24,57 @@ export type TestConnectionResult = {
   status: "success" | "error";
   message: string;
 };
+
+async function handleDatabaseTest(
+  config: IntegrationConfig
+): Promise<NextResponse<TestConnectionResult>> {
+  const url = buildDatabaseUrlFromConfig(config);
+  if (!url) {
+    return NextResponse.json(
+      {
+        status: "error",
+        message:
+          "Provide a connection string or connection details (host, username, password, database).",
+      },
+      { status: 200 }
+    );
+  }
+  const sslMode =
+    typeof config.sslMode === "string" ? config.sslMode : undefined;
+  const result = await testDatabaseConnection(url, sslMode);
+  return NextResponse.json(result);
+}
+
+async function handlePluginTest(
+  type: IntegrationType,
+  config: IntegrationConfig
+): Promise<NextResponse<TestConnectionResult | { error: string }>> {
+  const plugin = getPluginFromRegistry(type);
+
+  if (!plugin) {
+    return NextResponse.json(
+      { error: "Invalid integration type" },
+      { status: 400 }
+    );
+  }
+  if (!plugin.testConfig) {
+    return NextResponse.json(
+      { error: "Integration does not support testing" },
+      { status: 400 }
+    );
+  }
+
+  const credentials = getCredentialMapping(plugin, config);
+  const testFn = await plugin.testConfig.getTestFunction();
+  const testResult = await testFn(credentials);
+  const result: TestConnectionResult = {
+    status: testResult.success ? "success" : "error",
+    message: testResult.success
+      ? "Connection successful"
+      : testResult.error || "Connection failed",
+  };
+  return NextResponse.json(result);
+}
 
 /**
  * POST /api/integrations/test
@@ -44,76 +100,34 @@ export async function POST(request: Request) {
     }
 
     if (body.type === "database") {
-      const url = body.config.url;
-      if (typeof url !== "string") {
-        return NextResponse.json(
-          { error: "Database URL must be a string" },
-          { status: 400 }
-        );
-      }
-      const result = await testDatabaseConnection(url);
-      return NextResponse.json(result);
+      return handleDatabaseTest(body.config);
     }
 
-    const plugin = getPluginFromRegistry(body.type);
-
-    if (!plugin) {
-      return NextResponse.json(
-        { error: "Invalid integration type" },
-        { status: 400 }
-      );
-    }
-
-    if (!plugin.testConfig) {
-      return NextResponse.json(
-        { error: "Integration does not support testing" },
-        { status: 400 }
-      );
-    }
-
-    const credentials = getCredentialMapping(plugin, body.config);
-
-    const testFn = await plugin.testConfig.getTestFunction();
-    const testResult = await testFn(credentials);
-
-    const result: TestConnectionResult = {
-      status: testResult.success ? "success" : "error",
-      message: testResult.success
-        ? "Connection successful"
-        : testResult.error || "Connection failed",
-    };
-
-    return NextResponse.json(result);
+    return handlePluginTest(body.type, body.config);
   } catch (error) {
-    console.error("Failed to test connection:", error);
-    return NextResponse.json(
-      {
-        status: "error",
-        message:
-          error instanceof Error ? error.message : "Failed to test connection",
-      },
-      { status: 500 }
-    );
+    const message =
+      error instanceof Error ? error.message : "Failed to test connection";
+    return NextResponse.json({ status: "error", message }, { status: 500 });
   }
 }
 
 async function testDatabaseConnection(
-  databaseUrl?: string
+  databaseUrl: string,
+  sslMode?: string
 ): Promise<TestConnectionResult> {
   let connection: postgres.Sql | null = null;
 
   try {
-    if (!databaseUrl) {
-      return {
-        status: "error",
-        message: "Connection failed",
-      };
-    }
+    const { normalizedUrl, ssl } = getPostgresConnectionOptions(
+      databaseUrl,
+      sslMode
+    );
 
-    connection = postgres(databaseUrl, {
+    connection = postgres(normalizedUrl, {
       max: 1,
       idle_timeout: 5,
       connect_timeout: 5,
+      ssl,
     });
 
     await connection`SELECT 1`;
@@ -122,10 +136,10 @@ async function testDatabaseConnection(
       status: "success",
       message: "Connection successful",
     };
-  } catch {
+  } catch (error) {
     return {
       status: "error",
-      message: "Connection failed",
+      message: getDatabaseErrorMessage(error),
     };
   } finally {
     if (connection) {
