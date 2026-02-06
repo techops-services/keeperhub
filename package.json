@@ -83,7 +83,7 @@
     "lucide-react": "^0.552.0",
     "motion": "^12.23.24",
     "nanoid": "^5.1.6",
-    "next": "16.0.10",
+    "next": "16.1.5",
     "next-themes": "^0.4.6",
     "openai": "^6.8.1",
     "postgres": "^3.4.7",
@@ -99,7 +99,7 @@
     "tailwind-merge": "^3.3.1",
     "v0-sdk": "^0.15.1",
     "vaul": "^1.1.2",
-    "workflow": "4.0.1-beta.17",
+    "workflow": "4.1.0-beta.51",
     "zod": "^4.1.12"
   },
   "devDependencies": {

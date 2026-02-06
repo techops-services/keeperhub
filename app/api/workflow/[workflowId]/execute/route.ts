@@ -39,17 +39,17 @@ async function executeWorkflowBackground(
     });
 
     // Use start() from workflow/api to properly execute the workflow
-    start(executeWorkflow, [
+    const run = await start(executeWorkflow, [
       {
         nodes,
         edges,
         triggerInput: input,
         executionId,
-        workflowId, // Pass workflow ID so steps can fetch credentials
+        workflowId,
       },
     ]);
 
-    console.log("[Workflow Execute] Workflow started successfully");
+    console.log("[Workflow Execute] Workflow started, runId:", run.runId);
   } catch (error) {
     console.error("[Workflow Execute] Error during execution:", error);
     console.error(
