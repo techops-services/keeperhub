@@ -232,7 +232,7 @@ function AbiFunctionSelectField({
       </SelectTrigger>
       <SelectContent>
         {functions.map((func) => (
-          <SelectItem key={func.name} value={func.name}>
+          <SelectItem key={func.label} value={func.name}>
             <div className="flex flex-col items-start">
               <span>{func.label}</span>
               <span className="text-muted-foreground text-xs">

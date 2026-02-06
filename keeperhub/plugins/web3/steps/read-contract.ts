@@ -226,19 +226,19 @@ async function stepHandler(
     if (outputs && outputs.length > 0) {
       if (outputs.length === 1) {
         // Single output: return the value directly if unnamed, or as object if named
-        const outputName = outputs[0].name?.trim();
-        if (outputName) {
-          // Named single output: wrap in object
-          structuredResult = {
-            [outputName]: Array.isArray(serializedResult)
-              ? serializedResult[0]
-              : serializedResult,
-          };
-        } else {
-          // Unnamed single output: return raw value
-          structuredResult = Array.isArray(serializedResult)
+        const singleOutput = outputs[0];
+        const outputName = singleOutput.name?.trim();
+        const outputType = singleOutput.type ?? "";
+        const isArrayType = outputType.endsWith("[]");
+        // When the ABI output is an array type (e.g. address[]), the result is the full array; do not take [0]
+        const singleValue =
+          Array.isArray(serializedResult) && !isArrayType
             ? serializedResult[0]
             : serializedResult;
+        if (outputName) {
+          structuredResult = { [outputName]: singleValue };
+        } else {
+          structuredResult = singleValue;
         }
       } else if (Array.isArray(serializedResult)) {
         // Multiple outputs: always map to object with field names (named or generated)

@@ -387,6 +387,156 @@ function combineAbis(abis: string[]): string {
   return JSON.stringify(allItems);
 }
 
+type DiamondFacetResult = {
+  address: string;
+  name: string | null;
+  abi?: string;
+};
+
+const DIAMOND_FACET_CHUNK_SIZE = 5;
+const DIAMOND_FACET_CHUNK_DELAY_MS = 1000;
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  return Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
+    arr.slice(i * size, (i + 1) * size)
+  );
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+type FacetFetchResult = {
+  address: string;
+  name: string | null;
+  abi?: string;
+  failed: boolean;
+};
+
+async function fetchOneFacet(
+  baseUrl: string,
+  chainId: number,
+  facetAddress: string
+): Promise<FacetFetchResult> {
+  let facetAbi: string | undefined;
+  try {
+    facetAbi = await fetchAbiFromAddress(baseUrl, chainId, facetAddress);
+  } catch (error) {
+    console.warn(
+      `[Diamond] Failed to fetch ABI for facet ${facetAddress}:`,
+      error instanceof Error ? error.message : "Unknown error"
+    );
+    return { address: facetAddress, name: null, failed: true };
+  }
+
+  let facetName: string | null = null;
+  try {
+    facetName = await fetchContractName(baseUrl, chainId, facetAddress);
+  } catch (error) {
+    console.log(
+      `[Diamond] Could not fetch name for facet ${facetAddress}:`,
+      error instanceof Error ? error.message : "Unknown error"
+    );
+  }
+
+  return {
+    address: facetAddress,
+    name: facetName,
+    abi: facetAbi,
+    failed: false,
+  };
+}
+
+function processFacetResult(result: FacetFetchResult): {
+  facetAbi: string | null;
+  facet: DiamondFacetResult;
+  failed: boolean;
+} {
+  const { address, name, abi, failed } = result;
+
+  if (failed) {
+    return {
+      facetAbi: null,
+      facet: { address, name },
+      failed: true,
+    };
+  }
+  return {
+    facetAbi: abi ?? null,
+    facet: { address, name, abi },
+    failed: false,
+  };
+}
+
+/**
+ * Fetch ABIs and names for diamond facets in chunks (default 5 per chunk) with a delay between chunks
+ * to reduce Etherscan rate limit risk when there are many facets.
+ */
+async function fetchDiamondFacets(
+  facetAddresses: string[],
+  baseUrl: string,
+  chainId: number
+): Promise<{
+  facetAbis: string[];
+  facets: DiamondFacetResult[];
+  failedFacets: string[];
+}> {
+  const facetAbis: string[] = [];
+  const failedFacets: string[] = [];
+  const facets: DiamondFacetResult[] = [];
+  const chunks = chunk(facetAddresses, DIAMOND_FACET_CHUNK_SIZE);
+
+  for (const [i, chunkAddresses] of chunks.entries()) {
+    if (i > 0) {
+      await delay(DIAMOND_FACET_CHUNK_DELAY_MS);
+    }
+    const results = await Promise.all(
+      chunkAddresses.map((addr) => fetchOneFacet(baseUrl, chainId, addr))
+    );
+    for (const r of results) {
+      const { facetAbi: abi, facet, failed } = processFacetResult(r);
+      if (failed) {
+        failedFacets.push(facet.address);
+      } else if (abi) {
+        facetAbis.push(abi);
+      }
+      facets.push(facet);
+    }
+  }
+
+  return { facetAbis, facets, failedFacets };
+}
+
+async function fetchReadAsProxyAbi(
+  implementationAddress: string | undefined,
+  baseUrl: string,
+  chainId: number
+): Promise<
+  { implementationAddress: string; implementationAbi: string } | undefined
+> {
+  if (!implementationAddress) {
+    return;
+  }
+  try {
+    const implementationAbi = await fetchAbiFromAddress(
+      baseUrl,
+      chainId,
+      implementationAddress
+    );
+    console.log(
+      "[Diamond] Read as Proxy ABI fetched for implementation:",
+      implementationAddress
+    );
+    return { implementationAddress, implementationAbi };
+  } catch (error) {
+    console.log(
+      "[Diamond] Could not fetch Read as Proxy implementation ABI:",
+      error instanceof Error ? error.message : "Unknown error"
+    );
+    return;
+  }
+}
+
 /**
  * Handle Diamond contract ABI fetching
  */
@@ -394,41 +544,52 @@ async function handleDiamondContract(
   contractAddress: string,
   baseUrl: string,
   chainId: number,
-  sourceCodeResult: { facetAddresses?: string[] }
+  sourceCodeResult: {
+    facetAddresses?: string[];
+    implementationAddress?: string;
+  }
 ): Promise<{
   abi: string;
   isProxy: boolean;
   isDiamond: boolean;
   proxyAddress: string;
-  facets: Array<{ address: string; name: string | null; abi?: string }>;
+  facets: DiamondFacetResult[];
   diamondProxyAbi: string;
   diamondDirectAbi?: string;
+  implementationAddress?: string;
+  implementationAbi?: string;
   warning?: string;
 }> {
   console.log("[Diamond] Diamond contract detected");
-  let facetAddresses = sourceCodeResult.facetAddresses || [];
 
-  // If Etherscan didn't provide facets, try to get them via RPC
-  if (facetAddresses.length === 0) {
-    console.log(
-      "[Diamond] No facets from Etherscan, trying RPC loupe calls..."
-    );
-    try {
-      facetAddresses = await getDiamondFacets(contractAddress, chainId);
-    } catch (error) {
-      console.warn(
-        "[Diamond] Failed to get facets via RPC:",
-        error instanceof Error ? error.message : "Unknown error"
+  // Prefer RPC loupe for the full facet list; Etherscan's Facets field may be truncated.
+  let facetAddresses: string[] = [];
+  try {
+    facetAddresses = await getDiamondFacets(contractAddress, chainId);
+    if (facetAddresses.length > 0) {
+      console.log(
+        "[Diamond] Using facet list from RPC loupe (full list from chain)"
       );
-      throw new Error(
-        "Diamond contract detected but could not fetch facet addresses. Please ensure the Diamond contract implements the standard loupe interface (EIP-2535)."
+    }
+  } catch (error) {
+    console.warn(
+      "[Diamond] RPC loupe failed, using Etherscan facet list if available:",
+      error instanceof Error ? error.message : "Unknown error"
+    );
+  }
+
+  if (facetAddresses.length === 0) {
+    facetAddresses = sourceCodeResult.facetAddresses || [];
+    if (facetAddresses.length > 0) {
+      console.log(
+        "[Diamond] Using facet list from Etherscan (RPC loupe unavailable)"
       );
     }
   }
 
   if (facetAddresses.length === 0) {
     throw new Error(
-      "Diamond contract detected but no facets found. Please provide ABI manually."
+      "Diamond contract detected but could not fetch facet addresses. Please ensure the Diamond contract implements the standard loupe interface (EIP-2535), or provide ABI manually."
     );
   }
 
@@ -437,48 +598,12 @@ async function handleDiamondContract(
     facetAddresses
   );
 
-  // Fetch ABIs and names for all facets
-  const facetAbis: string[] = [];
-  const failedFacets: string[] = [];
-  const facets: Array<{ address: string; name: string | null; abi?: string }> =
-    [];
+  const { facetAbis, facets, failedFacets } = await fetchDiamondFacets(
+    facetAddresses,
+    baseUrl,
+    chainId
+  );
 
-  const facetPromises = facetAddresses.map(async (facetAddress) => {
-    let facetName: string | null = null;
-    let facetAbi: string | undefined;
-
-    try {
-      facetName = await fetchContractName(baseUrl, chainId, facetAddress);
-    } catch (error) {
-      console.log(
-        `[Diamond] Could not fetch name for facet ${facetAddress}:`,
-        error instanceof Error ? error.message : "Unknown error"
-      );
-    }
-
-    // Try to fetch ABI
-    try {
-      facetAbi = await fetchAbiFromAddress(baseUrl, chainId, facetAddress);
-      facetAbis.push(facetAbi);
-
-      facets.push({ address: facetAddress, name: facetName, abi: facetAbi });
-      return { success: true, address: facetAddress, hasAbi: true };
-    } catch (error) {
-      console.warn(
-        `[Diamond] Failed to fetch ABI for facet ${facetAddress}${facetName ? ` (${facetName})` : ""}:`,
-        error instanceof Error ? error.message : "Unknown error"
-      );
-
-      // Store facet with name but no ABI
-      facets.push({ address: facetAddress, name: facetName });
-      failedFacets.push(facetAddress);
-      return { success: false, address: facetAddress, hasAbi: false };
-    }
-  });
-
-  await Promise.all(facetPromises);
-
-  // Log summary of facets with ABIs
   const facetsWithAbis = facets.filter((f) => f.abi).length;
   console.log(
     `[Diamond] Facet summary: ${facets.length} total facets, ${facetsWithAbis} with ABIs, ${facets.length - facetsWithAbis} without ABIs`
@@ -490,10 +615,8 @@ async function handleDiamondContract(
     );
   }
 
-  // Combine all facet ABIs
   const combinedAbi = combineAbis(facetAbis);
 
-  // Log combined ABI stats for debugging
   try {
     const parsedAbi = JSON.parse(combinedAbi) as unknown[];
     const functionCount = parsedAbi.filter(
@@ -522,6 +645,12 @@ async function handleDiamondContract(
     );
   }
 
+  const readAsProxy = await fetchReadAsProxyAbi(
+    sourceCodeResult.implementationAddress,
+    baseUrl,
+    chainId
+  );
+
   return {
     abi: combinedAbi,
     isProxy: true,
@@ -530,6 +659,8 @@ async function handleDiamondContract(
     facets,
     diamondProxyAbi: combinedAbi,
     diamondDirectAbi,
+    implementationAddress: readAsProxy?.implementationAddress,
+    implementationAbi: readAsProxy?.implementationAbi,
     warning:
       failedFacets.length > 0
         ? `Some facets (${failedFacets.length}) could not be fetched. Using available facets.`
@@ -553,7 +684,8 @@ function validateAbiFetchInputs(contractAddress: string): void {
 }
 
 /**
- * Try to detect Diamond contract via RPC
+ * Try to detect Diamond contract via RPC.
+ * When found, also tries Etherscan for implementation (Read/Write as Proxy) so the UI can show both options.
  */
 async function tryDetectDiamondViaRpc(
   contractAddress: string,
@@ -567,6 +699,8 @@ async function tryDetectDiamondViaRpc(
   facets: Array<{ address: string; name: string | null; abi?: string }>;
   diamondProxyAbi: string;
   diamondDirectAbi?: string;
+  implementationAddress?: string;
+  implementationAbi?: string;
   warning?: string;
 } | null> {
   console.log("[Diamond] Attempting to detect Diamond contract via RPC...");
@@ -576,9 +710,34 @@ async function tryDetectDiamondViaRpc(
       console.log(
         `[Diamond] Detected Diamond contract with ${facetAddresses.length} facets via RPC`
       );
-      return await handleDiamondContract(contractAddress, baseUrl, chainId, {
-        facetAddresses,
-      });
+      const result = await handleDiamondContract(
+        contractAddress,
+        baseUrl,
+        chainId,
+        {
+          facetAddresses,
+        }
+      );
+      if (!result.implementationAddress) {
+        const sourceCode = await fetchEtherscanSourceCode(
+          baseUrl,
+          chainId,
+          contractAddress,
+          ETHERSCAN_API_KEY
+        );
+        if (sourceCode.success && sourceCode.implementationAddress) {
+          const readAsProxy = await fetchReadAsProxyAbi(
+            sourceCode.implementationAddress,
+            baseUrl,
+            chainId
+          );
+          if (readAsProxy) {
+            result.implementationAddress = readAsProxy.implementationAddress;
+            result.implementationAbi = readAsProxy.implementationAbi;
+          }
+        }
+      }
+      return result;
     }
   } catch (error) {
     console.log(
@@ -984,6 +1143,7 @@ async function handleEtherscanExplorer(
   isProxy: boolean;
   isDiamond?: boolean;
   implementationAddress?: string;
+  implementationAbi?: string;
   proxyAddress?: string;
   proxyAbi?: string;
   facets?: Array<{ address: string; name: string | null; abi?: string }>;
@@ -1044,6 +1204,7 @@ async function fetchAbiFromEtherscan(
   isProxy: boolean;
   isDiamond?: boolean;
   implementationAddress?: string;
+  implementationAbi?: string;
   proxyAddress?: string;
   proxyAbi?: string;
   facets?: Array<{ address: string; name: string | null; abi?: string }>;
@@ -1168,6 +1329,7 @@ export async function POST(request: Request) {
       isProxy: result.isProxy,
       isDiamond: result.isDiamond,
       implementationAddress: result.implementationAddress,
+      implementationAbi: result.implementationAbi,
       proxyAddress: result.proxyAddress,
       proxyAbi: result.proxyAbi,
       facets: result.facets,

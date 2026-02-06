@@ -80,6 +80,9 @@ export type ActionConfigFieldBase = {
 
   // For abi-with-auto-fetch: which field contains the network
   networkField?: string;
+
+  // For abi-with-auto-fetch: "read" or "write" so the node shows the right proxy option label (Read as Proxy / Write as Proxy)
+  contractInteractionType?: "read" | "write";
 };
 
 /**
