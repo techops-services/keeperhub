@@ -192,9 +192,13 @@ function DiamondFacetItem({ facet, explorerUrl }: DiamondFacetItemProps) {
   const addressLabel = truncateAddress(facet.address);
   const checksummed = toChecksumAddress(facet.address);
 
-  const copyAddress = () => {
-    navigator.clipboard.writeText(checksummed);
-    toast.success("Copied to clipboard");
+  const copyAddress = async () => {
+    try {
+      await navigator.clipboard.writeText(checksummed);
+      toast.success("Copied to clipboard");
+    } catch {
+      toast.error("Failed to copy address");
+    }
   };
 
   return (
