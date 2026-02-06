@@ -9,6 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { IntegrationIcon } from "@/components/ui/integration-icon";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   aiGatewayStatusAtom,
@@ -303,7 +310,7 @@ export function ConfigureConnectionOverlay({
 }: ConfigureConnectionOverlayProps) {
   const { push, closeAll } = useOverlay();
   const [saving, setSaving] = useState(false);
-  const [_testing, setTesting] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [_testResult, setTestResult] = useState<{
     status: "success" | "error";
     message: string;
@@ -344,60 +351,91 @@ export function ConfigureConnectionOverlay({
     }
   };
 
+  const hasValidDatabaseConfig = (config: Record<string, string>) => {
+    const { url, host, username, password, database } = config;
+    const hasUrl = typeof url === "string" && url.trim() !== "";
+    const hasParts =
+      typeof host === "string" && host.trim() !== "" &&
+      typeof username === "string" && username.trim() !== "" &&
+      typeof password === "string" && typeof database === "string" && database.trim() !== "";
+    return hasUrl || hasParts;
+  };
+
+  const showSaveAnywayConfirm = (message: string) => {
+    push(ConfirmOverlay, {
+      title: "Connection Test Failed",
+      message: `${message}\n\nDo you want to save anyway?`,
+      confirmLabel: "Save Anyway",
+      onConfirm: async () => {
+        await doSave();
+      },
+    });
+  };
+
+  const validateAndRunSave = async () => {
+    const result = await api.integration.testCredentials({ type, config });
+    if (result.status === "error") {
+      setSaving(false);
+      showSaveAnywayConfirm(result.message);
+      return;
+    }
+    await doSave();
+  };
+
   const handleSave = async () => {
-    const hasConfig = Object.values(config).some((v) => v && v.length > 0);
+    if (saving) {
+      return;
+    }
+    const hasConfig =
+      type === "database"
+        ? hasValidDatabaseConfig(config)
+        : Object.values(config).some((v) => v && v.length > 0);
     if (!hasConfig) {
-      toast.error("Please enter credentials");
+      toast.error(
+        type === "database"
+          ? "Enter either a connection string or the connection details below."
+          : "Please enter credentials"
+      );
       return;
     }
 
-    // Test before saving
+    setSaving(true);
+    setTestResult(null);
     try {
-      setSaving(true);
-      setTestResult(null);
-
-      const result = await api.integration.testCredentials({ type, config });
-
-      if (result.status === "error") {
-        // Show confirmation to save anyway
-        push(ConfirmOverlay, {
-          title: "Connection Test Failed",
-          message: `The test failed: ${result.message}\n\nDo you want to save anyway?`,
-          confirmLabel: "Save Anyway",
-          onConfirm: async () => {
-            await doSave();
-          },
-        });
-        setSaving(false);
-        return;
-      }
-
-      await doSave();
+      await validateAndRunSave();
     } catch (error) {
+      setSaving(false);
       const message =
         error instanceof Error ? error.message : "Failed to test connection";
-      push(ConfirmOverlay, {
-        title: "Connection Test Failed",
-        message: `${message}\n\nDo you want to save anyway?`,
-        confirmLabel: "Save Anyway",
-        onConfirm: async () => {
-          await doSave();
-        },
-      });
-      setSaving(false);
+      showSaveAnywayConfirm(message);
     }
   };
 
-  const _handleTest = async () => {
-    const hasConfig = Object.values(config).some((v) => v && v.length > 0);
+  const getTestConfigError = (): string | null => {
+    const hasConfig =
+      type === "database"
+        ? hasValidDatabaseConfig(config)
+        : Object.values(config).some((v) => v && v.length > 0);
     if (!hasConfig) {
-      toast.error("Please enter credentials first");
+      return type === "database"
+        ? "Enter either a connection string or the connection details below."
+        : "Please enter credentials first";
+    }
+    return null;
+  };
+
+  const handleTest = async () => {
+    if (testing) {
       return;
     }
-
+    const err = getTestConfigError();
+    if (err) {
+      toast.error(err);
+      return;
+    }
+    setTesting(true);
+    setTestResult(null);
     try {
-      setTesting(true);
-      setTestResult(null);
       const result = await api.integration.testCredentials({ type, config });
       setTestResult(result);
       if (result.status === "success") {
@@ -437,15 +475,97 @@ export function ConfigureConnectionOverlay({
 
     if (type === "database") {
       return (
-        <SecretField
-          configKey="url"
-          fieldId="url"
-          helpText="Connection string in the format: postgresql://user:password@host:port/database"
-          label="Database URL"
-          onChange={updateConfig}
-          placeholder="postgresql://user:password@host:port/database"
-          value={config.url || ""}
-        />
+        <div className="space-y-4">
+          <p className="text-muted-foreground text-xs">
+            Enter either a connection string or the connection details below.
+          </p>
+          <SecretField
+            configKey="url"
+            fieldId="db-url"
+            helpText="Connection string: postgresql://user:password@host:port/database (passwords with @ are supported)"
+            label="Connection string"
+            onChange={updateConfig}
+            placeholder="postgresql://user:password@host:port/database"
+            value={config.url || ""}
+          />
+          <div className="border-t pt-3 font-medium text-muted-foreground text-xs">
+            Or use connection details
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="db-host">Host</Label>
+              <Input
+                id="db-host"
+                onChange={(e) => updateConfig("host", e.target.value)}
+                placeholder="e.g. db.example.com or your-provider.supabase.co"
+                value={config.host || ""}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="db-port">Port</Label>
+              <Input
+                id="db-port"
+                onChange={(e) => updateConfig("port", e.target.value)}
+                placeholder="5432"
+                value={config.port || ""}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="db-username">Username</Label>
+              <Input
+                id="db-username"
+                onChange={(e) => updateConfig("username", e.target.value)}
+                placeholder="postgres"
+                value={config.username || ""}
+              />
+            </div>
+            <div className="space-y-2">
+              <SecretField
+                configKey="password"
+                fieldId="db-password"
+                label="Password"
+                onChange={updateConfig}
+                placeholder=""
+                value={config.password || ""}
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="db-database">Database name</Label>
+            <Input
+              id="db-database"
+              onChange={(e) => updateConfig("database", e.target.value)}
+              placeholder="postgres"
+              value={config.database || ""}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="database-ssl-mode">SSL mode</Label>
+            <Select
+              onValueChange={(value: string) => updateConfig("sslMode", value)}
+              value={(config.sslMode as string) || "auto"}
+            >
+              <SelectTrigger id="database-ssl-mode">
+                <SelectValue placeholder="SSL mode" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">
+                  Auto (use SSL for remote hosts)
+                </SelectItem>
+                <SelectItem value="require">Require</SelectItem>
+                <SelectItem value="prefer">Prefer</SelectItem>
+                <SelectItem value="disable">Disable</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-muted-foreground text-xs">
+              Use Require for cloud providers (e.g. Supabase). Auto enables SSL
+              for remote hosts. For Supabase, use the connection pooler host if
+              your environment cannot resolve IPv6; the pooler uses IPv4.
+            </p>
+          </div>
+        </div>
       );
     }
 
@@ -511,7 +631,16 @@ export function ConfigureConnectionOverlay({
       actions={
         hideOverlayActions
           ? undefined
-          : [{ label: "Create", onClick: handleSave, loading: saving }]
+          : [
+              {
+                label: "Test",
+                variant: "outline",
+                onClick: handleTest,
+                loading: testing,
+                disabled: saving,
+              },
+              { label: "Create", onClick: handleSave, loading: saving },
+            ]
       }
       overlayId={overlayId}
       title={`Add ${getLabel(type)}`}

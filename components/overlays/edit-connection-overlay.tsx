@@ -1,16 +1,24 @@
 "use client";
 
 import { Check, Pencil, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { api, type Integration } from "@/lib/api-client";
 // start keeperhub
 import { getCustomIntegrationFormHandler } from "@/lib/extension-registry";
+import type { IntegrationConfig } from "@/lib/types/integration";
 import { getIntegration, getIntegrationLabels } from "@/plugins";
 // end keeperhub
 import { ConfirmOverlay } from "./confirm-overlay";
@@ -24,6 +32,19 @@ const SYSTEM_INTEGRATION_LABELS: Record<string, string> = {
 const getLabel = (type: string): string => {
   const labels = getIntegrationLabels() as Record<string, string>;
   return labels[type] || SYSTEM_INTEGRATION_LABELS[type] || type;
+};
+
+function normalizeConfig(c: IntegrationConfig): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const key of Object.keys(c)) {
+    const v = c[key];
+    out[key] = v === undefined || v === null ? "" : String(v);
+  }
+  return out;
+}
+
+type IntegrationWithOptionalConfig = Integration & {
+  config?: IntegrationConfig;
 };
 
 type EditConnectionOverlayProps = {
@@ -138,6 +159,12 @@ export function EditConnectionOverlay({
   onDelete,
 }: EditConnectionOverlayProps) {
   const { push, closeAll } = useOverlay();
+  const integrationWithConfig = integration as IntegrationWithOptionalConfig;
+  const hasConfigFromProps =
+    integrationWithConfig.config != null &&
+    typeof integrationWithConfig.config === "object" &&
+    !Array.isArray(integrationWithConfig.config);
+  const [loading, setLoading] = useState(!hasConfigFromProps);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [_testResult, setTestResult] = useState<{
@@ -145,7 +172,48 @@ export function EditConnectionOverlay({
     message: string;
   } | null>(null);
   const [name, setName] = useState(integration.name);
-  const [config, setConfig] = useState<Record<string, string>>({});
+  const [config, setConfig] = useState<Record<string, string>>(() => {
+    if (hasConfigFromProps && integrationWithConfig.config) {
+      return normalizeConfig(integrationWithConfig.config);
+    }
+    return {};
+  });
+
+  useEffect(() => {
+    if (hasConfigFromProps && integrationWithConfig.config) {
+      setName(integration.name);
+      setConfig(normalizeConfig(integrationWithConfig.config));
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    api.integration
+      .get(integration.id)
+      .then((full) => {
+        if (cancelled) {
+          return;
+        }
+        setName(full.name);
+        setConfig(normalizeConfig(full.config));
+        setLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) {
+          return;
+        }
+        setLoading(false);
+        toast.error("Failed to load connection");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    integration.id,
+    integration.name,
+    hasConfigFromProps,
+    integrationWithConfig.config,
+  ]);
 
   const updateConfig = (key: string, value: string) => {
     setConfig((prev) => ({ ...prev, [key]: value }));
@@ -170,26 +238,47 @@ export function EditConnectionOverlay({
     }
   };
 
+  const hasValidDatabaseConfig = (c: Record<string, string>) => {
+    const hasUrl = typeof c.url === "string" && c.url.trim() !== "";
+    const hasParts =
+      typeof c.host === "string" &&
+      c.host.trim() !== "" &&
+      typeof c.username === "string" &&
+      c.username.trim() !== "" &&
+      typeof c.password === "string" &&
+      typeof c.database === "string" &&
+      c.database.trim() !== "";
+    return hasUrl || hasParts;
+  };
+
   const handleSave = async () => {
+    if (saving) {
+      return;
+    }
     const hasNewConfig = Object.values(config).some((v) => v && v.length > 0);
 
-    // If no new config, just save the name
     if (!hasNewConfig) {
       await doSave();
       return;
     }
 
-    // Test before saving
-    try {
-      setSaving(true);
-      setTestResult(null);
+    if (integration.type === "database" && !hasValidDatabaseConfig(config)) {
+      toast.error(
+        "Enter either a connection string or the connection details below."
+      );
+      return;
+    }
 
+    setSaving(true);
+    setTestResult(null);
+    try {
       const result = await api.integration.testCredentials({
         type: integration.type,
         config,
       });
 
       if (result.status === "error") {
+        setSaving(false);
         push(ConfirmOverlay, {
           title: "Connection Test Failed",
           message: `The test failed: ${result.message}\n\nDo you want to save anyway?`,
@@ -198,12 +287,12 @@ export function EditConnectionOverlay({
             await doSave();
           },
         });
-        setSaving(false);
         return;
       }
 
       await doSave();
     } catch (error) {
+      setSaving(false);
       const message =
         error instanceof Error ? error.message : "Failed to test connection";
       push(ConfirmOverlay, {
@@ -214,30 +303,43 @@ export function EditConnectionOverlay({
           await doSave();
         },
       });
-      setSaving(false);
     }
   };
 
-  const _handleTest = async () => {
+  const runConnectionTest = (): Promise<{
+    status: "success" | "error";
+    message: string;
+  }> => {
     const hasNewConfig = Object.values(config).some((v) => v && v.length > 0);
+    if (hasNewConfig) {
+      return api.integration.testCredentials({
+        type: integration.type,
+        config,
+      });
+    }
+    return api.integration.testConnection(integration.id);
+  };
 
+  const handleTest = async () => {
+    if (testing) {
+      return;
+    }
+    const hasNewConfig = Object.values(config).some((v) => v && v.length > 0);
+    if (
+      hasNewConfig &&
+      integration.type === "database" &&
+      !hasValidDatabaseConfig(config)
+    ) {
+      toast.error(
+        "Enter either a connection string or the connection details below."
+      );
+      return;
+    }
+
+    setTesting(true);
+    setTestResult(null);
     try {
-      setTesting(true);
-      setTestResult(null);
-
-      let result: { status: "success" | "error"; message: string };
-
-      if (hasNewConfig) {
-        // Test new credentials
-        result = await api.integration.testCredentials({
-          type: integration.type,
-          config,
-        });
-      } else {
-        // Test existing credentials
-        result = await api.integration.testConnection(integration.id);
-      }
-
+      const result = await runConnectionTest();
       setTestResult(result);
       if (result.status === "success") {
         toast.success(result.message || "Connection successful");
@@ -284,15 +386,97 @@ export function EditConnectionOverlay({
 
     if (integration.type === "database") {
       return (
-        <SecretField
-          configKey="url"
-          fieldId="url"
-          helpText="Connection string in the format: postgresql://user:password@host:port/database"
-          label="Database URL"
-          onChange={updateConfig}
-          placeholder="postgresql://user:password@host:port/database"
-          value={config.url || ""}
-        />
+        <div className="space-y-4">
+          <p className="text-muted-foreground text-xs">
+            Enter either a connection string or the connection details below.
+          </p>
+          <SecretField
+            configKey="url"
+            fieldId="db-url"
+            helpText="Connection string: postgresql://user:password@host:port/database (passwords with @ are supported)"
+            label="Connection string"
+            onChange={updateConfig}
+            placeholder="postgresql://user:password@host:port/database"
+            value={config.url || ""}
+          />
+          <div className="border-t pt-3 font-medium text-muted-foreground text-xs">
+            Or use connection details
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="db-host">Host</Label>
+              <Input
+                id="db-host"
+                onChange={(e) => updateConfig("host", e.target.value)}
+                placeholder="e.g. db.example.com or your-provider.supabase.co"
+                value={config.host || ""}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="db-port">Port</Label>
+              <Input
+                id="db-port"
+                onChange={(e) => updateConfig("port", e.target.value)}
+                placeholder="5432"
+                value={config.port || ""}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="db-username">Username</Label>
+              <Input
+                id="db-username"
+                onChange={(e) => updateConfig("username", e.target.value)}
+                placeholder="postgres"
+                value={config.username || ""}
+              />
+            </div>
+            <div className="space-y-2">
+              <SecretField
+                configKey="password"
+                fieldId="db-password"
+                label="Password"
+                onChange={updateConfig}
+                placeholder=""
+                value={config.password || ""}
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="db-database">Database name</Label>
+            <Input
+              id="db-database"
+              onChange={(e) => updateConfig("database", e.target.value)}
+              placeholder="postgres"
+              value={config.database || ""}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="database-ssl-mode">SSL mode</Label>
+            <Select
+              onValueChange={(value: string) => updateConfig("sslMode", value)}
+              value={(config.sslMode as string) || "auto"}
+            >
+              <SelectTrigger id="database-ssl-mode">
+                <SelectValue placeholder="SSL mode" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">
+                  Auto (use SSL for remote hosts)
+                </SelectItem>
+                <SelectItem value="require">Require</SelectItem>
+                <SelectItem value="prefer">Prefer</SelectItem>
+                <SelectItem value="disable">Disable</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-muted-foreground text-xs">
+              Use Require for cloud providers (e.g. Supabase). Auto enables SSL
+              for remote hosts. For Supabase, use the connection pooler host if
+              your environment cannot resolve IPv6; the pooler uses IPv4.
+            </p>
+          </div>
+        </div>
       );
     }
 
@@ -354,19 +538,21 @@ export function EditConnectionOverlay({
           label: "Delete",
           variant: "ghost",
           onClick: handleDelete,
-          disabled: saving || testing,
+          disabled: loading || saving || testing,
         },
-        // start custom keeperhub code //
-        // Test button hidden - unreliable functionality
-        // {
-        //   label: "Test",
-        //   variant: "outline",
-        //   onClick: handleTest,
-        //   loading: testing,
-        //   disabled: saving,
-        // },
-        // end keeperhub code //
-        { label: "Update", onClick: handleSave, loading: saving },
+        {
+          label: "Test",
+          variant: "outline",
+          onClick: handleTest,
+          loading: testing,
+          disabled: loading || saving,
+        },
+        {
+          label: "Update",
+          onClick: handleSave,
+          loading: saving,
+          disabled: loading,
+        },
       ]}
       overlayId={overlayId}
       title={`Edit ${getLabel(integration.type)}`}
@@ -375,19 +561,26 @@ export function EditConnectionOverlay({
         Update your connection credentials
       </p>
 
-      <div className="space-y-4">
-        {renderConfigFields()}
-
-        <div className="space-y-2">
-          <Label htmlFor="name">Label (Optional)</Label>
-          <Input
-            id="name"
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Production, Personal, Work"
-            value={name}
-          />
+      {loading ? (
+        <div className="flex items-center gap-2 py-8 text-muted-foreground">
+          <div className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          <span className="text-sm">Loading connection...</span>
         </div>
-      </div>
+      ) : (
+        <div className="space-y-4">
+          {renderConfigFields()}
+
+          <div className="space-y-2">
+            <Label htmlFor="name">Label (Optional)</Label>
+            <Input
+              id="name"
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Production, Personal, Work"
+              value={name}
+            />
+          </div>
+        </div>
+      )}
     </Overlay>
   );
 }
@@ -411,20 +604,21 @@ export function DeleteConnectionOverlay({
   const [revokeKey, setRevokeKey] = useState(true);
 
   const handleDelete = async () => {
+    if (deleting) {
+      return;
+    }
+    setDeleting(true);
     try {
-      setDeleting(true);
-
       if (integration.isManaged && revokeKey) {
         await api.aiGateway.revokeConsent();
       } else {
         await api.integration.delete(integration.id);
       }
-
       toast.success("Connection deleted");
       onSuccess?.();
-    } catch (error) {
-      console.error("Failed to delete integration:", error);
+    } catch (_error) {
       toast.error("Failed to delete connection");
+    } finally {
       setDeleting(false);
     }
   };
