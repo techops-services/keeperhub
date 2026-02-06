@@ -16,6 +16,7 @@
 import "server-only";
 
 import { getCredentialMapping, getIntegration } from "@/plugins";
+import { buildDatabaseUrlFromConfig } from "./db/connection-utils";
 import { getIntegrationById } from "./db/integrations";
 import type { IntegrationConfig, IntegrationType } from "./types/integration";
 
@@ -29,8 +30,16 @@ const SYSTEM_CREDENTIAL_MAPPERS: Record<
 > = {
   database: (config) => {
     const creds: WorkflowCredentials = {};
-    if (config.url && typeof config.url === "string") {
-      creds.DATABASE_URL = config.url;
+    const url = buildDatabaseUrlFromConfig(config);
+    if (url) {
+      creds.DATABASE_URL = url;
+    }
+    if (
+      config.sslMode &&
+      typeof config.sslMode === "string" &&
+      ["require", "prefer", "disable", "auto"].includes(config.sslMode)
+    ) {
+      creds.DATABASE_SSL_MODE = config.sslMode;
     }
     return creds;
   },
@@ -69,28 +78,11 @@ function mapIntegrationConfig(
 export async function fetchCredentials(
   integrationId: string
 ): Promise<WorkflowCredentials> {
-  console.log("[Credential Fetcher] Fetching integration:", integrationId);
-
   const integration = await getIntegrationById(integrationId);
-
   if (!integration) {
-    console.log("[Credential Fetcher] Integration not found");
     return {};
   }
-
-  console.log("[Credential Fetcher] Found integration:", integration.type);
-
-  const credentials = mapIntegrationConfig(
-    integration.type,
-    integration.config
-  );
-
-  console.log(
-    "[Credential Fetcher] Returning credentials for type:",
-    integration.type
-  );
-
-  return credentials;
+  return mapIntegrationConfig(integration.type, integration.config);
 }
 
 /**

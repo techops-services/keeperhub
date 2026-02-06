@@ -30,6 +30,11 @@ import type { IntegrationType } from "@/lib/types/integration";
 import { cn } from "@/lib/utils";
 import { getIntegration } from "@/plugins";
 
+// System integrations that don't have plugins - human-readable labels for selector
+const SYSTEM_INTEGRATION_LABELS: Partial<Record<IntegrationType, string>> = {
+  database: "Database",
+};
+
 type IntegrationSelectorProps = {
   integrationType: IntegrationType;
   value?: string;
@@ -182,22 +187,23 @@ export function IntegrationSelector({
     }
   }, [integrations, value, disabled, onChange]);
 
-  const handleNewIntegrationCreated = async (integrationId: string) => {
-    await loadIntegrations();
-    onChange(integrationId);
-    // Increment version to trigger re-fetch in other selectors
-    setIntegrationsVersion((v) => v + 1);
-  };
+  const handleNewIntegrationCreated = useCallback(
+    async (integrationId: string) => {
+      await loadIntegrations();
+      onChange(integrationId);
+      setIntegrationsVersion((v) => v + 1);
+    },
+    [loadIntegrations, onChange, setIntegrationsVersion]
+  );
 
-  const handleIntegrationChange = async () => {
+  const handleIntegrationChange = useCallback(async () => {
     await loadIntegrations();
     setIntegrationsVersion((v) => v + 1);
-    // Refresh AI Gateway status if this is an AI Gateway integration
     if (integrationType === "ai-gateway") {
       const status = await api.aiGateway.getStatus();
       setAiGatewayStatus(status);
     }
-  };
+  }, [loadIntegrations, integrationType, setIntegrationsVersion, setAiGatewayStatus]);
 
   const openNewConnectionOverlay = useCallback(() => {
     push(ConfigureConnectionOverlay, {
@@ -261,7 +267,8 @@ export function IntegrationSelector({
   }
 
   const plugin = getIntegration(integrationType);
-  const integrationLabel = plugin?.label || integrationType;
+  const integrationLabel =
+    plugin?.label || SYSTEM_INTEGRATION_LABELS[integrationType] || integrationType;
 
   // Separate managed and manual integrations for AI Gateway
   const managedIntegrations = integrations.filter((i) => i.isManaged);

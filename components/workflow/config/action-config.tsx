@@ -26,6 +26,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+// start keeperhub
 import { actionRequiresCredentials } from "@/keeperhub/lib/integration-helpers";
 // end keeperhub
 import { aiGatewayStatusAtom } from "@/lib/ai-gateway/state";
@@ -85,8 +86,8 @@ function DatabaseQueryFields({
           />
         </div>
         <p className="text-muted-foreground text-xs">
-          The DATABASE_URL from your project integrations will be used to
-          execute this query.
+          The selected database connection above will be used to execute this
+          query.
         </p>
       </div>
       <div className="space-y-2">
@@ -387,13 +388,16 @@ export function ActionConfig({
   const globalIntegrations = useAtomValue(integrationsAtom);
   const { push } = useOverlay();
 
-  // start custom keeperhub code //
-  // Check if user is anonymous (for email action restriction)
+  // start keeperhub - anonymous check for email action restriction
   const [isAnonymous, setIsAnonymous] = useState(false);
   useEffect(() => {
+    let cancelled = false;
     fetch("/api/user")
       .then((res) => res.json())
       .then((data) => {
+        if (cancelled) {
+          return;
+        }
         const anon =
           data.isAnonymous ||
           data.email?.includes("@http://") ||
@@ -402,8 +406,11 @@ export function ActionConfig({
         setIsAnonymous(anon);
       })
       .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
   }, []);
-  // end keeperhub code //
+  // end keeperhub
 
   // AI Gateway managed keys state
   const aiGatewayStatus = useAtomValue(aiGatewayStatusAtom);
@@ -562,46 +569,48 @@ export function ActionConfig({
         </div>
       </div>
 
-      {/* start keeperhub - added requiresCredentials check (upstream: integrationType && isOwner) */}
-      {integrationType && isOwner && requiresCredentials && (
-        <div className="space-y-2">
-          <div className="ml-1 flex items-center justify-between">
-            <div className="flex items-center gap-1">
-              <Label>Connection</Label>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <HelpCircle className="size-3.5 text-muted-foreground" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>API key or OAuth credentials for this service</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+      {/* start keeperhub - show Connection for plugin actions that require credentials or system actions that use an integration (e.g. Database Query) */}
+      {integrationType &&
+        isOwner &&
+        (requiresCredentials || SYSTEM_ACTION_INTEGRATIONS[actionType]) && (
+          <div className="space-y-2">
+            <div className="ml-1 flex items-center justify-between">
+              <div className="flex items-center gap-1">
+                <Label>Connection</Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="size-3.5 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>API key or OAuth credentials for this service</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              {/* start keeperhub - hide + button for singleConnection integrations */}
+              {hasExistingConnections &&
+                !getIntegration(integrationType)?.singleConnection && (
+                  <Button
+                    className="size-6"
+                    disabled={disabled}
+                    onClick={handleAddSecondaryConnection}
+                    size="icon"
+                    variant="ghost"
+                  >
+                    <Plus className="size-4" />
+                  </Button>
+                )}
+              {/* end keeperhub */}
             </div>
-            {/* start keeperhub - hide + button for singleConnection integrations */}
-            {hasExistingConnections &&
-              !getIntegration(integrationType)?.singleConnection && (
-                <Button
-                  className="size-6"
-                  disabled={disabled}
-                  onClick={handleAddSecondaryConnection}
-                  size="icon"
-                  variant="ghost"
-                >
-                  <Plus className="size-4" />
-                </Button>
-              )}
-            {/* end keeperhub */}
+            <IntegrationSelector
+              disabled={disabled}
+              integrationType={integrationType}
+              onChange={(id) => onUpdateConfig("integrationId", id)}
+              value={(config?.integrationId as string) || ""}
+            />
           </div>
-          <IntegrationSelector
-            disabled={disabled}
-            integrationType={integrationType}
-            onChange={(id) => onUpdateConfig("integrationId", id)}
-            value={(config?.integrationId as string) || ""}
-          />
-        </div>
-      )}
+        )}
       {/* end keeperhub */}
 
       {/* System actions - hardcoded config fields */}

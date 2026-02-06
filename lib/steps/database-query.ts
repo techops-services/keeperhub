@@ -9,6 +9,11 @@ import "server-only";
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import {
+  getDatabaseErrorMessage,
+  getPostgresConnectionOptions,
+  type PostgresSslOption,
+} from "@/lib/db/connection-utils";
 import { fetchCredentials } from "../credential-fetcher";
 import { type StepInput, withStepLogging } from "./step-handler";
 
@@ -32,11 +37,15 @@ function validateInput(input: DatabaseQueryInput): string | null {
   return null;
 }
 
-function createDatabaseClient(databaseUrl: string): postgres.Sql {
-  return postgres(databaseUrl, {
+function createDatabaseClient(
+  normalizedUrl: string,
+  ssl: PostgresSslOption
+): postgres.Sql {
+  return postgres(normalizedUrl, {
     max: 1,
     connect_timeout: 10,
     idle_timeout: 20,
+    ssl: ssl as false | "require" | "prefer",
   });
 }
 
@@ -46,29 +55,6 @@ async function executeQuery(
 ): Promise<unknown> {
   const db = drizzle(client);
   return await db.execute(sql.raw(queryString));
-}
-
-function getDatabaseErrorMessage(error: unknown): string {
-  if (!(error instanceof Error)) {
-    return "Unknown database error";
-  }
-
-  const errorMessage = error.message;
-
-  if (errorMessage.includes("ECONNREFUSED")) {
-    return "Connection refused. Please check your database URL and ensure the database is running.";
-  }
-  if (errorMessage.includes("ENOTFOUND")) {
-    return "Database host not found. Please check your database URL.";
-  }
-  if (errorMessage.includes("authentication failed")) {
-    return "Authentication failed. Please check your database credentials.";
-  }
-  if (errorMessage.includes("does not exist")) {
-    return `Database error: ${errorMessage}`;
-  }
-
-  return errorMessage;
 }
 
 async function cleanupClient(client: postgres.Sql | null): Promise<void> {
@@ -106,25 +92,29 @@ async function databaseQuery(
     };
   }
 
+  const { normalizedUrl, ssl } = getPostgresConnectionOptions(
+    databaseUrl,
+    credentials.DATABASE_SSL_MODE
+  );
+
   const queryString = (input.dbQuery || input.query) as string;
   let client: postgres.Sql | null = null;
 
   try {
-    client = createDatabaseClient(databaseUrl);
+    client = createDatabaseClient(normalizedUrl, ssl);
     const result = await executeQuery(client, queryString);
-    await client.end();
-
     return {
       success: true,
       rows: result,
       count: Array.isArray(result) ? result.length : 0,
     };
   } catch (error) {
-    await cleanupClient(client);
     return {
       success: false,
       error: `Database query failed: ${getDatabaseErrorMessage(error)}`,
     };
+  } finally {
+    await cleanupClient(client);
   }
 }
 
