@@ -183,12 +183,12 @@ function DiamondAbiSourceChoice({
   );
 }
 
-type DiamonFaceItemProps = {
+type DiamondFacetItemProps = {
   facet: DiamondFacet;
   explorerUrl: string | null;
 };
 
-function DiamonFaceItem({ facet, explorerUrl }: DiamonFaceItemProps) {
+function DiamondFacetItem({ facet, explorerUrl }: DiamondFacetItemProps) {
   const addressLabel = truncateAddress(facet.address);
   const checksummed = toChecksumAddress(facet.address);
 
@@ -268,7 +268,7 @@ function DiamondFacetsList({
       </span>
       <ul className="mt-1 list-inside list-disc space-y-0.5 text-blue-800 text-sm dark:text-blue-200">
         {facets.map((facet) => (
-          <DiamonFaceItem
+          <DiamondFacetItem
             explorerUrl={getExplorerAddressUrl(network, chains, facet.address)}
             facet={facet}
             key={facet.address}
