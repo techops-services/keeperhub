@@ -7,10 +7,9 @@ dotenv.config({ path: ".env" });
 dotenv.config({ path: ".env.local" });
 
 // Build DATABASE_URL from individual vars since dotenv doesn't expand ${} references
-const DATABASE_URL =
-  process.env.POSTGRES_HOST
-    ? `postgresql://${process.env.POSTGRES_USER}:${process.env.POSTGRES_PASSWORD}@${process.env.POSTGRES_HOST}:${process.env.POSTGRES_PORT}/${process.env.POSTGRES_DB}`
-    : (process.env.DATABASE_URL || "postgres://localhost:5432/workflow");
+const DATABASE_URL = process.env.POSTGRES_HOST
+  ? `postgresql://${process.env.POSTGRES_USER}:${process.env.POSTGRES_PASSWORD}@${process.env.POSTGRES_HOST}:${process.env.POSTGRES_PORT}/${process.env.POSTGRES_DB}`
+  : process.env.DATABASE_URL || "postgres://localhost:5432/workflow";
 
 const ACCEPT_INVITE_URL_REGEX = /\/accept-invite/;
 
@@ -18,7 +17,10 @@ const ACCEPT_INVITE_URL_REGEX = /\/accept-invite/;
 // Next.js 16 has a hydration race condition that can occasionally redirect
 // away from the accept-invite page during initial load when a session is
 // active. Waiting for network idle and retrying resolves this reliably.
-async function gotoAcceptInvite(page: Page, invitationId: string): Promise<void> {
+async function gotoAcceptInvite(
+  page: Page,
+  invitationId: string
+): Promise<void> {
   const url = `/accept-invite/${invitationId}`;
   for (let attempt = 0; attempt < 5; attempt++) {
     await page.goto(url, { waitUntil: "networkidle" });
@@ -189,7 +191,9 @@ async function sendInvite(page: Page, inviteeEmail: string): Promise<string> {
   await openInviteForm(page);
 
   const dialog = page.locator('[role="dialog"]');
-  await dialog.locator('input[placeholder="colleague@example.com"]').fill(inviteeEmail);
+  await dialog
+    .locator('input[placeholder="colleague@example.com"]')
+    .fill(inviteeEmail);
   await dialog.locator('button:has-text("Invite")').click();
 
   await expect(
@@ -260,7 +264,9 @@ test.describe("Organization Invitations", () => {
       const dialog = page.locator('[role="dialog"]');
       const inviteEmail = `newinvitee+${Date.now()}@example.com`;
 
-      await dialog.locator('input[placeholder="colleague@example.com"]').fill(inviteEmail);
+      await dialog
+        .locator('input[placeholder="colleague@example.com"]')
+        .fill(inviteEmail);
       await dialog.locator('button:has-text("Invite")').click();
 
       // Verify success toast
@@ -291,7 +297,9 @@ test.describe("Organization Invitations", () => {
 
       const dialog = page.locator('[role="dialog"]');
 
-      await dialog.locator('input[placeholder="colleague@example.com"]').fill(existingUserEmail);
+      await dialog
+        .locator('input[placeholder="colleague@example.com"]')
+        .fill(existingUserEmail);
       await dialog.locator('button:has-text("Invite")').click();
 
       // Verify success toast
@@ -316,7 +324,9 @@ test.describe("Organization Invitations", () => {
       const inviteEmail = `duplicate+${Date.now()}@example.com`;
 
       // First invite should succeed
-      await dialog.locator('input[placeholder="colleague@example.com"]').fill(inviteEmail);
+      await dialog
+        .locator('input[placeholder="colleague@example.com"]')
+        .fill(inviteEmail);
       await dialog.locator('button:has-text("Invite")').click();
 
       await expect(
@@ -326,7 +336,9 @@ test.describe("Organization Invitations", () => {
       ).toBeVisible({ timeout: 10_000 });
 
       // Type the same email again (input was cleared on success)
-      await dialog.locator('input[placeholder="colleague@example.com"]').fill(inviteEmail);
+      await dialog
+        .locator('input[placeholder="colleague@example.com"]')
+        .fill(inviteEmail);
       await dialog.locator('button:has-text("Invite")').click();
 
       // Second invite should show error toast
@@ -345,7 +357,9 @@ test.describe("Organization Invitations", () => {
 
       const dialog = page.locator('[role="dialog"]');
 
-      await dialog.locator('input[placeholder="colleague@example.com"]').fill(ownEmail);
+      await dialog
+        .locator('input[placeholder="colleague@example.com"]')
+        .fill(ownEmail);
       await dialog.locator('button:has-text("Invite")').click();
 
       await expect(
