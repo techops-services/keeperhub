@@ -231,8 +231,8 @@ function AbiFunctionSelectField({
         <SelectValue placeholder={field.placeholder || "Select a function"} />
       </SelectTrigger>
       <SelectContent>
-        {functions.map((func, index) => (
-          <SelectItem key={`${func.label}-${index}`} value={func.name}>
+        {functions.map((func) => (
+          <SelectItem key={func.label} value={func.name}>
             <div className="flex flex-col items-start">
               <span>{func.label}</span>
               <span className="text-muted-foreground text-xs">
