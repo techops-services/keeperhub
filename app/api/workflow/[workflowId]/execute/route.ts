@@ -45,7 +45,7 @@ async function executeWorkflowBackground(
         edges,
         triggerInput: input,
         executionId,
-        workflowId, // Pass workflow ID so steps can fetch credentials
+        workflowId,
       },
     ]);
 
