@@ -351,13 +351,17 @@ export function ConfigureConnectionOverlay({
     }
   };
 
-  const hasValidDatabaseConfig = (config: Record<string, string>) => {
-    const { url, host, username, password, database } = config;
+  const hasValidDatabaseConfig = (cfg: Record<string, string>) => {
+    const { url, host, username, password, database } = cfg;
     const hasUrl = typeof url === "string" && url.trim() !== "";
     const hasParts =
-      typeof host === "string" && host.trim() !== "" &&
-      typeof username === "string" && username.trim() !== "" &&
-      typeof password === "string" && typeof database === "string" && database.trim() !== "";
+      typeof host === "string" &&
+      host.trim() !== "" &&
+      typeof username === "string" &&
+      username.trim() !== "" &&
+      typeof password === "string" &&
+      typeof database === "string" &&
+      database.trim() !== "";
     return hasUrl || hasParts;
   };
 
