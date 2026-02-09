@@ -3,6 +3,10 @@ shared_env: &shared_env
     type: parameterStore
     name: db-url
     parameter_name: /eks/maker-staging/keeperhub/db-url
+  WORKFLOW_POSTGRES_URL:
+    type: parameterStore
+    name: workflow-postgres-url
+    parameter_name: /eks/maker-staging/keeperhub/db-url
   CHAIN_RPC_CONFIG:
     type: parameterStore
     name: chain-rpc-config
