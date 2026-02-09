@@ -107,16 +107,14 @@ describe.skipIf(shouldSkip)("Postgres World E2E", () => {
 
   describe("Schema Setup", () => {
     it("should have workflow schema tables from workflow-postgres-setup", async () => {
-      const result = await client`
+      const result = await client<{ table_name: string }[]>`
         SELECT table_name
         FROM information_schema.tables
         WHERE table_schema = 'workflow'
         ORDER BY table_name
       `;
 
-      const tables = result.map(
-        (row: { table_name: string }) => row.table_name
-      );
+      const tables = result.map((row) => row.table_name);
 
       expect(tables).toContain("workflow_runs");
       expect(tables).toContain("workflow_steps");
@@ -126,16 +124,14 @@ describe.skipIf(shouldSkip)("Postgres World E2E", () => {
     });
 
     it("should have pgboss schema tables from world.start()", async () => {
-      const result = await client`
+      const result = await client<{ table_name: string }[]>`
         SELECT table_name
         FROM information_schema.tables
         WHERE table_schema = 'pgboss'
         ORDER BY table_name
       `;
 
-      const tables = result.map(
-        (row: { table_name: string }) => row.table_name
-      );
+      const tables = result.map((row) => row.table_name);
 
       expect(tables).toContain("job");
       expect(tables).toContain("queue");
@@ -179,30 +175,31 @@ describe.skipIf(shouldSkip)("Postgres World E2E", () => {
         expect(body.status).toBe("running");
 
         // Poll workflow.workflow_runs until the run reaches a terminal state
+        type RunRow = {
+          id: string;
+          status: string;
+          completed_at: string | null;
+        };
         const run = await poll(
-          async () => {
-            const rows = await client`
-            SELECT id, status, completed_at
-            FROM workflow.workflow_runs
-            ORDER BY created_at DESC
-            LIMIT 1
-          `;
-            return rows[0] as
-              | {
-                  id: string;
-                  status: string;
-                  completed_at: string | null;
-                }
-              | undefined;
+          async (): Promise<RunRow | null> => {
+            const rows = await client<RunRow[]>`
+              SELECT id, status, completed_at
+              FROM workflow.workflow_runs
+              ORDER BY created_at DESC
+              LIMIT 1
+            `;
+            return rows[0] ?? null;
           },
-          (row) =>
-            row !== undefined &&
+          (row): row is RunRow =>
+            row !== null &&
             (row.status === "completed" || row.status === "failed"),
           500,
           30_000
         );
 
-        expect(run).toBeDefined();
+        if (!run) {
+          throw new Error("Expected workflow run to exist");
+        }
         expect(run.status).toBe("completed");
         expect(run.completed_at).not.toBeNull();
       }
@@ -227,17 +224,18 @@ describe.skipIf(shouldSkip)("Postgres World E2E", () => {
         expect(response.status).toBe(200);
 
         // Poll until steps appear for the latest run
+        type StepRow = { step_name: string; status: string };
         const steps = await poll(
           async () => {
-            const rows = await client`
-            SELECT ws.step_name, ws.status
-            FROM workflow.workflow_steps ws
-            JOIN workflow.workflow_runs wr ON ws.run_id = wr.id
-            WHERE wr.status IN ('completed', 'failed')
-            ORDER BY wr.created_at DESC, ws.created_at ASC
-            LIMIT 10
-          `;
-            return rows as Array<{ step_name: string; status: string }>;
+            const rows = await client<StepRow[]>`
+              SELECT ws.step_name, ws.status
+              FROM workflow.workflow_steps ws
+              JOIN workflow.workflow_runs wr ON ws.run_id = wr.id
+              WHERE wr.status IN ('completed', 'failed')
+              ORDER BY wr.created_at DESC, ws.created_at ASC
+              LIMIT 10
+            `;
+            return [...rows];
           },
           (rows) => rows.length > 0,
           500,
@@ -253,18 +251,14 @@ describe.skipIf(shouldSkip)("Postgres World E2E", () => {
     );
 
     it("should process jobs through pg-boss", { timeout: 10_000 }, async () => {
-      const result = await client`
+      type JobStateRow = { state: string; count: number };
+      const result = await client<JobStateRow[]>`
         SELECT state, count(*)::int as count
         FROM pgboss.job
         GROUP BY state
       `;
 
-      const states = new Map(
-        (result as Array<{ state: string; count: number }>).map((row) => [
-          row.state,
-          row.count,
-        ])
-      );
+      const states = new Map(result.map((row) => [row.state, row.count]));
 
       // There should be completed jobs from the executions above
       expect(states.get("completed")).toBeGreaterThan(0);
