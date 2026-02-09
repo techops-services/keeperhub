@@ -1,6 +1,9 @@
 "use client";
 
 import { useAtom } from "jotai";
+// start keeperhub custom code //
+import type { CSSProperties } from "react";
+// end keeperhub custom code //
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { nodesAtom, selectedNodeAtom } from "@/lib/workflow-store";
@@ -15,6 +18,10 @@ export interface TemplateBadgeTextareaProps {
   className?: string;
   id?: string;
   rows?: number;
+  // start keeperhub custom code //
+  /** When set, limits visible height to this many rows and makes content scrollable */
+  maxRows?: number;
+  // end keeperhub custom code //
 }
 
 // Helper to check if a template references an existing node
@@ -154,6 +161,9 @@ export function TemplateBadgeTextarea({
   className,
   id,
   rows = 3,
+  // start keeperhub custom code //
+  maxRows,
+  // end keeperhub custom code //
 }: TemplateBadgeTextareaProps) {
   const [isFocused, setIsFocused] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -715,8 +725,15 @@ export function TemplateBadgeTextarea({
     }
   }, [internalValue, isFocused]);
 
-  // Calculate min height based on rows
+  // start keeperhub custom code //
+  // Calculate min height based on rows; max height when maxRows is set (truncates display, scrollable)
   const minHeight = `${rows * 1.5}rem`;
+  const style: CSSProperties = { minHeight };
+  if (maxRows !== undefined) {
+    style.maxHeight = `${maxRows * 1.5}rem`;
+    style.overflowY = "auto";
+  }
+  // end keeperhub custom code //
 
   return (
     <>
@@ -726,7 +743,7 @@ export function TemplateBadgeTextarea({
           disabled && "cursor-not-allowed opacity-50",
           className
         )}
-        style={{ minHeight }}
+        style={style}
       >
         <div
           className="w-full outline-none whitespace-pre-wrap break-words"

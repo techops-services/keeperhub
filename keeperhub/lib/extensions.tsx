@@ -47,6 +47,7 @@ registerFieldRenderer(
         <AbiWithAutoFetchField
           config={config}
           contractAddressField={contractAddressField}
+          contractInteractionType={field.contractInteractionType}
           disabled={disabled}
           field={field}
           networkField={networkField}

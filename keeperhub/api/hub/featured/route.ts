@@ -8,12 +8,14 @@ import { workflows } from "@/lib/db/schema";
 type FeaturedFields = {
   featured?: boolean;
   category?: string | null;
+  protocol?: string | null;
   featuredOrder?: number | null;
 };
 
 const ALLOWED_FEATURED_FIELDS: (keyof FeaturedFields)[] = [
   "featured",
   "category",
+  "protocol",
   "featuredOrder",
 ];
 
@@ -66,6 +68,7 @@ export async function POST(request: Request) {
         name: workflows.name,
         featured: workflows.featured,
         category: workflows.category,
+        protocol: workflows.protocol,
         featuredOrder: workflows.featuredOrder,
       });
 

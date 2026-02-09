@@ -17,6 +17,10 @@ export type WorkflowData = {
   edges: WorkflowEdge[];
   visibility?: WorkflowVisibility;
   enabled?: boolean;
+  // start custom keeperhub code //
+  category?: string | null;
+  protocol?: string | null;
+  // end keeperhub code //
 };
 
 export type SavedWorkflow = WorkflowData & {
@@ -30,6 +34,7 @@ export type SavedWorkflow = WorkflowData & {
   // start custom KeeperHub code
   featured?: boolean;
   category?: string | null;
+  protocol?: string | null;
   featuredOrder?: number;
   // end custom KeeperHub code
 };
@@ -436,6 +441,13 @@ export const organizationApi = {
         body: JSON.stringify(data),
       }
     ),
+
+  /** Leave organization. When sole owner, pass newOwnerMemberId for atomic transfer + leave. */
+  leave: (organizationId: string, body: { newOwnerMemberId?: string }) =>
+    apiCall<{ success: true }>(`/api/organizations/${organizationId}/leave`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 };
 
 // Address Book API
@@ -496,6 +508,11 @@ export const workflowApi = {
   // Get featured workflows
   getFeatured: () =>
     apiCall<SavedWorkflow[]>("/api/workflows/public?featured=true"),
+  // Get distinct categories and protocols
+  getTaxonomy: () =>
+    apiCall<{ categories: string[]; protocols: string[] }>(
+      "/api/workflows/taxonomy"
+    ),
   // end custom KeeperHub code
 
   // Get a specific workflow

@@ -183,3 +183,49 @@ pnpm test:e2e               # E2E tests
 4. Keep it **absolutely minimal** - no extra features, no over-engineering
 
 **Structure**: Each plugin has `index.ts` (definition), `icon.tsx`, `steps/` (actions), optional `credentials.ts` and `test.ts`.
+
+---
+
+## MCP Schemas Endpoint
+
+**Files**:
+- `keeperhub/api/mcp/schemas/route.ts` - Implementation
+- `app/api/mcp/schemas/route.ts` - Thin wrapper (re-exports from keeperhub)
+
+This endpoint serves workflow schemas to the KeeperHub MCP server. It's the source of truth for what actions, triggers, and capabilities are available.
+
+### What's Dynamic (no maintenance needed)
+
+- **Plugin Actions**: Pulled from `getAllIntegrations()` registry - add plugins normally and they appear automatically
+- **Chains**: Pulled from database `chains` table - add chains via DB and they appear automatically
+- **Platform Capabilities**: Derived by scanning plugin field types (e.g., `abi-with-auto-fetch` → proxy support)
+
+### What's Inline (update when changed)
+
+These are defined directly in the file because they rarely change and aren't in a registry:
+
+| Section | When to Update |
+|---------|----------------|
+| `SYSTEM_ACTIONS` | Adding new system action (Condition, HTTP Request, Database Query) |
+| `TRIGGERS` | Adding new trigger type (Manual, Schedule, Webhook, Event) |
+| `TEMPLATE_SYNTAX` | If template syntax `{{@nodeId:Label.field}}` changes |
+| `tips` array | When adding guidance for AI workflow generation |
+
+### How to Update
+
+1. **New System Action**: Add entry to `SYSTEM_ACTIONS` object, implement step in `lib/steps/`
+2. **New Trigger**: Add entry to `TRIGGERS` object, implement UI in `components/workflow/config/trigger-config.tsx`
+3. **New Plugin**: Just create the plugin normally in `keeperhub/plugins/` - it's picked up automatically
+
+### Testing the Endpoint
+
+```bash
+# Get all schemas
+curl http://localhost:3000/api/mcp/schemas
+
+# Filter by category
+curl http://localhost:3000/api/mcp/schemas?category=web3
+
+# Without chains
+curl http://localhost:3000/api/mcp/schemas?includeChains=false
+```

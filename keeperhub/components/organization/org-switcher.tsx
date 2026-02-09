@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, ChevronsUpDown, Plus, Settings, Users } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -25,9 +25,30 @@ import { useSession } from "@/lib/auth-client";
 export function OrgSwitcher() {
   const { data: session } = useSession();
   const { organization, switchOrganization } = useOrganization();
-  const { organizations } = useOrganizations();
+  const { organizations, isLoading: orgsLoading } = useOrganizations();
   const [open, setOpen] = useState(false);
   const [manageModalOpen, setManageModalOpen] = useState(false);
+  const [autoSwitching, setAutoSwitching] = useState(false);
+
+  // Auto-switch to first available org if no active org but user has orgs
+  useEffect(() => {
+    if (
+      !(organization || orgsLoading) &&
+      organizations.length > 0 &&
+      !autoSwitching
+    ) {
+      setAutoSwitching(true);
+      switchOrganization(organizations[0].id).finally(() => {
+        setAutoSwitching(false);
+      });
+    }
+  }, [
+    organization,
+    organizations,
+    orgsLoading,
+    switchOrganization,
+    autoSwitching,
+  ]);
 
   // Don't show anything if user is not logged in or is anonymous
   // Anonymous users have name "Anonymous" and temp- prefixed emails
@@ -40,8 +61,18 @@ export function OrgSwitcher() {
     return null;
   }
 
-  // Handle edge case: user has no active organization
-  if (!organization) {
+  // Show loading state while auto-switching
+  if (autoSwitching) {
+    return (
+      <Button className="w-[200px]" disabled size="sm" variant="outline">
+        <Users className="mr-2 h-4 w-4" />
+        Switching...
+      </Button>
+    );
+  }
+
+  // Handle edge case: user has no active organization AND no organizations at all
+  if (!organization && organizations.length === 0 && !orgsLoading) {
     return (
       <>
         <Button
@@ -58,6 +89,16 @@ export function OrgSwitcher() {
           open={manageModalOpen}
         />
       </>
+    );
+  }
+
+  // Still loading or waiting for auto-switch
+  if (!organization) {
+    return (
+      <Button className="w-[200px]" disabled size="sm" variant="outline">
+        <Users className="mr-2 h-4 w-4" />
+        Loading...
+      </Button>
     );
   }
 

@@ -149,6 +149,7 @@ export const workflows = pgTable("workflows", {
   isAnonymous: boolean("is_anonymous").default(false).notNull(),
   featured: boolean("featured").default(false).notNull(),
   category: text("category"),
+  protocol: text("protocol"),
   featuredOrder: integer("featured_order").default(0),
   // end keeperhub code //
   // biome-ignore lint/suspicious/noExplicitAny: JSONB type - structure validated at application level
