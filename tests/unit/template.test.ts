@@ -129,5 +129,47 @@ describe("template utils", () => {
       expect(fieldPaths).toContain("data.items[0].name");
       expect(fieldPaths).toContain("data.items[0].value");
     });
+
+    it("includes nested fields for objects", () => {
+      const nodeOutputs: NodeOutputs = {
+        n1: {
+          label: "API",
+          data: {
+            data: {
+              user: {
+                id: "u1",
+                name: "Alice",
+                project: {
+                  id: "p1",
+                  name: "Project 1",
+                  tags: ["tag1", "tag2"],
+                  positions: {
+                    x: 100,
+                    y: 200,
+                    z: 300,
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const fields = getAvailableFields(nodeOutputs);
+
+      const fieldPaths = fields.map((f) => f.fieldPath).filter(Boolean);
+      expect(fieldPaths).toContain("data");
+      expect(fieldPaths).toContain("data.user");
+      expect(fieldPaths).toContain("data.user.id");
+      expect(fieldPaths).toContain("data.user.name");
+      expect(fieldPaths).toContain("data.user.project");
+      expect(fieldPaths).toContain("data.user.project.id");
+      expect(fieldPaths).toContain("data.user.project.name");
+      expect(fieldPaths).toContain("data.user.project.tags");
+      expect(fieldPaths).toContain("data.user.project.positions");
+      expect(fieldPaths).toContain("data.user.project.positions.x");
+      expect(fieldPaths).toContain("data.user.project.positions.y");
+      expect(fieldPaths).toContain("data.user.project.positions.z");
+    });
   });
 });
