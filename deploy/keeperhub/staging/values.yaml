@@ -50,6 +50,8 @@ deployment:
         - -c
       args:
         - |
+          echo "Setting up workflow postgres tables..."
+          pnpm exec workflow-postgres-setup
           echo "Running database migrations..."
           pnpm db:push
           echo "Seeding chains..."
@@ -114,9 +116,9 @@ env:
   PARA_ENVIRONMENT:
     type: kv
     value: "beta"
-  WORKFLOW_EMBEDDED_DATA_DIR:
+  WORKFLOW_TARGET_WORLD:
     type: kv
-    value: "/tmp/workflow-data"
+    value: "@workflow/world-postgres"
   NEXT_PUBLIC_API_URL:
     type: kv
     value: "http://localhost:3000"

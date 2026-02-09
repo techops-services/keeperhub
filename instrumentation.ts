@@ -32,6 +32,18 @@ export async function register() {
       console.log("[Metrics] Prometheus dual-write collector initialized");
     }
 
+    // start custom keeperhub code //
+    // Initialize Workflow Postgres World (pg-boss queue polling)
+    if (process.env.WORKFLOW_TARGET_WORLD === "@workflow/world-postgres") {
+      const { getWorld } = await import("workflow/runtime");
+      const world = getWorld();
+      if (world.start) {
+        await world.start();
+        console.log("[Workflow] Postgres World initialized");
+      }
+    }
+    // end keeperhub code //
+
     // Catch unhandled promise rejections (would otherwise be silent)
     process.on("unhandledRejection", (reason) => {
       console.error(
