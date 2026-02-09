@@ -55,6 +55,17 @@ deployment:
       args:
         - |
           echo "Setting up workflow postgres tables..."
+          export WORKFLOW_POSTGRES_URL=$(node -e "
+            const u = process.env.WORKFLOW_POSTGRES_URL || process.env.DATABASE_URL || '';
+            try { new URL(u); console.log(u); } catch {
+              const s = u.indexOf('://') + 3;
+              const a = u.lastIndexOf('@');
+              const c = u.indexOf(':', s);
+              if (s > 3 && a > c && c > s) {
+                console.log(u.slice(0, s) + encodeURIComponent(u.slice(s, c)) + ':' + encodeURIComponent(u.slice(c + 1, a)) + u.slice(a));
+              } else { console.log(u); }
+            }
+          ")
           pnpm exec workflow-postgres-setup
           echo "Running database migrations..."
           pnpm db:push
