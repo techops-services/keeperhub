@@ -112,8 +112,6 @@ export default function HubPage() {
     debouncedSearchQuery,
   ]);
 
-  const topFeatured = featuredWorkflows[0];
-  const carouselWorkflows = featuredWorkflows.slice(1);
 
   useEffect(() => {
     const fetchWorkflows = async (): Promise<void> => {
@@ -174,9 +172,9 @@ export default function HubPage() {
           <p className="text-muted-foreground">Loading workflows...</p>
         ) : (
           <>
-            <HubHero topWorkflow={topFeatured} />
+            <HubHero />
 
-            <FeaturedCarousel workflows={carouselWorkflows} />
+            <FeaturedCarousel workflows={featuredWorkflows} />
 
             <div className="relative right-1/2 left-1/2 -mr-[50vw] -ml-[50vw] w-screen">
               <hr className="border-border" />

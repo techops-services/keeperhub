@@ -2,7 +2,7 @@
 
 import { ChevronLeft, ChevronRight, Eye } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,20 @@ export function FeaturedCarousel({ workflows }: FeaturedCarouselProps) {
   const { data: session } = useSession();
   const [duplicatingIds, setDuplicatingIds] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const arrowVisibility = useMemo((): string => {
+    const count = workflows.length;
+    if (count > 4) {
+      return "hidden sm:flex";
+    }
+    if (count > 3) {
+      return "hidden sm:flex lg:hidden";
+    }
+    if (count > 2) {
+      return "hidden sm:flex md:hidden";
+    }
+    return "hidden";
+  }, [workflows.length]);
 
   const scroll = useCallback((direction: "left" | "right") => {
     const container = scrollRef.current;
@@ -80,7 +94,7 @@ export function FeaturedCarousel({ workflows }: FeaturedCarouselProps) {
     <section className="mb-16">
       <div className="mb-6 flex items-center justify-between">
         <h2 className="font-bold text-3xl">Featured</h2>
-        <div className="flex gap-2">
+        <div className={`gap-2 ${arrowVisibility}`}>
           <Button
             aria-label="Scroll left"
             onClick={() => scroll("left")}
