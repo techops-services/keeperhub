@@ -237,6 +237,23 @@
   right: -0.5px !important;
 }
 
+/* start custom keeperhub code */
+.add-step-button {
+  display: flex;
+  align-items: center;
+}
+
+.add-step-line {
+  display: block;
+  width: 18px;
+  border-top: 1.5px dashed var(--border);
+}
+
+.add-step-button:hover .add-step-line {
+  border-color: var(--primary);
+}
+/* end keeperhub code */
+
 /* Safe area support for mobile devices */
 @supports (height: 100dvh) {
   html,
