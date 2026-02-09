@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { api, type Integration } from "@/lib/api-client";
+import { hasValidDatabaseConfig } from "@/lib/db/connection-utils";
 // start keeperhub
 import { getCustomIntegrationFormHandler } from "@/lib/extension-registry";
 import type { IntegrationConfig } from "@/lib/types/integration";
@@ -167,10 +168,6 @@ export function EditConnectionOverlay({
   const [loading, setLoading] = useState(!hasConfigFromProps);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [_testResult, setTestResult] = useState<{
-    status: "success" | "error";
-    message: string;
-  } | null>(null);
   const [name, setName] = useState(integration.name);
   const [config, setConfig] = useState<Record<string, string>>(() => {
     if (hasConfigFromProps && integrationWithConfig.config) {
@@ -230,25 +227,11 @@ export function EditConnectionOverlay({
       toast.success("Connection updated");
       onSuccess?.();
       closeAll();
-    } catch (error) {
-      console.error("Failed to update integration:", error);
+    } catch {
       toast.error("Failed to update connection");
     } finally {
       setSaving(false);
     }
-  };
-
-  const hasValidDatabaseConfig = (c: Record<string, string>) => {
-    const hasUrl = typeof c.url === "string" && c.url.trim() !== "";
-    const hasParts =
-      typeof c.host === "string" &&
-      c.host.trim() !== "" &&
-      typeof c.username === "string" &&
-      c.username.trim() !== "" &&
-      typeof c.password === "string" &&
-      typeof c.database === "string" &&
-      c.database.trim() !== "";
-    return hasUrl || hasParts;
   };
 
   const handleSave = async () => {
@@ -270,7 +253,6 @@ export function EditConnectionOverlay({
     }
 
     setSaving(true);
-    setTestResult(null);
     try {
       const result = await api.integration.testCredentials({
         type: integration.type,
@@ -337,10 +319,8 @@ export function EditConnectionOverlay({
     }
 
     setTesting(true);
-    setTestResult(null);
     try {
       const result = await runConnectionTest();
-      setTestResult(result);
       if (result.status === "success") {
         toast.success(result.message || "Connection successful");
       } else {
@@ -349,7 +329,6 @@ export function EditConnectionOverlay({
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Connection test failed";
-      setTestResult({ status: "error", message });
       toast.error(message);
     } finally {
       setTesting(false);

@@ -25,6 +25,7 @@ import {
 import { api } from "@/lib/api-client";
 // start keeperhub
 import { useSession } from "@/lib/auth-client";
+import { hasValidDatabaseConfig } from "@/lib/db/connection-utils";
 import { getCustomIntegrationFormHandler } from "@/lib/extension-registry";
 import { integrationsAtom } from "@/lib/integrations-store";
 // end keeperhub
@@ -80,6 +81,7 @@ export function AddConnectionOverlay({
 }: AddConnectionOverlayProps) {
   const { push, closeAll } = useOverlay();
   const [searchQuery, setSearchQuery] = useState("");
+  const [fetchingGateway, setFetchingGateway] = useState(false);
   const isMobile = useIsMobile();
 
   // AI Gateway state
@@ -133,36 +135,45 @@ export function AddConnectionOverlay({
     });
   }, [push, closeAll, onSuccess]);
 
-  const handleSelectType = (type: IntegrationType) => {
-    // If selecting AI Gateway and managed keys are available, show consent modal
+  const fetchAiGatewayAndShow = async (): Promise<void> => {
+    if (fetchingGateway) {
+      return;
+    }
+    setFetchingGateway(true);
+    try {
+      const status = await api.aiGateway.getStatus();
+      setAiGatewayStatus(status);
+      if (status?.enabled && status?.isVercelUser) {
+        setTeamsLoading(true);
+        try {
+          const response = await api.aiGateway.getTeams();
+          setTeams(response.teams);
+        } finally {
+          setTeamsLoading(false);
+        }
+        showConsentModalWithCallbacks();
+      } else {
+        push(ConfigureConnectionOverlay, {
+          type: "ai-gateway" as IntegrationType,
+          onSuccess,
+        });
+      }
+    } finally {
+      setFetchingGateway(false);
+    }
+  };
+
+  const handleSelectType = async (type: IntegrationType): Promise<void> => {
     if (type === "ai-gateway" && shouldUseManagedKeys) {
       showConsentModalWithCallbacks();
       return;
     }
 
-    // If AI Gateway but need to fetch status first
     if (type === "ai-gateway" && aiGatewayStatus === null) {
-      api.aiGateway.getStatus().then((status) => {
-        setAiGatewayStatus(status);
-        if (status?.enabled && status?.isVercelUser) {
-          setTeamsLoading(true);
-          api.aiGateway
-            .getTeams()
-            .then((response) => {
-              setTeams(response.teams);
-            })
-            .finally(() => {
-              setTeamsLoading(false);
-              showConsentModalWithCallbacks();
-            });
-        } else {
-          push(ConfigureConnectionOverlay, { type, onSuccess });
-        }
-      });
+      await fetchAiGatewayAndShow();
       return;
     }
 
-    // Push to configure overlay
     push(ConfigureConnectionOverlay, { type, onSuccess });
   };
 
@@ -311,10 +322,6 @@ export function ConfigureConnectionOverlay({
   const { push, closeAll } = useOverlay();
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [_testResult, setTestResult] = useState<{
-    status: "success" | "error";
-    message: string;
-  } | null>(null);
   const [name, setName] = useState("");
   const [config, setConfig] = useState<Record<string, string>>({});
   // start keeperhub - derive anonymous state from session reactively
@@ -343,26 +350,11 @@ export function ConfigureConnectionOverlay({
       toast.success("Connection created");
       onSuccess?.(newIntegration.id);
       closeAll();
-    } catch (error) {
-      console.error("Failed to save integration:", error);
+    } catch {
       toast.error("Failed to save connection");
     } finally {
       setSaving(false);
     }
-  };
-
-  const hasValidDatabaseConfig = (cfg: Record<string, string>) => {
-    const { url, host, username, password, database } = cfg;
-    const hasUrl = typeof url === "string" && url.trim() !== "";
-    const hasParts =
-      typeof host === "string" &&
-      host.trim() !== "" &&
-      typeof username === "string" &&
-      username.trim() !== "" &&
-      typeof password === "string" &&
-      typeof database === "string" &&
-      database.trim() !== "";
-    return hasUrl || hasParts;
   };
 
   const showSaveAnywayConfirm = (message: string) => {
@@ -404,7 +396,6 @@ export function ConfigureConnectionOverlay({
     }
 
     setSaving(true);
-    setTestResult(null);
     try {
       await validateAndRunSave();
     } catch (error) {
@@ -438,10 +429,8 @@ export function ConfigureConnectionOverlay({
       return;
     }
     setTesting(true);
-    setTestResult(null);
     try {
       const result = await api.integration.testCredentials({ type, config });
-      setTestResult(result);
       if (result.status === "success") {
         toast.success(result.message || "Connection successful");
       } else {
@@ -450,7 +439,6 @@ export function ConfigureConnectionOverlay({
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Connection test failed";
-      setTestResult({ status: "error", message });
       toast.error(message);
     } finally {
       setTesting(false);
