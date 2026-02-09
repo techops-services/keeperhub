@@ -74,10 +74,16 @@ export function getDatabaseErrorMessage(error: unknown): string {
     return "Authentication failed. Please check your database credentials.";
   }
   if (errorMessage.includes("does not exist")) {
-    return `Database error: ${errorMessage}`;
+    return "Database or resource not found. Please verify the database name and user permissions.";
+  }
+  if (errorMessage.includes("timeout") || errorMessage.includes("ETIMEDOUT")) {
+    return "Connection timed out. Please check your database host and network settings.";
+  }
+  if (errorMessage.includes("SSL") || errorMessage.includes("TLS")) {
+    return "SSL/TLS connection error. Try a different SSL mode (e.g. Require or Disable).";
   }
 
-  return errorMessage;
+  return "Database connection failed. Please verify your connection settings.";
 }
 
 export type DatabaseConnectionConfig = {
@@ -88,6 +94,25 @@ export type DatabaseConnectionConfig = {
   password?: string;
   database?: string;
 };
+
+/**
+ * Checks whether the given config has enough fields to attempt a database connection.
+ * Accepts either a connection URL or the individual host/username/password/database fields.
+ */
+export function hasValidDatabaseConfig(
+  config: Record<string, string | undefined>
+): boolean {
+  const hasUrl = typeof config.url === "string" && config.url.trim() !== "";
+  const hasParts =
+    typeof config.host === "string" &&
+    config.host.trim() !== "" &&
+    typeof config.username === "string" &&
+    config.username.trim() !== "" &&
+    typeof config.password === "string" &&
+    typeof config.database === "string" &&
+    config.database.trim() !== "";
+  return hasUrl || hasParts;
+}
 
 /**
  * Builds a single PostgreSQL connection URL from integration config.
@@ -110,7 +135,7 @@ export function buildDatabaseUrlFromConfig(
 
   if (hasParts) {
     const host = config.host?.trim() ?? "";
-    const port = (config.port?.trim() || "5432").trim() || "5432";
+    const port = config.port?.trim() || "5432";
     const username = config.username?.trim() ?? "";
     const password = config.password ?? "";
     const database = config.database?.trim() ?? "";
