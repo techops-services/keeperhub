@@ -10,6 +10,10 @@ import {
 import { getGasStrategy } from "@/keeperhub/lib/web3/gas-strategy";
 import { getNonceManager } from "@/keeperhub/lib/web3/nonce-manager";
 import {
+  isSponsorshipAvailable,
+  sendSponsoredTransaction,
+} from "@/keeperhub/lib/web3/sponsorship";
+import {
   type TransactionContext,
   withNonceSession,
 } from "@/keeperhub/lib/web3/transaction-manager";
@@ -210,6 +214,54 @@ export async function POST(request: Request) {
       txContext,
       walletAddress,
       async (session) => {
+        // --- Gas sponsorship path ---
+        if (await isSponsorshipAvailable(chainId)) {
+          let calls: Array<{
+            to: `0x${string}`;
+            data?: `0x${string}`;
+            value?: bigint;
+          }>;
+
+          if (tokenAddress) {
+            const readProvider = new ethers.JsonRpcProvider(rpcUrl);
+            const readContract = new ethers.Contract(
+              tokenAddress,
+              ERC20_TRANSFER_ABI,
+              readProvider
+            );
+            const decimals = await readContract.decimals();
+            const amountWei = ethers.parseUnits(amount, decimals);
+            const iface = new ethers.Interface(ERC20_TRANSFER_ABI);
+            const encodedData = iface.encodeFunctionData("transfer", [
+              recipient,
+              amountWei,
+            ]);
+            calls = [
+              {
+                to: tokenAddress as `0x${string}`,
+                data: encodedData as `0x${string}`,
+              },
+            ];
+          } else {
+            const amountWei = ethers.parseEther(amount);
+            calls = [{ to: recipient as `0x${string}`, value: amountWei }];
+          }
+
+          const sponsoredResult = await sendSponsoredTransaction({
+            organizationId,
+            chainId,
+            rpcUrl,
+            calls,
+          });
+
+          if (!sponsoredResult.success) {
+            throw new Error(sponsoredResult.error);
+          }
+
+          return { txHash: sponsoredResult.txHash };
+        }
+        // --- Direct submission path (no sponsorship) ---
+
         const nonceManager = getNonceManager();
         const gasStrategy = getGasStrategy();
 

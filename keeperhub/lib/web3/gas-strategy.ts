@@ -49,6 +49,9 @@ export type GasStrategyConfig = {
 
   // Block sample size
   volatilitySampleBlocks: number;
+
+  // Gas sponsorship (EIP-7702 via Gelato)
+  gasSponsorshipEnabled?: boolean;
 };
 
 type ChainGasConfig = GasStrategyConfig;

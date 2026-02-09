@@ -27,6 +27,12 @@ export {
 } from "./nonce-manager";
 
 export {
+  isSponsorshipAvailable,
+  type SponsoredTxResult,
+  sendSponsoredTransaction,
+} from "./sponsorship";
+
+export {
   executeContractTransaction,
   executeTransaction,
   getCurrentNonce,
