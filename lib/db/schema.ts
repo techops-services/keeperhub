@@ -151,6 +151,11 @@ export const creditTransactions = pgTable(
     type: text("type")
       .notNull()
       .$type<"deposit" | "workflow_run" | "bonus" | "adjustment">(),
+    // Transaction status for reservation flow
+    status: text("status")
+      .notNull()
+      .default("completed")
+      .$type<"pending" | "completed" | "refunded">(),
     amount: integer("amount").notNull(), // Positive for deposits, negative for usage
     balanceAfter: integer("balance_after").notNull(),
     // For deposits
@@ -164,12 +169,15 @@ export const creditTransactions = pgTable(
     // Metadata
     note: text("note"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at"),
   },
   (table) => [
     index("idx_credit_transactions_org").on(table.organizationId),
     index("idx_credit_transactions_type").on(table.type),
     index("idx_credit_transactions_created").on(table.createdAt),
     index("idx_credit_transactions_tx_hash").on(table.txHash),
+    index("idx_credit_transactions_status").on(table.status),
+    index("idx_credit_transactions_execution").on(table.executionId),
   ]
 );
 // end keeperhub code //
@@ -263,6 +271,14 @@ export const workflowExecutions = pgTable("workflow_executions", {
   lastSuccessfulNodeId: text("last_successful_node_id"),
   lastSuccessfulNodeName: text("last_successful_node_name"),
   executionTrace: jsonb("execution_trace").$type<string[]>(),
+  // start custom keeperhub code //
+  // Cost tracking fields
+  estimatedCost: integer("estimated_cost"), // Credits estimated before execution
+  actualCost: integer("actual_cost"), // Credits actually charged
+  // biome-ignore lint/suspicious/noExplicitAny: JSONB type - cost breakdown structure
+  costBreakdown: jsonb("cost_breakdown").$type<any>(), // Detailed breakdown: blocks, functions, gas, fee
+  gasStrategy: text("gas_strategy").$type<"conservative" | "optimized">(), // Gas strategy used
+  // end keeperhub code //
 });
 
 // Workflow execution logs to track individual node executions

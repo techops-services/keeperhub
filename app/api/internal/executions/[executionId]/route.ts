@@ -2,9 +2,45 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
+import {
+  finalizeReservation,
+  releaseReservation,
+} from "@/keeperhub/lib/billing/credit-service";
 import { authenticateInternalService } from "@/keeperhub/lib/internal-service-auth";
 import { db } from "@/lib/db";
 import { workflowExecutions } from "@/lib/db/schema";
+
+type ExecutionStatus = "running" | "success" | "error";
+
+async function handleCreditReservation(
+  executionId: string,
+  status: ExecutionStatus
+): Promise<void> {
+  if (status === "success") {
+    const result = await finalizeReservation(executionId);
+    if (!result.success) {
+      console.error(
+        `[Executions] Failed to finalize credit reservation for ${executionId}:`,
+        result.error
+      );
+    }
+    return;
+  }
+
+  if (status === "error") {
+    const result = await releaseReservation(executionId);
+    if (!result.success) {
+      console.error(
+        `[Executions] Failed to release credit reservation for ${executionId}:`,
+        result.error
+      );
+    } else if (result.creditsReturned > 0) {
+      console.log(
+        `[Executions] Released ${result.creditsReturned} credits for failed execution ${executionId}`
+      );
+    }
+  }
+}
 
 export async function PATCH(
   request: Request,
@@ -22,7 +58,6 @@ export async function PATCH(
   const body = await request.json();
   const { status, error } = body;
 
-  type ExecutionStatus = "running" | "success" | "error";
   const validStatuses: ExecutionStatus[] = ["running", "success", "error"];
 
   // Validate status
@@ -63,6 +98,9 @@ export async function PATCH(
     .update(workflowExecutions)
     .set(updateData)
     .where(eq(workflowExecutions.id, executionId));
+
+  // Handle credit reservation based on execution outcome
+  await handleCreditReservation(executionId, typedStatus);
 
   return NextResponse.json({ success: true });
 }

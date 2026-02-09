@@ -5,6 +5,12 @@
 import "server-only";
 
 import { eq } from "drizzle-orm";
+// start custom keeperhub code //
+import {
+  finalizeReservation,
+  releaseReservation,
+} from "@/keeperhub/lib/billing/credit-service";
+// end keeperhub code //
 import { db } from "@/lib/db";
 import { workflowExecutionLogs, workflowExecutions } from "@/lib/db/schema";
 
@@ -103,6 +109,27 @@ export async function logWorkflowCompleteDb(
       currentNodeName: null,
     })
     .where(eq(workflowExecutions.id, params.executionId));
+
+  // start custom keeperhub code //
+  // Handle credit reservation based on execution outcome
+  if (params.status === "success") {
+    const result = await finalizeReservation(params.executionId);
+    if (!result.success) {
+      console.error(
+        `[WorkflowLogging] Failed to finalize credit reservation for ${params.executionId}:`,
+        result.error
+      );
+    }
+  } else if (params.status === "error") {
+    const result = await releaseReservation(params.executionId);
+    if (!result.success) {
+      console.error(
+        `[WorkflowLogging] Failed to release credit reservation for ${params.executionId}:`,
+        result.error
+      );
+    }
+  }
+  // end keeperhub code //
 }
 
 // ============================================================================

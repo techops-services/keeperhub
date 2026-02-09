@@ -3,7 +3,11 @@ import { NextResponse } from "next/server";
 import { start } from "workflow/api";
 // start custom keeperhub code //
 import { authenticateApiKey } from "@/keeperhub/lib/api-key-auth";
-import { deductCredit } from "@/keeperhub/lib/billing/credit-service";
+import {
+  createCostBreakdown,
+  estimateWorkflowCost,
+} from "@/keeperhub/lib/billing/cost-calculator";
+import { reserveCredits } from "@/keeperhub/lib/billing/credit-service";
 import { authenticateInternalService } from "@/keeperhub/lib/internal-service-auth";
 import {
   getMetricsCollector,
@@ -11,6 +15,7 @@ import {
   MetricNames,
 } from "@/keeperhub/lib/metrics";
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
+import type { TriggerType } from "@/keeperhub/lib/web3/gas-strategy";
 // end keeperhub code //
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -241,19 +246,35 @@ export async function POST(
     }
 
     // start custom keeperhub code //
-    // Deduct 1 credit before executing workflow (if workflow has an organizationId)
+    // Determine trigger type for gas strategy
+    const triggerType: TriggerType = isInternalExecution
+      ? "scheduled"
+      : "manual";
+
+    // Estimate workflow cost before executing (if workflow has an organizationId)
     if (workflow.organizationId) {
-      const deductResult = await deductCredit({
+      // Estimate workflow execution cost
+      const costEstimate = await estimateWorkflowCost(
+        workflow.nodes as WorkflowNode[],
+        workflow.edges as WorkflowEdge[],
+        undefined, // chainId auto-detected from nodes
+        triggerType
+      );
+
+      // Reserve credits (will be finalized on success or released on failure)
+      const reserveResult = await reserveCredits({
         organizationId: workflow.organizationId,
         workflowId,
         executionId,
+        amount: costEstimate.totalCredits,
+        breakdown: createCostBreakdown(costEstimate),
       });
 
-      if (!deductResult.success) {
+      if (!reserveResult.success) {
         const errorMessage =
-          deductResult.error === "Insufficient credits"
+          reserveResult.error === "Insufficient credits"
             ? "Insufficient credits. Please purchase more credits to continue."
-            : deductResult.error;
+            : reserveResult.error;
 
         // Update execution status to failed
         await db
@@ -269,17 +290,24 @@ export async function POST(
           {
             error: errorMessage,
             currentBalance:
-              "currentBalance" in deductResult
-                ? deductResult.currentBalance
+              "currentBalance" in reserveResult
+                ? reserveResult.currentBalance
                 : undefined,
+            required: costEstimate.totalCredits,
+            costBreakdown: {
+              blocks: costEstimate.blockCost,
+              functionCalls: costEstimate.functionCost,
+              gasCost: costEstimate.gasCostCredits,
+              platformFee: costEstimate.platformFee,
+              gasStrategy: costEstimate.gasStrategy,
+            },
           },
-          { status: deductResult.error === "Insufficient credits" ? 402 : 500 }
+          { status: reserveResult.error === "Insufficient credits" ? 402 : 500 }
         );
       }
     }
 
     // Record workflow execution metric in API process (workflow runs in separate context)
-    const triggerType = isInternalExecution ? "scheduled" : "manual";
     const metrics = getMetricsCollector();
     metrics.incrementCounter(MetricNames.WORKFLOW_EXECUTIONS_TOTAL, {
       [LabelKeys.TRIGGER_TYPE]: triggerType,
