@@ -238,19 +238,13 @@
 }
 
 /* start custom keeperhub code */
-.add-step-button {
-  display: flex;
-  align-items: center;
+.add-step-connector line {
+  stroke: var(--border);
+  transition: stroke 150ms;
 }
 
-.add-step-line {
-  display: block;
-  width: 18px;
-  border-top: 1.5px dashed var(--border);
-}
-
-.add-step-button:hover .add-step-line {
-  border-color: var(--primary);
+.add-step-button:hover + .add-step-connector line {
+  stroke: var(--primary);
 }
 /* end keeperhub code */
 
