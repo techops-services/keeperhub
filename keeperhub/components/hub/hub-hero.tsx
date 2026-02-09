@@ -53,7 +53,6 @@ export function HubHero({ topWorkflow }: HubHeroProps) {
     }
   };
 
-
   return (
     <div className="mb-16 grid items-center gap-12 pt-8 lg:grid-cols-2">
       <div>
