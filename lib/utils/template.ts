@@ -57,7 +57,7 @@ function processNewFormatReference(
     if (nodeOutput) {
       return formatValue(nodeOutput.data);
     }
-    return match;
+    return "";
   }
 
   const value = resolveFieldPath(nodeOutputs[nodeId]?.data, fieldPath);
@@ -65,14 +65,14 @@ function processNewFormatReference(
     return formatValue(value);
   }
 
-  return match;
+  return "";
 }
 
 // Helper function to process legacy $ references ($nodeId)
 function processLegacyDollarReference(
   trimmed: string,
   nodeOutputs: NodeOutputs,
-  match: string
+  _match: string
 ): string {
   const withoutDollar = trimmed.substring(1);
 
@@ -81,7 +81,7 @@ function processLegacyDollarReference(
     if (nodeOutput) {
       return formatValue(nodeOutput.data);
     }
-    return match;
+    return "";
   }
 
   const value = resolveExpressionById(withoutDollar, nodeOutputs);
@@ -89,21 +89,21 @@ function processLegacyDollarReference(
     return formatValue(value);
   }
 
-  return match;
+  return "";
 }
 
 // Helper function to process legacy label references
 function processLegacyLabelReference(
   trimmed: string,
   nodeOutputs: NodeOutputs,
-  match: string
+  _match: string
 ): string {
   if (!(trimmed.includes(".") || trimmed.includes("["))) {
     const nodeOutput = findNodeOutputByLabel(trimmed, nodeOutputs);
     if (nodeOutput) {
       return formatValue(nodeOutput.data);
     }
-    return match;
+    return "";
   }
 
   const value = resolveExpression(trimmed, nodeOutputs);
@@ -111,7 +111,7 @@ function processLegacyLabelReference(
     return formatValue(value);
   }
 
-  return match;
+  return "";
 }
 
 /**
@@ -180,7 +180,7 @@ export function processConfigTemplates(
  * Resolve a field path in data like "field.nested" or "items[0]"
  */
 function resolveFieldPath(data: unknown, fieldPath: string): unknown {
-  if (!data) {
+  if (data === null || data === undefined) {
     return;
   }
 
@@ -445,33 +445,42 @@ export function extractTemplateVariables(template: string): string[] {
 
 /**
  * Get all available fields from node outputs for autocomplete/suggestions
+ * Returns entries with nodeId so consumers can build {{@nodeId:DisplayName.fieldPath}} templates.
  */
 export function getAvailableFields(nodeOutputs: NodeOutputs): Array<{
+  nodeId: string;
   nodeLabel: string;
   field: string;
+  fieldPath: string;
   path: string;
   sample?: unknown;
 }> {
   const fields: Array<{
+    nodeId: string;
     nodeLabel: string;
     field: string;
+    fieldPath: string;
     path: string;
     sample?: unknown;
   }> = [];
 
-  for (const output of Object.values(nodeOutputs)) {
+  for (const [nodeId, output] of Object.entries(nodeOutputs)) {
     // Add the whole node
     fields.push({
+      nodeId,
       nodeLabel: output.label,
       field: "",
+      fieldPath: "",
       path: `{{${output.label}}}`,
       sample: output.data,
     });
 
     // Add individual fields if data is an object
     if (output.data && typeof output.data === "object") {
-      extractFields(output.data, output.label, fields, {
+      extractFields(output.data, output.label, nodeId, fields, {
         currentPath: `{{${output.label}`,
+        pathFromRoot: "",
+        maxDepth: 5,
       });
     }
   }
@@ -479,44 +488,118 @@ export function getAvailableFields(nodeOutputs: NodeOutputs): Array<{
   return fields;
 }
 
+type ExtractFieldsEntry = {
+  nodeId: string;
+  nodeLabel: string;
+  field: string;
+  fieldPath: string;
+  path: string;
+  sample?: unknown;
+};
+
+function pushArrayElementFields(
+  key: string,
+  value: unknown[],
+  currentPath: string,
+  pathFromRoot: string,
+  nodeLabel: string,
+  nodeId: string,
+  fields: ExtractFieldsEntry[],
+  maxDepth: number,
+  currentDepth: number
+): void {
+  const basePathFromRoot = pathFromRoot ? `${pathFromRoot}.${key}` : key;
+  const baseDisplayPath = `${currentPath}.${key}`;
+  const indicesToSuggest: number[] = [0];
+  if (value.length > 1) {
+    indicesToSuggest.push(value.length - 1);
+  }
+
+  for (const i of indicesToSuggest) {
+    const elementPath = `${basePathFromRoot}[${i}]`;
+    const displayPath = `${baseDisplayPath}[${i}]}}`;
+    const element = value[i];
+    fields.push({
+      nodeId,
+      nodeLabel,
+      field: `${key}[${i}]`,
+      fieldPath: elementPath,
+      path: displayPath,
+      sample: element,
+    });
+    const canRecurse =
+      element &&
+      typeof element === "object" &&
+      !Array.isArray(element) &&
+      currentDepth + 1 < maxDepth;
+    if (canRecurse) {
+      extractFields(element, nodeLabel, nodeId, fields, {
+        currentPath: `${baseDisplayPath}[${i}]`,
+        pathFromRoot: elementPath,
+        maxDepth,
+        currentDepth: currentDepth + 1,
+      });
+    }
+  }
+}
+
 /**
- * Recursively extract fields from an object
+ * Recursively extract fields from an object for autocomplete.
+ * For arrays: suggests [0] and, if length > 1, [length-1] (first and last), so any index can be used by typing it.
+ * Recurse into each suggested element when it is an object.
+ * Uses same path semantics as resolveFieldPath (key[index]) so suggested paths resolve at runtime.
  */
 function extractFields(
   obj: Record<string, unknown> | unknown,
   nodeLabel: string,
-  fields: Array<{
-    nodeLabel: string;
-    field: string;
-    path: string;
-    sample?: unknown;
-  }>,
+  nodeId: string,
+  fields: ExtractFieldsEntry[],
   options: {
     currentPath: string;
+    pathFromRoot: string;
     maxDepth?: number;
     currentDepth?: number;
   }
 ): void {
-  const { currentPath, maxDepth = 3, currentDepth = 0 } = options;
+  const { currentPath, pathFromRoot, maxDepth = 5, currentDepth = 0 } = options;
 
   if (currentDepth >= maxDepth || !obj || typeof obj !== "object") {
     return;
   }
 
   for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
-    const fieldPath = `${currentPath}.${key}}}`;
+    const nextPathFromRoot = pathFromRoot ? `${pathFromRoot}.${key}` : key;
+    const displayPath = `${currentPath}.${key}}}`;
 
     fields.push({
+      nodeId,
       nodeLabel,
       field: key,
-      path: fieldPath,
+      fieldPath: nextPathFromRoot,
+      path: displayPath,
       sample: value,
     });
 
-    // Recurse for nested objects (but not arrays)
-    if (value && typeof value === "object" && !Array.isArray(value)) {
-      extractFields(value, nodeLabel, fields, {
+    if (!value) {
+      continue;
+    }
+
+    if (Array.isArray(value)) {
+      pushArrayElementFields(
+        key,
+        value,
+        currentPath,
+        pathFromRoot,
+        nodeLabel,
+        nodeId,
+        fields,
+        maxDepth,
+        currentDepth
+      );
+    } else if (typeof value === "object") {
+      extractFields(value, nodeLabel, nodeId, fields, {
         currentPath: `${currentPath}.${key}`,
+        pathFromRoot: nextPathFromRoot,
         maxDepth,
         currentDepth: currentDepth + 1,
       });

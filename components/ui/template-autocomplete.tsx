@@ -1,16 +1,56 @@
 "use client";
 
-import { useAtom } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { Check } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { api } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
-import { edgesAtom, nodesAtom, WorkflowTriggerEnum, type WorkflowNode } from "@/lib/workflow-store";
+import {
+  getAvailableFields,
+  type NodeOutputs,
+} from "@/lib/utils/template";
+import {
+  currentWorkflowIdAtom,
+  edgesAtom,
+  executionLogsAtom,
+  type ExecutionLogEntry,
+  lastExecutionLogsAtom,
+  nodesAtom,
+  WorkflowTriggerEnum,
+  type WorkflowNode,
+} from "@/lib/workflow-store";
 import { findActionById } from "@/plugins";
 import { getTriggerOutputFields } from "@/keeperhub/lib/trigger-output-fields";
 // start custom keeperhub code //
 import { getReadContractOutputFields } from "@/keeperhub/lib/action-output-fields";
-// end keeperhub code //
+
+/** Map of nodeId -> execution log entry. Used for last-run fallback in template autocomplete. */
+type ExecutionLogsByNodeId = Record<string, ExecutionLogEntry>;
+
+/** Build nodeId -> log entry map from API execution logs response. */
+function buildExecutionLogsMap(
+  logs: Array<{
+    nodeId: string;
+    nodeName: string;
+    nodeType: string;
+    status: "pending" | "running" | "success" | "error";
+    output?: unknown;
+  }>
+): ExecutionLogsByNodeId {
+  const map: ExecutionLogsByNodeId = {};
+  for (const log of logs) {
+    map[log.nodeId] = {
+      nodeId: log.nodeId,
+      nodeName: log.nodeName,
+      nodeType: log.nodeType,
+      status: log.status,
+      output: log.output,
+    };
+  }
+  return map;
+}
+// end custom keeperhub code //
 
 type TemplateAutocompleteProps = {
   isOpen: boolean;
@@ -232,6 +272,11 @@ const getCommonFields = (node: WorkflowNode) => {
   return [{ field: "data", description: "Output data" }];
 };
 
+// Sanitize nodeId the same way as workflow executor for consistent lookup
+function sanitizeNodeId(nodeId: string): string {
+  return nodeId.replace(/[^a-zA-Z0-9]/g, "_");
+}
+
 export function TemplateAutocomplete({
   isOpen,
   position,
@@ -242,8 +287,18 @@ export function TemplateAutocomplete({
 }: TemplateAutocompleteProps) {
   const [nodes] = useAtom(nodesAtom);
   const [edges] = useAtom(edgesAtom);
+  // start custom keeperhub code //
+  const executionLogs = useAtomValue(executionLogsAtom);
+  const currentWorkflowId = useAtomValue(currentWorkflowIdAtom);
+  const lastExecutionLogs = useAtomValue(lastExecutionLogsAtom);
+  const setLastExecutionLogs = useSetAtom(lastExecutionLogsAtom);
+  const currentWorkflowIdRef = useRef<string | null>(null);
+  const lastFetchWorkflowIdRef = useRef<string | null>(null);
+  currentWorkflowIdRef.current = currentWorkflowId;
+  // end custom keeperhub code //
   const [selectedIndex, setSelectedIndex] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
 
   // Ensure we're mounted before trying to use portal
@@ -251,6 +306,75 @@ export function TemplateAutocomplete({
     setMounted(true);
     return () => setMounted(false);
   }, []);
+
+  // start custom keeperhub code //
+  // Lazy-load last execution logs when autocomplete opens and we have no logs for this workflow.
+  // Race guards: (1) lastFetchWorkflowIdRef prevents double-fetch for same workflow;
+  // (2) only set state when currentWorkflowIdRef.current === workflowId so we never apply stale data after navigation.
+  useEffect(() => {
+    const alreadyHaveLogs =
+      lastExecutionLogs.workflowId === currentWorkflowId;
+    const fetchAlreadyInProgress =
+      lastFetchWorkflowIdRef.current === currentWorkflowId;
+    const shouldNotFetch =
+      !isOpen ||
+      !currentWorkflowId ||
+      alreadyHaveLogs ||
+      fetchAlreadyInProgress;
+
+    if (shouldNotFetch) return;
+
+    const workflowId = currentWorkflowId;
+    lastFetchWorkflowIdRef.current = workflowId;
+
+    let cancelled = false;
+
+    const fetchLogs = async () => {
+      try {
+        const executions = await api.workflow.getExecutions(workflowId);
+        if (cancelled) {
+          return;
+        }
+        const latest = executions[0];
+        if (!latest?.id) {
+          lastFetchWorkflowIdRef.current = null;
+          return;
+        }
+
+        const { logs } = await api.workflow.getExecutionLogs(latest.id);
+        if (cancelled) {
+          return;
+        }
+
+        const logsByNodeId = buildExecutionLogsMap(logs);
+
+        if (
+          !cancelled &&
+          currentWorkflowIdRef.current === workflowId
+        ) {
+          setLastExecutionLogs({ workflowId, logs: logsByNodeId });
+        }
+      } catch {
+        // Non-blocking: keep getCommonFields fallback
+      } finally {
+        if (lastFetchWorkflowIdRef.current === workflowId) {
+          lastFetchWorkflowIdRef.current = null;
+        }
+      }
+    };
+
+    fetchLogs();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isOpen,
+    currentWorkflowId,
+    lastExecutionLogs.workflowId,
+    setLastExecutionLogs,
+  ]);
+  // end custom keeperhub code //
 
   // Find all nodes that come before the current node
   const getUpstreamNodes = () => {
@@ -293,26 +417,79 @@ export function TemplateAutocomplete({
 
   for (const node of upstreamNodes) {
     const nodeName = getNodeDisplayName(node);
-    const fields = getCommonFields(node);
+    // start custom keeperhub code //
+    // 1) Prefer current execution in runtime; 2) else last execution output; 3) else getCommonFields
+    const runtimeOutput = executionLogs[node.id]?.output;
+    const hasRuntimeOutput =
+      runtimeOutput !== undefined && runtimeOutput !== null;
+    const lastLogsForWorkflow =
+      lastExecutionLogs.workflowId === currentWorkflowId
+        ? lastExecutionLogs.logs
+        : {};
+    const lastRunOutput = lastLogsForWorkflow[node.id]?.output;
+    const hasLastRunOutput =
+      lastRunOutput !== undefined && lastRunOutput !== null;
 
-    // Add node itself
-    options.push({
-      type: "node",
-      nodeId: node.id,
-      nodeName,
-      template: `{{@${node.id}:${nodeName}}}`,
-    });
+    const outputToUse = hasRuntimeOutput
+      ? runtimeOutput
+      : hasLastRunOutput
+        ? lastRunOutput
+        : null;
 
-    // Add fields
-    for (const field of fields) {
+    if (outputToUse !== null) {
+      const sanitizedId = sanitizeNodeId(node.id);
+      const nodeOutputs: NodeOutputs = {
+        [sanitizedId]: {
+          label: nodeName,
+          data: outputToUse,
+        },
+      };
+      const runtimeFields = getAvailableFields(nodeOutputs);
+
       options.push({
-        type: "field",
+        type: "node",
         nodeId: node.id,
         nodeName,
-        field: field.field,
-        description: field.description,
-        template: `{{@${node.id}:${nodeName}.${field.field}}}`,
+        template: `{{@${node.id}:${nodeName}}}`,
       });
+
+      for (const entry of runtimeFields) {
+        if (entry.fieldPath === "" && entry.field === "") {
+          continue;
+        }
+        const fieldPath = entry.fieldPath || entry.field;
+        options.push({
+          type: "field",
+          nodeId: node.id,
+          nodeName,
+          field: fieldPath,
+          description: undefined,
+          template: `{{@${node.id}:${nodeName}.${fieldPath}}}`,
+        });
+      }
+      // end custom keeperhub code //
+    } else {
+      const fields = getCommonFields(node);
+
+      // Add node itself
+      options.push({
+        type: "node",
+        nodeId: node.id,
+        nodeName,
+        template: `{{@${node.id}:${nodeName}}}`,
+      });
+
+      // Add fields
+      for (const field of fields) {
+        options.push({
+          type: "field",
+          nodeId: node.id,
+          nodeName,
+          field: field.field,
+          description: field.description,
+          template: `{{@${node.id}:${nodeName}.${field.field}}}`,
+        });
+      }
     }
   }
 
@@ -363,15 +540,15 @@ export function TemplateAutocomplete({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, filteredOptions, selectedIndex, onSelect, onClose]);
 
-  // Scroll selected item into view
+  // Scroll selected item into view (options live inside the scrollable list, not menuRef)
   useEffect(() => {
-    if (menuRef.current) {
-      const selectedElement = menuRef.current.children[
-        selectedIndex
-      ] as HTMLElement;
-      if (selectedElement) {
-        selectedElement.scrollIntoView({ block: "nearest" });
-      }
+    const list = listRef.current;
+    if (!list) {
+      return
+    };
+    const selectedElement = list.children[selectedIndex] as HTMLElement;
+    if (selectedElement) {
+      selectedElement.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
   }, [selectedIndex]);
 
@@ -387,14 +564,14 @@ export function TemplateAutocomplete({
 
   const menuContent = (
     <div
-      className="fixed z-[9999] w-80 rounded-lg border bg-popover p-1 text-popover-foreground shadow-md"
+      className="fixed z-9999 w-80 rounded-lg border bg-popover p-1 text-popover-foreground shadow-md"
       ref={menuRef}
       style={{
         top: `${adjustedPosition.top}px`,
         left: `${adjustedPosition.left}px`,
       }}
     >
-      <div className="max-h-60 overflow-y-auto">
+      <div ref={listRef} className="max-h-60 overflow-y-auto">
         {filteredOptions.map((option, index) => (
           <div
             className={cn(

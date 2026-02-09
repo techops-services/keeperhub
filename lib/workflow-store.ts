@@ -87,6 +87,17 @@ export type ExecutionLogEntry = {
 // Map of nodeId -> execution log entry for the currently selected execution
 export const executionLogsAtom = atom<Record<string, ExecutionLogEntry>>({});
 
+// Last execution logs per workflow (for template autocomplete when no run is selected)
+export type LastExecutionLogsState = {
+  workflowId: string | null;
+  logs: Record<string, ExecutionLogEntry>;
+};
+
+export const lastExecutionLogsAtom = atom<LastExecutionLogsState>({
+  workflowId: null,
+  logs: {},
+});
+
 // Autosave functionality
 let autosaveTimeoutId: NodeJS.Timeout | null = null;
 const AUTOSAVE_DELAY = 1000; // 1 second debounce for field typing
@@ -486,6 +497,7 @@ export const resetWorkflowStateForOrgSwitchAtom = atom(null, (_get, set) => {
   set(workflowNotFoundAtom, false);
   set(selectedExecutionIdAtom, null);
   set(executionLogsAtom, {});
+  set(lastExecutionLogsAtom, { workflowId: null, logs: {} });
   set(hasUnsavedChangesAtom, false);
   set(historyAtom, []);
   set(futureAtom, []);
