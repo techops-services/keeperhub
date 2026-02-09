@@ -244,6 +244,7 @@ describe("workflow-codegen condition validation", () => {
 describe("runtime condition evaluation", () => {
   describe("KEEP-1284: missing data should throw error", () => {
     it("should throw error when referenced node output does not exist", () => {
+      // When evaluation throws, no result is returned; executor passes values: undefined
       const expression = "{{@nonExistentNode:Label.value}} > 100";
       const outputs = {}; // No outputs available
 
@@ -285,6 +286,22 @@ describe("runtime condition evaluation", () => {
       );
     });
 
+    it("should return boolean result with empty resolvedValues when expression is boolean", () => {
+      const resultTrue = evaluateConditionExpression(true, {});
+      expect(resultTrue.result).toBe(true);
+      expect(resultTrue.resolvedValues).toEqual({});
+
+      const resultFalse = evaluateConditionExpression(false, {});
+      expect(resultFalse.result).toBe(false);
+      expect(resultFalse.resolvedValues).toEqual({});
+    });
+
+    it("should return result with empty resolvedValues when expression has no template variables", () => {
+      const result = evaluateConditionExpression("true === true", {});
+      expect(result.result).toBe(true);
+      expect(result.resolvedValues).toEqual({});
+    });
+
     it("should succeed when all referenced data exists", () => {
       const expression = "{{@node1:Label.value}} > 100";
       const outputs = {
@@ -304,6 +321,8 @@ describe("runtime condition evaluation", () => {
 
       const result = evaluateConditionExpression(expression, outputs);
       expect(result.result).toBe(true);
+      expect(result.resolvedValues).toHaveProperty("Label.count", 0);
+      expect(Object.keys(result.resolvedValues)).toHaveLength(1);
     });
 
     it("should succeed when comparing to empty string (falsy but valid)", () => {
@@ -314,6 +333,8 @@ describe("runtime condition evaluation", () => {
 
       const result = evaluateConditionExpression(expression, outputs);
       expect(result.result).toBe(true);
+      expect(result.resolvedValues).toHaveProperty("Label.name", "");
+      expect(Object.keys(result.resolvedValues)).toHaveLength(1);
     });
 
     it("should resolve nested array path (data.carts[0].products[0].id)", () => {

@@ -57,7 +57,7 @@ function processNewFormatReference(
     if (nodeOutput) {
       return formatValue(nodeOutput.data);
     }
-    return match;
+    return "";
   }
 
   const value = resolveFieldPath(nodeOutputs[nodeId]?.data, fieldPath);
@@ -65,14 +65,14 @@ function processNewFormatReference(
     return formatValue(value);
   }
 
-  return match;
+  return "";
 }
 
 // Helper function to process legacy $ references ($nodeId)
 function processLegacyDollarReference(
   trimmed: string,
   nodeOutputs: NodeOutputs,
-  match: string
+  _match: string
 ): string {
   const withoutDollar = trimmed.substring(1);
 
@@ -81,7 +81,7 @@ function processLegacyDollarReference(
     if (nodeOutput) {
       return formatValue(nodeOutput.data);
     }
-    return match;
+    return "";
   }
 
   const value = resolveExpressionById(withoutDollar, nodeOutputs);
@@ -89,21 +89,21 @@ function processLegacyDollarReference(
     return formatValue(value);
   }
 
-  return match;
+  return "";
 }
 
 // Helper function to process legacy label references
 function processLegacyLabelReference(
   trimmed: string,
   nodeOutputs: NodeOutputs,
-  match: string
+  _match: string
 ): string {
   if (!(trimmed.includes(".") || trimmed.includes("["))) {
     const nodeOutput = findNodeOutputByLabel(trimmed, nodeOutputs);
     if (nodeOutput) {
       return formatValue(nodeOutput.data);
     }
-    return match;
+    return "";
   }
 
   const value = resolveExpression(trimmed, nodeOutputs);
@@ -111,7 +111,7 @@ function processLegacyLabelReference(
     return formatValue(value);
   }
 
-  return match;
+  return "";
 }
 
 /**
@@ -180,7 +180,7 @@ export function processConfigTemplates(
  * Resolve a field path in data like "field.nested" or "items[0]"
  */
 function resolveFieldPath(data: unknown, fieldPath: string): unknown {
-  if (!data) {
+  if (data === null || data === undefined) {
     return;
   }
 

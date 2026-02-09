@@ -310,9 +310,11 @@ async function executeActionStep(input: {
 
     return await module[systemAction.stepFunction]({
       condition: evaluatedCondition,
-      // Include original expression and resolved values for logging purposes
+      // Include original expression only when evaluation succeeded (avoid raw template in UI on failure)
       expression:
-        typeof originalExpression === "string" ? originalExpression : undefined,
+        !evaluationError && typeof originalExpression === "string"
+          ? originalExpression
+          : undefined,
       values:
         Object.keys(resolvedValues).length > 0 ? resolvedValues : undefined,
       _evaluationError: evaluationError,
@@ -454,15 +456,15 @@ function replaceConfigTemplate(
   });
 
   if (!output) {
-    console.log("[Template] No output for node, leaving template as-is");
-    return match;
+    console.log("[Template] No output for node, returning empty string");
+    return "";
   }
   const data = output.data;
   if (data === null || data === undefined) {
     console.log(
-      "[Template] Output data is null/undefined, leaving template as-is"
+      "[Template] Output data is null/undefined, returning empty string"
     );
-    return match;
+    return "";
   }
 
   const dataKeys =
@@ -478,10 +480,10 @@ function replaceConfigTemplate(
       console.log("[Template] Trying inner output.data, keys:", innerKeys);
     }
     console.log(
-      "[Template] Path not found, leaving template as-is. fieldPath:",
+      "[Template] Path not found, returning empty string. fieldPath:",
       fieldPath
     );
-    return match;
+    return "";
   }
 
   console.log(

@@ -64,7 +64,21 @@ describe("template utils", () => {
 
       expect(
         processTemplate("{{@n1:Step.data.missing.deep}}", nodeOutputs)
-      ).toBe("{{@n1:Step.data.missing.deep}}");
+      ).toBe("");
+    });
+
+    it("returns empty string when node is not in nodeOutputs", () => {
+      const nodeOutputs: NodeOutputs = {
+        n1: {
+          label: "Step",
+          data: { data: { x: 1 } },
+        },
+      };
+
+      expect(processTemplate("{{@missing:Label.path}}", nodeOutputs)).toBe("");
+      expect(
+        processTemplate("{{@otherNode:HTTP Request.data.name}}", nodeOutputs)
+      ).toBe("");
     });
 
     it("returns whole node data when no field path", () => {
