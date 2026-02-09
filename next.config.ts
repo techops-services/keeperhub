@@ -4,6 +4,12 @@ import { withWorkflow } from "workflow/next";
 
 const nextConfig = {
   output: "standalone",
+  // start custom keeperhub code //
+  // Ensure @workflow/world-postgres is included in standalone output.
+  // The SDK loads it via dynamic require(process.env.WORKFLOW_TARGET_WORLD)
+  // which Next.js output tracing cannot follow.
+  serverExternalPackages: ["@workflow/world-postgres"],
+  // end keeperhub code //
   logging: {
     fetches: {
       fullUrl: true,
