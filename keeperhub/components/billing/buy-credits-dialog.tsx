@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { formatEther, formatUnits, parseEther } from "viem";
 import {
   useAccount,
+  useBalance,
   useConnect,
   useDisconnect,
   useReadContract,
@@ -168,6 +169,19 @@ export function BuyCreditsDialog({
   const tokenBalance = balanceData ? (balanceData as bigint) : BigInt(0);
   const hasInsufficientBalance =
     isStablecoinPayment && tokenBalance < tokenAmount;
+
+  // Check native ETH balance for ETH payments
+  const { data: ethBalanceData } = useBalance({
+    address,
+    query: {
+      enabled: !!(address && !isStablecoinPayment),
+    },
+  });
+
+  const ethBalance = ethBalanceData?.value ?? BigInt(0);
+  const ethRequired = ethAmount ? parseEther(ethAmount) : BigInt(0);
+  const hasInsufficientEth =
+    !isStablecoinPayment && ethRequired > BigInt(0) && ethBalance < ethRequired;
 
   const isOnBillingNetwork = chain?.id === CHAIN_CONFIG.chainId;
 
@@ -619,6 +633,14 @@ export function BuyCreditsDialog({
               </div>
             )}
 
+            {hasInsufficientEth && (
+              <div className="flex items-center gap-2 rounded-md bg-red-500/10 p-3 text-red-600 text-sm dark:text-red-400">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                Insufficient ETH balance. You need {ethAmount} ETH but only have{" "}
+                {formatEther(ethBalance)} ETH.
+              </div>
+            )}
+
             {!isOnBillingNetwork && (
               <div className="flex items-center gap-2 rounded-md bg-amber-500/10 p-3 text-amber-600 text-sm dark:text-amber-400">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -680,6 +702,7 @@ export function BuyCreditsDialog({
               disabled={
                 isSendingTx ||
                 hasInsufficientBalance ||
+                hasInsufficientEth ||
                 !isOnBillingNetwork ||
                 (isStablecoinPayment && needsApproval)
               }
