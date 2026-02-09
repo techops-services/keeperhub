@@ -1,12 +1,11 @@
 "use client";
 
 import { cva, type VariantProps } from "class-variance-authority";
-import { Search, X } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { ChevronDown, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const searchWrapperVariants = cva(
-  "flex w-full max-w-xl items-center gap-2 rounded-md border border-input bg-transparent shadow-xs transition-colors focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50",
+  "flex w-full items-center gap-2 rounded-md border border-input bg-transparent shadow-xs transition-colors focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50",
   {
     variants: {
       size: {
@@ -29,13 +28,6 @@ const iconSizeMap = {
   xl: "size-6",
 } as const;
 
-const smallIconSizeMap = {
-  sm: "size-2.5",
-  default: "size-3",
-  lg: "size-3",
-  xl: "size-4",
-} as const;
-
 const pillVariants = cva(
   "inline-flex items-center rounded-full border font-medium transition-colors",
   {
@@ -55,105 +47,156 @@ const pillVariants = cva(
 
 type WorkflowSearchFilterProps = VariantProps<typeof searchWrapperVariants> & {
   categories: string[];
+  protocols: string[];
+  triggers: string[];
   searchQuery: string;
-  selectedCategory: string | null;
+  selectedCategories: Set<string>;
+  selectedProtocols: Set<string>;
+  selectedTrigger: string | null;
   onSearchChange: (query: string) => void;
-  onCategoryChange: (category: string | null) => void;
+  onCategoriesChange: (categories: Set<string>) => void;
+  onProtocolsChange: (protocols: Set<string>) => void;
+  onTriggerChange: (trigger: string | null) => void;
 };
+
+function toggleInSet(set: Set<string>, value: string): Set<string> {
+  const next = new Set(set);
+  if (next.has(value)) {
+    next.delete(value);
+  } else {
+    next.add(value);
+  }
+  return next;
+}
 
 export function WorkflowSearchFilter({
   categories,
+  protocols,
+  triggers,
   searchQuery,
-  selectedCategory,
+  selectedCategories,
+  selectedProtocols,
+  selectedTrigger,
   size = "default",
   onSearchChange,
-  onCategoryChange,
+  onCategoriesChange,
+  onProtocolsChange,
+  onTriggerChange,
 }: WorkflowSearchFilterProps) {
   const sizeKey = size ?? "default";
   const iconSize = iconSizeMap[sizeKey];
-  const smallIconSize = smallIconSizeMap[sizeKey];
 
   return (
-    <div className="mb-16 flex flex-col items-center pt-8">
-      <h1 className="mb-12 max-w-2xl text-center font-bold text-5xl">
-        Explore KeeperHub Web3 Automation Ecosystem
-      </h1>
-      <div className="w-full max-w-xl">
-        {/* Search input with category chip */}
-        <div className={searchWrapperVariants({ size })}>
-          {selectedCategory && (
-            <Badge
-              className="shrink-0 gap-1 border-0 bg-muted/50 pr-1"
-              variant="outline"
-            >
-              {selectedCategory}
+    <div className="flex flex-col gap-4">
+      <div className={searchWrapperVariants({ size })}>
+        <input
+          className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder="Search workflows..."
+          type="text"
+          value={searchQuery}
+        />
+        {searchQuery && (
+          <button
+            aria-label="Clear search"
+            className="text-muted-foreground hover:text-foreground"
+            onClick={() => onSearchChange("")}
+            type="button"
+          >
+            <X className={iconSize} />
+          </button>
+        )}
+        <Search className={cn(iconSize, "text-muted-foreground")} />
+      </div>
+
+      {protocols.length > 0 && (
+        <div>
+          <p className="mb-2 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+            Protocol
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {protocols.map((protocol) => (
               <button
-                aria-label="Remove category filter"
-                className="ml-1 rounded-full p-0.5 opacity-70 hover:opacity-100"
-                onClick={() => onCategoryChange(null)}
+                className={cn(
+                  pillVariants({ size }),
+                  selectedProtocols.has(protocol)
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-input bg-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                )}
+                key={protocol}
+                onClick={() =>
+                  onProtocolsChange(toggleInSet(selectedProtocols, protocol))
+                }
                 type="button"
               >
-                <X className={smallIconSize} />
+                {protocol}
               </button>
-            </Badge>
-          )}
-          <input
-            className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder={
-              selectedCategory
-                ? "Filter within category..."
-                : "Search workflows..."
-            }
-            type="text"
-            value={searchQuery}
-          />
-          {searchQuery && (
-            <button
-              aria-label="Clear search"
-              className="text-muted-foreground hover:text-foreground"
-              onClick={() => onSearchChange("")}
-              type="button"
-            >
-              <X className={iconSize} />
-            </button>
-          )}
-          <Search className={cn(iconSize, "text-muted-foreground")} />
+            ))}
+          </div>
         </div>
+      )}
 
-        {/* Category pills */}
-        {categories.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              className={cn(
-                pillVariants({ size }),
-                selectedCategory === null
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-input bg-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-              )}
-              onClick={() => onCategoryChange(null)}
-              type="button"
-            >
-              All
-            </button>
+      {categories.length > 0 && (
+        <div>
+          <p className="mb-2 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+            Category
+          </p>
+          <div className="flex flex-wrap gap-2">
             {categories.map((category) => (
               <button
                 className={cn(
                   pillVariants({ size }),
-                  selectedCategory === category
+                  selectedCategories.has(category)
                     ? "border-primary bg-primary text-primary-foreground"
                     : "border-input bg-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                 )}
                 key={category}
-                onClick={() => onCategoryChange(category)}
+                onClick={() =>
+                  onCategoriesChange(toggleInSet(selectedCategories, category))
+                }
                 type="button"
               >
                 {category}
               </button>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {triggers.length > 0 && (
+        <div>
+          <p className="mb-2 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+            Trigger
+          </p>
+          <div className="relative">
+            <select
+              className={cn(
+                "w-full appearance-none rounded-md border border-input bg-transparent pr-8 shadow-xs transition-colors focus:border-ring focus:outline-none focus:ring-[3px] focus:ring-ring/50",
+                sizeKey === "sm" && "min-h-8 px-2.5 py-1 text-xs",
+                sizeKey === "default" && "min-h-10 px-3 py-1 text-sm",
+                sizeKey === "lg" && "min-h-12 px-4 py-2 text-base",
+                sizeKey === "xl" && "min-h-14 px-5 py-3 text-lg",
+                selectedTrigger ? "text-foreground" : "text-muted-foreground"
+              )}
+              onChange={(e) => onTriggerChange(e.target.value || null)}
+              value={selectedTrigger ?? ""}
+            >
+              <option value="">All triggers</option>
+              {triggers.map((trigger) => (
+                <option key={trigger} value={trigger}>
+                  {trigger}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              className={cn(
+                iconSize,
+                "pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground"
+              )}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

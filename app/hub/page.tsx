@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { FeaturedCarousel } from "@/keeperhub/components/hub/featured-carousel";
+import { getWorkflowTrigger } from "@/keeperhub/components/hub/get-workflow-trigger";
+import { HubHero } from "@/keeperhub/components/hub/hub-hero";
 import { HubResults } from "@/keeperhub/components/hub/hub-results";
 import { WorkflowSearchFilter } from "@/keeperhub/components/hub/workflow-search-filter";
 import { useDebounce } from "@/keeperhub/lib/hooks/use-debounce";
@@ -16,68 +19,104 @@ export default function HubPage() {
   );
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(
+    new Set()
+  );
+  const [selectedProtocols, setSelectedProtocols] = useState<Set<string>>(
+    new Set()
+  );
+  const [selectedTrigger, setSelectedTrigger] = useState<string | null>(null);
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   const categories = useMemo(() => {
-    const uniqueCategories = new Set<string>();
-    for (const workflow of featuredWorkflows) {
+    const unique = new Set<string>();
+    for (const workflow of communityWorkflows) {
       if (workflow.category) {
-        uniqueCategories.add(workflow.category);
+        unique.add(workflow.category);
       }
     }
-    return Array.from(uniqueCategories).sort();
-  }, [featuredWorkflows]);
+    return Array.from(unique).sort();
+  }, [communityWorkflows]);
+
+  const protocols = useMemo(() => {
+    const unique = new Set<string>();
+    for (const workflow of communityWorkflows) {
+      if (workflow.protocol) {
+        unique.add(workflow.protocol);
+      }
+    }
+    return Array.from(unique).sort();
+  }, [communityWorkflows]);
+
+  const triggers = useMemo(() => {
+    const unique = new Set<string>();
+    for (const workflow of communityWorkflows) {
+      const trigger = getWorkflowTrigger(workflow.nodes);
+      if (trigger) {
+        unique.add(trigger);
+      }
+    }
+    return Array.from(unique).sort();
+  }, [communityWorkflows]);
 
   const isSearchActive = Boolean(
-    debouncedSearchQuery.trim() || selectedCategory
+    debouncedSearchQuery.trim() ||
+      selectedCategories.size > 0 ||
+      selectedProtocols.size > 0 ||
+      selectedTrigger
   );
-  const hasTextSearch = Boolean(debouncedSearchQuery.trim());
 
-  const combinedResults = useMemo(() => {
+  const searchResults = useMemo((): SavedWorkflow[] | null => {
     if (!isSearchActive) {
       return null;
     }
 
     const query = debouncedSearchQuery.trim().toLowerCase();
 
-    // Filter featured workflows
-    let filteredFeatured = featuredWorkflows;
-    if (selectedCategory) {
-      filteredFeatured = filteredFeatured.filter(
-        (w) => w.category === selectedCategory
+    let filtered = communityWorkflows;
+
+    if (selectedCategories.size > 0) {
+      filtered = filtered.filter(
+        (w) => w.category && selectedCategories.has(w.category)
       );
     }
+
+    if (selectedProtocols.size > 0) {
+      filtered = filtered.filter(
+        (w) => w.protocol && selectedProtocols.has(w.protocol)
+      );
+    }
+
+    if (selectedTrigger) {
+      filtered = filtered.filter((w) => {
+        const trigger = getWorkflowTrigger(w.nodes);
+        return trigger === selectedTrigger;
+      });
+    }
+
     if (query) {
-      filteredFeatured = filteredFeatured.filter(
+      filtered = filtered.filter(
         (w) =>
           w.name.toLowerCase().includes(query) ||
           w.description?.toLowerCase().includes(query)
       );
     }
 
-    // Filter community workflows (only by search, not category)
-    let filteredCommunity: SavedWorkflow[] = [];
-    if (query) {
-      filteredCommunity = communityWorkflows.filter(
-        (w) =>
-          w.name.toLowerCase().includes(query) ||
-          w.description?.toLowerCase().includes(query)
-      );
-    }
-
-    // Merge with featured first
-    return [...filteredFeatured, ...filteredCommunity];
+    return filtered;
   }, [
     isSearchActive,
-    featuredWorkflows,
     communityWorkflows,
-    selectedCategory,
+    selectedCategories,
+    selectedProtocols,
+    selectedTrigger,
     debouncedSearchQuery,
   ]);
 
+  const topFeatured = featuredWorkflows[0];
+  const carouselWorkflows = featuredWorkflows.slice(1);
+
   useEffect(() => {
-    const fetchWorkflows = async () => {
+    const fetchWorkflows = async (): Promise<void> => {
       try {
         const [featured, community] = await Promise.all([
           api.workflow.getFeatured(),
@@ -106,7 +145,7 @@ export default function HubPage() {
       return;
     }
 
-    const handleScroll = () => {
+    const handleScroll = (): void => {
       const scrollTop = container.scrollTop;
       const fadeDistance = 500;
       const opacity = Math.max(0, 1 - scrollTop / fadeDistance);
@@ -135,23 +174,43 @@ export default function HubPage() {
           <p className="text-muted-foreground">Loading workflows...</p>
         ) : (
           <>
-            <WorkflowSearchFilter
-              categories={categories}
-              onCategoryChange={setSelectedCategory}
-              onSearchChange={setSearchQuery}
-              searchQuery={searchQuery}
-              selectedCategory={selectedCategory}
-              size="xl"
-            />
+            <HubHero topWorkflow={topFeatured} />
 
-            <HubResults
-              combinedResults={combinedResults}
-              communityWorkflows={communityWorkflows}
-              featuredWorkflows={featuredWorkflows}
-              hasTextSearch={hasTextSearch}
-              isSearchActive={isSearchActive}
-              selectedCategory={selectedCategory}
-            />
+            <FeaturedCarousel workflows={carouselWorkflows} />
+
+            <div className="relative right-1/2 left-1/2 -mr-[50vw] -ml-[50vw] w-screen">
+              <hr className="border-border" />
+              <div className="bg-sidebar px-4 pt-8 pb-12">
+                <div className="container mx-auto">
+                  <h2 className="mb-8 font-bold text-2xl">
+                    Community Workflows
+                  </h2>
+                </div>
+                <div className="container mx-auto grid grid-cols-[1fr_3fr] items-start gap-8">
+                  <div className="sticky top-28">
+                    <WorkflowSearchFilter
+                      categories={categories}
+                      onCategoriesChange={setSelectedCategories}
+                      onProtocolsChange={setSelectedProtocols}
+                      onSearchChange={setSearchQuery}
+                      onTriggerChange={setSelectedTrigger}
+                      protocols={protocols}
+                      searchQuery={searchQuery}
+                      selectedCategories={selectedCategories}
+                      selectedProtocols={selectedProtocols}
+                      selectedTrigger={selectedTrigger}
+                      triggers={triggers}
+                    />
+                  </div>
+
+                  <HubResults
+                    communityWorkflows={communityWorkflows}
+                    isSearchActive={isSearchActive}
+                    searchResults={searchResults}
+                  />
+                </div>
+              </div>
+            </div>
           </>
         )}
         {/* end custom KeeperHub code */}

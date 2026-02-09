@@ -20,13 +20,9 @@ import { WorkflowMiniMap } from "./workflow-mini-map";
 
 type WorkflowTemplateGridProps = {
   workflows: SavedWorkflow[];
-  isFeatured?: boolean;
 };
 
-export function WorkflowTemplateGrid({
-  workflows,
-  isFeatured = false,
-}: WorkflowTemplateGridProps) {
+export function WorkflowTemplateGrid({ workflows }: WorkflowTemplateGridProps) {
   const router = useRouter();
   const { data: session } = useSession();
   const [duplicatingIds, setDuplicatingIds] = useState<Set<string>>(new Set());
@@ -66,22 +62,13 @@ export function WorkflowTemplateGrid({
   if (workflows.length === 0) {
     return (
       <div className="">
-        <p className="text-muted-foreground">
-          {isFeatured
-            ? "No featured workflows available yet."
-            : "No public workflows available yet."}
-        </p>
+        <p className="text-muted-foreground">No workflows available yet.</p>
       </div>
     );
   }
 
   return (
-    <div
-      className="grid gap-4"
-      style={{
-        gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-      }}
-    >
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {workflows.map((workflow) => {
         const isDuplicating = duplicatingIds.has(workflow.id);
 
@@ -90,21 +77,29 @@ export function WorkflowTemplateGrid({
             className="flex flex-col overflow-hidden bg-sidebar"
             key={workflow.id}
           >
-            <div className="-mt-6 flex aspect-video w-full items-center justify-center overflow-hidden">
+            <div className="relative -mt-6 flex aspect-video w-full items-center justify-center overflow-hidden">
               <WorkflowMiniMap
                 edges={workflow.edges}
                 height={160}
                 nodes={workflow.nodes}
                 width={280}
               />
+              {workflow.category && (
+                <Badge
+                  className="absolute top-3 right-3 rounded-full bg-sidebar"
+                  variant="outline"
+                >
+                  {workflow.category}
+                </Badge>
+              )}
             </div>
             <CardHeader>
-              <div className="flex items-start justify-between gap-2">
-                <CardTitle className="line-clamp-2">{workflow.name}</CardTitle>
-                {isFeatured && workflow.category && (
-                  <Badge variant="secondary">{workflow.category}</Badge>
-                )}
-              </div>
+              {workflow.protocol && (
+                <p className="font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                  {workflow.protocol}
+                </p>
+              )}
+              <CardTitle className="line-clamp-2">{workflow.name}</CardTitle>
               {workflow.description && (
                 <CardDescription className="line-clamp-2">
                   {workflow.description}

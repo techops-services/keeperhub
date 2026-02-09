@@ -25,9 +25,11 @@ import {
 } from "@/lib/integrations-store";
 import type { IntegrationType } from "@/lib/types/integration";
 import {
+  currentWorkflowCategoryAtom,
   currentWorkflowDescriptionAtom,
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
+  currentWorkflowProtocolAtom,
   currentWorkflowVisibilityAtom,
   edgesAtom,
   hasSidebarBeenShownAtom,
@@ -136,6 +138,8 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   const setCurrentWorkflowDescription = useSetAtom(
     currentWorkflowDescriptionAtom
   );
+  const setCurrentWorkflowCategory = useSetAtom(currentWorkflowCategoryAtom);
+  const setCurrentWorkflowProtocol = useSetAtom(currentWorkflowProtocolAtom);
   const updateNodeData = useSetAtom(updateNodeDataAtom);
   const setHasUnsavedChanges = useSetAtom(hasUnsavedChangesAtom);
   const [workflowNotFound, setWorkflowNotFound] = useAtom(workflowNotFoundAtom);
@@ -395,6 +399,8 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
       );
       setIsWorkflowOwner(workflow.isOwner !== false); // Default to true if not set
       setIsWorkflowEnabled(workflow.enabled ?? false); // keeperhub custom field //
+      setCurrentWorkflowCategory(workflow.category ?? "");
+      setCurrentWorkflowProtocol(workflow.protocol ?? "");
       setHasUnsavedChanges(false);
       setWorkflowNotFound(false);
     } catch (error) {
@@ -410,6 +416,8 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
     setCurrentWorkflowVisibility,
     setIsWorkflowOwner,
     setIsWorkflowEnabled, // keeperhub custom field //
+    setCurrentWorkflowCategory,
+    setCurrentWorkflowProtocol,
     setHasUnsavedChanges,
     setWorkflowNotFound,
     setCurrentWorkflowDescription,

@@ -4,59 +4,33 @@ import { WorkflowTemplateGrid } from "@/keeperhub/components/hub/workflow-templa
 import type { SavedWorkflow } from "@/lib/api-client";
 
 type HubResultsProps = {
-  combinedResults: SavedWorkflow[] | null;
   communityWorkflows: SavedWorkflow[];
-  featuredWorkflows: SavedWorkflow[];
-  hasTextSearch: boolean;
+  searchResults: SavedWorkflow[] | null;
   isSearchActive: boolean;
-  selectedCategory: string | null;
 };
 
 export function HubResults({
-  combinedResults,
   communityWorkflows,
-  featuredWorkflows,
-  hasTextSearch,
+  searchResults,
   isSearchActive,
-  selectedCategory,
 }: HubResultsProps) {
-  if (isSearchActive) {
+  const workflows = isSearchActive ? searchResults : communityWorkflows;
+
+  if (!workflows || workflows.length === 0) {
     return (
       <section>
-        <h1 className="mb-8 font-bold text-3xl">
-          {hasTextSearch
-            ? `Results (${combinedResults?.length ?? 0})`
-            : `Featured ${selectedCategory} Templates`}
-        </h1>
-        {combinedResults && combinedResults.length > 0 ? (
-          <WorkflowTemplateGrid isFeatured workflows={combinedResults} />
-        ) : (
-          <p className="text-muted-foreground">
-            No workflows found matching your search.
-          </p>
-        )}
+        <p className="text-muted-foreground">
+          {isSearchActive
+            ? "No workflows found matching your search."
+            : "No public workflows available yet."}
+        </p>
       </section>
     );
   }
 
   return (
-    <>
-      {featuredWorkflows.length > 0 && (
-        <section className="mb-12">
-          <h1 className="mb-8 font-bold text-3xl">Quick Start Templates</h1>
-          <WorkflowTemplateGrid isFeatured workflows={featuredWorkflows} />
-        </section>
-      )}
-      <section>
-        <h2 className="mb-8 font-bold text-2xl">Community Workflows</h2>
-        {communityWorkflows.length > 0 ? (
-          <WorkflowTemplateGrid workflows={communityWorkflows} />
-        ) : (
-          <p className="text-muted-foreground">
-            No public workflows available yet.
-          </p>
-        )}
-      </section>
-    </>
+    <section>
+      <WorkflowTemplateGrid workflows={workflows} />
+    </section>
   );
 }

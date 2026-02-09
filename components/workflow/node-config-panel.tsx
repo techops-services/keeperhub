@@ -27,6 +27,7 @@ import { CodeEditor } from "@/components/ui/code-editor";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { ComboboxInput } from "@/keeperhub/components/hub/combobox-input";
 import { api } from "@/lib/api-client";
 import { integrationsAtom } from "@/lib/integrations-store";
 import type { IntegrationType } from "@/lib/types/integration";
@@ -34,9 +35,11 @@ import { generateWorkflowCode } from "@/lib/workflow-codegen";
 import {
   clearNodeStatusesAtom,
   clearWorkflowAtom,
+  currentWorkflowCategoryAtom,
   currentWorkflowDescriptionAtom,
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
+  currentWorkflowProtocolAtom,
   deleteEdgeAtom,
   deleteNodeAtom,
   deleteSelectedItemsAtom,
@@ -163,6 +166,16 @@ export const PanelInner = () => {
   const [currentWorkflowDescription, setCurrentWorkflowDescription] = useAtom(
     currentWorkflowDescriptionAtom
   );
+  const [currentWorkflowCategory, setCurrentWorkflowCategory] = useAtom(
+    currentWorkflowCategoryAtom
+  );
+  const [currentWorkflowProtocol, setCurrentWorkflowProtocol] = useAtom(
+    currentWorkflowProtocolAtom
+  );
+  const [taxonomyOptions, setTaxonomyOptions] = useState<{
+    categories: string[];
+    protocols: string[];
+  }>({ categories: [], protocols: [] });
   const isOwner = useAtomValue(isWorkflowOwnerAtom);
   const workflowNotFound = useAtomValue(workflowNotFoundAtom);
   const updateNodeData = useSetAtom(updateNodeDataAtom);
@@ -593,6 +606,49 @@ export const PanelInner = () => {
     }
   };
 
+  // start custom keeperhub code //
+  useEffect(() => {
+    api.workflow
+      .getTaxonomy()
+      .then(setTaxonomyOptions)
+      .catch(() => {
+        // Silently ignore - taxonomy options are optional
+      });
+  }, []);
+
+  const handleUpdateWorkflowCategory = async (
+    newCategory: string
+  ): Promise<void> => {
+    setCurrentWorkflowCategory(newCategory);
+    if (currentWorkflowId) {
+      try {
+        await api.workflow.update(currentWorkflowId, {
+          category: newCategory || null,
+        });
+      } catch (error) {
+        console.error("Failed to update workflow category:", error);
+        toast.error("Failed to update workflow category");
+      }
+    }
+  };
+
+  const handleUpdateWorkflowProtocol = async (
+    newProtocol: string
+  ): Promise<void> => {
+    setCurrentWorkflowProtocol(newProtocol);
+    if (currentWorkflowId) {
+      try {
+        await api.workflow.update(currentWorkflowId, {
+          protocol: newProtocol || null,
+        });
+      } catch (error) {
+        console.error("Failed to update workflow protocol:", error);
+        toast.error("Failed to update workflow protocol");
+      }
+    }
+  };
+  // end keeperhub code //
+
   const handleRefreshRuns = async () => {
     setIsRefreshing(true);
     try {
@@ -749,6 +805,28 @@ export const PanelInner = () => {
                   value={currentWorkflowDescription}
                 />
               </div>
+              {/* start custom keeperhub code */}
+              <div className="space-y-2">
+                <Label className="ml-1">Protocol</Label>
+                <ComboboxInput
+                  disabled={!isOwner}
+                  onChange={handleUpdateWorkflowProtocol}
+                  options={taxonomyOptions.protocols}
+                  placeholder="Select or type protocol..."
+                  value={currentWorkflowProtocol}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="ml-1">Category</Label>
+                <ComboboxInput
+                  disabled={!isOwner}
+                  onChange={handleUpdateWorkflowCategory}
+                  options={taxonomyOptions.categories}
+                  placeholder="Select or type category..."
+                  value={currentWorkflowCategory}
+                />
+              </div>
+              {/* end keeperhub code */}
               <div className="space-y-2">
                 <Label className="ml-1" htmlFor="workflow-id">
                   Workflow ID
