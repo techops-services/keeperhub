@@ -178,6 +178,13 @@ env:
     type: parameterStore
     name: etherscan-api-key
     parameter_name: /eks/maker-prod/keeperhub/etherscan-api-key
+  GAS_SPONSORSHIP_ENABLED:
+    type: kv
+    value: "false"
+  GELATO_SPONSOR_API_KEY:
+    type: parameterStore
+    name: gelato-sponsor-api-key
+    parameter_name: /eks/maker-prod/keeper-app/gelato-sponsor-api-key
   SENDGRID_API_KEY:
     type: parameterStore
     name: sendgrid-api-key
