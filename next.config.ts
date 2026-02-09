@@ -9,11 +9,34 @@ const nextConfig = {
   // require(process.env.WORKFLOW_TARGET_WORLD) which the standalone output
   // tracer cannot follow. serverExternalPackages keeps it out of the bundle
   // and outputFileTracingIncludes forces it into the standalone node_modules.
-  serverExternalPackages: ["@workflow/world-postgres", "pg-boss"],
+  // .npmrc public-hoist-pattern hoists these from .pnpm/ to top-level
+  // node_modules/ so the simple globs below can find them.
+  serverExternalPackages: [
+    "@workflow/world-postgres",
+    "@workflow/world-local",
+    "@workflow/world",
+    "@workflow/errors",
+    "@workflow/utils",
+    "@vercel/queue",
+    "pg-boss",
+    "cbor-x",
+    "ulid",
+    "async-sema",
+  ],
   outputFileTracingIncludes: {
     "/*": [
       "./node_modules/@workflow/world-postgres/**/*",
+      "./node_modules/@workflow/world-local/**/*",
+      "./node_modules/@workflow/world/**/*",
+      "./node_modules/@workflow/errors/**/*",
+      "./node_modules/@workflow/utils/**/*",
+      "./node_modules/@vercel/queue/**/*",
       "./node_modules/pg-boss/**/*",
+      "./node_modules/cbor-x/**/*",
+      "./node_modules/cbor-extract/**/*",
+      "./node_modules/ulid/**/*",
+      "./node_modules/async-sema/**/*",
+      "./node_modules/cron-parser/**/*",
     ],
   },
   // end keeperhub code //
