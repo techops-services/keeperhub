@@ -9,9 +9,12 @@ const nextConfig = {
   // require(process.env.WORKFLOW_TARGET_WORLD) which the standalone output
   // tracer cannot follow. serverExternalPackages keeps it out of the bundle
   // and outputFileTracingIncludes forces it into the standalone node_modules.
-  serverExternalPackages: ["@workflow/world-postgres"],
+  serverExternalPackages: ["@workflow/world-postgres", "pg-boss"],
   outputFileTracingIncludes: {
-    "/*": ["./node_modules/@workflow/world-postgres/**/*"],
+    "/*": [
+      "./node_modules/@workflow/world-postgres/**/*",
+      "./node_modules/pg-boss/**/*",
+    ],
   },
   // end keeperhub code //
   logging: {
