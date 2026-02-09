@@ -31,9 +31,9 @@ const BUTTON_DISTANCE = 12;
 // At t=0.11: 3t^2(1-t) + t^3 ≈ 0.035
 const BEZIER_FACTOR = 0.035;
 // Clearance past the nearest edge approximation (px)
-const EDGE_CLEARANCE = 10;
+const EDGE_CLEARANCE = 20;
 // Max offset from center so the button stays visually tied to the node
-const MAX_OFFSET = 28;
+const MAX_OFFSET = 25;
 
 type AddStepButtonProps = {
   sourceNodeId: string;
@@ -163,13 +163,14 @@ export function AddStepButton({
   );
 
   const isLeaf = outgoingEdges.length === 0;
+  const distance = isLeaf ? BUTTON_DISTANCE : BUTTON_DISTANCE;
 
   // Generate a curved bezier path from the handle to the button
   const [connectorPath] = getSimpleBezierPath({
     sourceX: 0,
     sourceY: 0,
     sourcePosition: Position.Right,
-    targetX: BUTTON_DISTANCE,
+    targetX: distance,
     targetY: buttonOffsetY,
     targetPosition: Position.Left,
   });
@@ -180,7 +181,7 @@ export function AddStepButton({
         className="add-step-button group nopan nodrag absolute -translate-y-1/2"
         onClick={handleClick}
         style={{
-          left: `calc(100% + ${BUTTON_DISTANCE}px)`,
+          left: `calc(100% + ${distance}px)`,
           top: `calc(50% + ${buttonOffsetY}px)`,
         }}
         title={isLeaf ? "Add step" : "Add branch"}
