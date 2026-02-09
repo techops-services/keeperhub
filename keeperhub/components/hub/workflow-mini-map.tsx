@@ -314,21 +314,6 @@ export function WorkflowMiniMap({
       viewBox={`0 0 ${width} ${height}`}
       width="100%"
     >
-      {/* Dotted background pattern */}
-      <defs>
-        <pattern
-          height="10"
-          id="dots"
-          patternUnits="userSpaceOnUse"
-          width="10"
-          x="0"
-          y="0"
-        >
-          <circle className="fill-slate-600/30" cx="1" cy="1" r="0.5" />
-        </pattern>
-      </defs>
-      <rect fill="url(#dots)" height="100%" width="100%" x="0" y="0" />
-
       {/* Render edges first (behind nodes) */}
       {edges.map((edge) => (
         <MiniEdge
