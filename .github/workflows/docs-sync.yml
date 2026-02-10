@@ -195,7 +195,7 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           base_branch: staging
-          branch_prefix: claude/docs-sync-
+          branch_prefix: docs-sync-
           prompt: |
             REPO: ${{ github.repository }}
             RELEASE TAG: ${{ steps.tag.outputs.release_tag }}
@@ -289,23 +289,36 @@ jobs:
             --max-turns 30
             --allowedTools "Read,Write,Edit,Glob,Grep,Bash(git:*),Bash(gh:*)"
 
-      - name: Notify Discord on completion
-        if: always() && steps.tag.outputs.release_tag != ''
+      - name: Notify Discord on docs update
+        if: steps.claude.outcome == 'success' && steps.claude.outputs.branch_name != ''
         continue-on-error: true
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           RELEASE_TAG="${{ steps.tag.outputs.release_tag }}"
-          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          BRANCH="${{ steps.claude.outputs.branch_name }}"
 
-          if [ "${{ steps.claude.outcome }}" = "success" ]; then
-            MESSAGE="**Docs Sync Completed** for \`$RELEASE_TAG\`\n\nClaude analyzed code changes and processed documentation updates.\nWorkflow run: $RUN_URL"
-          elif [ "${{ steps.claude.outcome }}" = "skipped" ]; then
-            MESSAGE="**Docs Sync Skipped** for \`$RELEASE_TAG\`\n\nNo relevant code changes detected.\nWorkflow run: $RUN_URL"
-          else
-            MESSAGE="**Docs Sync Failed** for \`$RELEASE_TAG\`\n\nPlease check the workflow logs: $RUN_URL"
+          # Find the PR created from this branch
+          PR_JSON=$(gh pr list --head "$BRANCH" --state open --json number,title,body --limit 1)
+          PR_NUMBER=$(echo "$PR_JSON" | jq -r '.[0].number // empty')
+
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No docs PR found. Skipping notification."
+            exit 0
           fi
 
-          curl -s -H "Content-Type: application/json" \
-            -d "{\"username\": \"KeeperHub Docs Bot\", \"content\": \"$MESSAGE\"}" \
-            "$DISCORD_WEBHOOK"
+          PR_URL="https://github.com/${{ github.repository }}/pull/$PR_NUMBER"
+          PR_BODY=$(echo "$PR_JSON" | jq -r '.[0].body // ""' | head -c 1500)
+
+          # Build message safely with jq
+          MESSAGE=$(jq -n \
+            --arg tag "$RELEASE_TAG" \
+            --arg body "$PR_BODY" \
+            --arg url "$PR_URL" \
+            '"**Docs Update** for `" + $tag + "`\n\n" + $body + "\n\nPR: " + $url')
+
+          # Send to Discord (jq output is already JSON-escaped string)
+          jq -n --argjson content "$MESSAGE" \
+            '{"username": "KeeperHub Docs Bot", "content": $content}' \
+            | curl -s -H "Content-Type: application/json" -d @- "$DISCORD_WEBHOOK"
