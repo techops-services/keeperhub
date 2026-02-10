@@ -3,10 +3,6 @@ shared_env: &shared_env
     type: parameterStore
     name: db-url
     parameter_name: /eks/maker-staging/keeperhub/db-url
-  WORKFLOW_POSTGRES_URL:
-    type: parameterStore
-    name: workflow-postgres-url
-    parameter_name: /eks/maker-staging/keeperhub/db-url
   CHAIN_RPC_CONFIG:
     type: parameterStore
     name: chain-rpc-config
@@ -54,19 +50,6 @@ deployment:
         - -c
       args:
         - |
-          echo "Setting up workflow postgres tables..."
-          export WORKFLOW_POSTGRES_URL=$(node -e "
-            const u = process.env.WORKFLOW_POSTGRES_URL || process.env.DATABASE_URL || '';
-            try { new URL(u); console.log(u); } catch {
-              const s = u.indexOf('://') + 3;
-              const a = u.lastIndexOf('@');
-              const c = u.indexOf(':', s);
-              if (s > 3 && a > c && c > s) {
-                console.log(u.slice(0, s) + encodeURIComponent(u.slice(s, c)) + ':' + encodeURIComponent(u.slice(c + 1, a)) + u.slice(a));
-              } else { console.log(u); }
-            }
-          ")
-          pnpm exec workflow-postgres-setup
           echo "Running database migrations..."
           pnpm db:push
           echo "Seeding chains..."
@@ -131,9 +114,9 @@ env:
   PARA_ENVIRONMENT:
     type: kv
     value: "beta"
-  WORKFLOW_TARGET_WORLD:
+  WORKFLOW_EMBEDDED_DATA_DIR:
     type: kv
-    value: "@workflow/world-postgres"
+    value: "/tmp/workflow-data"
   NEXT_PUBLIC_API_URL:
     type: kv
     value: "http://localhost:3000"

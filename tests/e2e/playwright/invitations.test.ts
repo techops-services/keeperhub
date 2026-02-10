@@ -6,34 +6,10 @@ import postgres from "postgres";
 dotenv.config({ path: ".env" });
 dotenv.config({ path: ".env.local" });
 
-// Build DATABASE_URL from individual vars since dotenv doesn't expand ${} references
-const DATABASE_URL = process.env.POSTGRES_HOST
-  ? `postgresql://${process.env.POSTGRES_USER}:${process.env.POSTGRES_PASSWORD}@${process.env.POSTGRES_HOST}:${process.env.POSTGRES_PORT}/${process.env.POSTGRES_DB}`
-  : process.env.DATABASE_URL || "postgres://localhost:5432/workflow";
+const DATABASE_URL =
+  process.env.DATABASE_URL || "postgres://localhost:5432/workflow";
 
 const ACCEPT_INVITE_URL_REGEX = /\/accept-invite/;
-
-// Navigate to accept-invite page with retry.
-// Next.js 16 has a hydration race condition that can occasionally redirect
-// away from the accept-invite page during initial load when a session is
-// active. Waiting for network idle and retrying resolves this reliably.
-async function gotoAcceptInvite(
-  page: Page,
-  invitationId: string
-): Promise<void> {
-  const url = `/accept-invite/${invitationId}`;
-  for (let attempt = 0; attempt < 5; attempt++) {
-    await page.goto(url, { waitUntil: "networkidle" });
-    if (page.url().includes("accept-invite")) {
-      return;
-    }
-    // Brief wait before retry to let any pending state settle
-    await page.waitForTimeout(500);
-  }
-  throw new Error(
-    `Failed to navigate to ${url} after 5 attempts (kept redirecting to ${page.url()})`
-  );
-}
 
 // Query the invitation table for the invite ID sent to an email
 async function getInvitationIdFromDb(
@@ -180,10 +156,9 @@ async function openInviteForm(page: Page): Promise<void> {
 
   await dialog.locator('button:has-text("Manage")').first().click();
 
-  // Invite form is now inline in the org detail view
-  await expect(
-    dialog.locator('input[placeholder="colleague@example.com"]')
-  ).toBeVisible({ timeout: 5000 });
+  await dialog.locator('button:has-text("Invite Members")').click();
+
+  await expect(dialog.locator("#invite-email")).toBeVisible({ timeout: 5000 });
 }
 
 // Send an invite from the current user and return the invitation ID
@@ -191,10 +166,8 @@ async function sendInvite(page: Page, inviteeEmail: string): Promise<string> {
   await openInviteForm(page);
 
   const dialog = page.locator('[role="dialog"]');
-  await dialog
-    .locator('input[placeholder="colleague@example.com"]')
-    .fill(inviteeEmail);
-  await dialog.locator('button:has-text("Invite")').click();
+  await dialog.locator("#invite-email").fill(inviteeEmail);
+  await dialog.locator('button:has-text("Send Invitation")').click();
 
   await expect(
     page
@@ -223,7 +196,9 @@ async function setupUserInTwoOrgs(
   await signUpAndVerify(page, { email: inviteeEmail });
 
   // Invitee accepts the invitation (now in 2 orgs)
-  await gotoAcceptInvite(page, invitationId);
+  await page.goto(`/accept-invite/${invitationId}`, {
+    waitUntil: "domcontentloaded",
+  });
   await expect(
     page.locator('button:has-text("Accept Invitation")')
   ).toBeVisible({ timeout: 15_000 });
@@ -264,10 +239,8 @@ test.describe("Organization Invitations", () => {
       const dialog = page.locator('[role="dialog"]');
       const inviteEmail = `newinvitee+${Date.now()}@example.com`;
 
-      await dialog
-        .locator('input[placeholder="colleague@example.com"]')
-        .fill(inviteEmail);
-      await dialog.locator('button:has-text("Invite")').click();
+      await dialog.locator("#invite-email").fill(inviteEmail);
+      await dialog.locator('button:has-text("Send Invitation")').click();
 
       // Verify success toast
       const toast = page.locator("[data-sonner-toast]");
@@ -275,8 +248,8 @@ test.describe("Organization Invitations", () => {
         toast.filter({ hasText: `Invitation sent to ${inviteEmail}` })
       ).toBeVisible({ timeout: 10_000 });
 
-      // Verify invited member appears in the members list
-      await expect(dialog.locator("text=invited").first()).toBeVisible({
+      // Verify confirmation box appears in the form
+      await expect(dialog.locator("text=Invitation sent").first()).toBeVisible({
         timeout: 5000,
       });
     });
@@ -297,10 +270,8 @@ test.describe("Organization Invitations", () => {
 
       const dialog = page.locator('[role="dialog"]');
 
-      await dialog
-        .locator('input[placeholder="colleague@example.com"]')
-        .fill(existingUserEmail);
-      await dialog.locator('button:has-text("Invite")').click();
+      await dialog.locator("#invite-email").fill(existingUserEmail);
+      await dialog.locator('button:has-text("Send Invitation")').click();
 
       // Verify success toast
       const toast = page.locator("[data-sonner-toast]");
@@ -308,8 +279,8 @@ test.describe("Organization Invitations", () => {
         toast.filter({ hasText: `Invitation sent to ${existingUserEmail}` })
       ).toBeVisible({ timeout: 10_000 });
 
-      // Verify invited member appears in the members list
-      await expect(dialog.locator("text=invited").first()).toBeVisible({
+      // Verify confirmation box appears in the form
+      await expect(dialog.locator("text=Invitation sent").first()).toBeVisible({
         timeout: 5000,
       });
     });
@@ -324,10 +295,8 @@ test.describe("Organization Invitations", () => {
       const inviteEmail = `duplicate+${Date.now()}@example.com`;
 
       // First invite should succeed
-      await dialog
-        .locator('input[placeholder="colleague@example.com"]')
-        .fill(inviteEmail);
-      await dialog.locator('button:has-text("Invite")').click();
+      await dialog.locator("#invite-email").fill(inviteEmail);
+      await dialog.locator('button:has-text("Send Invitation")').click();
 
       await expect(
         page
@@ -336,10 +305,8 @@ test.describe("Organization Invitations", () => {
       ).toBeVisible({ timeout: 10_000 });
 
       // Type the same email again (input was cleared on success)
-      await dialog
-        .locator('input[placeholder="colleague@example.com"]')
-        .fill(inviteEmail);
-      await dialog.locator('button:has-text("Invite")').click();
+      await dialog.locator("#invite-email").fill(inviteEmail);
+      await dialog.locator('button:has-text("Send Invitation")').click();
 
       // Second invite should show error toast
       await expect(
@@ -357,10 +324,8 @@ test.describe("Organization Invitations", () => {
 
       const dialog = page.locator('[role="dialog"]');
 
-      await dialog
-        .locator('input[placeholder="colleague@example.com"]')
-        .fill(ownEmail);
-      await dialog.locator('button:has-text("Invite")').click();
+      await dialog.locator("#invite-email").fill(ownEmail);
+      await dialog.locator('button:has-text("Send Invitation")').click();
 
       await expect(
         page
@@ -385,7 +350,9 @@ test.describe("Organization Invitations", () => {
       await context.clearCookies();
 
       // Navigate to the accept invite page
-      await gotoAcceptInvite(page, invitationId);
+      await page.goto(`/accept-invite/${invitationId}`, {
+        waitUntil: "domcontentloaded",
+      });
 
       // Should show auth form in signup mode
       await expect(page.locator("h1:has-text('Join')")).toBeVisible({
@@ -442,7 +409,9 @@ test.describe("Organization Invitations", () => {
       await context.clearCookies();
 
       // Visit accept-invite page as logged-out existing user
-      await gotoAcceptInvite(page, invitationId);
+      await page.goto(`/accept-invite/${invitationId}`, {
+        waitUntil: "domcontentloaded",
+      });
 
       // Should show auth form in signin mode (userExists = true)
       await expect(page.locator("h1:has-text('Join')")).toBeVisible({
@@ -480,7 +449,9 @@ test.describe("Organization Invitations", () => {
       await signUpAndVerify(page, { email: inviteeEmail });
 
       // Navigate to accept-invite page while logged in as correct user
-      await gotoAcceptInvite(page, invitationId);
+      await page.goto(`/accept-invite/${invitationId}`, {
+        waitUntil: "domcontentloaded",
+      });
 
       // Should show AcceptDirectState
       await expect(page.locator("h1:has-text('Join')")).toBeVisible({
@@ -518,7 +489,9 @@ test.describe("Organization Invitations", () => {
       await signUpAndVerify(page);
 
       // Navigate to accept-invite page while logged in as wrong user
-      await gotoAcceptInvite(page, invitationId);
+      await page.goto(`/accept-invite/${invitationId}`, {
+        waitUntil: "domcontentloaded",
+      });
 
       // Should show EmailMismatchState
       await expect(page.locator("h1:has-text('Wrong Account')")).toBeVisible({
@@ -588,9 +561,10 @@ test.describe("Organization Invitations", () => {
       // Create invitee with their own org
       await signUpAndVerify(page, { email: inviteeEmail });
 
-      // Wait for any pending navigations from sign-up to settle
       // Accept invite via accept-invite page
-      await gotoAcceptInvite(page, invitationId);
+      await page.goto(`/accept-invite/${invitationId}`, {
+        waitUntil: "domcontentloaded",
+      });
       await expect(
         page.locator('button:has-text("Accept Invitation")')
       ).toBeVisible({ timeout: 15_000 });

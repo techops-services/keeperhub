@@ -4,7 +4,6 @@ import {
   index,
   integer,
   jsonb,
-  pgEnum,
   pgTable,
   text,
   timestamp,
@@ -12,26 +11,6 @@ import {
 } from "drizzle-orm/pg-core";
 import type { IntegrationType } from "../types/integration";
 import { generateId } from "../utils/id";
-
-// start custom keeperhub code //
-// These enums are created by @workflow/world-postgres migrations in the public
-// schema and referenced by workflow.workflow_runs / workflow.workflow_steps.
-// Declaring them here prevents drizzle-kit from trying to drop them.
-export const workflowRunStatus = pgEnum("status", [
-  "pending",
-  "running",
-  "completed",
-  "failed",
-  "cancelled",
-]);
-export const workflowStepStatus = pgEnum("step_status", [
-  "pending",
-  "running",
-  "completed",
-  "failed",
-  "cancelled",
-]);
-// end keeperhub code //
 
 // Better Auth tables
 export const users = pgTable("users", {
