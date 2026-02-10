@@ -82,11 +82,9 @@ build-scheduler-images:
 	docker build --target dispatcher -t keeperhub-dispatcher:latest ./keeperhub-scheduler
 	@echo "Building executor image from submodule..."
 	docker build --target executor -t keeperhub-executor:latest ./keeperhub-scheduler
-	@echo "Building workflow runner image..."
-	docker build --target workflow-runner -t keeperhub-runner:latest .
 	@echo "Loading images into minikube..."
+	minikube image load keeperhub-dispatcher:latest
 	minikube image load keeperhub-executor:latest
-	minikube image load keeperhub-runner:latest
 	@echo "Images ready!"
 
 deploy-scheduler: check-local-kubernetes
