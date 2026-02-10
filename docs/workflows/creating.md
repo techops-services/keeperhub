@@ -132,6 +132,18 @@ The **Ask AI...** input at the bottom of the canvas lets you describe your autom
 - "Every hour, check if a contract's totalSupply changed and email me"
 - "When someone sends ETH to my wallet, log it to Slack"
 
+## Importing from the Hub
+
+The **Hub** lists workflow templates shared by the community. To use a template:
+
+1. Browse the Hub from the main navigation
+2. Select a workflow template
+3. Click **Duplicate** to copy it into your workspace
+
+The copy is created with a unique name (e.g., "My Workflow (Copy)") and set to private visibility. Node configurations are preserved, but integration credentials are removed so you can assign your own connections.
+
+You can also duplicate any public workflow you are viewing by clicking the **Duplicate** button in the toolbar.
+
 ## Workflow States
 
 | State | Description |

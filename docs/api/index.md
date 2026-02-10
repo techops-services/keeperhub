@@ -54,7 +54,8 @@ API requests are subject to rate limiting. Current limits:
 | [Executions](/api/executions) | Monitor workflow execution status and logs |
 | [Integrations](/api/integrations) | Manage notification and service integrations |
 | [Chains](/api/chains) | List supported blockchain networks |
-| [User](/api/user) | User profile and preferences |
+| [User](/api/user) | User profile, preferences, and address book |
+| [Organizations](/api/organizations) | Organization membership management |
 | [API Keys](/api/api-keys) | Manage API keys for programmatic access |
 
 ## SDKs
