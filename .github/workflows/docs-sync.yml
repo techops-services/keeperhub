@@ -1,10 +1,14 @@
 name: Docs Sync
 
 on:
-  workflow_run:
-    workflows: ['Release']
-    types: [completed]
-    branches: [prod]
+  # TODO: restore after debugging
+  # workflow_run:
+  #   workflows: ['Release']
+  #   types: [completed]
+  #   branches: [prod]
+
+  push:
+    branches: [staging]
 
   workflow_dispatch:
     inputs:
@@ -28,6 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     if: >-
       github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
       github.event.workflow_run.conclusion == 'success'
     timeout-minutes: 75
 
@@ -101,6 +106,43 @@ jobs:
             echo "CHANGED_FILES_EOF" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Detect changes from push
+        if: github.event_name == 'push'
+        id: push_changes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Triggered by push to staging (debug mode)."
+
+          RELEASE_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || echo "staging-test")
+          echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
+          CHANGED_FILES=$(git log --since="30 days ago" --name-only --pretty=format: -- \
+            'keeperhub/plugins/' \
+            'keeperhub/api/' \
+            'keeperhub/lib/' \
+            'lib/' \
+            'plugins/' \
+            'app/api/' \
+            | sort -u \
+            | grep -E '\.(ts|tsx|js|jsx)$' \
+            | grep -vE '\.(test|spec|stories)\.' \
+            | head -100 \
+            || true)
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No relevant code changes detected."
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            FILE_COUNT=$(echo "$CHANGED_FILES" | wc -l | tr -d ' ')
+            echo "Found $FILE_COUNT changed files."
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+
+            echo "changed_files<<CHANGED_FILES_EOF" >> "$GITHUB_OUTPUT"
+            echo "$CHANGED_FILES" >> "$GITHUB_OUTPUT"
+            echo "CHANGED_FILES_EOF" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Detect changes from manual trigger
         if: github.event_name == 'workflow_dispatch'
         id: manual_changes
@@ -151,18 +193,22 @@ jobs:
       - name: Skip if no changes
         if: >-
           (github.event_name == 'workflow_run' && steps.release_changes.outputs.has_changes != 'true') ||
-          (github.event_name == 'workflow_dispatch' && steps.manual_changes.outputs.has_changes != 'true')
+          (github.event_name == 'workflow_dispatch' && steps.manual_changes.outputs.has_changes != 'true') ||
+          (github.event_name == 'push' && steps.push_changes.outputs.has_changes != 'true')
         run: |
           echo "No relevant code changes detected. Skipping docs sync."
 
       - name: Set release tag
         if: >-
           (github.event_name == 'workflow_run' && steps.release_changes.outputs.has_changes == 'true') ||
-          (github.event_name == 'workflow_dispatch' && steps.manual_changes.outputs.has_changes == 'true')
+          (github.event_name == 'workflow_dispatch' && steps.manual_changes.outputs.has_changes == 'true') ||
+          (github.event_name == 'push' && steps.push_changes.outputs.has_changes == 'true')
         id: tag
         run: |
           if [ "${{ github.event_name }}" = "workflow_run" ]; then
             echo "release_tag=${{ steps.release_changes.outputs.release_tag }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            echo "release_tag=${{ steps.push_changes.outputs.release_tag }}" >> "$GITHUB_OUTPUT"
           else
             echo "release_tag=${{ steps.manual_changes.outputs.release_tag }}" >> "$GITHUB_OUTPUT"
           fi
@@ -182,6 +228,7 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           path_to_claude_code_executable: /home/runner/.local/bin/claude
+          show_full_output: "true"
           base_branch: staging
           branch_prefix: claude/docs-sync-
           prompt: |
@@ -189,7 +236,7 @@ jobs:
             RELEASE TAG: ${{ steps.tag.outputs.release_tag }}
 
             CHANGED FILES:
-            ${{ github.event_name == 'workflow_run' && steps.release_changes.outputs.changed_files || steps.manual_changes.outputs.changed_files }}
+            ${{ github.event_name == 'workflow_run' && steps.release_changes.outputs.changed_files || github.event_name == 'push' && steps.push_changes.outputs.changed_files || steps.manual_changes.outputs.changed_files }}
 
             ---
 
