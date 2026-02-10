@@ -31,7 +31,23 @@ Access your account settings to:
 - Update display name
 - Change email address
 - Manage authentication methods
+- Change your password
 - View wallet information
+- Deactivate your account
+
+## Password Management
+
+### Changing Your Password
+
+You can change your password from account settings. Enter your current password, then provide and confirm a new password. Passwords must be at least 8 characters. You will be signed out after changing your password and must sign in again.
+
+### Forgot Password
+
+If you forget your password, use the forgot password flow from the sign-in page. Enter your email address and a one-time verification code (OTP) will be sent to you. The code expires after 5 minutes. Enter the code along with your new password to complete the reset.
+
+### OAuth Users
+
+If you signed up with a social provider (Google, GitHub, or Vercel), your password is managed by that provider. The change password option will direct you to your provider's account settings. If you attempt a password reset, you will receive an email indicating which provider manages your account.
 
 ## Personal Workflows
 
@@ -66,4 +82,7 @@ See [API Authentication](/docs/api/authentication) for details.
 
 - Your workflows and run data are private to you and your organizations
 - Para wallet private keys are never exposed
-- Account deletion removes all associated data
+
+### Account Deactivation
+
+You can deactivate your account from account settings. To confirm, you must type **DEACTIVATE** in the confirmation dialog. Deactivation is a soft delete -- your data is preserved, but you will be signed out and unable to sign in. All active sessions are invalidated immediately. To reactivate a deactivated account, contact an administrator.
