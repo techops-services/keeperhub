@@ -73,14 +73,24 @@ export const verifications = pgTable("verifications", {
 
 // start custom keeperhub code //
 // Organization tables
-export const organization = pgTable("organization", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  slug: text("slug").notNull().unique(),
-  logo: text("logo"),
-  createdAt: timestamp("created_at").notNull(),
-  metadata: text("metadata"),
-});
+export const organization = pgTable(
+  "organization",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    slug: text("slug").notNull().unique(),
+    logo: text("logo"),
+    createdAt: timestamp("created_at").notNull(),
+    metadata: text("metadata"),
+    // Billing fields
+    creditBalance: integer("credit_balance").default(0).notNull(),
+    tier: text("tier").default("developer").notNull(),
+    tierExpiresAt: timestamp("tier_expires_at"),
+    tierIsLifetime: boolean("tier_is_lifetime").default(false).notNull(),
+    orgIdHash: text("org_id_hash"), // keccak256 hash for smart contract mapping
+  },
+  (table) => [index("idx_organization_org_id_hash").on(table.orgIdHash)]
+);
 
 export const member = pgTable("member", {
   id: text("id").primaryKey(),
@@ -126,6 +136,49 @@ export const addressBookEntry = pgTable(
     }),
   },
   (table) => [index("idx_address_book_org").on(table.organizationId)]
+);
+
+// Credit transactions table for billing history
+export const creditTransactions = pgTable(
+  "credit_transactions",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => generateId()),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    type: text("type")
+      .notNull()
+      .$type<"deposit" | "workflow_run" | "bonus" | "adjustment">(),
+    // Transaction status for reservation flow
+    status: text("status")
+      .notNull()
+      .default("completed")
+      .$type<"pending" | "completed" | "refunded">(),
+    amount: integer("amount").notNull(), // Positive for deposits, negative for usage
+    balanceAfter: integer("balance_after").notNull(),
+    // For deposits
+    txHash: text("tx_hash"), // Blockchain transaction hash
+    paymentToken: text("payment_token"), // "ETH", "USDC", "USDT", "USDS"
+    paymentAmount: text("payment_amount"), // Amount paid in token units
+    usdValue: text("usd_value"), // USD value at time of purchase (6 decimals)
+    // For workflow runs
+    workflowId: text("workflow_id"),
+    executionId: text("execution_id"),
+    // Metadata
+    note: text("note"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at"),
+  },
+  (table) => [
+    index("idx_credit_transactions_org").on(table.organizationId),
+    index("idx_credit_transactions_type").on(table.type),
+    index("idx_credit_transactions_created").on(table.createdAt),
+    index("idx_credit_transactions_tx_hash").on(table.txHash),
+    index("idx_credit_transactions_status").on(table.status),
+    index("idx_credit_transactions_execution").on(table.executionId),
+  ]
 );
 // end keeperhub code //
 
@@ -218,6 +271,14 @@ export const workflowExecutions = pgTable("workflow_executions", {
   lastSuccessfulNodeId: text("last_successful_node_id"),
   lastSuccessfulNodeName: text("last_successful_node_name"),
   executionTrace: jsonb("execution_trace").$type<string[]>(),
+  // start custom keeperhub code //
+  // Cost tracking fields
+  estimatedCost: integer("estimated_cost"), // Credits estimated before execution
+  actualCost: integer("actual_cost"), // Credits actually charged
+  // biome-ignore lint/suspicious/noExplicitAny: JSONB type - cost breakdown structure
+  costBreakdown: jsonb("cost_breakdown").$type<any>(), // Detailed breakdown: blocks, functions, gas, fee
+  gasStrategy: text("gas_strategy").$type<"conservative" | "optimized">(), // Gas strategy used
+  // end keeperhub code //
 });
 
 // Workflow execution logs to track individual node executions

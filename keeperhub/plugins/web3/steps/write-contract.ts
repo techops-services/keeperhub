@@ -10,6 +10,10 @@ import {
 import { getGasStrategy } from "@/keeperhub/lib/web3/gas-strategy";
 import { getNonceManager } from "@/keeperhub/lib/web3/nonce-manager";
 import {
+  isSponsorshipAvailable,
+  sendSponsoredTransaction,
+} from "@/keeperhub/lib/web3/sponsorship";
+import {
   type TransactionContext,
   withNonceSession,
 } from "@/keeperhub/lib/web3/transaction-manager";
@@ -219,7 +223,52 @@ async function stepHandler(
   };
 
   // Execute transaction with nonce management and gas strategy
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Dual-path tx handler (sponsorship + direct submission)
   return withNonceSession(txContext, walletAddress, async (session) => {
+    // --- Gas sponsorship path ---
+    if (await isSponsorshipAvailable(chainId)) {
+      try {
+        const iface = new ethers.Interface(parsedAbi as ethers.InterfaceAbi);
+        const encodedData = iface.encodeFunctionData(abiFunction, args);
+
+        const result = await sendSponsoredTransaction({
+          organizationId,
+          chainId,
+          rpcUrl,
+          calls: [
+            {
+              to: contractAddress as `0x${string}`,
+              data: encodedData as `0x${string}`,
+            },
+          ],
+        });
+
+        if (!result.success) {
+          return result;
+        }
+
+        const explorerConfig = await db.query.explorerConfigs.findFirst({
+          where: eq(explorerConfigs.chainId, chainId),
+        });
+        const transactionLink = explorerConfig
+          ? getTransactionUrl(explorerConfig, result.txHash)
+          : "";
+
+        return {
+          success: true,
+          transactionHash: result.txHash,
+          transactionLink,
+          result: undefined,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: `Gas sponsorship failed: ${getErrorMessage(error)}. Transaction was not submitted.`,
+        };
+      }
+    }
+    // --- Direct submission path (no sponsorship) ---
+
     const nonceManager = getNonceManager();
     const gasStrategy = getGasStrategy();
 

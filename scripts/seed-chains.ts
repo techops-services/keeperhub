@@ -77,6 +77,7 @@ const DEFAULT_CHAINS: NewChain[] = [
     }),
     isTestnet: getChainConfigValue("eth-mainnet", "isTestnet", false),
     isEnabled: getChainConfigValue("eth-mainnet", "isEnabled", true),
+    gasConfig: { gasSponsorshipEnabled: true },
   },
   {
     chainId: getChainConfigValue("eth-sepolia", "chainId", 11_155_111),
@@ -97,6 +98,7 @@ const DEFAULT_CHAINS: NewChain[] = [
     }),
     isTestnet: getChainConfigValue("eth-sepolia", "isTestnet", true),
     isEnabled: getChainConfigValue("eth-sepolia", "isEnabled", true),
+    gasConfig: { gasSponsorshipEnabled: true },
   },
   {
     chainId: getChainConfigValue("base-mainnet", "chainId", 8453),
@@ -117,6 +119,7 @@ const DEFAULT_CHAINS: NewChain[] = [
     }),
     isTestnet: getChainConfigValue("base-mainnet", "isTestnet", false),
     isEnabled: getChainConfigValue("base-mainnet", "isEnabled", true),
+    gasConfig: { gasSponsorshipEnabled: true },
   },
   {
     chainId: getChainConfigValue("base-testnet", "chainId", 84_532),
@@ -137,6 +140,7 @@ const DEFAULT_CHAINS: NewChain[] = [
     }),
     isTestnet: getChainConfigValue("base-testnet", "isTestnet", true),
     isEnabled: getChainConfigValue("base-testnet", "isEnabled", true),
+    gasConfig: { gasSponsorshipEnabled: true },
   },
   {
     chainId: getChainConfigValue("tempo-testnet", "chainId", 42_429),
@@ -157,6 +161,7 @@ const DEFAULT_CHAINS: NewChain[] = [
     }),
     isTestnet: getChainConfigValue("tempo-testnet", "isTestnet", true),
     isEnabled: getChainConfigValue("tempo-testnet", "isEnabled", true),
+    gasConfig: { gasSponsorshipEnabled: false },
   },
   {
     chainId: getChainConfigValue("tempo-mainnet", "chainId", 42_420),
@@ -177,6 +182,7 @@ const DEFAULT_CHAINS: NewChain[] = [
     }),
     isTestnet: getChainConfigValue("tempo-mainnet", "isTestnet", false),
     isEnabled: getChainConfigValue("tempo-mainnet", "isEnabled", false),
+    gasConfig: { gasSponsorshipEnabled: false },
   },
   // Solana chains (non-EVM - uses SolanaProviderManager)
   {
@@ -198,6 +204,7 @@ const DEFAULT_CHAINS: NewChain[] = [
     }),
     isTestnet: getChainConfigValue("solana-mainnet", "isTestnet", false),
     isEnabled: getChainConfigValue("solana-mainnet", "isEnabled", true),
+    gasConfig: { gasSponsorshipEnabled: false },
   },
   {
     chainId: getChainConfigValue("solana-testnet", "chainId", 103),
@@ -218,6 +225,7 @@ const DEFAULT_CHAINS: NewChain[] = [
     }),
     isTestnet: getChainConfigValue("solana-testnet", "isTestnet", true),
     isEnabled: getChainConfigValue("solana-testnet", "isEnabled", true),
+    gasConfig: { gasSponsorshipEnabled: false },
   },
 ];
 
@@ -342,6 +350,7 @@ async function seedChains() {
           defaultFallbackWss: chain.defaultFallbackWss ?? null,
           isTestnet: chain.isTestnet,
           isEnabled: chain.isEnabled,
+          gasConfig: chain.gasConfig ?? {},
           updatedAt: new Date(),
         })
         .where(eq(chains.chainId, chain.chainId));

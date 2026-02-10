@@ -125,5 +125,13 @@ tailwindcss-*.log
 .claude/lint-output.txt
 .claude/typecheck-output.txt
 
+<<<<<<< HEAD
 .planning
 .prompts
+# Hardhat artifacts (auto-generated during contract compilation)
+=======
+# Hardhat/Solidity artifacts (auto-generated during contract compilation)
+>>>>>>> 7fb64e0f (KEEP-811 - Some changes to improve branch git-wise)
+contracts/artifacts/
+contracts/cache/
+contracts/typechain-types/

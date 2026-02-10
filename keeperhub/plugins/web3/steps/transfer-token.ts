@@ -9,6 +9,10 @@ import {
 import { getGasStrategy } from "@/keeperhub/lib/web3/gas-strategy";
 import { getNonceManager } from "@/keeperhub/lib/web3/nonce-manager";
 import {
+  isSponsorshipAvailable,
+  sendSponsoredTransaction,
+} from "@/keeperhub/lib/web3/sponsorship";
+import {
   type TransactionContext,
   withNonceSession,
 } from "@/keeperhub/lib/web3/transaction-manager";
@@ -297,7 +301,98 @@ async function stepHandler(
   };
 
   // Execute transaction with nonce management and gas strategy
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Dual-path tx handler (sponsorship + direct submission)
   return withNonceSession(txContext, walletAddress, async (session) => {
+    // --- Gas sponsorship path ---
+    if (await isSponsorshipAvailable(chainId)) {
+      try {
+        // Get token info using read-only provider (no signer needed)
+        const readProvider = new ethers.JsonRpcProvider(rpcUrl);
+        const readContract = new ethers.Contract(
+          tokenAddress,
+          [
+            "function decimals() view returns (uint8)",
+            "function symbol() view returns (string)",
+            "function balanceOf(address) view returns (uint256)",
+          ],
+          readProvider
+        );
+
+        const [decimals, symbol] = await Promise.all([
+          readContract.decimals() as Promise<bigint>,
+          readContract.symbol() as Promise<string>,
+        ]);
+
+        const decimalsNum = Number(decimals);
+        let amountRaw: bigint;
+        try {
+          amountRaw = ethers.parseUnits(amount, decimalsNum);
+        } catch (error) {
+          return {
+            success: false,
+            error: `Invalid amount format: ${getErrorMessage(error)}`,
+          };
+        }
+
+        // Check balance
+        const balance = (await readContract.balanceOf(walletAddress)) as bigint;
+        if (balance < amountRaw) {
+          const balanceFormatted = ethers.formatUnits(balance, decimalsNum);
+          return {
+            success: false,
+            error: `Insufficient ${symbol} balance. Have: ${balanceFormatted}, Need: ${amount}`,
+          };
+        }
+
+        // Encode ERC20 transfer call
+        const transferIface = new ethers.Interface([
+          "function transfer(address to, uint256 amount) returns (bool)",
+        ]);
+        const encodedData = transferIface.encodeFunctionData("transfer", [
+          recipientAddress,
+          amountRaw,
+        ]);
+
+        const result = await sendSponsoredTransaction({
+          organizationId,
+          chainId,
+          rpcUrl,
+          calls: [
+            {
+              to: tokenAddress as `0x${string}`,
+              data: encodedData as `0x${string}`,
+            },
+          ],
+        });
+
+        if (!result.success) {
+          return result;
+        }
+
+        const explorerConfig = await db.query.explorerConfigs.findFirst({
+          where: eq(explorerConfigs.chainId, chainId),
+        });
+        const transactionLink = explorerConfig
+          ? getTransactionUrl(explorerConfig, result.txHash)
+          : "";
+
+        return {
+          success: true,
+          transactionHash: result.txHash,
+          transactionLink,
+          amount,
+          symbol,
+          recipient: recipientAddress,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: `Gas sponsorship failed: ${getErrorMessage(error)}. Transaction was not submitted.`,
+        };
+      }
+    }
+    // --- Direct submission path (no sponsorship) ---
+
     const nonceManager = getNonceManager();
     const gasStrategy = getGasStrategy();
 
