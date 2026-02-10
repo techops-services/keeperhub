@@ -45,24 +45,31 @@ jobs:
           PREV_TAG="${{ steps.prev_tag.outputs.tag }}"
           FIRST_RELEASE="${{ steps.prev_tag.outputs.first_release }}"
 
+          # Upper bound: the author date of HEAD (the prod push commit).
+          # This prevents including staging PRs merged after the prod push.
+          UNTIL=$(git log -1 --format=%aI HEAD)
+          echo "Upper bound (HEAD author date): $UNTIL"
+
           if [ "$FIRST_RELEASE" = "true" ]; then
-            # No previous tag: get all merged PRs to prod
+            # No previous tag: get all merged PRs to staging up to the prod push
+            echo "First release -- discovering all PRs merged to staging before $UNTIL"
             PR_JSON=$(gh pr list \
               --state merged \
-              --base prod \
-              --json number,title,author,url,body \
-              --limit 200)
+              --base staging \
+              --json number,title,author,url,body,mergedAt \
+              --limit 200 \
+              --jq "[.[] | select(.mergedAt <= \"$UNTIL\")]")
           else
             # Get the date of the previous tag commit
             SINCE=$(git log -1 --format=%aI "$PREV_TAG")
-            echo "Finding PRs merged after: $SINCE"
+            echo "Finding PRs merged after: $SINCE and before: $UNTIL"
 
             PR_JSON=$(gh pr list \
               --state merged \
-              --base prod \
+              --base staging \
               --json number,title,author,url,mergedAt,body \
               --limit 200 \
-              --jq "[.[] | select(.mergedAt > \"$SINCE\")]")
+              --jq "[.[] | select(.mergedAt > \"$SINCE\" and .mergedAt <= \"$UNTIL\")]")
           fi
 
           PR_COUNT=$(echo "$PR_JSON" | jq 'length')
@@ -111,7 +118,7 @@ jobs:
             TITLE=$(printf '%s' "$TITLE" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
             # Strip the prefix from the title for display
-            DISPLAY_TITLE=$(printf '%s' "$TITLE" | sed -E 's/^(feat|fix|bug|breaking|chore|docs|refactor|test|ci|build|perf|style)(\([^)]*\))?[!]?:[[:space:]]*//')
+            DISPLAY_TITLE=$(printf '%s' "$TITLE" | sed -E 's/^(feat|fix|bug|hotfix|breaking|chore|docs|refactor|test|ci|build|perf|style)(\([^)]*\))?[!]?:[[:space:]]*//')
 
             # If stripping produced empty string, use original title
             if [ -z "$DISPLAY_TITLE" ]; then
@@ -135,7 +142,7 @@ jobs:
             elif printf '%s' "$TITLE" | grep -qiE "^feat(\([^)]*\))?:"; then
               HAS_FEAT=true
               FEAT_PRS="${FEAT_PRS}${ENTRY}"$'\n'
-            elif printf '%s' "$TITLE" | grep -qiE "^(fix|bug)(\([^)]*\))?:"; then
+            elif printf '%s' "$TITLE" | grep -qiE "^(fix|bug|hotfix)(\([^)]*\))?:"; then
               FIX_PRS="${FIX_PRS}${ENTRY}"$'\n'
             else
               OTHER_PRS="${OTHER_PRS}${ENTRY}"$'\n'
