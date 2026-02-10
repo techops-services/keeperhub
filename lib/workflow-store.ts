@@ -12,6 +12,7 @@ export enum WorkflowTriggerEnum {
   SCHEDULE = "Schedule",
   WEBHOOK = "Webhook",
   EVENT = "Event", // keeperhub custom field //
+  BLOCK = "Block", // keeperhub custom field //
 }
 // end custom keeperhub code //
 
