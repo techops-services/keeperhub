@@ -227,7 +227,7 @@ spec:
               command:
                 - /bin/sh
                 - -c
-                - "pgrep -f 'job-spawner' || exit 1"
+                - "pgrep -f 'schedule-executor' || exit 1"
             initialDelaySeconds: 30
             periodSeconds: 30
             failureThreshold: 3
