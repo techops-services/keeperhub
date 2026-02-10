@@ -1,20 +1,3 @@
-import type { LucideIcon } from "lucide-react";
-import {
-  Bot,
-  Box,
-  Clock,
-  Code,
-  GitBranch,
-  Hash,
-  Mail,
-  Play,
-  User,
-  Zap,
-} from "lucide-react";
-import type { CSSProperties, ReactNode } from "react";
-import { DiscordIcon } from "@/keeperhub/plugins/discord/icon";
-import { Web3Icon } from "@/keeperhub/plugins/web3/icon";
-import { WebhookIcon } from "@/keeperhub/plugins/webhook/icon";
 import type { WorkflowEdge, WorkflowNode } from "@/lib/workflow-store";
 
 type WorkflowMiniMapProps = {
@@ -34,8 +17,7 @@ type Bounds = {
   height: number;
 };
 
-const NODE_WIDTH = 80;
-const NODE_HEIGHT = 80;
+const FIXED_NODE_SIZE = 18;
 const PADDING = 20;
 
 function calculateBounds(nodes: WorkflowNode[]): Bounds {
@@ -53,8 +35,8 @@ function calculateBounds(nodes: WorkflowNode[]): Bounds {
     const y = node.position?.y ?? 0;
     minX = Math.min(minX, x);
     minY = Math.min(minY, y);
-    maxX = Math.max(maxX, x + NODE_WIDTH);
-    maxY = Math.max(maxY, y + NODE_HEIGHT);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
   }
 
   return {
@@ -67,146 +49,32 @@ function calculateBounds(nodes: WorkflowNode[]): Bounds {
   };
 }
 
-type NodeIconType =
-  | LucideIcon
-  | (({
-      className,
-      style,
-    }: {
-      className?: string;
-      style?: CSSProperties;
-    }) => ReactNode);
-
-function getTriggerIcon(triggerType: string | undefined): NodeIconType {
-  switch (triggerType) {
-    case "Schedule":
-      return Clock;
-    case "Webhook":
-      return Zap;
-    default:
-      return Play;
-  }
-}
-
-function getActionIconBySlug(integrationType: string): NodeIconType {
-  switch (integrationType) {
-    case "web3":
-      return Web3Icon;
-    case "discord":
-      return DiscordIcon;
-    case "slack":
-      return Hash;
-    case "sendgrid":
-    case "resend":
-      return Mail;
-    case "webhook":
-      return WebhookIcon;
-    case "ai-gateway":
-      return Bot;
-    case "clerk":
-      return User;
-    default:
-      return Box;
-  }
-}
-
-function getActionIconByLabel(lowerActionType: string): NodeIconType {
-  if (
-    lowerActionType.includes("balance") ||
-    lowerActionType.includes("transfer") ||
-    lowerActionType.includes("contract")
-  ) {
-    return Web3Icon;
-  }
-  if (lowerActionType.includes("slack")) {
-    return Hash;
-  }
-  if (lowerActionType.includes("discord")) {
-    return DiscordIcon;
-  }
-  if (
-    lowerActionType.includes("email") ||
-    lowerActionType.includes("sendgrid")
-  ) {
-    return Mail;
-  }
-  if (lowerActionType.includes("webhook")) {
-    return WebhookIcon;
-  }
-  if (lowerActionType.includes("http") || lowerActionType.includes("request")) {
-    return Code;
-  }
-  if (lowerActionType === "condition") {
-    return GitBranch;
-  }
-  return Box;
-}
-
-function getNodeIcon(node: WorkflowNode): NodeIconType {
-  const isTrigger = node.type === "trigger" || node.data?.type === "trigger";
-
-  if (isTrigger) {
-    const triggerType = node.data?.config?.triggerType as string | undefined;
-    return getTriggerIcon(triggerType);
-  }
-
-  const actionType = node.data?.config?.actionType as string | undefined;
-  if (!actionType) {
-    return Box;
-  }
-
-  if (actionType.includes("/")) {
-    const integrationType = actionType.split("/")[0];
-    return getActionIconBySlug(integrationType);
-  }
-
-  return getActionIconByLabel(actionType.toLowerCase());
-}
-
 function MiniNode({
   node,
   bounds,
-  scale,
+  posScale,
   offsetX,
   offsetY,
 }: {
   node: WorkflowNode;
   bounds: Bounds;
-  scale: number;
+  posScale: number;
   offsetX: number;
   offsetY: number;
 }) {
-  const x = ((node.position?.x ?? 0) - bounds.minX) * scale + offsetX;
-  const y = ((node.position?.y ?? 0) - bounds.minY) * scale + offsetY;
-  const nodeWidth = NODE_WIDTH * scale;
-  const nodeHeight = NODE_HEIGHT * scale;
-  const Icon = getNodeIcon(node);
-
-  // Calculate icon size (50% of node size)
-  const iconSize = Math.min(nodeWidth, nodeHeight) * 0.5;
+  const x = ((node.position?.x ?? 0) - bounds.minX) * posScale + offsetX;
+  const y = ((node.position?.y ?? 0) - bounds.minY) * posScale + offsetY;
 
   return (
-    <g>
-      {/* Node background */}
-      <rect
-        className="fill-slate-400"
-        height={nodeHeight}
-        rx={nodeWidth * 0.15}
-        ry={nodeHeight * 0.15}
-        width={nodeWidth}
-        x={x}
-        y={y}
-      />
-      {/* Icon using foreignObject */}
-      <foreignObject height={nodeHeight} width={nodeWidth} x={x} y={y}>
-        <div className="flex h-full w-full items-center justify-center">
-          <Icon
-            className="text-slate-100"
-            style={{ width: iconSize, height: iconSize }}
-          />
-        </div>
-      </foreignObject>
-    </g>
+    <rect
+      className="fill-[#2a3342]"
+      height={FIXED_NODE_SIZE}
+      rx={FIXED_NODE_SIZE * 0.15}
+      ry={FIXED_NODE_SIZE * 0.15}
+      width={FIXED_NODE_SIZE}
+      x={x}
+      y={y}
+    />
   );
 }
 
@@ -214,14 +82,14 @@ function MiniEdge({
   edge,
   nodes,
   bounds,
-  scale,
+  posScale,
   offsetX,
   offsetY,
 }: {
   edge: WorkflowEdge;
   nodes: WorkflowNode[];
   bounds: Bounds;
-  scale: number;
+  posScale: number;
   offsetX: number;
   offsetY: number;
 }) {
@@ -232,29 +100,29 @@ function MiniEdge({
     return null;
   }
 
-  // Calculate center-right of source node
   const sourceX =
-    ((sourceNode.position?.x ?? 0) - bounds.minX + NODE_WIDTH) * scale +
-    offsetX;
+    ((sourceNode.position?.x ?? 0) - bounds.minX) * posScale +
+    offsetX +
+    FIXED_NODE_SIZE;
   const sourceY =
-    ((sourceNode.position?.y ?? 0) - bounds.minY + NODE_HEIGHT / 2) * scale +
-    offsetY;
+    ((sourceNode.position?.y ?? 0) - bounds.minY) * posScale +
+    offsetY +
+    FIXED_NODE_SIZE / 2;
 
-  // Calculate center-left of target node
   const targetX =
-    ((targetNode.position?.x ?? 0) - bounds.minX) * scale + offsetX;
+    ((targetNode.position?.x ?? 0) - bounds.minX) * posScale + offsetX;
   const targetY =
-    ((targetNode.position?.y ?? 0) - bounds.minY + NODE_HEIGHT / 2) * scale +
-    offsetY;
+    ((targetNode.position?.y ?? 0) - bounds.minY) * posScale +
+    offsetY +
+    FIXED_NODE_SIZE / 2;
 
-  // Create a smooth bezier curve
   const midX = (sourceX + targetX) / 2;
 
   return (
     <path
-      className="fill-none stroke-slate-300"
+      className="fill-none stroke-[#2a3342]"
       d={`M ${sourceX} ${sourceY} C ${midX} ${sourceY}, ${midX} ${targetY}, ${targetX} ${targetY}`}
-      strokeWidth={2}
+      strokeWidth={0.4}
     />
   );
 }
@@ -262,28 +130,28 @@ function MiniEdge({
 export function WorkflowMiniMap({
   nodes,
   edges,
-  width = 200,
-  height = 120,
+  width = 280,
+  height = 160,
   className = "",
 }: WorkflowMiniMapProps) {
   if (!nodes || nodes.length === 0) {
-    // Empty state - show placeholder
     return (
       <svg
         aria-label="Empty workflow diagram"
         className={`${className}`}
-        height={height}
+        height="100%"
+        preserveAspectRatio="xMidYMid meet"
         role="img"
         viewBox={`0 0 ${width} ${height}`}
-        width={width}
+        width="100%"
       >
         <rect
           className="fill-slate-300"
-          height={30}
+          height={FIXED_NODE_SIZE}
           rx={6}
-          width={60}
-          x={width / 2 - 30}
-          y={height / 2 - 15}
+          width={FIXED_NODE_SIZE * 2}
+          x={width / 2 - FIXED_NODE_SIZE}
+          y={height / 2 - FIXED_NODE_SIZE / 2}
         />
       </svg>
     );
@@ -291,18 +159,16 @@ export function WorkflowMiniMap({
 
   const bounds = calculateBounds(nodes);
 
-  // Calculate scale to fit within the viewport with padding
-  const availableWidth = width - PADDING * 2;
-  const availableHeight = height - PADDING * 2;
-  const scaleX = availableWidth / bounds.width;
-  const scaleY = availableHeight / bounds.height;
-  const scale = Math.min(scaleX, scaleY, 1); // Don't scale up, only down
+  const availW = width - PADDING * 2 - FIXED_NODE_SIZE;
+  const availH = height - PADDING * 2 - FIXED_NODE_SIZE;
+  const posScaleX = bounds.width > 0 ? availW / bounds.width : 1;
+  const posScaleY = bounds.height > 0 ? availH / bounds.height : 1;
+  const posScale = Math.min(posScaleX, posScaleY);
 
-  // Center the content
-  const scaledWidth = bounds.width * scale;
-  const scaledHeight = bounds.height * scale;
-  const offsetX = (width - scaledWidth) / 2;
-  const offsetY = (height - scaledHeight) / 2;
+  const scaledContentW = bounds.width * posScale + FIXED_NODE_SIZE;
+  const scaledContentH = bounds.height * posScale + FIXED_NODE_SIZE;
+  const offsetX = (width - scaledContentW) / 2;
+  const offsetY = (height - scaledContentH) / 2;
 
   return (
     <svg
@@ -314,7 +180,6 @@ export function WorkflowMiniMap({
       viewBox={`0 0 ${width} ${height}`}
       width="100%"
     >
-      {/* Render edges first (behind nodes) */}
       {edges.map((edge) => (
         <MiniEdge
           bounds={bounds}
@@ -323,10 +188,9 @@ export function WorkflowMiniMap({
           nodes={nodes}
           offsetX={offsetX}
           offsetY={offsetY}
-          scale={scale}
+          posScale={posScale}
         />
       ))}
-      {/* Render nodes */}
       {nodes
         .filter((node) => node.type !== "add")
         .map((node) => (
@@ -336,7 +200,7 @@ export function WorkflowMiniMap({
             node={node}
             offsetX={offsetX}
             offsetY={offsetY}
-            scale={scale}
+            posScale={posScale}
           />
         ))}
     </svg>
