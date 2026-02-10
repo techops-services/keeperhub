@@ -16,19 +16,17 @@ Run most services in Docker Compose with only job-spawner in Minikube. This enab
 ┌─────────────────────────────────────────────────────────────┐
 │                 Docker Compose (minikube profile)            │
 ├─────────────────────────────────────────────────────────────┤
-│  app-dev  │  db  │  localstack  │                           │
-│  (Next.js)│(Postgres)│  (SQS)  │                           │
+│  app-dev  │  db  │  localstack  │  dispatcher  │  redis     │
+│  (Next.js)│(Postgres)│  (SQS)  │  (cron loop) │            │
+│           │          │          │  sc-event-*  │            │
 └─────────────────────────────────────────────────────────────┘
-                              │
-                              │ host.minikube.internal
-                              ▼
+          ▲                           │
+          │ API call                  │ SQS message
+          │ host.minikube.internal    ▼ host.minikube.internal
 ┌─────────────────────────────────────────────────────────────┐
 │                    Minikube (minimal)                        │
 ├─────────────────────────────────────────────────────────────┤
-│  schedule-dispatcher (CronJob)                               │
-│         │                                                    │
-│         ▼ SQS                                                │
-│  job-spawner (Deployment) ───creates───▶ Workflow Jobs       │
+│  schedule-executor (Deployment) - polls SQS, calls API      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -97,14 +95,10 @@ make hybrid-status
 docker compose --profile minikube down
 ```
 
-### View Workflow Job Logs
+### View Executor Logs
 
 ```bash
-# List jobs
-kubectl get jobs -n local -l app=workflow-runner
-
-# View logs for a specific job
-kubectl logs -n local -l job-name=<job-name>
+kubectl logs -n local -l app=job-spawner -f
 ```
 
 ## Switching Between Modes
@@ -151,18 +145,18 @@ If it fails, try restarting Minikube:
 minikube stop && minikube start
 ```
 
-### Workflow jobs fail to run
+### Executor not processing messages
 
-Check job-spawner logs:
+Check executor logs:
 
 ```bash
 kubectl logs -n local -l app=job-spawner
 ```
 
-Verify runner image is loaded:
+Verify executor image is loaded:
 
 ```bash
-minikube image ls | grep keeperhub-runner
+minikube image ls | grep keeperhub-executor
 ```
 
 ### Database connection issues
@@ -198,14 +192,15 @@ awslocal sqs get-queue-attributes --queue-url http://host.minikube.internal:4566
 |-----------|--------------|-------------------|
 | db | Docker Compose | Docker Compose |
 | localstack | Docker Compose | Docker Compose |
+| redis | Docker Compose | Docker Compose |
 | app-dev | Docker Compose | Docker Compose |
-| dispatcher | Docker Compose (loop) | Minikube CronJob |
-| executor | Docker Compose (direct) | - |
-| job-spawner | - | Minikube Deployment |
-| workflow-runner | - | Minikube Jobs |
+| dispatcher | Docker Compose (loop) | Docker Compose (loop) |
+| sc-event-worker | Docker Compose | Docker Compose |
+| sc-event-tracker | Docker Compose | Docker Compose |
+| schedule-executor | - | Minikube Deployment |
 
-In `dev` profile, workflows execute directly via the `executor` service (calling the API).
-In `minikube` profile, workflows execute in isolated K8s Jobs created by `job-spawner`.
+In both profiles, the dispatcher runs in Docker Compose as a cron loop.
+In `minikube` profile, the executor runs in Minikube and executes workflows via the KeeperHub API.
 
 ## Testing
 
