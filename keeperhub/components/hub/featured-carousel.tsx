@@ -2,21 +2,26 @@
 
 import { ChevronLeft, ChevronRight, Eye } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardContent,
   CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { api, type SavedWorkflow } from "@/lib/api-client";
 import { authClient, useSession } from "@/lib/auth-client";
 import { WorkflowMiniMap } from "./workflow-mini-map";
+import { WorkflowNodeIcons } from "./workflow-node-icons";
 
 type FeaturedCarouselProps = {
   workflows: SavedWorkflow[];
@@ -27,6 +32,23 @@ export function FeaturedCarousel({ workflows }: FeaturedCarouselProps) {
   const { data: session } = useSession();
   const [duplicatingIds, setDuplicatingIds] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const arrowVisibility = useMemo((): string => {
+    const count = workflows.length;
+    if (count > 4) {
+      return "flex";
+    }
+    if (count > 3) {
+      return "flex lg:hidden";
+    }
+    if (count > 2) {
+      return "flex md:hidden";
+    }
+    if (count > 1) {
+      return "flex sm:hidden";
+    }
+    return "hidden";
+  }, [workflows.length]);
 
   const scroll = useCallback((direction: "left" | "right") => {
     const container = scrollRef.current;
@@ -77,10 +99,10 @@ export function FeaturedCarousel({ workflows }: FeaturedCarouselProps) {
   }
 
   return (
-    <section className="mb-16">
+    <section className="relative z-10">
       <div className="mb-6 flex items-center justify-between">
         <h2 className="font-bold text-3xl">Featured</h2>
-        <div className="flex gap-2">
+        <div className={`gap-2 ${arrowVisibility}`}>
           <Button
             aria-label="Scroll left"
             onClick={() => scroll("left")}
@@ -109,10 +131,10 @@ export function FeaturedCarousel({ workflows }: FeaturedCarouselProps) {
 
           return (
             <Card
-              className="flex w-[320px] shrink-0 flex-col overflow-hidden bg-sidebar"
+              className="flex w-[320px] shrink-0 flex-col gap-0 overflow-hidden border-none bg-sidebar py-0"
               key={workflow.id}
             >
-              <div className="relative -mt-6 flex aspect-video w-full items-center justify-center overflow-hidden">
+              <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden px-8">
                 <WorkflowMiniMap
                   edges={workflow.edges}
                   height={160}
@@ -121,14 +143,14 @@ export function FeaturedCarousel({ workflows }: FeaturedCarouselProps) {
                 />
                 {workflow.category && (
                   <Badge
-                    className="absolute top-3 right-3 rounded-full bg-sidebar"
+                    className="absolute top-3 right-3 rounded-full border-none bg-[#09fd671a] px-3 py-1 text-[#09fd67]"
                     variant="outline"
                   >
                     {workflow.category}
                   </Badge>
                 )}
               </div>
-              <CardHeader>
+              <CardHeader className="pb-4">
                 {workflow.protocol && (
                   <p className="font-medium text-muted-foreground text-xs uppercase tracking-wider">
                     {workflow.protocol}
@@ -140,9 +162,10 @@ export function FeaturedCarousel({ workflows }: FeaturedCarouselProps) {
                     {workflow.description}
                   </CardDescription>
                 )}
+                <WorkflowNodeIcons nodes={workflow.nodes} />
               </CardHeader>
-              <CardContent className="flex-1" />
-              <CardFooter className="gap-2">
+              <div className="flex-1" />
+              <CardFooter className="gap-2 pb-4">
                 <Button
                   className="flex-1"
                   disabled={isDuplicating}
@@ -151,12 +174,17 @@ export function FeaturedCarousel({ workflows }: FeaturedCarouselProps) {
                 >
                   {isDuplicating ? "Duplicating..." : "Use Template"}
                 </Button>
-                <Button
-                  onClick={() => router.push(`/workflows/${workflow.id}`)}
-                  variant="outline"
-                >
-                  <Eye className="size-4" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={() => router.push(`/workflows/${workflow.id}`)}
+                      variant="outline"
+                    >
+                      <Eye className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">View Template</TooltipContent>
+                </Tooltip>
               </CardFooter>
             </Card>
           );

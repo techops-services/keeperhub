@@ -16,10 +16,14 @@ import {
   type WorkflowNode,
 } from "@/lib/workflow-store";
 
-// Helper function to create a default trigger node
-function createDefaultTriggerNode() {
-  return {
-    id: nanoid(),
+// start custom keeperhub code //
+function createDefaultNodes() {
+  const triggerId = nanoid();
+  const actionId = nanoid();
+  const edgeId = nanoid();
+
+  const triggerNode: WorkflowNode = {
+    id: triggerId,
     type: "trigger" as const,
     position: { x: 0, y: 0 },
     data: {
@@ -30,7 +34,31 @@ function createDefaultTriggerNode() {
       status: "idle" as const,
     },
   };
+
+  const actionNode: WorkflowNode = {
+    id: actionId,
+    type: "action" as const,
+    position: { x: 272, y: 0 },
+    selected: true,
+    data: {
+      label: "",
+      description: "",
+      type: "action" as const,
+      config: {},
+      status: "idle" as const,
+    },
+  };
+
+  const edge = {
+    id: edgeId,
+    source: triggerId,
+    target: actionId,
+    type: "animated",
+  };
+
+  return { nodes: [triggerNode, actionNode], edges: [edge] };
 }
+// end keeperhub code //
 
 const Home = () => {
   const router = useRouter();
@@ -65,12 +93,14 @@ const Home = () => {
     }
   }, [session]);
 
-  // Handler to add the first node (replaces the "add" node)
+  // start custom keeperhub code //
+  // Handler to add initial nodes (replaces the "add" placeholder)
   const handleAddNode = useCallback(() => {
-    const newNode: WorkflowNode = createDefaultTriggerNode();
-    // Replace all nodes (removes the "add" node)
-    setNodes([newNode]);
-  }, [setNodes]);
+    const { nodes: defaultNodes, edges: defaultEdges } = createDefaultNodes();
+    setNodes(defaultNodes);
+    setEdges(defaultEdges);
+  }, [setNodes, setEdges]);
+  // end keeperhub code //
 
   // Initialize with a temporary "add" node on mount
   useEffect(() => {
