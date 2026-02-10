@@ -1,0 +1,17 @@
+{
+  "network": "sepolia",
+  "timestamp": "2026-01-26T17:06:36.997Z",
+  "deployer": "0x6261d9B5aB3943441e92D90800B1daf3EBf06377",
+  "contracts": {
+    "KeeperHubCredits": "0xB55ef961fc47bd67a3859fD61dc563e72B5605D6",
+    "KeeperHubTiers": "0x4B899Cc652944994741169875010E5a3C607975B"
+  },
+  "config": {
+    "priceFeed": "0x694AA1769357215DE4FAC081bf1f309aDC325306",
+    "stables": {
+      "usdc": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+      "usdt": "0x9F3BDc4459f0436eA0fe925d9aE6963eF1b7bb17",
+      "usds": "0x39d38839AAC04327577c795b4aC1E1235700EfCF"
+    }
+  }
+}

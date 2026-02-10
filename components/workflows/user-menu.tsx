@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  Bookmark,
+  CreditCard,
   Github,
   Key,
   LogOut,
@@ -9,9 +9,9 @@ import {
   Plug,
   Settings,
   Sun,
-  Users,
   Wallet,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import {
@@ -39,10 +39,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 // start custom keeperhub code //
 import { ManageOrgsModal } from "@/keeperhub/components/organization/manage-orgs-modal";
-import { AddressBookOverlay } from "@/keeperhub/components/overlays/address-book-overlay";
 import { FeedbackOverlay } from "@/keeperhub/components/overlays/feedback-overlay";
 import { WalletOverlay } from "@/keeperhub/components/overlays/wallet-overlay";
-import { useOrganization } from "@/keeperhub/lib/hooks/use-organization";
 // end keeperhub code //
 import { api } from "@/lib/api-client";
 import { signOut, useSession } from "@/lib/auth-client";
@@ -51,11 +49,9 @@ export const UserMenu = () => {
   const { data: session, isPending } = useSession();
   const { theme, setTheme } = useTheme();
   const { open: openOverlay } = useOverlay();
+  const router = useRouter();
   const [providerId, setProviderId] = useState<string | null>(null);
   const [orgModalOpen, setOrgModalOpen] = useState(false);
-  // start custom keeperhub code //
-  const { organization } = useOrganization();
-  // end keeperhub code //
 
   // Fetch provider info when session is available
   useEffect(() => {
@@ -73,8 +69,6 @@ export const UserMenu = () => {
 
   const handleLogout = async () => {
     await signOut();
-    // Full page refresh to clear all React/jotai state
-    window.location.href = "/";
   };
 
   // OAuth users can't edit their profile
@@ -100,16 +94,6 @@ export const UserMenu = () => {
 
   const signInInProgress = isSingleProviderSignInInitiated();
 
-  // Check if user is anonymous
-  // Better Auth anonymous plugin creates users with name "Anonymous" and temp- email
-  const isAnonymousUser =
-    !session?.user ||
-    session.user.name === "Anonymous" ||
-    session.user.email?.startsWith("temp-");
-
-  // Check if user's email is verified
-  const isEmailVerified = session?.user?.emailVerified === true;
-
   // Don't render anything while session is loading to prevent flash
   // BUT if sign-in is in progress, keep showing the AuthDialog with loading state
   if (isPending && !signInInProgress) {
@@ -118,8 +102,15 @@ export const UserMenu = () => {
     );
   }
 
-  // Show Sign In button if user is anonymous, not logged in, or email not verified
-  if (isAnonymousUser || !isEmailVerified) {
+  // Check if user is anonymous
+  // Better Auth anonymous plugin creates users with name "Anonymous" and temp- email
+  const isAnonymous =
+    !session?.user ||
+    session.user.name === "Anonymous" ||
+    session.user.email?.startsWith("temp-");
+
+  // Show Sign In button if user is anonymous or not logged in
+  if (isAnonymous) {
     return (
       <div className="flex items-center gap-2">
         <AuthDialog>
@@ -165,15 +156,6 @@ export const UserMenu = () => {
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           {/* start custom keeperhub code */}
-          <div className="lg:hidden">
-            <DropdownMenuItem onClick={() => setOrgModalOpen(true)}>
-              <Users className="size-4" />
-              <span className="truncate">
-                {organization?.name ?? "Organization"}
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-          </div>
           <DropdownMenuItem onClick={() => openOverlay(FeedbackOverlay)}>
             <Github className="size-4" />
             <span>Report an issue</span>
@@ -189,7 +171,6 @@ export const UserMenu = () => {
             <Plug className="size-4" />
             <span>Connections</span>
           </DropdownMenuItem>
-          {/* start custom keeperhub code */}
           <DropdownMenuItem onClick={() => openOverlay(ApiKeysOverlay)}>
             <Key className="size-4" />
             <span>API Keys</span>
@@ -198,11 +179,10 @@ export const UserMenu = () => {
             <Wallet className="size-4" />
             <span>Wallet</span>
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => openOverlay(AddressBookOverlay)}>
-            <Bookmark className="size-4" />
-            <span>Address Book</span>
+          <DropdownMenuItem onClick={() => router.push("/billing")}>
+            <CreditCard className="size-4" />
+            <span>Billing</span>
           </DropdownMenuItem>
-          {/* end keeperhub code */}
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
               <Sun className="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />

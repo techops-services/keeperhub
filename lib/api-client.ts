@@ -747,10 +747,74 @@ export const aiGatewayApi = {
     }),
 };
 
+// Billing API types
+export type CreditTransaction = {
+  id: string;
+  type: "deposit" | "workflow_run" | "bonus" | "adjustment";
+  amount: number;
+  balanceAfter: number;
+  txHash: string | null;
+  paymentToken: string | null;
+  paymentAmount: string | null;
+  usdValue: string | null;
+  workflowId: string | null;
+  executionId: string | null;
+  note: string | null;
+  createdAt: string;
+};
+
+export type BillingBalance = {
+  creditBalance: number;
+  tier: string;
+  tierExpiresAt: string | null;
+  tierIsLifetime: boolean;
+};
+
+// Billing API
+export const billingApi = {
+  // Confirm a deposit transaction from the blockchain
+  confirmDeposit: (txHash: string, orgId: string, creditsExpected: number) =>
+    apiCall<{
+      success: boolean;
+      credits: number;
+      newBalance: number;
+    }>("/api/billing/confirm-deposit", {
+      method: "POST",
+      body: JSON.stringify({ txHash, orgId, creditsExpected }),
+    }),
+
+  // Get credit balance and tier info
+  getBalance: (orgId: string) =>
+    apiCall<BillingBalance>(`/api/billing/balance?orgId=${orgId}`),
+
+  // Get credit transaction history
+  getHistory: (orgId: string) =>
+    apiCall<{ transactions: CreditTransaction[] }>(
+      `/api/billing/history?orgId=${orgId}`
+    ),
+
+  // Deduct credit for workflow execution
+  deductCredit: (
+    organizationId: string,
+    workflowId?: string,
+    executionId?: string
+  ) =>
+    apiCall<{
+      success: boolean;
+      creditsDeducted: number;
+      previousBalance: number;
+      newBalance: number;
+    }>("/api/billing/deduct-credit", {
+      method: "POST",
+      body: JSON.stringify({ organizationId, workflowId, executionId }),
+    }),
+};
+
 // Export all APIs as a single object
 export const api = {
   ai: aiApi,
   aiGateway: aiGatewayApi,
+  billing: billingApi,
   integration: integrationApi,
   organization: organizationApi,
   user: userApi,

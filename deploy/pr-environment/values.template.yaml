@@ -215,6 +215,24 @@ env:
     type: parameterStore
     name: scheduler-service-api-key
     parameter_name: /eks/maker-staging/keeperhub-scheduler/keeperhub-api-key
+  HUB_SERVICE_API_KEY:
+    type: parameterStore
+    name: hub-service-api-key
+    parameter_name: /eks/maker-staging/keeperhub-hub/keeperhub-api-key
+  WORKFLOW_EXECUTOR_SERVICE_API_KEY:
+    type: parameterStore
+    name: workflow-executor-service-api-key
+    parameter_name: /eks/maker-staging/keeperhub-workflow-executor/keeperhub-api-key
+  # Billing configuration (PR-specific for testing on Sepolia)
+  NEXT_PUBLIC_APP_URL:
+    type: kv
+    value: "https://app-pr-${PR_NUMBER}.keeperhub.com"
+  NEXT_PUBLIC_CREDITS_CONTRACT_ADDRESS:
+    type: kv
+    value: "0xB55ef961fc47bd67a3859fD61dc563e72B5605D6"
+  NEXT_PUBLIC_TIERS_CONTRACT_ADDRESS:
+    type: kv
+    value: "0x4B899Cc652944994741169875010E5a3C607975B"
   # PR-specific SQS configuration (using LocalStack)
   AWS_REGION:
     type: kv
