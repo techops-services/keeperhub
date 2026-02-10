@@ -174,7 +174,6 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           base_branch: staging
           branch_prefix: claude/docs-sync-
-          track_progress: true
           prompt: |
             REPO: ${{ github.repository }}
             RELEASE TAG: ${{ steps.tag.outputs.release_tag }}
