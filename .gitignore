@@ -29,6 +29,7 @@
 # misc
 .DS_Store
 *.pem
+.workflow-data/
 
 # OS files
 Thumbs.db
