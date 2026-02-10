@@ -8,15 +8,20 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardContent,
   CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { api, type SavedWorkflow } from "@/lib/api-client";
 import { authClient, useSession } from "@/lib/auth-client";
 import { WorkflowMiniMap } from "./workflow-mini-map";
+import { WorkflowNodeIcons } from "./workflow-node-icons";
 
 type WorkflowTemplateGridProps = {
   workflows: SavedWorkflow[];
@@ -74,10 +79,10 @@ export function WorkflowTemplateGrid({ workflows }: WorkflowTemplateGridProps) {
 
         return (
           <Card
-            className="flex flex-col overflow-hidden bg-sidebar"
+            className="flex flex-col gap-0 overflow-hidden border-none bg-sidebar py-0 transition-colors hover:brightness-125"
             key={workflow.id}
           >
-            <div className="relative -mt-6 flex aspect-video w-full items-center justify-center overflow-hidden">
+            <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden px-8">
               <WorkflowMiniMap
                 edges={workflow.edges}
                 height={160}
@@ -86,14 +91,14 @@ export function WorkflowTemplateGrid({ workflows }: WorkflowTemplateGridProps) {
               />
               {workflow.category && (
                 <Badge
-                  className="absolute top-3 right-3 rounded-full bg-sidebar"
+                  className="absolute top-3 right-3 rounded-full border-none bg-[#09fd671a] px-3 py-1 text-[#09fd67]"
                   variant="outline"
                 >
                   {workflow.category}
                 </Badge>
               )}
             </div>
-            <CardHeader>
+            <CardHeader className="pb-4">
               {workflow.protocol && (
                 <p className="font-medium text-muted-foreground text-xs uppercase tracking-wider">
                   {workflow.protocol}
@@ -105,9 +110,10 @@ export function WorkflowTemplateGrid({ workflows }: WorkflowTemplateGridProps) {
                   {workflow.description}
                 </CardDescription>
               )}
+              <WorkflowNodeIcons nodes={workflow.nodes} />
             </CardHeader>
-            <CardContent className="flex-1" />
-            <CardFooter className="gap-2">
+            <div className="flex-1" />
+            <CardFooter className="gap-2 pb-4">
               <Button
                 className="flex-1"
                 disabled={isDuplicating}
@@ -116,12 +122,17 @@ export function WorkflowTemplateGrid({ workflows }: WorkflowTemplateGridProps) {
               >
                 {isDuplicating ? "Duplicating..." : "Use Template"}
               </Button>
-              <Button
-                onClick={() => router.push(`/workflows/${workflow.id}`)}
-                variant="outline"
-              >
-                <Eye className="size-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={() => router.push(`/workflows/${workflow.id}`)}
+                    variant="outline"
+                  >
+                    <Eye className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">View Template</TooltipContent>
+              </Tooltip>
             </CardFooter>
           </Card>
         );
