@@ -244,6 +244,7 @@ describe("workflow-codegen condition validation", () => {
 describe("runtime condition evaluation", () => {
   describe("KEEP-1284: missing data should throw error", () => {
     it("should throw error when referenced node output does not exist", () => {
+      // When evaluation throws, no result is returned; executor passes values: undefined
       const expression = "{{@nonExistentNode:Label.value}} > 100";
       const outputs = {}; // No outputs available
 
@@ -285,6 +286,22 @@ describe("runtime condition evaluation", () => {
       );
     });
 
+    it("should return boolean result with empty resolvedValues when expression is boolean", () => {
+      const resultTrue = evaluateConditionExpression(true, {});
+      expect(resultTrue.result).toBe(true);
+      expect(resultTrue.resolvedValues).toEqual({});
+
+      const resultFalse = evaluateConditionExpression(false, {});
+      expect(resultFalse.result).toBe(false);
+      expect(resultFalse.resolvedValues).toEqual({});
+    });
+
+    it("should return result with empty resolvedValues when expression has no template variables", () => {
+      const result = evaluateConditionExpression("true === true", {});
+      expect(result.result).toBe(true);
+      expect(result.resolvedValues).toEqual({});
+    });
+
     it("should succeed when all referenced data exists", () => {
       const expression = "{{@node1:Label.value}} > 100";
       const outputs = {
@@ -304,6 +321,8 @@ describe("runtime condition evaluation", () => {
 
       const result = evaluateConditionExpression(expression, outputs);
       expect(result.result).toBe(true);
+      expect(result.resolvedValues).toHaveProperty("Label.count", 0);
+      expect(Object.keys(result.resolvedValues)).toHaveLength(1);
     });
 
     it("should succeed when comparing to empty string (falsy but valid)", () => {
@@ -314,6 +333,221 @@ describe("runtime condition evaluation", () => {
 
       const result = evaluateConditionExpression(expression, outputs);
       expect(result.result).toBe(true);
+      expect(result.resolvedValues).toHaveProperty("Label.name", "");
+      expect(Object.keys(result.resolvedValues)).toHaveLength(1);
+    });
+
+    it("should resolve nested array path (data.carts[0].products[0].id)", () => {
+      const expression =
+        "{{@node1:API.data.carts[0].products[0].id}} === 'prod-1'";
+      const outputs = {
+        node1: {
+          label: "API",
+          data: {
+            data: {
+              carts: [{ products: [{ id: "prod-1" }, { id: "prod-2" }] }],
+              total: 1,
+              skip: 0,
+              limit: 10,
+            },
+          },
+        },
+      };
+
+      const result = evaluateConditionExpression(expression, outputs);
+      expect(result.result).toBe(true);
+      expect(result.resolvedValues).toHaveProperty(
+        "API.data.carts[0].products[0].id",
+        "prod-1"
+      );
+    });
+
+    it("should resolve complex nested object path", () => {
+      const cart0Products = [
+        { id: "prod-1", name: "Product 1", price: 100, quantity: 1 },
+        { id: "prod-2", name: "Product 2", price: 200, quantity: 2 },
+        { id: "prod-3", name: "Product 3", price: 300, quantity: 3 },
+      ];
+      const cart1Products = [
+        { id: "prod-4", name: "Product 4", price: 50, quantity: 2, total: 100 },
+        {
+          id: "prod-5",
+          name: "Product 5",
+          price: 100,
+          quantity: 2,
+          total: 200,
+        },
+      ];
+      const outputs = {
+        node1: {
+          label: "API",
+          data: {
+            data: {
+              carts: [{ products: cart0Products }, { products: cart1Products }],
+              total: 2,
+              skip: 0,
+              limit: 10,
+            },
+          },
+        },
+      };
+
+      const result1 = evaluateConditionExpression(
+        "{{@node1:API.data.carts[0].products[0].id}} === 'prod-1'",
+        outputs
+      );
+      expect(result1.result).toBe(true);
+      expect(result1.resolvedValues).toHaveProperty(
+        "API.data.carts[0].products[0].id",
+        "prod-1"
+      );
+
+      const result2 = evaluateConditionExpression(
+        "{{@node1:API.data.carts[0].products[0].name}} === 'Product 1'",
+        outputs
+      );
+      expect(result2.result).toBe(true);
+      expect(result2.resolvedValues).toHaveProperty(
+        "API.data.carts[0].products[0].name",
+        "Product 1"
+      );
+
+      const result3 = evaluateConditionExpression(
+        "{{@node1:API.data.carts[0].products[0].price}} === 100",
+        outputs
+      );
+      expect(result3.result).toBe(true);
+      expect(result3.resolvedValues).toHaveProperty(
+        "API.data.carts[0].products[0].price",
+        100
+      );
+
+      const result4 = evaluateConditionExpression(
+        "{{@node1:API.data.carts[0].products[0].quantity}} === 1",
+        outputs
+      );
+      expect(result4.result).toBe(true);
+      expect(result4.resolvedValues).toHaveProperty(
+        "API.data.carts[0].products[0].quantity",
+        1
+      );
+
+      const result5 = evaluateConditionExpression(
+        "{{@node1:API.data.carts[1].products[1].total}} === 200",
+        outputs
+      );
+      expect(result5.result).toBe(true);
+      expect(result5.resolvedValues).toHaveProperty(
+        "API.data.carts[1].products[1].total",
+        200
+      );
+    });
+
+    it("should resolve multiple template variables from same node in one expression", () => {
+      const expression =
+        "{{@node1:API.data.carts[0].products[0].price}} > {{@node1:API.data.carts[0].products[1].price}}";
+      const outputs = {
+        node1: {
+          label: "API",
+          data: {
+            data: {
+              carts: [
+                {
+                  products: [
+                    { id: "a", price: 300 },
+                    { id: "b", price: 100 },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      };
+
+      const result = evaluateConditionExpression(expression, outputs);
+      expect(result.result).toBe(true);
+      expect(result.resolvedValues).toHaveProperty(
+        "API.data.carts[0].products[0].price",
+        300
+      );
+      expect(result.resolvedValues).toHaveProperty(
+        "API.data.carts[0].products[1].price",
+        100
+      );
+    });
+
+    it("should resolve nested path from multiple nodes in one expression", () => {
+      const expression =
+        "{{@nodeA:FetchUser.response.user.id}} === {{@nodeB:ParseBody.payload.userId}}";
+      const outputs = {
+        nodeA: {
+          label: "FetchUser",
+          data: { response: { user: { id: "u-123" } } },
+        },
+        nodeB: {
+          label: "ParseBody",
+          data: { payload: { userId: "u-123" } },
+        },
+      };
+
+      const result = evaluateConditionExpression(expression, outputs);
+      expect(result.result).toBe(true);
+      expect(result.resolvedValues).toHaveProperty(
+        "FetchUser.response.user.id",
+        "u-123"
+      );
+      expect(result.resolvedValues).toHaveProperty(
+        "ParseBody.payload.userId",
+        "u-123"
+      );
+    });
+
+    it("should resolve deeply nested path with multiple array indices", () => {
+      const expression =
+        "{{@n:API.data.regions[0].zones[1].items[2].sku}} === 'SKU-C'";
+      const outputs = {
+        n: {
+          label: "API",
+          data: {
+            data: {
+              regions: [
+                {
+                  zones: [
+                    { items: [{ sku: "SKU-A" }, { sku: "SKU-B" }] },
+                    {
+                      items: [{ sku: "X" }, { sku: "Y" }, { sku: "SKU-C" }],
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      };
+
+      const result = evaluateConditionExpression(expression, outputs);
+      expect(result.result).toBe(true);
+      expect(result.resolvedValues).toHaveProperty(
+        "API.data.regions[0].zones[1].items[2].sku",
+        "SKU-C"
+      );
+    });
+
+    it("should resolve root-level array index (data.items[0])", () => {
+      const expression = "{{@node1:Source.data.items[0].name}} === 'First'";
+      const outputs = {
+        node1: {
+          label: "Source",
+          data: { data: { items: [{ name: "First" }, { name: "Second" }] } },
+        },
+      };
+
+      const result = evaluateConditionExpression(expression, outputs);
+      expect(result.result).toBe(true);
+      expect(result.resolvedValues).toHaveProperty(
+        "Source.data.items[0].name",
+        "First"
+      );
     });
   });
 });

@@ -19,7 +19,7 @@ type TriggerNodeProps = NodeProps & {
   data?: WorkflowNodeData;
 };
 
-export const TriggerNode = memo(({ data, selected }: TriggerNodeProps) => {
+export const TriggerNode = memo(({ data, selected, id }: TriggerNodeProps) => {
   if (!data) {
     return null;
   }
@@ -47,6 +47,7 @@ export const TriggerNode = memo(({ data, selected }: TriggerNodeProps) => {
         selected && "border-primary"
       )}
       handles={{ target: false, source: true }}
+      nodeId={id}
       status={status}
     >
       {/* Status indicator badge in top right */}

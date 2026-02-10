@@ -112,9 +112,6 @@ export default function HubPage() {
     debouncedSearchQuery,
   ]);
 
-  const topFeatured = featuredWorkflows[0];
-  const carouselWorkflows = featuredWorkflows.slice(1);
-
   useEffect(() => {
     const fetchWorkflows = async (): Promise<void> => {
       try {
@@ -161,25 +158,23 @@ export default function HubPage() {
       className="pointer-events-auto fixed inset-0 overflow-y-auto bg-sidebar [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       ref={scrollContainerRef}
     >
-      {/* Fixed dot pattern behind */}
-      <div className="pointer-events-none fixed inset-0 [background-image:radial-gradient(rgb(148_163_184_/_0.15)_1px,transparent_1px)] [background-size:24px_24px]" />
-      {/* Fixed gradient overlay - fades as you scroll */}
-      <div
-        className="pointer-events-none fixed inset-x-0 top-0 h-[80vh] bg-gradient-to-b from-60% from-sidebar to-transparent"
-        ref={gradientRef}
-      />
       <div className="container relative mx-auto px-4 py-4 pt-28 pb-12">
         {/* start custom KeeperHub code */}
         {isLoading ? (
           <p className="text-muted-foreground">Loading workflows...</p>
         ) : (
           <>
-            <HubHero topWorkflow={topFeatured} />
+            <HubHero />
 
-            <FeaturedCarousel workflows={carouselWorkflows} />
+            <div className="relative right-1/2 left-1/2 -mr-[50vw] -ml-[50vw] w-screen bg-sidebar">
+              <div className="bg-white/[0.03] py-12">
+                <div className="container mx-auto px-4">
+                  <FeaturedCarousel workflows={featuredWorkflows} />
+                </div>
+              </div>
+            </div>
 
             <div className="relative right-1/2 left-1/2 -mr-[50vw] -ml-[50vw] w-screen">
-              <hr className="border-border" />
               <div className="bg-sidebar px-4 pt-8 pb-12">
                 <div className="container mx-auto">
                   <h2 className="mb-8 font-bold text-2xl">

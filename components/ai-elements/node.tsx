@@ -11,6 +11,9 @@ import { cn } from "@/lib/utils";
 import { Handle, Position } from "@xyflow/react";
 import type { ComponentProps } from "react";
 import { AnimatedBorder } from "@/components/ui/animated-border";
+// start custom keeperhub code //
+import { AddStepButton } from "@/keeperhub/components/workflow/add-step-button";
+// end keeperhub code //
 
 export type NodeProps = ComponentProps<typeof Card> & {
   handles: {
@@ -18,9 +21,12 @@ export type NodeProps = ComponentProps<typeof Card> & {
     source: boolean;
   };
   status?: "idle" | "running" | "success" | "error";
+  // start custom keeperhub code //
+  nodeId?: string;
+  // end keeperhub code //
 };
 
-export const Node = ({ handles, className, status, ...props }: NodeProps) => (
+export const Node = ({ handles, className, status, nodeId, ...props }: NodeProps) => (
   <Card
     className={cn(
       "node-container relative size-full h-auto w-sm gap-0 rounded-md bg-card p-0 transition-all duration-200",
@@ -33,6 +39,9 @@ export const Node = ({ handles, className, status, ...props }: NodeProps) => (
     {status === "running" && <AnimatedBorder />}
     {handles.target && <Handle position={Position.Left} type="target" />}
     {handles.source && <Handle position={Position.Right} type="source" />}
+    {/* start custom keeperhub code */}
+    {handles.source && nodeId && <AddStepButton sourceNodeId={nodeId} />}
+    {/* end keeperhub code */}
     {props.children}
   </Card>
 );

@@ -40,9 +40,18 @@ import {
   isSidebarCollapsedAtom,
   isWorkflowEnabled,
   isWorkflowOwnerAtom,
+  // start custom keeperhub code //
+  newlyCreatedNodeIdAtom,
+  // end keeperhub code //
   nodesAtom,
+  // start custom keeperhub code //
+  propertiesPanelActiveTabAtom,
+  // end keeperhub code //
   rightPanelWidthAtom,
   selectedExecutionIdAtom,
+  // start custom keeperhub code //
+  selectedNodeAtom,
+  // end keeperhub code //
   triggerExecuteAtom,
   updateNodeDataAtom,
   type WorkflowNode,
@@ -155,6 +164,11 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   );
   const [isOwner, setIsWorkflowOwner] = useAtom(isWorkflowOwnerAtom);
   const setIsWorkflowEnabled = useSetAtom(isWorkflowEnabled); // keeperhub custom field //
+  // start custom keeperhub code //
+  const setSelectedNode = useSetAtom(selectedNodeAtom);
+  const setActiveTab = useSetAtom(propertiesPanelActiveTabAtom);
+  const setNewlyCreatedNodeId = useSetAtom(newlyCreatedNodeIdAtom);
+  // end keeperhub code //
   const setGlobalIntegrations = useSetAtom(integrationsAtom);
   const setIntegrationsLoaded = useSetAtom(integrationsLoadedAtom);
   const integrationsVersion = useAtomValue(integrationsVersionAtom);
@@ -403,6 +417,25 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
       setCurrentWorkflowProtocol(workflow.protocol ?? "");
       setHasUnsavedChanges(false);
       setWorkflowNotFound(false);
+
+      // start custom keeperhub code //
+      // Auto-select an unconfigured action node (fresh workflow from homepage)
+      const emptyAction = nodesWithIdleStatus.find(
+        (n: WorkflowNode) =>
+          n.data.type === "action" && !n.data.config?.actionType
+      );
+      if (emptyAction) {
+        setNodes(
+          nodesWithIdleStatus.map((n: WorkflowNode) => ({
+            ...n,
+            selected: n.id === emptyAction.id,
+          }))
+        );
+        setSelectedNode(emptyAction.id);
+        setActiveTab("properties");
+        setNewlyCreatedNodeId(emptyAction.id);
+      }
+      // end keeperhub code //
     } catch (error) {
       console.error("Failed to load workflow:", error);
       setWorkflowNotFound(true);
@@ -421,6 +454,11 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
     setHasUnsavedChanges,
     setWorkflowNotFound,
     setCurrentWorkflowDescription,
+    // start custom keeperhub code //
+    setSelectedNode,
+    setActiveTab,
+    setNewlyCreatedNodeId,
+    // end keeperhub code //
   ]);
 
   // start custom keeperhub code //
@@ -733,9 +771,12 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
                 className="gap-2"
                 onClick={async () => {
                   try {
+                    // start custom keeperhub code //
                     await ensureSession();
+                    const triggerId = `trigger-${Date.now()}`;
+                    const actionId = `action-${Date.now()}`;
                     const triggerNode = {
-                      id: `trigger-${Date.now()}`,
+                      id: triggerId,
                       type: "trigger" as const,
                       position: { x: 400, y: 200 },
                       data: {
@@ -745,12 +786,32 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
                         status: "idle" as const,
                       },
                     };
+                    const actionNode = {
+                      id: actionId,
+                      type: "action" as const,
+                      position: { x: 672, y: 200 },
+                      selected: true,
+                      data: {
+                        label: "",
+                        type: "action" as const,
+                        config: {},
+                        status: "idle" as const,
+                      },
+                    };
                     const newWorkflow = await api.workflow.create({
                       name: "Untitled Workflow",
                       description: "",
-                      nodes: [triggerNode],
-                      edges: [],
+                      nodes: [triggerNode, actionNode],
+                      edges: [
+                        {
+                          id: `edge-${Date.now()}`,
+                          source: triggerId,
+                          target: actionId,
+                          type: "animated",
+                        },
+                      ],
                     });
+                    // end keeperhub code //
                     router.replace(`/workflows/${newWorkflow.id}`);
                   } catch (error) {
                     console.error("Failed to create workflow:", error);

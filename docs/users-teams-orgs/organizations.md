@@ -58,6 +58,16 @@ Workflows created within an organization are automatically shared with all membe
 - All members can view run history
 - All members can enable or disable workflows
 
+## Leaving an Organization
+
+Members can leave an organization at any time:
+
+1. Open the Manage Organizations modal
+2. Select the organization you want to leave
+3. Click **Leave Organization**
+
+If you are the sole owner, you must transfer ownership to another accepted member before leaving. Select a member to promote to owner during the leave process.
+
 ## Current Limitations
 
 ### No Role-Based Access

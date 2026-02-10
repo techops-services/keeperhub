@@ -24,7 +24,11 @@ import { useSession } from "@/lib/auth-client";
 
 export function OrgSwitcher() {
   const { data: session } = useSession();
-  const { organization, switchOrganization } = useOrganization();
+  const {
+    organization,
+    switchOrganization,
+    isLoading: orgLoading,
+  } = useOrganization();
   const { organizations, isLoading: orgsLoading } = useOrganizations();
   const [open, setOpen] = useState(false);
   const [manageModalOpen, setManageModalOpen] = useState(false);
@@ -33,7 +37,7 @@ export function OrgSwitcher() {
   // Auto-switch to first available org if no active org but user has orgs
   useEffect(() => {
     if (
-      !(organization || orgsLoading) &&
+      !(organization || orgsLoading || orgLoading) &&
       organizations.length > 0 &&
       !autoSwitching
     ) {
@@ -46,6 +50,7 @@ export function OrgSwitcher() {
     organization,
     organizations,
     orgsLoading,
+    orgLoading,
     switchOrganization,
     autoSwitching,
   ]);
@@ -126,9 +131,9 @@ export function OrgSwitcher() {
                 {organizations.map((org) => (
                   <CommandItem
                     key={org.id}
-                    onSelect={async () => {
-                      await switchOrganization(org.id);
+                    onSelect={() => {
                       setOpen(false);
+                      switchOrganization(org.id);
                     }}
                   >
                     <Check

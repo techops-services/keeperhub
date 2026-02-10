@@ -12,10 +12,14 @@ import { generateId } from "@/lib/utils/id";
 
 // end keeperhub code //
 
-// Helper function to create a default trigger node
-function createDefaultTriggerNode() {
-  return {
-    id: nanoid(),
+// start custom keeperhub code //
+function createDefaultNodes() {
+  const triggerId = nanoid();
+  const actionId = nanoid();
+  const edgeId = nanoid();
+
+  const triggerNode = {
+    id: triggerId,
     type: "trigger" as const,
     position: { x: 0, y: 0 },
     data: {
@@ -26,7 +30,31 @@ function createDefaultTriggerNode() {
       status: "idle" as const,
     },
   };
+
+  const actionNode = {
+    id: actionId,
+    type: "action" as const,
+    position: { x: 272, y: 0 },
+    selected: true,
+    data: {
+      label: "",
+      description: "",
+      type: "action" as const,
+      config: {},
+      status: "idle" as const,
+    },
+  };
+
+  const edge = {
+    id: edgeId,
+    source: triggerId,
+    target: actionId,
+    type: "animated",
+  };
+
+  return { nodes: [triggerNode, actionNode], edges: [edge] };
 }
+// end keeperhub code //
 
 // start custom keeperhub code //
 // Helper to authenticate and get user context
@@ -128,11 +156,16 @@ export async function POST(request: Request) {
       );
     }
 
-    // Ensure there's always a trigger node (only add one if nodes array is empty)
+    // start custom keeperhub code //
+    // Ensure there are always default nodes (trigger + action) if nodes array is empty
     let nodes = body.nodes;
+    let edges = body.edges;
     if (nodes.length === 0) {
-      nodes = [createDefaultTriggerNode()];
+      const defaults = createDefaultNodes();
+      nodes = defaults.nodes;
+      edges = defaults.edges;
     }
+    // end keeperhub code //
 
     // start custom keeperhub code //
     const isAnonymous = !organizationId;
@@ -153,7 +186,7 @@ export async function POST(request: Request) {
         name: workflowName,
         description: body.description,
         nodes,
-        edges: body.edges,
+        edges,
         userId,
         // start custom keeperhub code //
         organizationId,
