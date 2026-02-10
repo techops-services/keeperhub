@@ -1,6 +1,6 @@
 # Hybrid Development Mode
 
-Run most services in Docker Compose with only job-spawner in Minikube. This enables full workflow execution via K8s Jobs with lower resource usage.
+Run most services in Docker Compose with only the schedule executor in Minikube. The executor polls SQS and executes workflows via the KeeperHub API.
 
 ## Why Hybrid Mode?
 

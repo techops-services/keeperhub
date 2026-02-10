@@ -155,22 +155,16 @@ metadata:
   name: job-spawner
   namespace: local
 ---
-# Role allowing job-spawner to manage Jobs
+# Role for schedule-executor service account
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: job-spawner-role
   namespace: local
 rules:
-  - apiGroups: ["batch"]
-    resources: ["jobs"]
-    verbs: ["create", "get", "list", "watch", "delete"]
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list", "watch"]
-  - apiGroups: [""]
-    resources: ["pods/log"]
-    verbs: ["get"]
 ---
 # Bind role to service account
 apiVersion: rbac.authorization.k8s.io/v1
@@ -187,8 +181,8 @@ roleRef:
   name: job-spawner-role
   apiGroup: rbac.authorization.k8s.io
 ---
-# Job Spawner Deployment
-# Long-running process that polls SQS and creates K8s Jobs for workflow execution
+# Schedule Executor Deployment
+# Long-running process that polls SQS and executes workflows via KeeperHub API
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -262,20 +256,15 @@ teardown() {
         rm -f "$SCRIPT_DIR/schedule-trigger-hybrid.yaml"
         log_info "Scheduler components removed"
     else
-        # Try to delete by label/name
-        kubectl delete cronjob -n "$NAMESPACE" -l component=scheduler --ignore-not-found=true
+        # Try to delete by name
         kubectl delete deployment -n "$NAMESPACE" -l component=scheduler --ignore-not-found=true
         kubectl delete configmap -n "$NAMESPACE" scheduler-env --ignore-not-found=true
         kubectl delete secret -n "$NAMESPACE" keeperhub-secrets --ignore-not-found=true
         kubectl delete serviceaccount -n "$NAMESPACE" job-spawner --ignore-not-found=true
         kubectl delete role -n "$NAMESPACE" job-spawner-role --ignore-not-found=true
         kubectl delete rolebinding -n "$NAMESPACE" job-spawner-binding --ignore-not-found=true
-        log_info "Scheduler components removed (by label)"
+        log_info "Executor components removed (by name)"
     fi
-
-    # Clean up any workflow jobs
-    log_info "Cleaning up workflow jobs..."
-    kubectl delete jobs -n "$NAMESPACE" -l app=workflow-runner --ignore-not-found=true
 }
 
 show_status() {
