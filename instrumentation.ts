@@ -4,30 +4,6 @@
  * https://nextjs.org/docs/app/building-your-application/optimizing/instrumentation
  */
 
-// start custom keeperhub code //
-/**
- * Ensure special characters in postgres URL passwords are percent-encoded.
- * postgres.js parses connection strings via new URL() which requires encoding.
- * CNPG-generated passwords often contain +/= (base64) that break URL parsing.
- */
-function encodePostgresPassword(url: string): string {
-  try {
-    new URL(url);
-    return url;
-  } catch {
-    const schemeEnd = url.indexOf("://") + 3;
-    const atIdx = url.lastIndexOf("@");
-    const colonIdx = url.indexOf(":", schemeEnd);
-    if (schemeEnd > 3 && atIdx > colonIdx && colonIdx > schemeEnd) {
-      const user = url.slice(schemeEnd, colonIdx);
-      const pass = url.slice(colonIdx + 1, atIdx);
-      return `${url.slice(0, schemeEnd)}${encodeURIComponent(user)}:${encodeURIComponent(pass)}${url.slice(atIdx)}`;
-    }
-    return url;
-  }
-}
-// end keeperhub code //
-
 export async function register() {
   // Patch console with LOG_LEVEL support
   // This must be imported dynamically to ensure it runs at startup
@@ -55,24 +31,6 @@ export async function register() {
       setMetricsCollector(dualCollector);
       console.log("[Metrics] Prometheus dual-write collector initialized");
     }
-
-    // start custom keeperhub code //
-    // Initialize Workflow Postgres World (pg-boss queue polling)
-    if (process.env.WORKFLOW_TARGET_WORLD === "@workflow/world-postgres") {
-      const rawUrl =
-        process.env.WORKFLOW_POSTGRES_URL || process.env.DATABASE_URL;
-      if (rawUrl) {
-        process.env.WORKFLOW_POSTGRES_URL = encodePostgresPassword(rawUrl);
-      }
-
-      const { getWorld } = await import("workflow/runtime");
-      const world = getWorld();
-      if (world.start) {
-        await world.start();
-        console.log("[Workflow] Postgres World initialized");
-      }
-    }
-    // end keeperhub code //
 
     // Catch unhandled promise rejections (would otherwise be silent)
     process.on("unhandledRejection", (reason) => {

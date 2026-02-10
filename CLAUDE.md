@@ -122,7 +122,7 @@ When you must use an ignore comment:
 - **Database**: PostgreSQL + Drizzle ORM
 - **Testing**: Vitest (unit/integration), Playwright (E2E)
 - **AI**: Vercel AI SDK with Anthropic/OpenAI
-- **Workflow**: Workflow DevKit 4.1.0-beta.51
+- **Workflow**: Workflow DevKit 4.0.1-beta.17
 - **Package Manager**: pnpm
 
 ## Project Structure

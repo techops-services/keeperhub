@@ -95,7 +95,7 @@ async function executeWorkflowBackground(
       workflowId,
     });
 
-    const run = await start(executeWorkflow, [
+    start(executeWorkflow, [
       {
         nodes,
         edges,
@@ -105,7 +105,7 @@ async function executeWorkflowBackground(
       },
     ]);
 
-    console.log("[Webhook] Workflow started, runId:", run.runId);
+    console.log("[Webhook] Workflow started successfully");
   } catch (error) {
     console.error("[Webhook] Error during execution:", error);
     console.error(
