@@ -1,11 +1,10 @@
 name: Docs Sync
 
 on:
-  # TODO: restore after debugging
-  # workflow_run:
-  #   workflows: ['Release']
-  #   types: [completed]
-  #   branches: [prod]
+  workflow_run:
+    workflows: ['Release']
+    types: [completed]
+    branches: [prod]
 
   workflow_dispatch:
     inputs:
@@ -168,22 +167,33 @@ jobs:
             echo "release_tag=${{ steps.manual_changes.outputs.release_tag }}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Install Claude Code
+      - name: Validate Anthropic API key
         if: steps.tag.outputs.release_tag != ''
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          curl -fsSL https://claude.ai/install.sh | bash -s -- 2.1.18
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST https://api.anthropic.com/v1/messages \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            -d '{"model":"claude-sonnet-4-5-20250929","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}')
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "API key is valid and has sufficient credits."
+          else
+            echo "::error::Anthropic API pre-flight check failed (HTTP $HTTP_CODE): $BODY"
+            exit 1
+          fi
 
       - name: Run Claude Code docs sync
         if: steps.tag.outputs.release_tag != ''
         id: claude
         uses: anthropics/claude-code-action@v1
-        env:
-          ANTHROPIC_MODEL: claude-sonnet-4-5-20250929
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          path_to_claude_code_executable: /home/runner/.local/bin/claude
-          show_full_output: "true"
           base_branch: staging
           branch_prefix: claude/docs-sync-
           prompt: |
@@ -274,7 +284,10 @@ jobs:
                automatically create a pull request from your commits. Use a commit message
                format like: "docs: sync documentation with ${{ steps.tag.outputs.release_tag }}"
                and include a summary of what was updated and why in the commit body.
-          claude_args: --max-turns 30 --allowedTools "Read,Write,Edit,Glob,Grep,Bash(git:*),Bash(gh:*)"
+          claude_args: |
+            --model claude-sonnet-4-5-20250929
+            --max-turns 30
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(git:*),Bash(gh:*)"
 
       - name: Notify Discord on completion
         if: always() && steps.tag.outputs.release_tag != ''
