@@ -182,6 +182,7 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           path_to_claude_code_executable: /home/runner/.local/bin/claude
+          show_full_output: "true"
           base_branch: staging
           branch_prefix: claude/docs-sync-
           prompt: |
