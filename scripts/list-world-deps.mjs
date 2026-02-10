@@ -11,7 +11,7 @@
  * Usage: node scripts/list-world-deps.mjs
  */
 
-import { readFileSync, existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { builtinModules, createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
@@ -40,14 +40,16 @@ function findPkgDir(name, fromDir) {
       const pj = join(dir, "package.json");
       if (existsSync(pj)) {
         const data = JSON.parse(readFileSync(pj, "utf8"));
-        if (data.name === name) return dir;
+        if (data.name === name) {
+          return dir;
+        }
       }
       dir = dirname(dir);
     }
   } catch {
     // not resolvable from this location
   }
-  return undefined;
+  return;
 }
 
 /**
@@ -56,7 +58,9 @@ function findPkgDir(name, fromDir) {
  * is respected.
  */
 function walk(pkg, fromDir) {
-  if (seen.has(pkg) || builtins.has(pkg)) return;
+  if (seen.has(pkg) || builtins.has(pkg)) {
+    return;
+  }
   seen.add(pkg);
 
   const pkgDir = findPkgDir(pkg, fromDir);
@@ -87,21 +91,31 @@ walk(ROOT_PKG, projectRoot);
 const packages = [...seen].sort();
 
 // Read package.json to find direct deps (these don't need .npmrc hoisting)
-const appPj = JSON.parse(readFileSync(join(projectRoot, "package.json"), "utf8"));
-const directDeps = new Set(Object.keys({
-  ...appPj.dependencies,
-  ...appPj.devDependencies,
-}));
+const appPj = JSON.parse(
+  readFileSync(join(projectRoot, "package.json"), "utf8")
+);
+const directDeps = new Set(
+  Object.keys({
+    ...appPj.dependencies,
+    ...appPj.devDependencies,
+  })
+);
 
 const transitiveDeps = packages.filter((p) => !directDeps.has(p));
 
 console.log(`Found ${packages.length} packages in ${ROOT_PKG} dependency tree`);
-console.log(`  ${directDeps.size > 0 ? transitiveDeps.length : packages.length} transitive (need .npmrc hoisting)`);
-console.log(`  ${packages.length - transitiveDeps.length} direct (already hoisted)\n`);
+const transitiveCount =
+  directDeps.size > 0 ? transitiveDeps.length : packages.length;
+console.log(`  ${transitiveCount} transitive (need .npmrc hoisting)`);
+console.log(
+  `  ${packages.length - transitiveDeps.length} direct (already hoisted)\n`
+);
 
 // .npmrc output
 console.log("# ── .npmrc public-hoist-pattern entries ──");
-console.log("# Only transitive deps need hoisting (direct deps are already at top level)");
+console.log(
+  "# Only transitive deps need hoisting (direct deps are already at top level)"
+);
 for (const pkg of transitiveDeps) {
   console.log(`public-hoist-pattern[]=${pkg}`);
 }
