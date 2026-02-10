@@ -167,12 +167,21 @@ jobs:
             echo "release_tag=${{ steps.manual_changes.outputs.release_tag }}" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Install Claude Code
+        if: steps.tag.outputs.release_tag != ''
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash -s -- 2.1.18
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
       - name: Run Claude Code docs sync
         if: steps.tag.outputs.release_tag != ''
         id: claude
         uses: anthropics/claude-code-action@v1
+        env:
+          ANTHROPIC_MODEL: claude-sonnet-4-5-20250929
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          path_to_claude_code_executable: /home/runner/.local/bin/claude
           base_branch: staging
           branch_prefix: claude/docs-sync-
           prompt: |
@@ -263,10 +272,7 @@ jobs:
                automatically create a pull request from your commits. Use a commit message
                format like: "docs: sync documentation with ${{ steps.tag.outputs.release_tag }}"
                and include a summary of what was updated and why in the commit body.
-          claude_args: |
-            --model claude-sonnet-4-5-20250929
-            --max-turns 30
-            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(git:*),Bash(gh:*)"
+          claude_args: --max-turns 30 --allowedTools "Read,Write,Edit,Glob,Grep,Bash(git:*),Bash(gh:*)"
 
       - name: Notify Discord on completion
         if: always() && steps.tag.outputs.release_tag != ''
