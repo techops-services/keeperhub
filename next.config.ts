@@ -41,6 +41,10 @@ const nextConfig = {
       "./node_modules/ulid/**/*",
       "./node_modules/async-sema/**/*",
       "./node_modules/cron-parser/**/*",
+      "./node_modules/postgres/**/*",
+      "./node_modules/drizzle-orm/**/*",
+      "./node_modules/zod/**/*",
+      "./node_modules/dotenv/**/*",
     ],
   },
   // end keeperhub code //
