@@ -30,11 +30,43 @@
 .DS_Store
 *.pem
 
+# OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+*~
+
+# Editor/IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+*.swp
+*.swo
+*.swn
+*.sublime-workspace
+*.sublime-project
+.project
+.classpath
+.settings/
+
+# Backup files
+*.bak
+*.backup
+*.orig
+
 # debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+
+# logs
+logs/
+*.log
+lerna-debug.log*
 
 # env files (can opt-in for committing if needed)
 .env*
@@ -50,6 +82,19 @@ next-env.d.ts
 .env*.local
 
 tmp/
+
+# cache
+.cache/
+*.cache
+
+# docker
+docker-compose.override.yml
+.docker/
+
+# database
+*.sqlite
+*.sqlite3
+*.db
 
 # generated files
 lib/types/integration.ts
@@ -80,9 +125,13 @@ tailwindcss-*.log
 .claude/lint-output.txt
 .claude/typecheck-output.txt
 
+<<<<<<< HEAD
 .planning
 .prompts
 # Hardhat artifacts (auto-generated during contract compilation)
+=======
+# Hardhat/Solidity artifacts (auto-generated during contract compilation)
+>>>>>>> 7fb64e0f (KEEP-811 - Some changes to improve branch git-wise)
 contracts/artifacts/
 contracts/cache/
 contracts/typechain-types/

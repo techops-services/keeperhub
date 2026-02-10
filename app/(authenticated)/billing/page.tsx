@@ -1,7 +1,8 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Check, Sparkles } from "lucide-react";
+import { Check, History, Sparkles } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -78,12 +79,20 @@ export default function BillingPage() {
 
       {/* Current Balance */}
       <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-8">
-        <div>
-          <p className="mb-1 text-muted-foreground text-sm">Current Balance</p>
-          <p className="font-bold text-5xl">
-            {balance?.creditBalance?.toLocaleString() ?? 0}
-          </p>
-          <p className="mt-2 text-muted-foreground text-sm">credits</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="mb-1 text-muted-foreground text-sm">Current Balance</p>
+            <p className="font-bold text-5xl">
+              {balance?.creditBalance?.toLocaleString() ?? 0}
+            </p>
+            <p className="mt-2 text-muted-foreground text-sm">credits</p>
+          </div>
+          <Button asChild variant="outline">
+            <Link href="/billing/history">
+              <History className="mr-2 size-4" />
+              View History
+            </Link>
+          </Button>
         </div>
       </Card>
 

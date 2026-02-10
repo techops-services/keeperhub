@@ -86,7 +86,7 @@ export default function BillingHistoryPage() {
   const transactions = historyData?.transactions ?? [];
 
   return (
-    <div className="container pointer-events-auto mx-auto max-w-7xl space-y-8 p-6">
+    <div className="container pointer-events-auto mx-auto max-w-7xl space-y-8 p-6 pt-24">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="space-y-2">
