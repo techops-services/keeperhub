@@ -121,6 +121,8 @@ tailwindcss-*.log
 # Worktrees (local only)
 .worktrees/
 
-# Claude lint output cache (read instead of re-running commands)
-.claude/lint-output.txt
-.claude/typecheck-output.txt
+# Claude Code (blanket ignore, whitelist tracked files)
+.claude/
+!.claude/settings.json
+!.claude/hooks/
+!.claude/hooks/**
