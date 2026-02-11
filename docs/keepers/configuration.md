@@ -132,6 +132,15 @@ KeeperHub automatically fetches the contract ABI from block explorers. For proxy
 | Channel | Target channel |
 | Message * | Message content to send |
 
+### Send Telegram Message
+
+| Field | Description |
+|-------|-------------|
+| Connection * | Telegram bot connection |
+| Chat ID * | Numeric chat ID or @channelusername |
+| Message * | Message content to send |
+| Parse Mode | None (plain text) or MarkdownV2 |
+
 ## Condition Node Configuration
 
 ### Low Balance Condition
@@ -179,6 +188,7 @@ Connections store credentials for external services. Set them up before configur
 | Email | Provider API key |
 | Discord | Webhook URL |
 | Slack | Workspace OAuth token |
+| Telegram | Bot token from BotFather |
 | Webhook | URL and authentication headers |
 
 ### Using Connections in Nodes

@@ -13,6 +13,7 @@ Manage integrations for notifications and external services.
 |------|-------------|
 | `discord` | Discord webhook notifications |
 | `slack` | Slack workspace integration |
+| `telegram` | Telegram bot messaging |
 | `sendgrid` | Email via SendGrid |
 | `resend` | Email via Resend |
 | `webhook` | Custom HTTP webhooks |

@@ -53,6 +53,7 @@ API requests are subject to rate limiting. Current limits:
 | [Workflows](/api/workflows) | Create, read, update, delete workflows |
 | [Executions](/api/executions) | Monitor workflow execution status and logs |
 | [Integrations](/api/integrations) | Manage notification and service integrations |
+| [Projects](/api/projects) | Organize workflows into projects |
 | [Chains](/api/chains) | List supported blockchain networks |
 | [User](/api/user) | User profile, preferences, and address book |
 | [Organizations](/api/organizations) | Organization membership management |

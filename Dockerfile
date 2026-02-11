@@ -152,6 +152,9 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Copy OG image fonts for server-side image generation
+COPY --from=source --chown=nextjs:nodejs /app/keeperhub/api/og/fonts ./keeperhub/api/og/fonts
+
 # Switch to non-root user
 USER nextjs
 

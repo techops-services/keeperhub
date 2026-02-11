@@ -167,6 +167,58 @@ jobs:
             echo "release_tag=${{ steps.manual_changes.outputs.release_tag }}" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Pre-read file diffs for Claude context
+        if: steps.tag.outputs.release_tag != ''
+        id: diffs
+        run: |
+          CHANGED_FILES="${{ github.event_name == 'workflow_run' && steps.release_changes.outputs.changed_files || steps.manual_changes.outputs.changed_files }}"
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No changed files to diff."
+            echo "diff_content=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Generate compact diffs for each changed file
+          # This saves Claude from spending turns reading files individually
+          DIFF_OUTPUT=""
+          FILE_COUNT=0
+
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            FILE_COUNT=$((FILE_COUNT + 1))
+
+            # Get the diff between the two most recent tags, or show the file if new
+            if [ "${{ github.event_name }}" = "workflow_run" ]; then
+              PREV_TAG=$(gh release list --limit 2 --json tagName --jq '.[1].tagName' 2>/dev/null || echo "")
+              CURRENT_TAG="${{ steps.tag.outputs.release_tag }}"
+              if [ -n "$PREV_TAG" ]; then
+                FILE_DIFF=$(git diff "$PREV_TAG".."$CURRENT_TAG" -- "$file" 2>/dev/null | head -80 || echo "(binary or unavailable)")
+              else
+                FILE_DIFF=$(git show "$CURRENT_TAG":"$file" 2>/dev/null | head -60 || echo "(unavailable)")
+              fi
+            else
+              # For manual trigger, show recent diff
+              FILE_DIFF=$(git log --since="${{ github.event.inputs.days_back || '30' }} days ago" -p -- "$file" 2>/dev/null | head -80 || echo "(unavailable)")
+            fi
+
+            DIFF_OUTPUT="${DIFF_OUTPUT}
+          === ${file} ===
+          ${FILE_DIFF}
+          "
+          done <<< "$CHANGED_FILES"
+
+          echo "Prepared diffs for $FILE_COUNT files."
+
+          # Write to a temp file to avoid GitHub output size limits
+          echo "$DIFF_OUTPUT" > /tmp/file-diffs.txt
+
+          # Also prepare the docs directory listing
+          DOCS_LISTING=$(find docs -name "*.md" -o -name "_meta.json" | sort)
+          echo "$DOCS_LISTING" > /tmp/docs-listing.txt
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Validate Anthropic API key
         if: steps.tag.outputs.release_tag != ''
         env:
@@ -210,6 +262,24 @@ jobs:
             changed. Your job is to ensure the documentation in `/docs/` stays accurate and
             in sync with the codebase.
 
+            ## IMPORTANT: Tool Usage
+
+            You have access to: Read, Write, Edit, Glob, Grep, and Bash (git/gh commands only).
+            - Use **Glob** to find files (NOT `find` via Bash - it will be denied)
+            - Use **Grep** to search file contents (NOT `grep` or `rg` via Bash)
+            - Use **Read** to read files (NOT `cat` or `head` via Bash)
+            - Use **Bash** ONLY for `git` and `gh` commands
+            - Call multiple tools in parallel when they are independent of each other
+
+            ## Pre-loaded Context
+
+            The file `/tmp/file-diffs.txt` contains the git diffs for all changed files.
+            The file `/tmp/docs-listing.txt` contains the full docs directory listing.
+
+            **Start by reading these two files** instead of individually reading each source
+            file. This saves significant time. Only read individual source files if you need
+            more context than the diff provides.
+
             ## Documentation Infrastructure
 
             - Documentation lives in the `/docs/` directory at the repository root.
@@ -218,7 +288,7 @@ jobs:
             - Navigation is controlled by `_meta.json` files in each directory. The root
               `_meta.json` at `/docs/_meta.json` defines the top-level sections. Each
               subdirectory has its own `_meta.json` for page ordering within that section.
-            - There are approximately 33 documentation pages organized across these sections:
+            - There are approximately 35 documentation pages organized across these sections:
               intro, getting-started, keepers, workflows, keeper-runs, notifications,
               wallet-management, users-teams-orgs, practices, api, FAQ.
             - Two sections are hidden from navigation: `api` and `plans-features`.
@@ -241,12 +311,13 @@ jobs:
 
             ## Your Task
 
-            1. Read each changed file listed above to understand what was modified.
-               Focus on: API endpoint changes, plugin interface changes, configuration
-               changes, new features, removed features, changed function signatures.
+            1. Read `/tmp/file-diffs.txt` and `/tmp/docs-listing.txt` first.
+               Analyze the diffs to understand what changed. Focus on: API endpoint changes,
+               plugin interface changes, configuration changes, new features, removed features.
+               Skip internal files (OG images, metrics, internal APIs) - they don't need docs.
 
-            2. For each meaningful change, search the `/docs/` directory for related
-               documentation pages. Check:
+            2. For each meaningful user-facing change, search the `/docs/` directory for
+               related documentation pages. Check:
                - Are code examples in the docs still correct?
                - Are API signatures, types, and endpoints still accurate?
                - Are plugin configuration options still complete and correct?
@@ -286,7 +357,7 @@ jobs:
                and include a summary of what was updated and why in the commit body.
           claude_args: |
             --model claude-sonnet-4-5-20250929
-            --max-turns 30
+            --max-turns 50
             --allowedTools "Read,Write,Edit,Glob,Grep,Bash(git:*),Bash(gh:*)"
 
       - name: Notify Discord on docs update
