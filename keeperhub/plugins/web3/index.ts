@@ -202,6 +202,20 @@ const web3Plugin: IntegrationPlugin = {
           example: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
           required: true,
         },
+        {
+          type: "group",
+          label: "Advanced",
+          defaultExpanded: false,
+          fields: [
+            {
+              key: "gasLimitMultiplier",
+              label: "Gas Limit Multiplier",
+              type: "number",
+              placeholder: "Auto (uses chain default)",
+              min: 1,
+            },
+          ],
+        },
       ],
     },
     {
@@ -273,6 +287,20 @@ const web3Plugin: IntegrationPlugin = {
           placeholder: "0x... or {{NodeName.address}}",
           example: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
           required: true,
+        },
+        {
+          type: "group",
+          label: "Advanced",
+          defaultExpanded: false,
+          fields: [
+            {
+              key: "gasLimitMultiplier",
+              label: "Gas Limit Multiplier",
+              type: "number",
+              placeholder: "Auto (uses chain default)",
+              min: 1,
+            },
+          ],
         },
       ],
     },
@@ -652,6 +680,20 @@ const web3Plugin: IntegrationPlugin = {
           type: "abi-function-args",
           abiField: "abi",
           abiFunctionField: "abiFunction",
+        },
+        {
+          type: "group",
+          label: "Advanced",
+          defaultExpanded: false,
+          fields: [
+            {
+              key: "gasLimitMultiplier",
+              label: "Gas Limit Multiplier",
+              type: "number",
+              placeholder: "Auto (uses chain default)",
+              min: 1,
+            },
+          ],
         },
       ],
     },

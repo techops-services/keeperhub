@@ -41,6 +41,7 @@ export type TransferTokenCoreInput = {
   tokenConfig: string | Record<string, unknown>;
   recipientAddress: string;
   amount: string;
+  gasLimitMultiplier?: string;
   // Legacy support
   tokenAddress?: string;
 };
@@ -169,7 +170,12 @@ async function stepHandler(
     executionId: input._context?.executionId,
   });
 
-  const { network, recipientAddress, amount, _context } = input;
+  const { network, recipientAddress, amount, gasLimitMultiplier, _context } =
+    input;
+
+  const multiplierOverride = gasLimitMultiplier
+    ? Number.parseFloat(gasLimitMultiplier)
+    : undefined;
 
   // Get chain ID first (needed for token config parsing)
   let chainId: number;
@@ -307,6 +313,8 @@ async function stepHandler(
     workflowId,
     chainId,
     rpcUrl,
+    triggerType:
+      (_context.triggerType as TransactionContext["triggerType"]) ?? undefined,
   };
 
   // Execute transaction with nonce management and gas strategy
@@ -403,7 +411,8 @@ async function stepHandler(
         provider,
         txContext.triggerType ?? "manual",
         estimatedGas,
-        chainId
+        chainId,
+        multiplierOverride
       );
 
       console.log("[Transfer Token] Gas config:", {
