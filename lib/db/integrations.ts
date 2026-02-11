@@ -99,6 +99,52 @@ function decryptConfig(encryptedConfig: string): Record<string, unknown> {
   }
 }
 
+// start custom keeperhub code //
+const DB_SECRET_KEYS = new Set(["password", "url"]);
+
+/**
+ * Strip secret fields from a database integration config before sending to clients.
+ * For non-database integrations, returns the config unchanged.
+ */
+export function stripDatabaseSecrets(
+  config: IntegrationConfig,
+  integrationType: string
+): IntegrationConfig {
+  if (integrationType !== "database") {
+    return config;
+  }
+
+  const stripped: IntegrationConfig = {};
+  for (const key of Object.keys(config)) {
+    if (!DB_SECRET_KEYS.has(key)) {
+      stripped[key] = config[key];
+    }
+  }
+  return stripped;
+}
+
+/**
+ * Merge incoming config with existing config, preserving secret fields
+ * that were not provided (empty or missing) in the update.
+ */
+function mergeDatabaseConfig(
+  existingConfig: IntegrationConfig,
+  incomingConfig: IntegrationConfig
+): IntegrationConfig {
+  const merged: IntegrationConfig = { ...existingConfig };
+  for (const [key, value] of Object.entries(incomingConfig)) {
+    if (DB_SECRET_KEYS.has(key)) {
+      if (value !== undefined && value !== "") {
+        merged[key] = value;
+      }
+    } else {
+      merged[key] = value;
+    }
+  }
+  return merged;
+}
+// end keeperhub code //
+
 export type DecryptedIntegration = {
   id: string;
   userId: string;
@@ -270,9 +316,22 @@ export async function updateIntegration(
     updateData.name = updates.name;
   }
 
+  // start custom keeperhub code //
   if (updates.config !== undefined) {
-    updateData.config = encryptConfig(updates.config);
+    const existing = await getIntegration(
+      integrationId,
+      userId,
+      organizationId
+    );
+    if (existing?.type === "database") {
+      updateData.config = encryptConfig(
+        mergeDatabaseConfig(existing.config, updates.config)
+      );
+    } else {
+      updateData.config = encryptConfig(updates.config);
+    }
   }
+  // end keeperhub code //
 
   // start custom keeperhub code //
   const conditions = organizationId

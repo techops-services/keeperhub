@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import {
   deleteIntegration,
   getIntegration,
+  stripDatabaseSecrets,
   updateIntegration,
 } from "@/lib/db/integrations";
 import type { IntegrationConfig } from "@/lib/types/integration";
@@ -62,14 +63,16 @@ export async function GET(
       );
     }
 
+    // start custom keeperhub code //
     const response: GetIntegrationResponse = {
       id: integration.id,
       name: integration.name,
       type: integration.type,
-      config: integration.config,
+      config: stripDatabaseSecrets(integration.config, integration.type),
       createdAt: integration.createdAt.toISOString(),
       updatedAt: integration.updatedAt.toISOString(),
     };
+    // end keeperhub code //
 
     return NextResponse.json(response);
   } catch (error) {
@@ -125,14 +128,16 @@ export async function PUT(
       );
     }
 
+    // start custom keeperhub code //
     const response: GetIntegrationResponse = {
       id: integration.id,
       name: integration.name,
       type: integration.type,
-      config: integration.config,
+      config: stripDatabaseSecrets(integration.config, integration.type),
       createdAt: integration.createdAt.toISOString(),
       updatedAt: integration.updatedAt.toISOString(),
     };
+    // end keeperhub code //
 
     return NextResponse.json(response);
   } catch (error) {
