@@ -122,3 +122,110 @@ DELETE /api/user/rpc-preferences/{chainId}
 ```
 
 Reverts to default RPC endpoints for the chain.
+
+## Change Password
+
+```http
+POST /api/user/password
+```
+
+Change the password for a credential-based account. Requires the current password and a new password (minimum 8 characters). Not available for OAuth-only accounts.
+
+### Request Body
+
+```json
+{
+  "currentPassword": "old-password",
+  "newPassword": "new-password"
+}
+```
+
+## Forgot Password
+
+```http
+POST /api/user/forgot-password
+```
+
+Handles password reset via OTP. Supports two actions controlled by the `action` field in the request body.
+
+**Request OTP** (default when `action` is omitted or set to `"request"`):
+
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+**Reset password** (`action: "reset"`):
+
+```json
+{
+  "action": "reset",
+  "email": "user@example.com",
+  "otp": "123456",
+  "newPassword": "new-password"
+}
+```
+
+The OTP expires after 5 minutes. OAuth-only accounts receive a notification email instead of a reset code.
+
+## Deactivate Account
+
+```http
+POST /api/user/delete
+```
+
+Soft-deletes the authenticated user account. Requires a confirmation string in the request body. Invalidates all active sessions on success. Not available for anonymous users.
+
+### Request Body
+
+```json
+{
+  "confirmation": "DEACTIVATE"
+}
+```
+
+## Address Book
+
+Manage saved Ethereum addresses scoped to the active organization. All address book endpoints require an active organization context.
+
+### List Address Book Entries
+
+```http
+GET /api/address-book
+```
+
+Returns all address book entries for the active organization, ordered by creation date (newest first).
+
+### Create Address Book Entry
+
+```http
+POST /api/address-book
+```
+
+#### Request Body
+
+```json
+{
+  "label": "Treasury Wallet",
+  "address": "0x..."
+}
+```
+
+The address must be a valid Ethereum address.
+
+### Update Address Book Entry
+
+```http
+PATCH /api/address-book/{entryId}
+```
+
+Update the label or address of an existing entry. Both fields are optional.
+
+### Delete Address Book Entry
+
+```http
+DELETE /api/address-book/{entryId}
+```
+
+Removes the entry from the organization address book.

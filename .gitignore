@@ -126,3 +126,6 @@ tailwindcss-*.log
 !.claude/settings.json
 !.claude/hooks/
 !.claude/hooks/**
+
+.planning
+.prompts

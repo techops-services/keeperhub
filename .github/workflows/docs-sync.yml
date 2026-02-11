@@ -1,0 +1,324 @@
+name: Docs Sync
+
+on:
+  workflow_run:
+    workflows: ['Release']
+    types: [completed]
+    branches: [prod]
+
+  workflow_dispatch:
+    inputs:
+      days_back:
+        description: 'Number of days to look back for code changes'
+        required: false
+        default: '30'
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+concurrency:
+  group: docs-sync
+  cancel-in-progress: true
+
+jobs:
+  docs-sync:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    timeout-minutes: 75
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Detect changes from release
+        if: github.event_name == 'workflow_run'
+        id: release_changes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Triggered by Release workflow completion."
+
+          # Get the two most recent release tags
+          RELEASE_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName')
+          PREV_TAG=$(gh release list --limit 2 --json tagName --jq '.[1].tagName')
+
+          if [ -z "$RELEASE_TAG" ]; then
+            echo "No release tag found. Skipping."
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Latest release: $RELEASE_TAG"
+          echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous tag found. Scanning all files in release tag."
+            CHANGED_FILES=$(git ls-tree -r --name-only "$RELEASE_TAG" -- \
+              'keeperhub/plugins/' \
+              'keeperhub/api/' \
+              'keeperhub/lib/' \
+              'lib/' \
+              'plugins/' \
+              'app/api/' \
+              | grep -E '\.(ts|tsx|js|jsx)$' \
+              | grep -vE '\.(test|spec|stories)\.' \
+              | head -100 \
+              || true)
+          else
+            echo "Previous release: $PREV_TAG"
+            CHANGED_FILES=$(git diff --name-only "$PREV_TAG".."$RELEASE_TAG" -- \
+              'keeperhub/plugins/' \
+              'keeperhub/api/' \
+              'keeperhub/lib/' \
+              'lib/' \
+              'plugins/' \
+              'app/api/' \
+              | grep -E '\.(ts|tsx|js|jsx)$' \
+              | grep -vE '\.(test|spec|stories)\.' \
+              | head -100 \
+              || true)
+          fi
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No relevant code changes detected between tags."
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            FILE_COUNT=$(echo "$CHANGED_FILES" | wc -l | tr -d ' ')
+            echo "Found $FILE_COUNT changed files."
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+
+            # Save file list to output using heredoc
+            echo "changed_files<<CHANGED_FILES_EOF" >> "$GITHUB_OUTPUT"
+            echo "$CHANGED_FILES" >> "$GITHUB_OUTPUT"
+            echo "CHANGED_FILES_EOF" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Detect changes from manual trigger
+        if: github.event_name == 'workflow_dispatch'
+        id: manual_changes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DAYS_BACK="${{ github.event.inputs.days_back }}"
+
+          # Validate that days_back is a positive integer
+          if ! echo "$DAYS_BACK" | grep -qE '^[0-9]+$' || [ "$DAYS_BACK" -lt 1 ] || [ "$DAYS_BACK" -gt 365 ]; then
+            echo "Invalid days_back value: $DAYS_BACK. Must be a number between 1 and 365."
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Manual trigger: scanning changes from the last $DAYS_BACK days."
+
+          # Try to get the latest release tag for labeling
+          RELEASE_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || echo "manual-sync")
+          echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
+          CHANGED_FILES=$(git log --since="${DAYS_BACK} days ago" --name-only --pretty=format: -- \
+            'keeperhub/plugins/' \
+            'keeperhub/api/' \
+            'keeperhub/lib/' \
+            'lib/' \
+            'plugins/' \
+            'app/api/' \
+            | sort -u \
+            | grep -E '\.(ts|tsx|js|jsx)$' \
+            | grep -vE '\.(test|spec|stories)\.' \
+            | head -100 \
+            || true)
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No relevant code changes in the last $DAYS_BACK days."
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            FILE_COUNT=$(echo "$CHANGED_FILES" | wc -l | tr -d ' ')
+            echo "Found $FILE_COUNT changed files."
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+
+            echo "changed_files<<CHANGED_FILES_EOF" >> "$GITHUB_OUTPUT"
+            echo "$CHANGED_FILES" >> "$GITHUB_OUTPUT"
+            echo "CHANGED_FILES_EOF" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip if no changes
+        if: >-
+          (github.event_name == 'workflow_run' && steps.release_changes.outputs.has_changes != 'true') ||
+          (github.event_name == 'workflow_dispatch' && steps.manual_changes.outputs.has_changes != 'true')
+        run: |
+          echo "No relevant code changes detected. Skipping docs sync."
+
+      - name: Set release tag
+        if: >-
+          (github.event_name == 'workflow_run' && steps.release_changes.outputs.has_changes == 'true') ||
+          (github.event_name == 'workflow_dispatch' && steps.manual_changes.outputs.has_changes == 'true')
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            echo "release_tag=${{ steps.release_changes.outputs.release_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "release_tag=${{ steps.manual_changes.outputs.release_tag }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate Anthropic API key
+        if: steps.tag.outputs.release_tag != ''
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST https://api.anthropic.com/v1/messages \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            -d '{"model":"claude-sonnet-4-5-20250929","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}')
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "API key is valid and has sufficient credits."
+          else
+            echo "::error::Anthropic API pre-flight check failed (HTTP $HTTP_CODE): $BODY"
+            exit 1
+          fi
+
+      - name: Run Claude Code docs sync
+        if: steps.tag.outputs.release_tag != ''
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          base_branch: staging
+          branch_prefix: docs-sync-
+          prompt: |
+            REPO: ${{ github.repository }}
+            RELEASE TAG: ${{ steps.tag.outputs.release_tag }}
+
+            CHANGED FILES:
+            ${{ github.event_name == 'workflow_run' && steps.release_changes.outputs.changed_files || steps.manual_changes.outputs.changed_files }}
+
+            ---
+
+            You are a documentation maintenance agent for KeeperHub, a blockchain automation
+            platform. A new release has been published and the code files listed above have
+            changed. Your job is to ensure the documentation in `/docs/` stays accurate and
+            in sync with the codebase.
+
+            ## Documentation Infrastructure
+
+            - Documentation lives in the `/docs/` directory at the repository root.
+            - The docs site uses Nextra 4 (a Next.js-based docs framework). Content is plain
+              Markdown with YAML frontmatter.
+            - Navigation is controlled by `_meta.json` files in each directory. The root
+              `_meta.json` at `/docs/_meta.json` defines the top-level sections. Each
+              subdirectory has its own `_meta.json` for page ordering within that section.
+            - There are approximately 33 documentation pages organized across these sections:
+              intro, getting-started, keepers, workflows, keeper-runs, notifications,
+              wallet-management, users-teams-orgs, practices, api, FAQ.
+            - Two sections are hidden from navigation: `api` and `plans-features`.
+
+            ## Documentation Style Rules
+
+            Follow these rules strictly when editing or creating documentation:
+
+            - Every page starts with YAML frontmatter containing `title` and `description`.
+            - Use one `# H1` heading per page matching the frontmatter title.
+            - Use `## H2` for major sections, `### H3` for subsections.
+            - Write in a professional, instructive tone. Use second person ("you") for
+              instructions and third person for feature descriptions.
+            - Use short paragraphs, bullet lists, and tables. Use bold for emphasis and key
+              terms.
+            - Do NOT use emojis anywhere in the documentation. This is strictly enforced.
+            - Use code blocks for configuration examples, API responses, addresses, and code
+              snippets.
+            - File and directory naming convention is kebab-case.
+
+            ## Your Task
+
+            1. Read each changed file listed above to understand what was modified.
+               Focus on: API endpoint changes, plugin interface changes, configuration
+               changes, new features, removed features, changed function signatures.
+
+            2. For each meaningful change, search the `/docs/` directory for related
+               documentation pages. Check:
+               - Are code examples in the docs still correct?
+               - Are API signatures, types, and endpoints still accurate?
+               - Are plugin configuration options still complete and correct?
+               - Are instructions and procedures still valid?
+
+            3. Fix ONLY what is broken or inaccurate:
+               - Update incorrect code examples to match the current code.
+               - Fix wrong API signatures, types, and endpoint paths.
+               - Update outdated configuration examples.
+               - Add minimal documentation for significant new features that have absolutely
+                 no existing documentation coverage. Only do this for user-facing features.
+               - If a plugin gained new configuration options, add them to the relevant
+                 docs table or list.
+
+            4. Do NOT do any of the following:
+               - Do NOT rewrite working documentation for style or tone improvements.
+               - Do NOT add changelog or release notes entries.
+               - Do NOT reorganize existing documentation structure or navigation.
+               - Do NOT add sections about internal implementation details.
+               - Do NOT modify documentation that is already accurate.
+               - Do NOT create documentation for test utilities, internal helpers, or
+                 non-user-facing code.
+
+            5. If you create any new documentation pages:
+               - Use kebab-case filenames.
+               - Add the page to the appropriate `_meta.json` file.
+               - Include proper YAML frontmatter with title and description.
+               - Match the writing style and depth of existing pages in that section.
+
+            6. If after analyzing all changes you determine that no documentation updates
+               are needed (the docs are already accurate), report that finding and do not
+               create a PR. Simply state: "Documentation is up to date. No changes needed."
+
+            7. If you do make changes, commit them to the branch. The CI system will
+               automatically create a pull request from your commits. Use a commit message
+               format like: "docs: sync documentation with ${{ steps.tag.outputs.release_tag }}"
+               and include a summary of what was updated and why in the commit body.
+          claude_args: |
+            --model claude-sonnet-4-5-20250929
+            --max-turns 30
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(git:*),Bash(gh:*)"
+
+      - name: Notify Discord on docs update
+        if: steps.claude.outcome == 'success' && steps.claude.outputs.branch_name != ''
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE_TAG="${{ steps.tag.outputs.release_tag }}"
+          BRANCH="${{ steps.claude.outputs.branch_name }}"
+
+          # Find the PR created from this branch
+          PR_JSON=$(gh pr list --head "$BRANCH" --state open --json number,title,body --limit 1)
+          PR_NUMBER=$(echo "$PR_JSON" | jq -r '.[0].number // empty')
+
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No docs PR found. Skipping notification."
+            exit 0
+          fi
+
+          PR_URL="https://github.com/${{ github.repository }}/pull/$PR_NUMBER"
+          PR_BODY=$(echo "$PR_JSON" | jq -r '.[0].body // ""' | head -c 1500)
+
+          # Build message safely with jq
+          MESSAGE=$(jq -n \
+            --arg tag "$RELEASE_TAG" \
+            --arg body "$PR_BODY" \
+            --arg url "$PR_URL" \
+            '"**Docs Update** for `" + $tag + "`\n\n" + $body + "\n\nPR: " + $url')
+
+          # Send to Discord (jq output is already JSON-escaped string)
+          jq -n --argjson content "$MESSAGE" \
+            '{"username": "KeeperHub Docs Bot", "content": $content}' \
+            | curl -s -H "Content-Type: application/json" -d @- "$DISCORD_WEBHOOK"
