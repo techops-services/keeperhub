@@ -127,7 +127,7 @@ export function stripDatabaseSecrets(
  * Merge incoming config with existing config, preserving secret fields
  * that were not provided (empty or missing) in the update.
  */
-function mergeDatabaseConfig(
+export function mergeDatabaseConfig(
   existingConfig: IntegrationConfig,
   incomingConfig: IntegrationConfig
 ): IntegrationConfig {

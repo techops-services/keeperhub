@@ -2,8 +2,12 @@ import { NextResponse } from "next/server";
 // start custom keeperhub code //
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 import { auth } from "@/lib/auth";
-import { getIntegration as getIntegrationFromDb } from "@/lib/db/integrations";
+import {
+  getIntegration as getIntegrationFromDb,
+  mergeDatabaseConfig,
+} from "@/lib/db/integrations";
 import { handleDatabaseTest, handlePluginTest } from "@/lib/db/test-connection";
+import type { IntegrationConfig } from "@/lib/types/integration";
 
 // end keeperhub code //
 
@@ -51,12 +55,30 @@ export async function POST(
       );
     }
 
+    // start custom keeperhub code //
+    // Accept optional config overrides from the request body.
+    // For database integrations, merge overrides with stored config so the
+    // server can test with updated non-secret fields (e.g. host) without
+    // the client needing to send the password.
+    let body: { configOverrides?: IntegrationConfig } = {};
+    try {
+      body = await request.json();
+    } catch {
+      // No body or invalid JSON is fine - test with stored config only
+    }
+
+    const testConfig =
+      integration.type === "database" && body.configOverrides
+        ? mergeDatabaseConfig(integration.config, body.configOverrides)
+        : integration.config;
+    // end keeperhub code //
+
     if (integration.type === "database") {
-      const result = await handleDatabaseTest(integration.config);
+      const result = await handleDatabaseTest(testConfig);
       return NextResponse.json(result);
     }
 
-    const result = await handlePluginTest(integration.type, integration.config);
+    const result = await handlePluginTest(integration.type, testConfig);
     if (
       result.message === "Invalid integration type" ||
       result.message === "Integration does not support testing"
