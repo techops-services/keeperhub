@@ -133,3 +133,36 @@ GET /api/workflows/{workflowId}/code
 ```
 
 Generate SDK code for the workflow.
+
+## Claim Workflow
+
+```http
+POST /api/workflows/{workflowId}/claim
+```
+
+Claim an anonymous workflow into the authenticated user's organization. Only the original creator of the anonymous workflow can claim it.
+
+## Workflow Taxonomy
+
+```http
+GET /api/workflows/taxonomy
+```
+
+Returns distinct categories and protocols from all public workflows. Useful for building filter UIs.
+
+### Response
+
+```json
+{
+  "categories": ["defi", "nft"],
+  "protocols": ["uniswap", "aave"]
+}
+```
+
+## Update Featured Status (Internal)
+
+```http
+POST /api/hub/featured
+```
+
+Mark a workflow as featured in the hub. Requires internal service authentication (`hub` service). Accepts optional `category`, `protocol`, and `featuredOrder` fields alongside the `workflowId`.
