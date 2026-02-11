@@ -121,11 +121,5 @@ tailwindcss-*.log
 # Worktrees (local only)
 .worktrees/
 
-# Claude Code (blanket ignore, whitelist tracked files)
-.claude/
-!.claude/settings.json
-!.claude/hooks/
-!.claude/hooks/**
-
 .planning
 .prompts
