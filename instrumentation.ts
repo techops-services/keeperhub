@@ -5,6 +5,12 @@
  */
 
 export async function register() {
+  // start custom keeperhub code //
+  // Prefer IPv4 DNS results to avoid ENETUNREACH in IPv4-only environments (e.g. EKS)
+  const dns = await import("node:dns");
+  dns.setDefaultResultOrder("ipv4first");
+  // end keeperhub code //
+
   // Patch console with LOG_LEVEL support
   // This must be imported dynamically to ensure it runs at startup
   await import("@/lib/logger");

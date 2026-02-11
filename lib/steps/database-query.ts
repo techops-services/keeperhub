@@ -14,6 +14,9 @@ import {
   getPostgresConnectionOptions,
   type PostgresSslOption,
 } from "@/lib/db/connection-utils";
+// start custom keeperhub code //
+import { checkUrlForIPv6Only } from "@/keeperhub/lib/db/resolve-ipv4";
+// end keeperhub code //
 import { fetchCredentials } from "../credential-fetcher";
 import { type StepInput, withStepLogging } from "./step-handler";
 
@@ -96,6 +99,13 @@ async function databaseQuery(
     databaseUrl,
     credentials.DATABASE_SSL_MODE
   );
+
+  // start custom keeperhub code //
+  const ipv6Error = await checkUrlForIPv6Only(normalizedUrl);
+  if (ipv6Error) {
+    return { success: false, error: ipv6Error };
+  }
+  // end keeperhub code //
 
   const queryString = (input.dbQuery || input.query) as string;
   let client: postgres.Sql | null = null;

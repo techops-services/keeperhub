@@ -107,7 +107,7 @@ env:
     value: "prometheus"
   NODE_OPTIONS:
     type: kv
-    value: "--enable-source-maps"
+    value: "--enable-source-maps --dns-result-order=ipv4first"
   HOSTNAME:
     type: kv
     value: "0.0.0.0"

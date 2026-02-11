@@ -5,6 +5,9 @@ import {
   getDatabaseErrorMessage,
   getPostgresConnectionOptions,
 } from "@/lib/db/connection-utils";
+// start custom keeperhub code //
+import { checkUrlForIPv6Only } from "@/keeperhub/lib/db/resolve-ipv4";
+// end keeperhub code //
 import type { IntegrationType } from "@/lib/types/integration";
 import {
   getCredentialMapping,
@@ -27,6 +30,13 @@ export async function testDatabaseConnection(
       databaseUrl,
       sslMode
     );
+
+    // start custom keeperhub code //
+    const ipv6Error = await checkUrlForIPv6Only(normalizedUrl);
+    if (ipv6Error) {
+      return { status: "error", message: ipv6Error };
+    }
+    // end keeperhub code //
 
     connection = postgres(normalizedUrl, {
       max: 1,

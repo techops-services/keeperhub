@@ -68,7 +68,7 @@ export function getDatabaseErrorMessage(error: unknown): string {
     return "Database host not found. Please check your database URL.";
   }
   if (errorMessage.includes("ENETUNREACH")) {
-    return "Network unreachable. The database host may resolve to an IPv6 address; try using an IPv4 address or a hostname that resolves to IPv4.";
+    return "Network unreachable. The database host likely resolves to an IPv6 address, which is not supported in this environment. If using Supabase, switch to the Session Pooler connection string. For other providers, use a hostname that resolves to IPv4.";
   }
   if (errorMessage.includes("authentication failed")) {
     return "Authentication failed. Please check your database credentials.";
