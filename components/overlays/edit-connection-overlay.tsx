@@ -219,11 +219,22 @@ export function EditConnectionOverlay({
   const doSave = async () => {
     try {
       setSaving(true);
-      const hasNewConfig = Object.values(config).some((v) => v && v.length > 0);
+      // start custom keeperhub code //
+      // Filter out empty values so we only send fields the user actually filled in.
+      // This prevents sending empty strings for secret fields that were stripped
+      // by the server, providing defense-in-depth alongside server-side merge.
+      const nonEmptyConfig: Record<string, string> = {};
+      for (const [key, value] of Object.entries(config)) {
+        if (value && value.length > 0) {
+          nonEmptyConfig[key] = value;
+        }
+      }
+      const hasNewConfig = Object.keys(nonEmptyConfig).length > 0;
       await api.integration.update(integration.id, {
         name: name.trim(),
-        ...(hasNewConfig ? { config } : {}),
+        ...(hasNewConfig ? { config: nonEmptyConfig } : {}),
       });
+      // end keeperhub code //
       toast.success("Connection updated");
       onSuccess?.();
       closeAll();
@@ -234,21 +245,75 @@ export function EditConnectionOverlay({
     }
   };
 
+  // start custom keeperhub code //
+  // For database integrations, secret fields (password, url) are stripped from
+  // the server response. We check if the user entered new secret values to
+  // decide whether to test client-side or use the server-side test endpoint.
+  const hasNewDatabaseSecrets =
+    integration.type === "database" &&
+    ((config.password ?? "").length > 0 || (config.url ?? "").length > 0);
+
+  /**
+   * Returns a validation error message if the current config is invalid for
+   * testing or saving, or null if the config is valid. For database integrations
+   * without new secret values, validation is skipped (server-side test/merge).
+   */
+  const getConfigValidationError = (): string | null => {
+    if (integration.type !== "database") {
+      return null;
+    }
+    if (!hasNewDatabaseSecrets) {
+      return null;
+    }
+    if (!hasValidDatabaseConfig(config)) {
+      return "Enter either a connection string or the connection details below.";
+    }
+    return null;
+  };
+
+  const runConnectionTest = (): Promise<{
+    status: "success" | "error";
+    message: string;
+  }> => {
+    if (integration.type === "database" && !hasNewDatabaseSecrets) {
+      return api.integration.testConnection(integration.id);
+    }
+    const hasNewConfig = Object.values(config).some((v) => v && v.length > 0);
+    if (hasNewConfig) {
+      return api.integration.testCredentials({
+        type: integration.type,
+        config,
+      });
+    }
+    return api.integration.testConnection(integration.id);
+  };
+
+  /**
+   * For database integrations without new secrets, returns true so that
+   * handleSave skips the client-side pre-save connection test.
+   */
+  const shouldSkipPreSaveTest = (): boolean => {
+    const hasNewConfig = Object.values(config).some((v) => v && v.length > 0);
+    if (!hasNewConfig) {
+      return true;
+    }
+    return integration.type === "database" && !hasNewDatabaseSecrets;
+  };
+  // end keeperhub code //
+
   const handleSave = async () => {
     if (saving) {
       return;
     }
-    const hasNewConfig = Object.values(config).some((v) => v && v.length > 0);
 
-    if (!hasNewConfig) {
+    if (shouldSkipPreSaveTest()) {
       await doSave();
       return;
     }
 
-    if (integration.type === "database" && !hasValidDatabaseConfig(config)) {
-      toast.error(
-        "Enter either a connection string or the connection details below."
-      );
+    const validationError = getConfigValidationError();
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
 
@@ -288,33 +353,13 @@ export function EditConnectionOverlay({
     }
   };
 
-  const runConnectionTest = (): Promise<{
-    status: "success" | "error";
-    message: string;
-  }> => {
-    const hasNewConfig = Object.values(config).some((v) => v && v.length > 0);
-    if (hasNewConfig) {
-      return api.integration.testCredentials({
-        type: integration.type,
-        config,
-      });
-    }
-    return api.integration.testConnection(integration.id);
-  };
-
   const handleTest = async () => {
     if (testing) {
       return;
     }
-    const hasNewConfig = Object.values(config).some((v) => v && v.length > 0);
-    if (
-      hasNewConfig &&
-      integration.type === "database" &&
-      !hasValidDatabaseConfig(config)
-    ) {
-      toast.error(
-        "Enter either a connection string or the connection details below."
-      );
+    const validationError = getConfigValidationError();
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
 
