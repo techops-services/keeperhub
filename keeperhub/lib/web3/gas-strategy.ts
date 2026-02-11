@@ -237,7 +237,8 @@ export class AdaptiveGasStrategy {
     provider: ethers.Provider,
     triggerType: TriggerType,
     estimatedGas: bigint,
-    chainId: number
+    chainId: number,
+    gasLimitMultiplierOverride?: number
   ): Promise<GasConfig> {
     // Apply chain-specific overrides (from DB with hardcoded fallback)
     const chainConfig = await this.getChainConfig(chainId);
@@ -246,7 +247,8 @@ export class AdaptiveGasStrategy {
     const gasLimit = this.calculateGasLimit(
       estimatedGas,
       triggerType,
-      chainConfig
+      chainConfig,
+      gasLimitMultiplierOverride
     );
 
     // Get fee configuration based on strategy
@@ -266,11 +268,17 @@ export class AdaptiveGasStrategy {
   private calculateGasLimit(
     estimatedGas: bigint,
     triggerType: TriggerType,
-    chainConfig: ChainGasConfig
+    chainConfig: ChainGasConfig,
+    gasLimitMultiplierOverride?: number
   ): bigint {
-    const multiplier = this.isTimeSensitive(triggerType)
-      ? chainConfig.gasLimitMultiplierConservative
-      : chainConfig.gasLimitMultiplier;
+    let multiplier: number;
+    if (gasLimitMultiplierOverride && gasLimitMultiplierOverride > 0) {
+      multiplier = gasLimitMultiplierOverride;
+    } else if (this.isTimeSensitive(triggerType)) {
+      multiplier = chainConfig.gasLimitMultiplierConservative;
+    } else {
+      multiplier = chainConfig.gasLimitMultiplier;
+    }
 
     // Apply multiplier (using integer math with basis points)
     const multiplierBps = BigInt(Math.floor(multiplier * 10_000));

@@ -29,6 +29,7 @@ export type TransferFundsCoreInput = {
   network: string;
   amount: string;
   recipientAddress: string;
+  gasLimitMultiplier?: string;
 };
 
 export type TransferFundsInput = StepInput & TransferFundsCoreInput;
@@ -47,7 +48,12 @@ async function stepHandler(
     executionId: input._context?.executionId,
   });
 
-  const { network, amount, recipientAddress, _context } = input;
+  const { network, amount, recipientAddress, gasLimitMultiplier, _context } =
+    input;
+
+  const multiplierOverride = gasLimitMultiplier
+    ? Number.parseFloat(gasLimitMultiplier)
+    : undefined;
 
   // Validate recipient address
   if (!ethers.isAddress(recipientAddress)) {
@@ -173,6 +179,8 @@ async function stepHandler(
     workflowId,
     chainId,
     rpcUrl,
+    triggerType:
+      (_context.triggerType as TransactionContext["triggerType"]) ?? undefined,
   };
 
   // Execute transaction with nonce management and gas strategy
@@ -230,7 +238,8 @@ async function stepHandler(
         provider,
         txContext.triggerType ?? "manual",
         estimatedGas,
-        chainId
+        chainId,
+        multiplierOverride
       );
 
       console.log("[Transfer Funds] Gas config:", {

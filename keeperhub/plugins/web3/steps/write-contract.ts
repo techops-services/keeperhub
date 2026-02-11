@@ -36,6 +36,7 @@ export type WriteContractCoreInput = {
   abi: string;
   abiFunction: string;
   functionArgs?: string;
+  gasLimitMultiplier?: string;
 };
 
 export type WriteContractInput = StepInput & WriteContractCoreInput;
@@ -47,8 +48,19 @@ export type WriteContractInput = StepInput & WriteContractCoreInput;
 async function stepHandler(
   input: WriteContractInput
 ): Promise<WriteContractResult> {
-  const { contractAddress, network, abi, abiFunction, functionArgs, _context } =
-    input;
+  const {
+    contractAddress,
+    network,
+    abi,
+    abiFunction,
+    functionArgs,
+    gasLimitMultiplier,
+    _context,
+  } = input;
+
+  const multiplierOverride = gasLimitMultiplier
+    ? Number.parseFloat(gasLimitMultiplier)
+    : undefined;
 
   // Validate contract address
   if (!ethers.isAddress(contractAddress)) {
@@ -216,6 +228,8 @@ async function stepHandler(
     workflowId,
     chainId,
     rpcUrl,
+    triggerType:
+      (_context.triggerType as TransactionContext["triggerType"]) ?? undefined,
   };
 
   // Execute transaction with nonce management and gas strategy
@@ -279,7 +293,8 @@ async function stepHandler(
         provider,
         txContext.triggerType ?? "manual",
         estimatedGas,
-        chainId
+        chainId,
+        multiplierOverride
       );
 
       console.log("[Write Contract] Gas config:", {
