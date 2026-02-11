@@ -3,6 +3,12 @@
  * This executor captures step executions through the workflow SDK for better observability
  */
 
+// start custom keeperhub code //
+import {
+  BUILTIN_NODE_ID,
+  BUILTIN_NODE_LABEL,
+  getBuiltinVariables,
+} from "@/keeperhub/lib/builtin-variables";
 import {
   getMetricsCollector,
   LabelKeys,
@@ -12,7 +18,6 @@ import {
   decrementConcurrentExecutions,
   incrementConcurrentExecutions,
 } from "@/keeperhub/lib/metrics/instrumentation/saturation";
-// start custom keeperhub code //
 import {
   detectTriggerType,
   recordWorkflowComplete,
@@ -625,6 +630,15 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
       );
       return;
     }
+
+    // start custom keeperhub code //
+    // Inject fresh built-in system variables for each node execution
+    const builtinSanitizedId = BUILTIN_NODE_ID.replace(/[^a-zA-Z0-9]/g, "_");
+    outputs[builtinSanitizedId] = {
+      label: BUILTIN_NODE_LABEL,
+      data: getBuiltinVariables(),
+    };
+    // end keeperhub code //
 
     try {
       let result: ExecutionResult;
