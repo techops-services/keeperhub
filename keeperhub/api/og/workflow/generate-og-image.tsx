@@ -297,13 +297,27 @@ function renderWorkflowOG(data: OGRenderData): ImageResponse {
         />
       ))}
 
-      {/* Subtle vignette overlay */}
+      {/* Vignette + top/bottom fade in a single overlay to avoid seam lines */}
       <div
         style={{
           position: "absolute",
-          inset: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
           background:
             "radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.4) 100%)",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background:
+            "linear-gradient(180deg, rgba(17,24,39,0.95) 0%, rgba(17,24,39,0.85) 15%, rgba(17,24,39,0.4) 30%, transparent 42%, transparent 78%, rgba(17,24,39,0.6) 88%, rgba(17,24,39,0.95) 100%)",
         }}
       />
 
@@ -409,7 +423,7 @@ function renderWorkflowOG(data: OGRenderData): ImageResponse {
         );
       })}
 
-      {/* Top content gradient for text readability */}
+      {/* Top content */}
       <div
         style={{
           position: "absolute",
@@ -420,8 +434,6 @@ function renderWorkflowOG(data: OGRenderData): ImageResponse {
           display: "flex",
           flexDirection: "column",
           padding: "40px 56px 0",
-          background:
-            "linear-gradient(180deg, rgba(17,24,39,0.95) 0%, rgba(17,24,39,0.85) 30%, rgba(17,24,39,0.4) 65%, transparent 100%)",
         }}
       >
         {/* Header: logo + domain */}
@@ -501,7 +513,7 @@ function renderWorkflowOG(data: OGRenderData): ImageResponse {
         ) : null}
       </div>
 
-      {/* Footer gradient pinned to bottom */}
+      {/* Footer pinned to bottom */}
       <div
         style={{
           position: "absolute",
@@ -517,8 +529,6 @@ function renderWorkflowOG(data: OGRenderData): ImageResponse {
           fontSize: 18,
           fontWeight: 500,
           color: "rgba(255,255,255,0.45)",
-          background:
-            "linear-gradient(0deg, rgba(17,24,39,0.95) 0%, rgba(17,24,39,0.6) 50%, transparent 100%)",
         }}
       >
         {data.triggerLabel ? (

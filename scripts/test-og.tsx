@@ -254,13 +254,27 @@ async function renderOG(tc: TestCase): Promise<void> {
         />
       ))}
 
-      {/* Subtle vignette overlay */}
+      {/* Vignette + top/bottom fade in a single overlay to avoid seam lines */}
       <div
         style={{
           position: "absolute",
-          inset: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
           background:
             "radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.4) 100%)",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background:
+            "linear-gradient(180deg, rgba(17,24,39,0.95) 0%, rgba(17,24,39,0.85) 15%, rgba(17,24,39,0.4) 30%, transparent 42%, transparent 78%, rgba(17,24,39,0.6) 88%, rgba(17,24,39,0.95) 100%)",
         }}
       />
 
@@ -362,7 +376,7 @@ async function renderOG(tc: TestCase): Promise<void> {
         );
       })}
 
-      {/* Top content gradient for text readability */}
+      {/* Top content */}
       <div
         style={{
           position: "absolute",
@@ -373,8 +387,6 @@ async function renderOG(tc: TestCase): Promise<void> {
           display: "flex",
           flexDirection: "column",
           padding: "40px 56px 0",
-          background:
-            "linear-gradient(180deg, rgba(17,24,39,0.95) 0%, rgba(17,24,39,0.85) 30%, rgba(17,24,39,0.4) 65%, transparent 100%)",
         }}
       >
         <div
@@ -449,7 +461,7 @@ async function renderOG(tc: TestCase): Promise<void> {
         ) : null}
       </div>
 
-      {/* Footer gradient pinned to bottom */}
+      {/* Footer pinned to bottom */}
       <div
         style={{
           position: "absolute",
@@ -465,8 +477,6 @@ async function renderOG(tc: TestCase): Promise<void> {
           fontSize: 18,
           fontWeight: 500,
           color: "rgba(255,255,255,0.45)",
-          background:
-            "linear-gradient(0deg, rgba(17,24,39,0.95) 0%, rgba(17,24,39,0.6) 50%, transparent 100%)",
         }}
       >
         {triggerLabel ? (
@@ -713,12 +723,27 @@ async function renderHubOG(): Promise<void> {
           }}
         />
       ))}
+      {/* Vignette + top/bottom fade in a single overlay to avoid seam lines */}
       <div
         style={{
           position: "absolute",
-          inset: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
           background:
             "radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.4) 100%)",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background:
+            "linear-gradient(180deg, rgba(17,24,39,0.95) 0%, rgba(17,24,39,0.85) 15%, rgba(17,24,39,0.4) 30%, transparent 42%, transparent 78%, rgba(17,24,39,0.6) 88%, rgba(17,24,39,0.95) 100%)",
         }}
       />
 
@@ -793,8 +818,6 @@ async function renderHubOG(): Promise<void> {
           display: "flex",
           flexDirection: "column",
           padding: "40px 56px 0",
-          background:
-            "linear-gradient(180deg, rgba(17,24,39,0.95) 0%, rgba(17,24,39,0.85) 30%, rgba(17,24,39,0.4) 65%, transparent 100%)",
         }}
       >
         <div
@@ -883,8 +906,6 @@ async function renderHubOG(): Promise<void> {
           fontSize: 18,
           fontWeight: 500,
           color: "rgba(255,255,255,0.45)",
-          background:
-            "linear-gradient(0deg, rgba(17,24,39,0.95) 0%, rgba(17,24,39,0.6) 50%, transparent 100%)",
         }}
       >
         <div style={{ display: "flex" }}>Featured workflows</div>
