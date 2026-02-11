@@ -36,21 +36,32 @@ try {
 //
 // Standard format: scheme://user:password@host:port/database?params
 //
-// Assumptions:
-// - The first ':' after '://' separates username from password
-//   (PostgreSQL usernames cannot contain unescaped ':')
-// - The last '@' separates credentials from the host
-//   (handles passwords containing '@')
+// Parsing strategy:
+// 1. The last '@' separates credentials from the host
+//    (handles passwords containing '@', e.g. p@ssword)
+// 2. The first ':' after '://' AND before '@' separates username from password
+//    (handles passwords containing ':', e.g. base64 a:b=)
+// 3. PostgreSQL usernames cannot contain unescaped ':'
 const schemeEnd = url.indexOf("://") + 3;
 const atIdx = url.lastIndexOf("@");
-const colonIdx = url.indexOf(":", schemeEnd);
 
-if (schemeEnd > 3 && atIdx > colonIdx && colonIdx > schemeEnd) {
+// Find the credential separator — must be between scheme and '@'
+const credentialRange = url.slice(schemeEnd, atIdx);
+const colonOffset = credentialRange.indexOf(":");
+const colonIdx = colonOffset !== -1 ? schemeEnd + colonOffset : -1;
+
+if (schemeEnd > 3 && atIdx > schemeEnd && colonIdx > schemeEnd) {
   const user = url.slice(schemeEnd, colonIdx);
   const pass = url.slice(colonIdx + 1, atIdx);
-  process.stdout.write(
-    `${url.slice(0, schemeEnd)}${encodeURIComponent(user)}:${encodeURIComponent(pass)}${url.slice(atIdx)}`
-  );
+  // Verify the host portion after '@' looks valid (contains ':' for port or '/' for path)
+  const hostPart = url.slice(atIdx + 1);
+  if (hostPart.includes(":") || hostPart.includes("/")) {
+    process.stdout.write(
+      `${url.slice(0, schemeEnd)}${encodeURIComponent(user)}:${encodeURIComponent(pass)}${url.slice(atIdx)}`
+    );
+  } else {
+    process.stdout.write(url);
+  }
 } else {
   process.stdout.write(url);
 }

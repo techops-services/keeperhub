@@ -9,6 +9,12 @@
  * Ensure special characters in postgres URL passwords are percent-encoded.
  * postgres.js parses connection strings via new URL() which requires encoding.
  * CNPG-generated passwords often contain +/= (base64) that break URL parsing.
+ *
+ * Parsing strategy (keep in sync with scripts/encode-pg-url.mjs):
+ * 1. The last '@' separates credentials from the host (handles passwords with '@')
+ * 2. The first ':' between '://' and '@' separates username from password
+ *    (handles passwords with ':', e.g. base64 a:b=)
+ * 3. PostgreSQL usernames cannot contain unescaped ':'
  */
 function encodePostgresPassword(url: string): string {
   try {
@@ -17,11 +23,16 @@ function encodePostgresPassword(url: string): string {
   } catch {
     const schemeEnd = url.indexOf("://") + 3;
     const atIdx = url.lastIndexOf("@");
-    const colonIdx = url.indexOf(":", schemeEnd);
-    if (schemeEnd > 3 && atIdx > colonIdx && colonIdx > schemeEnd) {
+    const credentialRange = url.slice(schemeEnd, atIdx);
+    const colonOffset = credentialRange.indexOf(":");
+    const colonIdx = colonOffset !== -1 ? schemeEnd + colonOffset : -1;
+    if (schemeEnd > 3 && atIdx > schemeEnd && colonIdx > schemeEnd) {
       const user = url.slice(schemeEnd, colonIdx);
       const pass = url.slice(colonIdx + 1, atIdx);
-      return `${url.slice(0, schemeEnd)}${encodeURIComponent(user)}:${encodeURIComponent(pass)}${url.slice(atIdx)}`;
+      const hostPart = url.slice(atIdx + 1);
+      if (hostPart.includes(":") || hostPart.includes("/")) {
+        return `${url.slice(0, schemeEnd)}${encodeURIComponent(user)}:${encodeURIComponent(pass)}${url.slice(atIdx)}`;
+      }
     }
     return url;
   }
