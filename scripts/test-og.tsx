@@ -2,23 +2,23 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { ImageResponse } from "@vercel/og";
 
-const fontLight = readFileSync(
-  resolve(process.cwd(), "keeperhub/api/og/fonts/AnekLatin-Light.ttf")
-);
 const fontRegular = readFileSync(
   resolve(process.cwd(), "keeperhub/api/og/fonts/AnekLatin-Regular.ttf")
+);
+const fontSemiBold = readFileSync(
+  resolve(process.cwd(), "keeperhub/api/og/fonts/AnekLatin-SemiBold.ttf")
 );
 const FONT_OPTIONS = [
   {
     name: "Anek Latin",
-    data: fontLight.buffer as ArrayBuffer,
-    weight: 300 as const,
+    data: fontRegular.buffer as ArrayBuffer,
+    weight: 400 as const,
     style: "normal" as const,
   },
   {
     name: "Anek Latin",
-    data: fontRegular.buffer as ArrayBuffer,
-    weight: 400 as const,
+    data: fontSemiBold.buffer as ArrayBuffer,
+    weight: 600 as const,
     style: "normal" as const,
   },
 ];
@@ -364,10 +364,10 @@ async function renderOG(tc: TestCase): Promise<void> {
       {/* Workflow nodes - icon + label inside card */}
       {nodes.map((node) => {
         const pos = tp(node.position.x, node.position.y, vp);
-        const nodeSquare = Math.max(ns * 0.65, 100);
+        const nodeSquare = Math.max(ns * 0.7, 110);
         const isTrigger = node.data.type === "trigger";
         const label = node.data.label ?? "";
-        const iconSize = Math.max(nodeSquare * 0.3, 26);
+        const iconSize = Math.max(nodeSquare * 0.32, 30);
 
         return (
           <div
@@ -378,7 +378,7 @@ async function renderOG(tc: TestCase): Promise<void> {
               top: pos.y + (ns - nodeSquare) / 2,
               width: nodeSquare,
               height: nodeSquare,
-              borderRadius: 12,
+              borderRadius: 14,
               backgroundColor: "#1e293b",
               border: `2px solid ${isTrigger ? NODE_BORDER_GREEN_BRIGHT : NODE_BORDER_GREEN}`,
               display: "flex",
@@ -386,7 +386,7 @@ async function renderOG(tc: TestCase): Promise<void> {
               alignItems: "center",
               justifyContent: "center",
               boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
-              gap: 6,
+              gap: 8,
             }}
           >
             {/* biome-ignore lint/a11y/useAltText: test script OG render */}
@@ -399,9 +399,9 @@ async function renderOG(tc: TestCase): Promise<void> {
             />
             <div
               style={{
-                fontSize: 11,
+                fontSize: 12,
                 color: "rgba(255,255,255,0.55)",
-                fontWeight: 300,
+                fontWeight: 400,
                 textAlign: "center",
                 padding: "0 6px",
               }}
@@ -444,16 +444,16 @@ async function renderOG(tc: TestCase): Promise<void> {
             {/* biome-ignore lint/a11y/useAltText: test script */}
             {/* biome-ignore lint/performance/noImgElement: Satori */}
             <img
-              height={28}
+              height={32}
               src={LOGO_SVG}
-              style={{ width: 18, height: 28 }}
-              width={18}
+              style={{ width: 20, height: 32 }}
+              width={20}
             />
             <div
               style={{
                 display: "flex",
-                fontSize: 20,
-                fontWeight: 400,
+                fontSize: 22,
+                fontWeight: 600,
                 color: "rgba(255,255,255,0.85)",
               }}
             >
@@ -463,7 +463,7 @@ async function renderOG(tc: TestCase): Promise<void> {
           <div
             style={{
               display: "flex",
-              fontSize: 16,
+              fontSize: 18,
               color: "rgba(255,255,255,0.3)",
             }}
           >
@@ -473,8 +473,8 @@ async function renderOG(tc: TestCase): Promise<void> {
         <div
           style={{
             display: "flex",
-            fontSize: 52,
-            fontWeight: 400,
+            fontSize: 58,
+            fontWeight: 600,
             color: "#ffffff",
             marginTop: 36,
             lineHeight: 1.15,
@@ -486,7 +486,8 @@ async function renderOG(tc: TestCase): Promise<void> {
           <div
             style={{
               display: "flex",
-              fontSize: 22,
+              fontSize: 24,
+              fontWeight: 400,
               color: "rgba(255,255,255,0.5)",
               marginTop: 14,
               lineHeight: 1.4,
@@ -510,8 +511,8 @@ async function renderOG(tc: TestCase): Promise<void> {
           alignItems: "flex-end",
           padding: "0 56px 36px",
           gap: 32,
-          fontSize: 18,
-          fontWeight: 300,
+          fontSize: 20,
+          fontWeight: 400,
           color: "rgba(255,255,255,0.45)",
         }}
       >
@@ -603,16 +604,16 @@ async function renderDefaultOG(): Promise<void> {
         {/* biome-ignore lint/a11y/useAltText: test script */}
         {/* biome-ignore lint/performance/noImgElement: Satori */}
         <img
-          height={75}
+          height={88}
           src={LOGO_SVG}
-          style={{ width: 48, height: 75 }}
-          width={48}
+          style={{ width: 56, height: 88 }}
+          width={56}
         />
         <div
           style={{
             display: "flex",
-            fontSize: 64,
-            fontWeight: 400,
+            fontSize: 72,
+            fontWeight: 600,
             color: "#ffffff",
             marginTop: 8,
           }}
@@ -622,7 +623,8 @@ async function renderDefaultOG(): Promise<void> {
         <div
           style={{
             display: "flex",
-            fontSize: 24,
+            fontSize: 28,
+            fontWeight: 400,
             color: "rgba(255,255,255,0.45)",
           }}
         >
@@ -724,12 +726,12 @@ type HubCard = {
 };
 
 const HUB_CARDS: HubCard[] = [
-  { label: "Schedule", x: 120, y: 340 },
-  { label: "Swap", x: 300, y: 340 },
-  { label: "Transfer", x: 480, y: 340 },
-  { label: "Monitor", x: 660, y: 340 },
-  { label: "Notify", x: 840, y: 340 },
-  { label: "Condition", x: 1020, y: 340 },
+  { label: "Schedule", x: 100, y: 330 },
+  { label: "Swap", x: 290, y: 330 },
+  { label: "Transfer", x: 480, y: 330 },
+  { label: "Monitor", x: 670, y: 330 },
+  { label: "Notify", x: 860, y: 330 },
+  { label: "Condition", x: 1050, y: 330 },
 ];
 
 async function renderHubOG(): Promise<void> {
@@ -794,9 +796,9 @@ async function renderHubOG(): Promise<void> {
             key={`edge-${card.label}`}
             style={{
               position: "absolute",
-              left: card.x + 90,
-              top: card.y + 45,
-              width: next.x - card.x - 90,
+              left: card.x + 100,
+              top: card.y + 50,
+              width: next.x - card.x - 100,
               height: 2,
               backgroundColor: EDGE_COLOR,
             }}
@@ -812,9 +814,9 @@ async function renderHubOG(): Promise<void> {
             position: "absolute",
             left: card.x,
             top: card.y,
-            width: 90,
-            height: 90,
-            borderRadius: 12,
+            width: 100,
+            height: 100,
+            borderRadius: 14,
             backgroundColor: "#1e293b",
             border: `1.5px solid ${NODE_BORDER_GREEN}`,
             display: "flex",
@@ -822,20 +824,20 @@ async function renderHubOG(): Promise<void> {
             alignItems: "center",
             justifyContent: "center",
             boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
-            gap: 6,
+            gap: 8,
           }}
         >
           {/* biome-ignore lint/a11y/useAltText: test script OG render */}
           {/* biome-ignore lint/performance/noImgElement: Satori requires img */}
           <img
-            height={28}
+            height={32}
             src={HUB_ICONS[card.label] ?? ICON_ZAP}
-            style={{ width: 28, height: 28 }}
-            width={28}
+            style={{ width: 32, height: 32 }}
+            width={32}
           />
           <div
             style={{
-              fontSize: 10,
+              fontSize: 12,
               color: "rgba(255,255,255,0.55)",
               fontWeight: 400,
               textAlign: "center",
@@ -878,16 +880,16 @@ async function renderHubOG(): Promise<void> {
             {/* biome-ignore lint/a11y/useAltText: test script */}
             {/* biome-ignore lint/performance/noImgElement: Satori */}
             <img
-              height={28}
+              height={32}
               src={LOGO_SVG}
-              style={{ width: 18, height: 28 }}
-              width={18}
+              style={{ width: 20, height: 32 }}
+              width={20}
             />
             <div
               style={{
                 display: "flex",
-                fontSize: 20,
-                fontWeight: 400,
+                fontSize: 22,
+                fontWeight: 600,
                 color: "rgba(255,255,255,0.85)",
               }}
             >
@@ -897,7 +899,7 @@ async function renderHubOG(): Promise<void> {
           <div
             style={{
               display: "flex",
-              fontSize: 16,
+              fontSize: 18,
               color: "rgba(255,255,255,0.3)",
             }}
           >
@@ -907,8 +909,8 @@ async function renderHubOG(): Promise<void> {
         <div
           style={{
             display: "flex",
-            fontSize: 52,
-            fontWeight: 400,
+            fontSize: 58,
+            fontWeight: 600,
             color: "#ffffff",
             marginTop: 36,
             lineHeight: 1.15,
@@ -919,7 +921,8 @@ async function renderHubOG(): Promise<void> {
         <div
           style={{
             display: "flex",
-            fontSize: 22,
+            fontSize: 24,
+            fontWeight: 400,
             color: "rgba(255,255,255,0.5)",
             marginTop: 14,
             lineHeight: 1.4,
@@ -942,8 +945,8 @@ async function renderHubOG(): Promise<void> {
           alignItems: "flex-end",
           padding: "0 56px 36px",
           gap: 32,
-          fontSize: 18,
-          fontWeight: 300,
+          fontSize: 20,
+          fontWeight: 400,
           color: "rgba(255,255,255,0.45)",
         }}
       >

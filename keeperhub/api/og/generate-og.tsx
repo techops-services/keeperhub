@@ -8,12 +8,12 @@ import { workflows } from "@/lib/db/schema";
 // Font loading (Anek Latin, bundled locally)
 // ---------------------------------------------------------------------------
 
-const fontLightPromise = fetch(
-  new URL("./fonts/AnekLatin-Light.ttf", import.meta.url)
-).then((res) => res.arrayBuffer());
-
 const fontRegularPromise = fetch(
   new URL("./fonts/AnekLatin-Regular.ttf", import.meta.url)
+).then((res) => res.arrayBuffer());
+
+const fontSemiBoldPromise = fetch(
+  new URL("./fonts/AnekLatin-SemiBold.ttf", import.meta.url)
 ).then((res) => res.arrayBuffer());
 
 // ---------------------------------------------------------------------------
@@ -232,9 +232,9 @@ async function renderOGImage(
   content: React.JSX.Element,
   cacheSeconds: number
 ): Promise<ImageResponse> {
-  const [light, regular] = await Promise.all([
-    fontLightPromise,
+  const [regular, semiBold] = await Promise.all([
     fontRegularPromise,
+    fontSemiBoldPromise,
   ]);
   return new ImageResponse(content, {
     width: OG_WIDTH,
@@ -242,14 +242,14 @@ async function renderOGImage(
     fonts: [
       {
         name: "Anek Latin",
-        data: light,
-        weight: 300,
+        data: regular,
+        weight: 400,
         style: "normal" as const,
       },
       {
         name: "Anek Latin",
-        data: regular,
-        weight: 400,
+        data: semiBold,
+        weight: 600,
         style: "normal" as const,
       },
     ],
@@ -283,16 +283,16 @@ export function generateDefaultOGImage(): Promise<ImageResponse> {
         {/* biome-ignore lint/a11y/useAltText: OG image render context */}
         {/* biome-ignore lint/performance/noImgElement: Satori requires img */}
         <img
-          height={75}
+          height={88}
           src={LOGO_SVG}
-          style={{ width: 48, height: 75 }}
-          width={48}
+          style={{ width: 56, height: 88 }}
+          width={56}
         />
         <div
           style={{
             display: "flex",
-            fontSize: 64,
-            fontWeight: 400,
+            fontSize: 72,
+            fontWeight: 600,
             color: "#ffffff",
             marginTop: 8,
           }}
@@ -302,8 +302,8 @@ export function generateDefaultOGImage(): Promise<ImageResponse> {
         <div
           style={{
             display: "flex",
-            fontSize: 24,
-            fontWeight: 300,
+            fontSize: 28,
+            fontWeight: 400,
             color: "rgba(255,255,255,0.45)",
           }}
         >
@@ -334,12 +334,12 @@ export function generateDefaultOGImage(): Promise<ImageResponse> {
 type HubCard = { label: string; x: number; y: number };
 
 const HUB_CARDS: HubCard[] = [
-  { label: "Schedule", x: 120, y: 340 },
-  { label: "Swap", x: 300, y: 340 },
-  { label: "Transfer", x: 480, y: 340 },
-  { label: "Monitor", x: 660, y: 340 },
-  { label: "Notify", x: 840, y: 340 },
-  { label: "Condition", x: 1020, y: 340 },
+  { label: "Schedule", x: 100, y: 330 },
+  { label: "Swap", x: 290, y: 330 },
+  { label: "Transfer", x: 480, y: 330 },
+  { label: "Monitor", x: 670, y: 330 },
+  { label: "Notify", x: 860, y: 330 },
+  { label: "Condition", x: 1050, y: 330 },
 ];
 
 export function generateHubOGImage(): Promise<ImageResponse> {
@@ -353,9 +353,9 @@ export function generateHubOGImage(): Promise<ImageResponse> {
             key={`edge-${card.label}`}
             style={{
               position: "absolute",
-              left: card.x + 90,
-              top: card.y + 45,
-              width: next.x - card.x - 90,
+              left: card.x + 100,
+              top: card.y + 50,
+              width: next.x - card.x - 100,
               height: 2,
               backgroundColor: EDGE_COLOR,
             }}
@@ -371,9 +371,9 @@ export function generateHubOGImage(): Promise<ImageResponse> {
             position: "absolute",
             left: card.x,
             top: card.y,
-            width: 90,
-            height: 90,
-            borderRadius: 12,
+            width: 100,
+            height: 100,
+            borderRadius: 14,
             backgroundColor: CARD_COLOR,
             border: `1.5px solid ${NODE_BORDER_GREEN}`,
             display: "flex",
@@ -381,20 +381,20 @@ export function generateHubOGImage(): Promise<ImageResponse> {
             alignItems: "center",
             justifyContent: "center",
             boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
-            gap: 6,
+            gap: 8,
           }}
         >
           {/* biome-ignore lint/a11y/useAltText: OG image render context */}
           {/* biome-ignore lint/performance/noImgElement: Satori requires img */}
           <img
-            height={28}
+            height={32}
             src={HUB_ICONS[card.label] ?? ICON_ZAP}
-            style={{ width: 28, height: 28 }}
-            width={28}
+            style={{ width: 32, height: 32 }}
+            width={32}
           />
           <div
             style={{
-              fontSize: 10,
+              fontSize: 12,
               color: "rgba(255,255,255,0.55)",
               fontWeight: 400,
               textAlign: "center",
@@ -422,8 +422,8 @@ export function generateHubOGImage(): Promise<ImageResponse> {
         <div
           style={{
             display: "flex",
-            fontSize: 52,
-            fontWeight: 400,
+            fontSize: 58,
+            fontWeight: 600,
             color: "#ffffff",
             marginTop: 36,
             lineHeight: 1.15,
@@ -434,8 +434,8 @@ export function generateHubOGImage(): Promise<ImageResponse> {
         <div
           style={{
             display: "flex",
-            fontSize: 22,
-            fontWeight: 300,
+            fontSize: 24,
+            fontWeight: 400,
             color: "rgba(255,255,255,0.5)",
             marginTop: 14,
             lineHeight: 1.4,
@@ -667,10 +667,10 @@ function renderWorkflowOG(data: OGRenderData): Promise<ImageResponse> {
           node.position.y,
           viewport
         );
-        const nodeSquare = Math.max(ns * 0.65, 100);
+        const nodeSquare = Math.max(ns * 0.7, 110);
         const isTrigger = node.data.type === "trigger";
         const label = node.data.label ?? "";
-        const iconSize = Math.max(nodeSquare * 0.3, 26);
+        const iconSize = Math.max(nodeSquare * 0.32, 30);
 
         return (
           <div
@@ -681,7 +681,7 @@ function renderWorkflowOG(data: OGRenderData): Promise<ImageResponse> {
               top: pos.y + (ns - nodeSquare) / 2,
               width: nodeSquare,
               height: nodeSquare,
-              borderRadius: 12,
+              borderRadius: 14,
               backgroundColor: CARD_COLOR,
               border: `2px solid ${isTrigger ? NODE_BORDER_GREEN_BRIGHT : NODE_BORDER_GREEN}`,
               display: "flex",
@@ -689,7 +689,7 @@ function renderWorkflowOG(data: OGRenderData): Promise<ImageResponse> {
               alignItems: "center",
               justifyContent: "center",
               boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
-              gap: 6,
+              gap: 8,
             }}
           >
             {/* biome-ignore lint/a11y/useAltText: OG image render context */}
@@ -702,9 +702,9 @@ function renderWorkflowOG(data: OGRenderData): Promise<ImageResponse> {
             />
             <div
               style={{
-                fontSize: 11,
+                fontSize: 12,
                 color: "rgba(255,255,255,0.55)",
-                fontWeight: 300,
+                fontWeight: 400,
                 textAlign: "center",
                 padding: "0 6px",
               }}
@@ -732,8 +732,8 @@ function renderWorkflowOG(data: OGRenderData): Promise<ImageResponse> {
         <div
           style={{
             display: "flex",
-            fontSize: 52,
-            fontWeight: 400,
+            fontSize: 58,
+            fontWeight: 600,
             color: "#ffffff",
             marginTop: 36,
             lineHeight: 1.15,
@@ -745,8 +745,8 @@ function renderWorkflowOG(data: OGRenderData): Promise<ImageResponse> {
           <div
             style={{
               display: "flex",
-              fontSize: 22,
-              fontWeight: 300,
+              fontSize: 24,
+              fontWeight: 400,
               color: "rgba(255,255,255,0.5)",
               marginTop: 14,
               lineHeight: 1.4,
@@ -843,16 +843,16 @@ function Header(): React.JSX.Element {
         {/* biome-ignore lint/a11y/useAltText: OG image render context */}
         {/* biome-ignore lint/performance/noImgElement: Satori requires img */}
         <img
-          height={28}
+          height={32}
           src={LOGO_SVG}
-          style={{ width: 18, height: 28 }}
-          width={18}
+          style={{ width: 20, height: 32 }}
+          width={20}
         />
         <div
           style={{
             display: "flex",
-            fontSize: 20,
-            fontWeight: 400,
+            fontSize: 22,
+            fontWeight: 600,
             color: "rgba(255,255,255,0.85)",
           }}
         >
@@ -862,7 +862,7 @@ function Header(): React.JSX.Element {
       <div
         style={{
           display: "flex",
-          fontSize: 16,
+          fontSize: 18,
           color: "rgba(255,255,255,0.3)",
         }}
       >
@@ -886,8 +886,8 @@ function Footer({ children }: { children: ReactNode }): React.JSX.Element {
         alignItems: "flex-end",
         padding: "0 56px 36px",
         gap: 32,
-        fontSize: 18,
-        fontWeight: 300,
+        fontSize: 20,
+        fontWeight: 400,
         color: "rgba(255,255,255,0.45)",
       }}
     >
