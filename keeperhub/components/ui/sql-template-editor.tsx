@@ -567,6 +567,12 @@ export function SqlTemplateEditor({
         {
           triggerCharacters: ["@"],
           provideCompletionItems: (model, position) => {
+            // Only provide suggestions for our editor instance (the
+            // provider is registered at the language level, not per-editor)
+            if (model !== editorRef.current?.getModel()) {
+              return { suggestions: [] };
+            }
+
             const textUntilPosition = model.getValueInRange({
               startLineNumber: position.lineNumber,
               startColumn: 1,
