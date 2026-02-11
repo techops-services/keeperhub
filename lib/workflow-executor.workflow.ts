@@ -533,8 +533,10 @@ function processTemplates(
 /**
  * Resolve a display-format template (e.g. "Label.field") by searching outputs
  * for a node whose label matches, then resolving the field path from its data.
+ * Uses case-insensitive label matching to stay consistent with the UI-side
+ * findNodeOutputByLabel in lib/utils/template.ts.
  */
-function resolveDisplayTemplate(
+export function resolveDisplayTemplate(
   displayRef: string,
   outputs: NodeOutputs
 ): unknown {
@@ -543,15 +545,30 @@ function resolveDisplayTemplate(
     dotIndex === -1 ? displayRef : displayRef.substring(0, dotIndex);
   const fieldPath = dotIndex === -1 ? "" : displayRef.substring(dotIndex + 1);
 
-  for (const entry of Object.values(outputs)) {
-    if (entry.label === label) {
-      if (entry.data === null || entry.data === undefined) {
-        return null;
-      }
-      return resolveFromOutputData(entry.data, fieldPath) ?? null;
-    }
+  console.log("[DB Template] Resolving display template:", {
+    displayRef,
+    label,
+    fieldPath: fieldPath || "(whole output)",
+    availableLabels: Object.values(outputs).map((e) => e.label),
+  });
+
+  const entry = findOutputByLabel(label, outputs);
+  if (!entry) {
+    console.log("[DB Template] No node found with label:", label);
+    return null;
   }
-  return null;
+
+  if (entry.data === null || entry.data === undefined) {
+    console.log("[DB Template] Found node by label but data is null/undefined");
+    return null;
+  }
+
+  const resolved = resolveFromOutputData(entry.data, fieldPath) ?? null;
+  console.log("[DB Template] Display template resolved:", {
+    type: typeof resolved,
+    isNull: resolved === null,
+  });
+  return resolved;
 }
 
 /**
@@ -565,10 +582,16 @@ function resolveDisplayTemplate(
  * Surrounding SQL single quotes are consumed during replacement (e.g.
  * '{{...}}' -> $N) so the parameter is bound correctly.
  */
-function extractTemplateParameters(
+export function extractTemplateParameters(
   query: string,
   outputs: NodeOutputs
 ): { parameterizedQuery: string; paramValues: unknown[] } {
+  console.log("[DB Template] Extracting parameters:", {
+    queryPreview: query.length > 200 ? `${query.slice(0, 200)}...` : query,
+    outputNodeCount: Object.keys(outputs).length,
+    outputLabels: Object.values(outputs).map((e) => e.label),
+  });
+
   const paramValues: unknown[] = [];
   let paramIndex = 0;
 
@@ -594,15 +617,48 @@ function extractTemplateParameters(
     }
   );
 
+  console.log("[DB Template] Extraction complete:", {
+    paramCount: paramValues.length,
+    paramTypes: paramValues.map((v) => {
+      if (v === null) {
+        return "null";
+      }
+      if (Array.isArray(v)) {
+        return "array";
+      }
+      return typeof v;
+    }),
+  });
+
   return { parameterizedQuery: result, paramValues };
+}
+
+/**
+ * Find a node output by case-insensitive label matching.
+ * Used as a fallback when direct node ID lookup fails.
+ */
+function findOutputByLabel(
+  label: string,
+  outputs: NodeOutputs
+): { label: string; data: unknown } | undefined {
+  const normalizedLabel = label.toLowerCase().trim();
+  for (const entry of Object.values(outputs)) {
+    if (entry.label.toLowerCase().trim() === normalizedLabel) {
+      return entry;
+    }
+  }
+  return;
 }
 
 /**
  * Resolve a single template to its raw value (preserving native type).
  * Unlike replaceConfigTemplate which stringifies, this returns the native
  * type (number, string, boolean, etc.) for proper SQL parameterization.
+ *
+ * Falls back to case-insensitive label matching when the node ID lookup
+ * fails, keeping parity with the display-format resolution path.
  */
-function resolveTemplateToRawValue(
+export function resolveTemplateToRawValue(
   nodeId: string,
   rest: string,
   outputs: NodeOutputs
@@ -614,17 +670,49 @@ function resolveTemplateToRawValue(
     ? rest.substring(rest.indexOf(".") + 1).trim()
     : "";
 
-  if (!output) {
+  console.log("[DB Template] Resolving stored template:", {
+    nodeId: trimmedNodeId,
+    sanitizedNodeId,
+    fieldPath: fieldPath || "(whole output)",
+    outputKeys: Object.keys(outputs),
+    foundOutput: !!output,
+  });
+
+  const resolvedOutput = output ?? findOutputByLabelFallback(rest, outputs);
+
+  if (!resolvedOutput) {
+    console.log("[DB Template] No output found for node:", trimmedNodeId);
     return null;
   }
 
-  const data = output.data;
+  const data = resolvedOutput.data;
   if (data === null || data === undefined) {
+    console.log("[DB Template] Output data is null/undefined");
     return null;
   }
 
   const resolved = resolveFromOutputData(data, fieldPath);
+  console.log("[DB Template] Stored template resolved:", {
+    type: typeof resolved,
+    isNull: resolved === null || resolved === undefined,
+  });
   return resolved ?? null;
+}
+
+/**
+ * Attempt label-based fallback lookup, logging the result.
+ */
+function findOutputByLabelFallback(
+  rest: string,
+  outputs: NodeOutputs
+): { label: string; data: unknown } | undefined {
+  const dotIndex = rest.indexOf(".");
+  const label = dotIndex === -1 ? rest : rest.substring(0, dotIndex);
+  const result = findOutputByLabel(label, outputs);
+  if (result) {
+    console.log("[DB Template] Found node by label fallback:", label);
+  }
+  return result;
 }
 // end keeperhub code //
 
