@@ -52,22 +52,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     });
 
     const allChains = await db
-      .select({
-        id: chains.id,
-        chainId: chains.chainId,
-        name: chains.name,
-        symbol: chains.symbol,
-        chainType: chains.chainType,
-        defaultPrimaryRpc: chains.defaultPrimaryRpc,
-        defaultFallbackRpc: chains.defaultFallbackRpc,
-        defaultPrimaryWss: chains.defaultPrimaryWss,
-        defaultFallbackWss: chains.defaultFallbackWss,
-        isTestnet: chains.isTestnet,
-        isEnabled: chains.isEnabled,
-        createdAt: chains.createdAt,
-        updatedAt: chains.updatedAt,
-        gasConfig: chains.gasConfig,
-      })
+      .select()
       .from(chains)
       .where(eq(chains.isEnabled, true));
 
