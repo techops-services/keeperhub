@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { computeSelector } from "@/keeperhub/lib/abi-utils";
 import type { ActionConfigFieldBase } from "@/plugins";
 
 type FieldProps = {
@@ -52,9 +53,14 @@ export function AbiEventSelectField({
               return `${input.type}${indexed} ${input.name || "unnamed"}`;
             })
             .join(", ");
+          const inputTypes = inputs.map(
+            (input: { type: string }) => input.type
+          );
+          const selector = computeSelector(event.name, inputTypes);
           return {
             name: event.name,
             label: `${event.name}(${params})`,
+            selector,
           };
         });
     } catch {
@@ -81,7 +87,12 @@ export function AbiEventSelectField({
         {events.map((event) => (
           <SelectItem key={event.name} value={event.name}>
             <div className="flex flex-col items-start">
-              <span>{event.label}</span>
+              <span>
+                {event.label}{" "}
+                <code className="text-muted-foreground text-xs">
+                  ({event.selector})
+                </code>
+              </span>
             </div>
           </SelectItem>
         ))}
