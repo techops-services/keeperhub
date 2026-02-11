@@ -271,12 +271,31 @@ export function EditConnectionOverlay({
     return null;
   };
 
+  /**
+   * Build non-empty config for sending as overrides to the server-side test.
+   */
+  const getNonEmptyConfig = (): Record<string, string> => {
+    const result: Record<string, string> = {};
+    for (const [key, value] of Object.entries(config)) {
+      if (value && value.length > 0) {
+        result[key] = value;
+      }
+    }
+    return result;
+  };
+
   const runConnectionTest = (): Promise<{
     status: "success" | "error";
     message: string;
   }> => {
-    if (integration.type === "database" && !hasNewDatabaseSecrets) {
-      return api.integration.testConnection(integration.id);
+    // For database integrations, always test server-side. The server merges
+    // any config overrides with stored secrets before testing.
+    if (integration.type === "database") {
+      const overrides = getNonEmptyConfig();
+      return api.integration.testConnection(
+        integration.id,
+        Object.keys(overrides).length > 0 ? overrides : undefined
+      );
     }
     const hasNewConfig = Object.values(config).some((v) => v && v.length > 0);
     if (hasNewConfig) {
@@ -289,15 +308,15 @@ export function EditConnectionOverlay({
   };
 
   /**
-   * For database integrations without new secrets, returns true so that
-   * handleSave skips the client-side pre-save connection test.
+   * Returns true when there is no config to test (name-only change for
+   * non-database integrations). Database integrations always test server-side.
    */
   const shouldSkipPreSaveTest = (): boolean => {
-    const hasNewConfig = Object.values(config).some((v) => v && v.length > 0);
-    if (!hasNewConfig) {
-      return true;
+    if (integration.type === "database") {
+      return false;
     }
-    return integration.type === "database" && !hasNewDatabaseSecrets;
+    const hasNewConfig = Object.values(config).some((v) => v && v.length > 0);
+    return !hasNewConfig;
   };
   // end keeperhub code //
 
@@ -319,10 +338,7 @@ export function EditConnectionOverlay({
 
     setSaving(true);
     try {
-      const result = await api.integration.testCredentials({
-        type: integration.type,
-        config,
-      });
+      const result = await runConnectionTest();
 
       if (result.status === "error") {
         setSaving(false);
