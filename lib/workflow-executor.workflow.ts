@@ -803,7 +803,7 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
       // Store null output for disabled nodes so downstream templates don't fail
       const sanitizedNodeId = nodeId.replace(/[^a-zA-Z0-9]/g, "_");
       outputs[sanitizedNodeId] = {
-        label: node.data.label || nodeId,
+        label: getNodeName(node),
         data: null,
       };
 
@@ -995,7 +995,7 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
       // Store outputs with sanitized nodeId for template variable lookup
       const sanitizedNodeId = nodeId.replace(/[^a-zA-Z0-9]/g, "_");
       outputs[sanitizedNodeId] = {
-        label: node.data.label || nodeId,
+        label: getNodeName(node),
         data: result.data,
       };
 
