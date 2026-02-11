@@ -1,12 +1,11 @@
 // start custom keeperhub code //
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { authenticateInternalService } from "@/keeperhub/lib/internal-service-auth";
 import { db } from "@/lib/db";
 import { type Chain, chains, workflows } from "@/lib/db/schema";
 import type { WorkflowNode } from "@/lib/workflow-store";
-import { WorkflowTriggerEnum } from "@/lib/workflow-store";
 
 export async function GET(request: Request): Promise<NextResponse> {
   const auth = authenticateInternalService(request);
@@ -21,7 +20,13 @@ export async function GET(request: Request): Promise<NextResponse> {
     const { searchParams } = new URL(request.url);
     const filterActive = searchParams.get("active") === "true";
 
-    const query = db
+    const blockTriggerFilter = sql`${workflows.nodes} @> '[{"data":{"type":"trigger","config":{"triggerType":"Block"}}}]'::jsonb`;
+
+    const conditions = filterActive
+      ? and(eq(workflows.enabled, true), blockTriggerFilter)
+      : blockTriggerFilter;
+
+    const matchedWorkflows = await db
       .select({
         id: workflows.id,
         name: workflows.name,
@@ -30,49 +35,21 @@ export async function GET(request: Request): Promise<NextResponse> {
         enabled: workflows.enabled,
         nodes: workflows.nodes,
       })
-      .from(workflows);
+      .from(workflows)
+      .where(conditions);
 
-    const allWorkflows = filterActive
-      ? await query.where(eq(workflows.enabled, true))
-      : await query;
-
-    const blockWorkflows = allWorkflows
-      .map((workflow) => {
-        try {
-          const nodes = workflow.nodes as WorkflowNode[];
-          if (!Array.isArray(nodes)) {
-            return null;
-          }
-
-          const triggerNode = nodes.find(
-            (node) => node.data?.type === "trigger"
-          );
-
-          if (!triggerNode) {
-            return null;
-          }
-
-          const triggerType = triggerNode.data?.config?.triggerType as
-            | string
-            | undefined;
-
-          if (triggerType !== WorkflowTriggerEnum.BLOCK) {
-            return null;
-          }
-
-          return {
-            id: workflow.id,
-            name: workflow.name,
-            userId: workflow.userId,
-            organizationId: workflow.organizationId,
-            enabled: workflow.enabled,
-            nodes: [triggerNode],
-          };
-        } catch {
-          return null;
-        }
-      })
-      .filter((workflow) => workflow !== null);
+    const blockWorkflows = matchedWorkflows.map((workflow) => {
+      const nodes = workflow.nodes as WorkflowNode[];
+      const triggerNode = nodes.find((node) => node.data?.type === "trigger");
+      return {
+        id: workflow.id,
+        name: workflow.name,
+        userId: workflow.userId,
+        organizationId: workflow.organizationId,
+        enabled: workflow.enabled,
+        nodes: triggerNode ? [triggerNode] : [],
+      };
+    });
 
     const allChains = await db
       .select({
