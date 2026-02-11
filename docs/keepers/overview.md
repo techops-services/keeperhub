@@ -122,6 +122,17 @@ Post messages to Slack channels.
 - Channel selection
 - Message content
 
+#### Send Telegram Message
+Send messages to Telegram chats and channels.
+
+**Configuration:**
+- Connection (Telegram bot token)
+- Chat ID (numeric ID or @username)
+- Message content
+- Parse mode (plain text or MarkdownV2)
+
+**Output:** Success status, message ID
+
 ### Integration Actions
 
 #### Send Webhook

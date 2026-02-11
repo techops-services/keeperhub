@@ -1,6 +1,6 @@
 ---
 title: "Notification Connections"
-description: "Configure Email, Discord, Slack, and Webhook connections for KeeperHub notifications."
+description: "Configure Email, Discord, Slack, Telegram, and Webhook connections for KeeperHub notifications."
 ---
 
 # Notification Connections
@@ -56,6 +56,31 @@ Connect to Slack workspaces for team notifications.
 - Workspace and channel targeting
 - Thread support for organized conversations
 - Mention capabilities for urgent alerts
+
+### Telegram
+
+Send messages to Telegram chats and channels via bot API.
+
+**Setup:**
+1. Create a Telegram bot using [BotFather](https://core.telegram.org/bots/tutorial)
+2. Copy the bot token provided by BotFather
+3. In KeeperHub, click **Add Connection** and select Telegram
+4. Paste your bot token and save
+
+**Features:**
+- Send messages to any chat, group, or channel
+- Support for plain text and MarkdownV2 formatting
+- Dynamic variables from workflow data
+
+**Configuration Fields:**
+
+| Field | Description |
+|-------|-------------|
+| Chat ID | Numeric chat ID or `@channelusername` |
+| Message | Message content (supports dynamic variables) |
+| Parse Mode | Plain text or MarkdownV2 |
+
+**MarkdownV2 Note:** When using MarkdownV2 parse mode, special characters (`.`, `-`, `_`, `*`, `[`, `]`, `(`, `)`, `~`, `` ` ``, `>`, `#`, `+`, `=`, `|`, `{`, `}`, `!`) must be escaped with a backslash (`\`).
 
 ### Webhook
 

@@ -20,6 +20,7 @@ export type WorkflowData = {
   // start custom keeperhub code //
   category?: string | null;
   protocol?: string | null;
+  projectId?: string | null;
   // end keeperhub code //
 };
 
@@ -35,6 +36,7 @@ export type SavedWorkflow = WorkflowData & {
   featured?: boolean;
   category?: string | null;
   protocol?: string | null;
+  projectId?: string | null;
   featuredOrder?: number;
   // end custom KeeperHub code
 };
@@ -747,12 +749,52 @@ export const aiGatewayApi = {
     }),
 };
 
+// start custom keeperhub code //
+export type Project = {
+  id: string;
+  name: string;
+  description: string | null;
+  color: string | null;
+  workflowCount: number;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const projectApi = {
+  getAll: () => apiCall<Project[]>("/api/projects"),
+
+  create: (data: { name: string; description?: string; color?: string }) =>
+    apiCall<Project>("/api/projects", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  update: (
+    id: string,
+    data: { name?: string; description?: string; color?: string }
+  ) =>
+    apiCall<Project>(`/api/projects/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    apiCall<{ success: boolean }>(`/api/projects/${id}`, {
+      method: "DELETE",
+    }),
+};
+// end keeperhub code //
+
 // Export all APIs as a single object
 export const api = {
   ai: aiApi,
   aiGateway: aiGatewayApi,
   integration: integrationApi,
   organization: organizationApi,
+  // start custom keeperhub code //
+  project: projectApi,
+  // end keeperhub code //
   user: userApi,
   workflow: workflowApi,
 };

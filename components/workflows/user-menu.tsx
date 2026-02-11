@@ -2,17 +2,15 @@
 
 import {
   Bookmark,
+  FolderOpen,
   Github,
   Key,
   LogOut,
-  Moon,
   Plug,
   Settings,
-  Sun,
   Users,
   Wallet,
 } from "lucide-react";
-import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import {
   AuthDialog,
@@ -29,18 +27,14 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 // start custom keeperhub code //
 import { ManageOrgsModal } from "@/keeperhub/components/organization/manage-orgs-modal";
 import { AddressBookOverlay } from "@/keeperhub/components/overlays/address-book-overlay";
 import { FeedbackOverlay } from "@/keeperhub/components/overlays/feedback-overlay";
+import { ProjectsOverlay } from "@/keeperhub/components/overlays/projects-overlay";
 import { WalletOverlay } from "@/keeperhub/components/overlays/wallet-overlay";
 import { useOrganization } from "@/keeperhub/lib/hooks/use-organization";
 // end keeperhub code //
@@ -49,7 +43,6 @@ import { signOut, useSession } from "@/lib/auth-client";
 
 export const UserMenu = () => {
   const { data: session, isPending } = useSession();
-  const { theme, setTheme } = useTheme();
   const { open: openOverlay } = useOverlay();
   const [providerId, setProviderId] = useState<string | null>(null);
   const [orgModalOpen, setOrgModalOpen] = useState(false);
@@ -203,24 +196,12 @@ export const UserMenu = () => {
             <span>Address Book</span>
           </DropdownMenuItem>
           {/* end keeperhub code */}
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <Sun className="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-              <Moon className="absolute size-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-              <span>Theme</span>
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent>
-              <DropdownMenuRadioGroup onValueChange={setTheme} value={theme}>
-                <DropdownMenuRadioItem value="light">
-                  Light
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="dark">Dark</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="system">
-                  System
-                </DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
+          {/* start custom keeperhub code */}
+          <DropdownMenuItem onClick={() => openOverlay(ProjectsOverlay)}>
+            <FolderOpen className="size-4" />
+            <span>Projects</span>
+          </DropdownMenuItem>
+          {/* end keeperhub code */}
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleLogout}>
             <LogOut className="size-4" />

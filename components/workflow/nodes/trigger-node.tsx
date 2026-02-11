@@ -1,7 +1,7 @@
 "use client";
 
 import type { NodeProps } from "@xyflow/react";
-import { Boxes, Check, Clock, Play, Webhook, XCircle } from "lucide-react";
+import { Box, Boxes, Check, Clock, Play, Webhook, XCircle } from "lucide-react";
 import { type ElementType, memo } from "react";
 import {
   Node,
@@ -35,6 +35,7 @@ export const TriggerNode = memo(({ data, selected, id }: TriggerNodeProps) => {
     [WorkflowTriggerEnum.SCHEDULE]: Clock,
     [WorkflowTriggerEnum.WEBHOOK]: Webhook,
     [WorkflowTriggerEnum.EVENT]: Boxes, // keeperhub custom field //
+    [WorkflowTriggerEnum.BLOCK]: Box, // keeperhub custom field //
   };
 
   const TriggerIcon = triggerIcons[triggerType as WorkflowTriggerType] || Play;

@@ -29,6 +29,7 @@ import {
   currentWorkflowDescriptionAtom,
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
+  currentWorkflowProjectIdAtom,
   currentWorkflowProtocolAtom,
   currentWorkflowVisibilityAtom,
   edgesAtom,
@@ -149,6 +150,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   );
   const setCurrentWorkflowCategory = useSetAtom(currentWorkflowCategoryAtom);
   const setCurrentWorkflowProtocol = useSetAtom(currentWorkflowProtocolAtom);
+  const setCurrentWorkflowProjectId = useSetAtom(currentWorkflowProjectIdAtom);
   const updateNodeData = useSetAtom(updateNodeDataAtom);
   const setHasUnsavedChanges = useSetAtom(hasUnsavedChangesAtom);
   const [workflowNotFound, setWorkflowNotFound] = useAtom(workflowNotFoundAtom);
@@ -415,6 +417,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
       setIsWorkflowEnabled(workflow.enabled ?? false); // keeperhub custom field //
       setCurrentWorkflowCategory(workflow.category ?? "");
       setCurrentWorkflowProtocol(workflow.protocol ?? "");
+      setCurrentWorkflowProjectId(workflow.projectId ?? null);
       setHasUnsavedChanges(false);
       setWorkflowNotFound(false);
 
@@ -451,6 +454,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
     setIsWorkflowEnabled, // keeperhub custom field //
     setCurrentWorkflowCategory,
     setCurrentWorkflowProtocol,
+    setCurrentWorkflowProjectId,
     setHasUnsavedChanges,
     setWorkflowNotFound,
     setCurrentWorkflowDescription,

@@ -40,11 +40,11 @@ export async function generateMetadata({
   }
 
   const baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL || "https://workflow-builder.dev";
+    process.env.NEXT_PUBLIC_APP_URL || "https://app.keeperhub.com";
   const workflowUrl = `${baseUrl}/workflows/${workflowId}`;
   const ogImageUrl = isPublic
     ? `${baseUrl}/api/og/workflow/${workflowId}`
-    : `${baseUrl}/og-default.png`;
+    : `${baseUrl}/api/og/default`;
 
   return {
     title: `${title} | KeeperHub`,

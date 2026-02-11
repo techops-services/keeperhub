@@ -1,6 +1,6 @@
 "use client";
 
-import { Boxes, Clock, Copy, Play, Webhook } from "lucide-react";
+import { Box, Boxes, Clock, Copy, Play, Webhook } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { CodeEditor } from "@/components/ui/code-editor";
@@ -34,6 +34,20 @@ export function TriggerConfig({
   const webhookUrl = workflowId
     ? `${typeof window !== "undefined" ? window.location.origin : ""}/api/workflows/${workflowId}/webhook`
     : "";
+
+  // start custom keeperhub code //
+  const handleConfigValue = (key: string, value: unknown): void => {
+    let stringValue: string;
+    if (typeof value === "string") {
+      stringValue = value;
+    } else if (typeof value === "object" && value !== null) {
+      stringValue = JSON.stringify(value);
+    } else {
+      stringValue = String(value);
+    }
+    onUpdateConfig(key, stringValue);
+  };
+  // end keeperhub code //
 
   const handleCopyWebhookUrl = () => {
     if (webhookUrl) {
@@ -82,6 +96,12 @@ export function TriggerConfig({
                 Event
               </div>
             </SelectItem>
+            <SelectItem value="Block">
+              <div className="flex items-center gap-2">
+                <Box className="h-4 w-4" />
+                Block
+              </div>
+            </SelectItem>
             {/* end custom keeperhub code // */}
           </SelectContent>
         </Select>
@@ -115,13 +135,18 @@ export function TriggerConfig({
               onChange={(schema) =>
                 onUpdateConfig("webhookSchema", JSON.stringify(schema))
               }
-              schema={
-                config?.webhookSchema
-                  ? (JSON.parse(
-                      config.webhookSchema as string
-                    ) as SchemaField[])
-                  : []
-              }
+              schema={(() => {
+                if (!config?.webhookSchema) {
+                  return [];
+                }
+                try {
+                  return JSON.parse(
+                    config.webhookSchema as string
+                  ) as SchemaField[];
+                } catch {
+                  return [];
+                }
+              })()}
             />
             <p className="text-muted-foreground text-xs">
               Define the expected structure of the incoming webhook payload.
@@ -230,21 +255,60 @@ export function TriggerConfig({
               config={config}
               disabled={disabled}
               fields={eventFields}
-              onUpdateConfig={(key: string, value: unknown) => {
-                // Convert value to string for storage
-                // For JSON values (like ABI), they're already strings
-                // For other types, convert appropriately
-                let stringValue: string;
-                if (typeof value === "string") {
-                  stringValue = value;
-                } else if (typeof value === "object" && value !== null) {
-                  stringValue = JSON.stringify(value);
-                } else {
-                  stringValue = String(value);
-                }
-                onUpdateConfig(key, stringValue);
-              }}
+              onUpdateConfig={handleConfigValue}
             />
+          );
+        })()}
+      {/* Block fields */}
+      {config?.triggerType === "Block" &&
+        (() => {
+          const blockFields: ActionConfigField[] = [
+            {
+              key: "network",
+              label: "Network",
+              type: "chain-select",
+              chainTypeFilter: "evm",
+              placeholder: "Select network",
+              required: true,
+            },
+          ];
+
+          return (
+            <>
+              <ActionConfigRenderer
+                config={config}
+                disabled={disabled}
+                fields={blockFields}
+                onUpdateConfig={handleConfigValue}
+              />
+              <div className="space-y-2">
+                <Label className="ml-1" htmlFor="blockInterval">
+                  Block Interval <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  disabled={disabled}
+                  id="blockInterval"
+                  min={1}
+                  onChange={(e) => {
+                    const parsed = Number.parseInt(e.target.value, 10);
+                    if (e.target.value === "") {
+                      onUpdateConfig("blockInterval", "");
+                      return;
+                    }
+                    if (Number.isNaN(parsed) || parsed < 1) {
+                      return;
+                    }
+                    onUpdateConfig("blockInterval", String(parsed));
+                  }}
+                  placeholder="1 = every block, 10 = every 10th block"
+                  type="number"
+                  value={(config?.blockInterval as string) || ""}
+                />
+                <p className="text-muted-foreground text-xs">
+                  Fire the workflow every N blocks on the selected network.
+                </p>
+              </div>
+            </>
           );
         })()}
       {/* end custom keeperhub code // */}

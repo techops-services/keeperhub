@@ -148,6 +148,27 @@ export const addressBookEntry = pgTable(
   },
   (table) => [index("idx_address_book_org").on(table.organizationId)]
 );
+
+export const projects = pgTable(
+  "projects",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => generateId()),
+    name: text("name").notNull(),
+    description: text("description"),
+    color: text("color"),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [index("idx_projects_org").on(table.organizationId)]
+);
 // end keeperhub code //
 
 // Workflow visibility type
@@ -172,6 +193,9 @@ export const workflows = pgTable("workflows", {
   category: text("category"),
   protocol: text("protocol"),
   featuredOrder: integer("featured_order").default(0),
+  projectId: text("project_id").references(() => projects.id, {
+    onDelete: "set null",
+  }),
   // end keeperhub code //
   // biome-ignore lint/suspicious/noExplicitAny: JSONB type - structure validated at application level
   nodes: jsonb("nodes").notNull().$type<any[]>(),
@@ -448,6 +472,7 @@ export const organizationRelations = relations(organization, ({ many }) => ({
   members: many(member),
   invitations: many(invitation),
   addressBookEntries: many(addressBookEntry),
+  projects: many(projects),
 }));
 
 export const memberRelations = relations(member, ({ one }) => ({
@@ -485,6 +510,25 @@ export const addressBookEntryRelations = relations(
     }),
   })
 );
+
+export const projectsRelations = relations(projects, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [projects.organizationId],
+    references: [organization.id],
+  }),
+  creator: one(users, {
+    fields: [projects.userId],
+    references: [users.id],
+  }),
+  workflows: many(workflows),
+}));
+
+export const workflowsRelations = relations(workflows, ({ one }) => ({
+  project: one(projects, {
+    fields: [workflows.projectId],
+    references: [projects.id],
+  }),
+}));
 // end keeperhub code //
 
 export const chainsRelations = relations(chains, ({ one, many }) => ({
@@ -541,6 +585,8 @@ export type Invitation = typeof invitation.$inferSelect;
 export type NewInvitation = typeof invitation.$inferInsert;
 export type AddressBookEntry = typeof addressBookEntry.$inferSelect;
 export type NewAddressBookEntry = typeof addressBookEntry.$inferInsert;
+export type Project = typeof projects.$inferSelect;
+export type NewProject = typeof projects.$inferInsert;
 // end keeperhub code //
 export type Chain = typeof chains.$inferSelect;
 export type NewChain = typeof chains.$inferInsert;
