@@ -486,12 +486,15 @@ function replaceConfigTemplate(
     return "";
   }
 
-  console.log(
-    "[Template] Resolved, type:",
-    typeof resolved,
-    Array.isArray(resolved) ? "array" : ""
-  );
-  return formatConfigValue(resolved);
+  const formatted = formatConfigValue(resolved);
+  console.log("[Template] Resolved:", {
+    type: typeof resolved,
+    isArray: Array.isArray(resolved),
+    formattedLength: formatted.length,
+    preview:
+      formatted.length > 100 ? `${formatted.slice(0, 100)}...` : formatted,
+  });
+  return formatted;
 }
 
 /**
@@ -525,6 +528,103 @@ function processTemplates(
   }
 
   return processed;
+}
+
+/**
+ * Resolve a display-format template (e.g. "Label.field") by searching outputs
+ * for a node whose label matches, then resolving the field path from its data.
+ */
+function resolveDisplayTemplate(
+  displayRef: string,
+  outputs: NodeOutputs
+): unknown {
+  const dotIndex = displayRef.indexOf(".");
+  const label =
+    dotIndex === -1 ? displayRef : displayRef.substring(0, dotIndex);
+  const fieldPath = dotIndex === -1 ? "" : displayRef.substring(dotIndex + 1);
+
+  for (const entry of Object.values(outputs)) {
+    if (entry.label === label) {
+      if (entry.data === null || entry.data === undefined) {
+        return null;
+      }
+      return resolveFromOutputData(entry.data, fieldPath) ?? null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Extract template references from a SQL query string and convert them to
+ * PostgreSQL parameterized query placeholders ($1, $2, ...).
+ * Returns the parameterized SQL and an ordered array of resolved values,
+ * preserving native types for proper SQL parameterization.
+ *
+ * Handles both stored format {{@nodeId:Label.field}} and display format
+ * {{Label.field}} (fallback when the editor doesn't convert to stored format).
+ * Surrounding SQL single quotes are consumed during replacement (e.g.
+ * '{{...}}' -> $N) so the parameter is bound correctly.
+ */
+function extractTemplateParameters(
+  query: string,
+  outputs: NodeOutputs
+): { parameterizedQuery: string; paramValues: unknown[] } {
+  const paramValues: unknown[] = [];
+  let paramIndex = 0;
+
+  // First pass: handle stored format '?{{@nodeId:Label.field}}'? (optional quotes)
+  let result = query.replace(
+    /'?\{\{@([^:]+):([^}]+)\}\}'?/g,
+    (_match: string, nodeId: string, rest: string) => {
+      const resolved = resolveTemplateToRawValue(nodeId, rest, outputs);
+      paramIndex++;
+      paramValues.push(resolved);
+      return `$${paramIndex}`;
+    }
+  );
+
+  // Second pass: handle display format '?{{Label.field}}'? (optional quotes)
+  result = result.replace(
+    /'?\{\{([^@}][^}]*)\}\}'?/g,
+    (_match: string, displayRef: string) => {
+      const resolved = resolveDisplayTemplate(displayRef, outputs);
+      paramIndex++;
+      paramValues.push(resolved);
+      return `$${paramIndex}`;
+    }
+  );
+
+  return { parameterizedQuery: result, paramValues };
+}
+
+/**
+ * Resolve a single template to its raw value (preserving native type).
+ * Unlike replaceConfigTemplate which stringifies, this returns the native
+ * type (number, string, boolean, etc.) for proper SQL parameterization.
+ */
+function resolveTemplateToRawValue(
+  nodeId: string,
+  rest: string,
+  outputs: NodeOutputs
+): unknown {
+  const trimmedNodeId = nodeId.trim();
+  const sanitizedNodeId = trimmedNodeId.replace(/[^a-zA-Z0-9]/g, "_");
+  const output = outputs[sanitizedNodeId] ?? outputs[trimmedNodeId];
+  const fieldPath = rest.includes(".")
+    ? rest.substring(rest.indexOf(".") + 1).trim()
+    : "";
+
+  if (!output) {
+    return null;
+  }
+
+  const data = output.data;
+  if (data === null || data === undefined) {
+    return null;
+  }
+
+  const resolved = resolveFromOutputData(data, fieldPath);
+  return resolved ?? null;
 }
 // end keeperhub code //
 
@@ -710,20 +810,43 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
           return;
         }
 
-        // Process templates in config, but keep condition unprocessed for special handling
-        const configWithoutCondition = { ...config };
+        // Process templates in config, but keep condition and dbQuery unprocessed for special handling
+        const configWithoutSpecial = { ...config };
         const originalCondition = config.condition;
-        configWithoutCondition.condition = undefined;
+        configWithoutSpecial.condition = undefined;
+        // start custom keeperhub code //
+        const originalDbQuery = config.dbQuery;
+        if (actionType === "Database Query") {
+          configWithoutSpecial.dbQuery = undefined;
+        }
+        // end keeperhub code //
 
-        const processedConfig = processTemplates(
-          configWithoutCondition,
-          outputs
-        );
+        const processedConfig = processTemplates(configWithoutSpecial, outputs);
 
         // Add back the original condition (unprocessed)
         if (originalCondition !== undefined) {
           processedConfig.condition = originalCondition;
         }
+
+        // start custom keeperhub code //
+        // For Database Query, use parameterized queries instead of raw interpolation
+        if (
+          actionType === "Database Query" &&
+          typeof originalDbQuery === "string"
+        ) {
+          const { parameterizedQuery, paramValues } = extractTemplateParameters(
+            originalDbQuery,
+            outputs
+          );
+          processedConfig.dbQuery = parameterizedQuery;
+          processedConfig._dbParams = paramValues;
+        } else if (
+          actionType === "Database Query" &&
+          originalDbQuery !== undefined
+        ) {
+          processedConfig.dbQuery = originalDbQuery;
+        }
+        // end keeperhub code //
 
         // Build step context for logging (stepHandler will handle the logging)
         const stepContext: StepContext = {

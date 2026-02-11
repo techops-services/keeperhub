@@ -25,6 +25,9 @@ export type DatabaseQueryInput = StepInput & {
   integrationId?: string;
   dbQuery?: string;
   query?: string;
+  // start custom keeperhub code //
+  _dbParams?: unknown[];
+  // end keeperhub code //
 };
 
 function validateInput(input: DatabaseQueryInput): string | null {
@@ -51,8 +54,28 @@ function createDatabaseClient(
 
 async function executeQuery(
   client: postgres.Sql,
-  queryString: string
+  queryString: string,
+  // start custom keeperhub code //
+  params?: unknown[]
+  // end keeperhub code //
 ): Promise<unknown> {
+  // start custom keeperhub code //
+  if (params && params.length > 0) {
+    const serialized = params.map((p) => {
+      if (p === null || p === undefined) {
+        return null;
+      }
+      if (typeof p === "object") {
+        return JSON.stringify(p);
+      }
+      return p;
+    });
+    return await client.unsafe(
+      queryString,
+      serialized as postgres.SerializableParameter[]
+    );
+  }
+  // end keeperhub code //
   const db = drizzle(client);
   return await db.execute(sql.raw(queryString));
 }
@@ -102,7 +125,9 @@ async function databaseQuery(
 
   try {
     client = createDatabaseClient(normalizedUrl, ssl);
-    const result = await executeQuery(client, queryString);
+    // start custom keeperhub code //
+    const result = await executeQuery(client, queryString, input._dbParams);
+    // end keeperhub code //
     return {
       success: true,
       rows: result,
