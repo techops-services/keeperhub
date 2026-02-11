@@ -2,6 +2,7 @@
 # Stage 1: Dependencies
 FROM node:25-alpine AS deps
 RUN apk add --no-cache libc6-compat
+RUN wget -O /etc/ssl/certs/rds-combined-ca-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
 WORKDIR /app
 
 # Install pnpm
@@ -45,6 +46,7 @@ RUN pnpm build
 FROM node:25-alpine AS migrator
 WORKDIR /app
 RUN npm install -g pnpm tsx
+COPY --from=deps /etc/ssl/certs/rds-combined-ca-bundle.pem /etc/ssl/certs/rds-combined-ca-bundle.pem
 
 # Copy dependencies, migration files, and seed scripts
 COPY --from=deps /app/node_modules ./node_modules
@@ -81,6 +83,7 @@ RUN --mount=type=cache,id=pnpm-scheduler,target=/root/.local/share/pnpm/store \
 FROM node:25-alpine AS scheduler
 WORKDIR /app
 RUN npm install -g tsx
+COPY --from=deps /etc/ssl/certs/rds-combined-ca-bundle.pem /etc/ssl/certs/rds-combined-ca-bundle.pem
 
 # Copy ONLY scheduler dependencies (not full node_modules - saves ~1.7GB)
 COPY --from=scheduler-deps /app/node_modules ./node_modules
@@ -104,6 +107,7 @@ ENV NODE_ENV=production
 FROM node:25-alpine AS workflow-runner
 WORKDIR /app
 RUN npm install -g pnpm tsx
+COPY --from=deps /etc/ssl/certs/rds-combined-ca-bundle.pem /etc/ssl/certs/rds-combined-ca-bundle.pem
 
 # Copy dependencies and workflow execution files
 COPY --from=deps /app/node_modules ./node_modules
@@ -142,6 +146,8 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+
+COPY --from=deps /etc/ssl/certs/rds-combined-ca-bundle.pem /etc/ssl/certs/rds-combined-ca-bundle.pem
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs

@@ -1,4 +1,7 @@
 shared_env: &shared_env
+  NODE_EXTRA_CA_CERTS:
+    type: kv
+    value: "/etc/ssl/certs/rds-combined-ca-bundle.pem"
   DATABASE_URL:
     type: parameterStore
     name: db-url
