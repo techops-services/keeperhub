@@ -274,6 +274,7 @@ export class AdaptiveGasStrategy {
     let multiplier: number;
     if (gasLimitMultiplierOverride && gasLimitMultiplierOverride > 0) {
       multiplier = gasLimitMultiplierOverride;
+      console.log(`[GasStrategy] Using override multiplier: ${multiplier}x`);
     } else if (this.isTimeSensitive(triggerType)) {
       multiplier = chainConfig.gasLimitMultiplierConservative;
     } else {

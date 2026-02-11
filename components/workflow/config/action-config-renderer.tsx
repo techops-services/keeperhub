@@ -120,6 +120,7 @@ function NumberInputField({ field, value, onChange, disabled }: FieldProps) {
     <Input
       disabled={disabled}
       id={field.key}
+      max={field.max}
       min={field.min}
       onChange={(e) => onChange(e.target.value)}
       placeholder={field.placeholder}

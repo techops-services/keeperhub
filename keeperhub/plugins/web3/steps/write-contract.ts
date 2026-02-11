@@ -228,8 +228,7 @@ async function stepHandler(
     workflowId,
     chainId,
     rpcUrl,
-    triggerType:
-      (_context.triggerType as TransactionContext["triggerType"]) ?? undefined,
+    triggerType: _context.triggerType as TransactionContext["triggerType"],
   };
 
   // Execute transaction with nonce management and gas strategy

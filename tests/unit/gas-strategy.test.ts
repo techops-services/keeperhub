@@ -560,6 +560,117 @@ describe("AdaptiveGasStrategy", () => {
     });
   });
 
+  describe("gas limit multiplier override", () => {
+    it("should use override multiplier when provided", async () => {
+      const strategy = new AdaptiveGasStrategy({
+        gasLimitMultiplier: 2.0,
+      });
+      const provider = createMockProvider();
+
+      const config = await strategy.getGasConfig(
+        provider as unknown as import("ethers").Provider,
+        "manual",
+        BigInt(100_000),
+        1,
+        3.0
+      );
+
+      // Override 3.0x should take precedence over default 2.0x
+      expect(config.gasLimit).toBe(BigInt(300_000));
+    });
+
+    it("should use override multiplier even for time-sensitive triggers", async () => {
+      const strategy = new AdaptiveGasStrategy({
+        gasLimitMultiplier: 2.0,
+        gasLimitMultiplierConservative: 2.5,
+      });
+      const provider = createMockProvider();
+
+      const config = await strategy.getGasConfig(
+        provider as unknown as import("ethers").Provider,
+        "event",
+        BigInt(100_000),
+        1,
+        4.0
+      );
+
+      // Override 4.0x should take precedence over conservative 2.5x
+      expect(config.gasLimit).toBe(BigInt(400_000));
+    });
+
+    it("should ignore override when zero", async () => {
+      const strategy = new AdaptiveGasStrategy({
+        gasLimitMultiplier: 2.0,
+      });
+      const provider = createMockProvider();
+
+      const config = await strategy.getGasConfig(
+        provider as unknown as import("ethers").Provider,
+        "scheduled",
+        BigInt(100_000),
+        1,
+        0
+      );
+
+      // Should fall back to default 2.0x
+      expect(config.gasLimit).toBe(BigInt(200_000));
+    });
+
+    it("should ignore override when negative", async () => {
+      const strategy = new AdaptiveGasStrategy({
+        gasLimitMultiplier: 2.0,
+      });
+      const provider = createMockProvider();
+
+      const config = await strategy.getGasConfig(
+        provider as unknown as import("ethers").Provider,
+        "scheduled",
+        BigInt(100_000),
+        1,
+        -1.5
+      );
+
+      // Should fall back to default 2.0x
+      expect(config.gasLimit).toBe(BigInt(200_000));
+    });
+
+    it("should ignore override when undefined", async () => {
+      const strategy = new AdaptiveGasStrategy({
+        gasLimitMultiplier: 2.0,
+      });
+      const provider = createMockProvider();
+
+      const config = await strategy.getGasConfig(
+        provider as unknown as import("ethers").Provider,
+        "scheduled",
+        BigInt(100_000),
+        1,
+        undefined
+      );
+
+      // Should fall back to default 2.0x
+      expect(config.gasLimit).toBe(BigInt(200_000));
+    });
+
+    it("should handle NaN override gracefully", async () => {
+      const strategy = new AdaptiveGasStrategy({
+        gasLimitMultiplier: 2.0,
+      });
+      const provider = createMockProvider();
+
+      const config = await strategy.getGasConfig(
+        provider as unknown as import("ethers").Provider,
+        "scheduled",
+        BigInt(100_000),
+        1,
+        Number.NaN
+      );
+
+      // NaN is falsy, should fall back to default 2.0x
+      expect(config.gasLimit).toBe(BigInt(200_000));
+    });
+  });
+
   describe("gas limit calculation precision", () => {
     it("should maintain precision for large gas estimates", async () => {
       const strategy = new AdaptiveGasStrategy({
