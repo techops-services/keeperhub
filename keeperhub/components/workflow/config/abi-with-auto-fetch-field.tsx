@@ -329,7 +329,13 @@ function DiamondContractAlert({
             Using combined ABI from all facets (Diamond Proxy).
           </p>
         )}
-        <DiamondFacetsList chains={chains} facets={facets} network={network} />
+        {useDiamondAbi && (
+          <DiamondFacetsList
+            chains={chains}
+            facets={facets}
+            network={network}
+          />
+        )}
         {warning && (
           <p className="mt-2 text-amber-700 text-sm dark:text-amber-300">
             {warning}
