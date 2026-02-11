@@ -186,6 +186,11 @@ const TEMPLATE_SYNTAX = {
       template: "{{@http-1:Fetch Price.data.price}}",
       description: "Reference 'price' from HTTP request response data",
     },
+    {
+      template: "{{@__system:System.unixTimestamp}}",
+      description:
+        "Current Unix timestamp in seconds (built-in, evaluated at execution time)",
+    },
   ],
   notes: [
     "nodeId is the unique identifier of the node (visible in node settings)",
@@ -433,6 +438,35 @@ export async function GET(request: Request) {
     // Template syntax documentation
     templateSyntax: TEMPLATE_SYNTAX,
 
+    // start custom keeperhub code //
+    // Built-in system variables (evaluated at runtime)
+    builtinVariables: {
+      description:
+        "Built-in variables evaluated at runtime. Reference using {{@__system:System.fieldName}} syntax.",
+      nodeId: "__system",
+      nodeLabel: "System",
+      variables: {
+        unixTimestamp: {
+          type: "number",
+          description:
+            "Current Unix timestamp in seconds (Solidity-compatible, matches block.timestamp)",
+          example: "{{@__system:System.unixTimestamp}}",
+        },
+        unixTimestampMs: {
+          type: "number",
+          description:
+            "Current Unix timestamp in milliseconds (JavaScript Date.now())",
+          example: "{{@__system:System.unixTimestampMs}}",
+        },
+        isoTimestamp: {
+          type: "string",
+          description: "Current time as ISO 8601 UTC string",
+          example: "{{@__system:System.isoTimestamp}}",
+        },
+      },
+    },
+    // end keeperhub code //
+
     // Workflow structure hints for AI
     workflowStructure: {
       nodeStructure: {
@@ -487,6 +521,7 @@ export async function GET(request: Request) {
       "web3 read actions (check-balance, read-contract) don't require wallet integration",
       "web3 write actions (transfer-funds, write-contract) require wallet integration",
       "Use projectId to organize related workflows into a project (e.g., all Sky ESM workflows in one project)",
+      "Use {{@__system:System.unixTimestamp}} for current time comparisons in conditions (e.g., checking if a contract timestamp has passed)",
     ],
   };
 
