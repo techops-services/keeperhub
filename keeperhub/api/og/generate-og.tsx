@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { ImageResponse } from "@vercel/og";
 import { eq } from "drizzle-orm";
 import type { ReactNode } from "react";
@@ -8,13 +10,15 @@ import { workflows } from "@/lib/db/schema";
 // Font loading (Anek Latin, bundled locally)
 // ---------------------------------------------------------------------------
 
-const fontRegularPromise = fetch(
-  new URL("./fonts/AnekLatin-Regular.ttf", import.meta.url)
-).then((res) => res.arrayBuffer());
+const fontsDir = join(process.cwd(), "keeperhub/api/og/fonts");
 
-const fontSemiBoldPromise = fetch(
-  new URL("./fonts/AnekLatin-SemiBold.ttf", import.meta.url)
-).then((res) => res.arrayBuffer());
+const fontRegularPromise = readFile(
+  join(fontsDir, "AnekLatin-Regular.ttf")
+).then((buf) => buf.buffer as ArrayBuffer);
+
+const fontSemiBoldPromise = readFile(
+  join(fontsDir, "AnekLatin-SemiBold.ttf")
+).then((buf) => buf.buffer as ArrayBuffer);
 
 // ---------------------------------------------------------------------------
 // Shared constants
