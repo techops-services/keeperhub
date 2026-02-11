@@ -53,9 +53,12 @@ POST /api/workflows
 ```json
 {
   "name": "New Workflow",
-  "description": "Optional description"
+  "description": "Optional description",
+  "projectId": "proj_123"
 }
 ```
+
+The `projectId` field is optional. If provided, the workflow is assigned to the specified [project](/api/projects).
 
 ### Response
 
@@ -73,6 +76,7 @@ PATCH /api/workflows/{workflowId}
 {
   "name": "Updated Name",
   "description": "Updated description",
+  "projectId": "proj_123",
   "nodes": [...],
   "edges": [...],
   "visibility": "private"
