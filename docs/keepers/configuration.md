@@ -79,7 +79,7 @@ No additional configuration needed. Click the Run button to execute.
 | Function * | Read function to call (auto-populated from ABI) |
 | Parameters | Function input parameters |
 
-KeeperHub automatically fetches the contract ABI from block explorers.
+KeeperHub automatically fetches the contract ABI from block explorers. For proxy contracts, it detects the proxy pattern and fetches the implementation ABI automatically. Supported proxy standards include EIP-1967, EIP-1822 (UUPS), OpenZeppelin Transparent Proxy, EIP-1167 (minimal proxy), and Gnosis Safe. For EIP-2535 Diamond contracts, KeeperHub queries the Diamond Loupe interface to discover all facets and combines their ABIs into a single unified interface.
 
 ### Write Contract
 

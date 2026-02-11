@@ -44,7 +44,7 @@ export async function generateMetadata({
   const workflowUrl = `${baseUrl}/workflows/${workflowId}`;
   const ogImageUrl = isPublic
     ? `${baseUrl}/api/og/workflow/${workflowId}`
-    : `${baseUrl}/og-default.png`;
+    : `${baseUrl}/api/og/default`;
 
   return {
     title: `${title} | KeeperHub`,

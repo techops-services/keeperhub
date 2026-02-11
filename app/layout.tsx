@@ -19,11 +19,38 @@ import { MobileWarningDialog } from "@/keeperhub/components/mobile-warning-dialo
 import { mono, sans } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 
+// start custom keeperhub code //
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL ?? "https://app.keeperhub.com"
+  ),
   title: "KeeperHub - Blockchain Workflow Automation",
   description:
     "Build powerful blockchain workflow automations with a visual, node-based editor. Built with Next.js and React Flow.",
+  openGraph: {
+    title: "KeeperHub - Blockchain Workflow Automation",
+    description:
+      "Build powerful blockchain workflow automations with a visual, node-based editor.",
+    type: "website",
+    siteName: "KeeperHub",
+    images: [
+      {
+        url: "/api/og/default",
+        width: 1200,
+        height: 630,
+        alt: "KeeperHub - Blockchain Workflow Automation",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "KeeperHub - Blockchain Workflow Automation",
+    description:
+      "Build powerful blockchain workflow automations with a visual, node-based editor.",
+    images: ["/api/og/default"],
+  },
 };
+// end keeperhub code //
 
 export const viewport: Viewport = {
   width: "device-width",

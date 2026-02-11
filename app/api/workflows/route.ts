@@ -36,27 +36,27 @@ export async function GET(request: Request) {
       organizationId = context.organization?.id || null;
     }
 
-    const userWorkflows =
+    // Optional projectId filter
+    const { searchParams } = new URL(request.url);
+    const projectIdFilter = searchParams.get("projectId");
+
+    const conditions =
       !organizationId && userId
-        ? // Anonymous users or users without org: show trial workflows
-          await db
-            .select()
-            .from(workflows)
-            .where(
-              and(eq(workflows.userId, userId), eq(workflows.isAnonymous, true))
-            )
-            .orderBy(asc(workflows.createdAt))
-        : // Authenticated users with org or API key: show org workflows
-          await db
-            .select()
-            .from(workflows)
-            .where(
-              and(
-                eq(workflows.organizationId, organizationId ?? ""),
-                eq(workflows.isAnonymous, false)
-              )
-            )
-            .orderBy(asc(workflows.createdAt));
+        ? [eq(workflows.userId, userId), eq(workflows.isAnonymous, true)]
+        : [
+            eq(workflows.organizationId, organizationId ?? ""),
+            eq(workflows.isAnonymous, false),
+          ];
+
+    if (projectIdFilter) {
+      conditions.push(eq(workflows.projectId, projectIdFilter));
+    }
+
+    const userWorkflows = await db
+      .select()
+      .from(workflows)
+      .where(and(...conditions))
+      .orderBy(asc(workflows.createdAt));
     // end keeperhub code //
 
     const mappedWorkflows = userWorkflows.map((workflow) => ({

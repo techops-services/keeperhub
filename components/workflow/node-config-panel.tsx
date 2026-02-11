@@ -28,6 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ComboboxInput } from "@/keeperhub/components/hub/combobox-input";
+import { ProjectSelect } from "@/keeperhub/components/projects/project-select";
 import { api } from "@/lib/api-client";
 import { integrationsAtom } from "@/lib/integrations-store";
 import type { IntegrationType } from "@/lib/types/integration";
@@ -39,6 +40,7 @@ import {
   currentWorkflowDescriptionAtom,
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
+  currentWorkflowProjectIdAtom,
   currentWorkflowProtocolAtom,
   deleteEdgeAtom,
   deleteNodeAtom,
@@ -171,6 +173,9 @@ export const PanelInner = () => {
   );
   const [currentWorkflowProtocol, setCurrentWorkflowProtocol] = useAtom(
     currentWorkflowProtocolAtom
+  );
+  const [currentWorkflowProjectId, setCurrentWorkflowProjectId] = useAtom(
+    currentWorkflowProjectIdAtom
   );
   const [taxonomyOptions, setTaxonomyOptions] = useState<{
     categories: string[];
@@ -647,6 +652,22 @@ export const PanelInner = () => {
       }
     }
   };
+
+  const handleUpdateWorkflowProject = async (
+    newProjectId: string | null
+  ): Promise<void> => {
+    setCurrentWorkflowProjectId(newProjectId);
+    if (currentWorkflowId) {
+      try {
+        await api.workflow.update(currentWorkflowId, {
+          projectId: newProjectId,
+        });
+      } catch (error) {
+        console.error("Failed to update workflow project:", error);
+        toast.error("Failed to update workflow project");
+      }
+    }
+  };
   // end keeperhub code //
 
   const handleRefreshRuns = async () => {
@@ -824,6 +845,14 @@ export const PanelInner = () => {
                   options={taxonomyOptions.categories}
                   placeholder="Select or type category..."
                   value={currentWorkflowCategory}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="ml-1">Project</Label>
+                <ProjectSelect
+                  disabled={!isOwner}
+                  onChange={handleUpdateWorkflowProject}
+                  value={currentWorkflowProjectId}
                 />
               </div>
               {/* end keeperhub code */}
