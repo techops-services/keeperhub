@@ -15,6 +15,18 @@ GET /api/workflows
 
 Returns all workflows for the authenticated user.
 
+### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `projectId` | string | Optional. Filter workflows by project ID |
+
+### Example
+
+```http
+GET /api/workflows?projectId=proj_123
+```
+
 ### Response
 
 ```json

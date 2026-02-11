@@ -24,7 +24,7 @@ Each run contains a complete execution trace showing how data flowed through you
 ### Trigger Log
 
 The first entry shows your trigger node:
-- Trigger type (Scheduled, Webhook, Event, Manual)
+- Trigger type (Scheduled, Webhook, Event, Block, Manual)
 - Execution time (typically 0ms for triggers)
 - Trigger configuration used
 - Output data passed to the next node

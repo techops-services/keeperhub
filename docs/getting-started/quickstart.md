@@ -23,7 +23,7 @@ Click the workflow dropdown in the top left and select **New Workflow** to open 
 
 The workflow builder is a visual node-based editor where you build automations by connecting nodes:
 
-- **Trigger Nodes**: Start your workflow (Scheduled, Webhook, Event, Manual)
+- **Trigger Nodes**: Start your workflow (Scheduled, Webhook, Event, Block, Manual)
 - **Action Nodes**: Perform operations (Check Balance, Send Email, Send Discord Message, etc.)
 - **Condition Nodes**: Add branching logic based on results
 
