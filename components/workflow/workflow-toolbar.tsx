@@ -217,7 +217,12 @@ function getBrokenTemplateReferences(
     }
 
     const allRefs = extractAllTemplateReferences(config);
-    const brokenRefs = allRefs.filter((ref) => !nodeIds.has(ref.nodeId));
+    // start custom keeperhub code //
+    // __system is a built-in pseudo-node for system variables, not a real workflow node
+    const brokenRefs = allRefs.filter(
+      (ref) => ref.nodeId !== "__system" && !nodeIds.has(ref.nodeId)
+    );
+    // end keeperhub code //
 
     if (brokenRefs.length > 0) {
       // Get action for label lookups

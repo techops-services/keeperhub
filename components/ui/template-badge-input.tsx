@@ -22,6 +22,10 @@ function doesNodeExist(template: string, nodes: ReturnType<typeof useAtom<typeof
   if (!match) return false;
   
   const nodeId = match[1];
+  // start custom keeperhub code //
+  // __system is a built-in pseudo-node for system variables
+  if (nodeId === "__system") return true;
+  // end keeperhub code //
   return nodes.some((n) => n.id === nodeId);
 }
 
