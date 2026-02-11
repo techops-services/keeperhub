@@ -28,6 +28,7 @@ Every workflow starts with a trigger that determines when it runs:
 - **Scheduled**: Run at intervals (every 5 minutes, hourly, daily)
 - **Webhook**: Run when an external service calls your workflow URL
 - **Event**: Run when a blockchain event is detected
+- **Block**: Run at blockchain block intervals on a specific chain
 - **Manual**: Run only when you click the Run button
 
 ### Action Nodes
