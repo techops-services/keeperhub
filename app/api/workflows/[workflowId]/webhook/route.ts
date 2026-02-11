@@ -106,6 +106,13 @@ async function executeWorkflowBackground(
     ]);
 
     console.log("[Webhook] Workflow started, runId:", run.runId);
+
+    // start custom keeperhub code //
+    await db
+      .update(workflowExecutions)
+      .set({ runId: run.runId })
+      .where(eq(workflowExecutions.id, executionId));
+    // end keeperhub code //
   } catch (error) {
     console.error("[Webhook] Error during execution:", error);
     console.error(
