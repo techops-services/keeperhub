@@ -493,6 +493,41 @@ export function TemplateAutocomplete({
     }
   }
 
+  // start custom keeperhub code //
+  // Built-in system variables (available to all nodes, evaluated at execution time)
+  // Constants inlined to avoid importing server-side module into "use client" component
+  {
+    const systemNodeId = "__system";
+    const systemLabel = "System";
+    const builtinFields = [
+      {
+        field: "unixTimestamp",
+        description:
+          "Current time as Unix timestamp in seconds (Solidity-compatible)",
+      },
+      {
+        field: "unixTimestampMs",
+        description: "Current time as Unix timestamp in milliseconds",
+      },
+      {
+        field: "isoTimestamp",
+        description: "Current time as ISO 8601 UTC string",
+      },
+    ];
+
+    for (const field of builtinFields) {
+      options.push({
+        type: "field",
+        nodeId: systemNodeId,
+        nodeName: systemLabel,
+        field: field.field,
+        description: field.description,
+        template: `{{@${systemNodeId}:${systemLabel}.${field.field}}}`,
+      });
+    }
+  }
+  // end keeperhub code //
+
   // Filter options based on search term
   const filteredOptions = filter
     ? options.filter(
