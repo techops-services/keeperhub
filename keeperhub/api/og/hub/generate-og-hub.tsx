@@ -88,7 +88,7 @@ export function generateHubOGImage(): ImageResponse {
             width: 2,
             height: 2,
             borderRadius: 1,
-            backgroundColor: "rgba(255,255,255,0.18)",
+            backgroundColor: "rgba(255,255,255,0.35)",
           }}
         />
       ))}

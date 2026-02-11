@@ -249,7 +249,7 @@ async function renderOG(tc: TestCase): Promise<void> {
             width: 2,
             height: 2,
             borderRadius: 1,
-            backgroundColor: "rgba(255,255,255,0.18)",
+            backgroundColor: "rgba(255,255,255,0.35)",
           }}
         />
       ))}
@@ -526,7 +526,7 @@ async function renderDefaultOG(): Promise<void> {
             width: 2,
             height: 2,
             borderRadius: 1,
-            backgroundColor: "rgba(255,255,255,0.18)",
+            backgroundColor: "rgba(255,255,255,0.35)",
           }}
         />
       ))}
@@ -719,7 +719,7 @@ async function renderHubOG(): Promise<void> {
             width: 2,
             height: 2,
             borderRadius: 1,
-            backgroundColor: "rgba(255,255,255,0.18)",
+            backgroundColor: "rgba(255,255,255,0.35)",
           }}
         />
       ))}
