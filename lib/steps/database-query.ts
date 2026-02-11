@@ -65,6 +65,11 @@ async function executeQuery(
       if (p === null || p === undefined) {
         return null;
       }
+      // Date and Uint8Array are natively supported by postgres.js
+      if (p instanceof Date || p instanceof Uint8Array) {
+        return p;
+      }
+      // Objects/arrays must be JSON-stringified for JSONB columns
       if (typeof p === "object") {
         return JSON.stringify(p);
       }
@@ -72,7 +77,7 @@ async function executeQuery(
     });
     return await client.unsafe(
       queryString,
-      serialized as postgres.SerializableParameter[]
+      serialized as postgres.ParameterOrJSON<never>[]
     );
   }
   // end keeperhub code //
