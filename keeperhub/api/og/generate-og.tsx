@@ -5,6 +5,18 @@ import { db } from "@/lib/db";
 import { workflows } from "@/lib/db/schema";
 
 // ---------------------------------------------------------------------------
+// Font loading (Anek Latin, bundled locally)
+// ---------------------------------------------------------------------------
+
+const fontLightPromise = fetch(
+  new URL("./fonts/AnekLatin-Light.ttf", import.meta.url)
+).then((res) => res.arrayBuffer());
+
+const fontRegularPromise = fetch(
+  new URL("./fonts/AnekLatin-Regular.ttf", import.meta.url)
+).then((res) => res.arrayBuffer());
+
+// ---------------------------------------------------------------------------
 // Shared constants
 // ---------------------------------------------------------------------------
 
@@ -28,58 +40,84 @@ const GRADIENT =
   "linear-gradient(180deg, rgba(17,24,39,0.95) 0%, rgba(17,24,39,0.85) 15%, rgba(17,24,39,0.4) 35%, rgba(17,24,39,0.3) 50%, rgba(17,24,39,0.4) 65%, rgba(17,24,39,0.6) 80%, rgba(17,24,39,0.95) 100%)";
 
 // ---------------------------------------------------------------------------
-// Shared icon SVG data URIs
+// Shared icon SVG data URIs (matching lucide-react icons used in workflow UI)
 // ---------------------------------------------------------------------------
 
-const ICON_CLOCK =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23aaaaaa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 6v6l4 2'/%3E%3C/svg%3E";
+const LUCIDE = (inner: string): string =>
+  `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23aaaaaa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E${inner}%3C/svg%3E`;
 
-const ICON_GLOBE =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23aaaaaa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M2 12h20'/%3E%3Cpath d='M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z'/%3E%3C/svg%3E";
+// Trigger icons (from components/workflow/nodes/trigger-node.tsx)
+const ICON_PLAY = LUCIDE(
+  "%3Cpath d='M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z'/%3E"
+);
+const ICON_CLOCK = LUCIDE(
+  "%3Cpath d='M12 6v6l4 2'/%3E%3Ccircle cx='12' cy='12' r='10'/%3E"
+);
+const ICON_WEBHOOK = LUCIDE(
+  "%3Cpath d='M18 16.98h-5.99c-1.1 0-1.95.94-2.48 1.9A4 4 0 0 1 2 17c.01-.7.2-1.4.57-2'/%3E%3Cpath d='m6 17 3.13-5.78c.53-.97.1-2.18-.5-3.1a4 4 0 1 1 6.89-4.06'/%3E%3Cpath d='m12 6 3.13 5.73C15.66 12.7 16.9 13 18 13a4 4 0 0 1 0 8'/%3E"
+);
+const ICON_BOXES = LUCIDE(
+  "%3Cpath d='M2.97 12.92A2 2 0 0 0 2 14.63v3.24a2 2 0 0 0 .97 1.71l3 1.8a2 2 0 0 0 2.06 0L12 19v-5.5l-5-3-4.03 2.42Z'/%3E%3Cpath d='m7 16.5-4.74-2.85'/%3E%3Cpath d='m7 16.5 5-3'/%3E%3Cpath d='M7 16.5v5.17'/%3E%3Cpath d='M12 13.5V19l3.97 2.38a2 2 0 0 0 2.06 0l3-1.8a2 2 0 0 0 .97-1.71v-3.24a2 2 0 0 0-.97-1.71L17 10.5l-5 3Z'/%3E%3Cpath d='m17 16.5-5-3'/%3E%3Cpath d='m17 16.5 4.74-2.85'/%3E%3Cpath d='M17 16.5v5.17'/%3E%3Cpath d='M7.97 4.42A2 2 0 0 0 7 6.13v4.37l5 3 5-3V6.13a2 2 0 0 0-.97-1.71l-3-1.8a2 2 0 0 0-2.06 0l-3 1.8Z'/%3E%3Cpath d='M12 8 7.26 5.15'/%3E%3Cpath d='m12 8 4.74-2.85'/%3E%3Cpath d='M12 13.5V8'/%3E"
+);
 
-const ICON_ZAP =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23aaaaaa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 2L3 14h9l-1 8 10-12h-9l1-8z'/%3E%3C/svg%3E";
+// System action icons (from components/workflow/nodes/action-node.tsx)
+const ICON_ZAP = LUCIDE(
+  "%3Cpath d='M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z'/%3E"
+);
+const ICON_DATABASE = LUCIDE(
+  "%3Cellipse cx='12' cy='5' rx='9' ry='3'/%3E%3Cpath d='M3 5V19A9 3 0 0 0 21 19V5'/%3E%3Cpath d='M3 12A9 3 0 0 0 21 12'/%3E"
+);
+const ICON_CODE = LUCIDE(
+  "%3Cpath d='m16 18 6-6-6-6'/%3E%3Cpath d='m8 6-6 6 6 6'/%3E"
+);
+const ICON_GIT_BRANCH = LUCIDE(
+  "%3Cline x1='6' x2='6' y1='3' y2='15'/%3E%3Ccircle cx='18' cy='6' r='3'/%3E%3Ccircle cx='6' cy='18' r='3'/%3E%3Cpath d='M18 9a9 9 0 0 1-9 9'/%3E"
+);
 
-const ICON_BRANCH =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23aaaaaa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 3v12'/%3E%3Ccircle cx='18' cy='6' r='3'/%3E%3Ccircle cx='6' cy='18' r='3'/%3E%3Cpath d='M18 9c0 6-6 6-12 6'/%3E%3C/svg%3E";
+// Plugin icons (from keeperhub/plugins/*/icon.tsx)
+const ICON_GLOBE = LUCIDE(
+  "%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20'/%3E%3Cpath d='M2 12h20'/%3E"
+);
+const ICON_MAIL = LUCIDE(
+  "%3Cpath d='m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7'/%3E%3Crect x='2' y='4' width='20' height='16' rx='2'/%3E"
+);
+const ICON_BELL = LUCIDE(
+  "%3Cpath d='M10.268 21a2 2 0 0 0 3.464 0'/%3E%3Cpath d='M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326'/%3E"
+);
+const ICON_SEND = LUCIDE(
+  "%3Cpath d='M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z'/%3E%3Cpath d='m21.854 2.147-10.94 10.939'/%3E"
+);
+const ICON_SWAP = LUCIDE(
+  "%3Cpath d='m16 3 4 4-4 4'/%3E%3Cpath d='M20 7H4'/%3E%3Cpath d='m8 21-4-4 4-4'/%3E%3Cpath d='M4 17h16'/%3E"
+);
+const ICON_DOLLAR = LUCIDE(
+  "%3Cline x1='12' x2='12' y1='2' y2='22'/%3E%3Cpath d='M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6'/%3E"
+);
 
-const ICON_BELL =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23aaaaaa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9'/%3E%3Cpath d='M13.73 21a2 2 0 0 1-3.46 0'/%3E%3C/svg%3E";
+// Brand icons (from keeperhub/plugins/discord/icon.tsx, telegram/icon.tsx)
+const ICON_DISCORD =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 586 446' fill='none'%3E%3Cpath d='M495.562 37.06C458.062 19.87 418.218 7.37 376.343 0.03c-.78 0-1.56 0-1.87.94-5.16 9.22-10.94 21.09-14.85 30.47-45.31-6.72-89.84-6.72-133.9 0-4.07-9.69-9.85-21.4-15.63-31.34-.47-.63-1.09-1.1-1.87-.94C172.28 7.22 126.34 20.34 89.47 37.06c-.31 0-.63.31-.78.63C12.12 151.75-8.19 261.12 2.75 370.5c0 .47.31 1.09.78 1.56 50 36.88 98.44 59.38 146.25 73.91.78 0 1.56 0 2.03-.63 11.25-15.31 21.25-31.56 30-48.75.47-.94 0-2.19-1.09-2.5-15.63-6.25-31.25-13.44-45.78-21.88-1.1-.62-1.25-2.34 0-3.12 3.12-2.34 6.25-4.69 9.06-7.03.47-.47 1.25-.47 1.88-.31 95.94 43.75 200 43.75 293.75 0 .63-.31 1.41-.16 1.88.31 2.97 2.5 5.94 4.69 9.06 7.03 1.1.78.94 2.5 0 3.12-14.53 8.6-29.69 15.63-45.78 21.88-1.1.47-1.56 1.56-.94 2.66 8.75 17.19 18.91 33.28 29.69 48.44.47.63 1.25.94 2.03.63 47.82-14.84 96.41-37.19 146.56-73.91.47-.31.78-.78.78-1.56 12.19-126.41-20.47-237-68.56-333.01-.16-.31-.47-.63-.78-.63zM195.56 304.25c-29.69 0-53.12-26.56-53.12-59.38 0-32.81 23.44-59.38 53.12-59.38s53.69 26.56 53.12 59.38c0 32.81-23.44 59.38-53.12 59.38zm195.31 0c-29.69 0-53.12-26.56-53.12-59.38 0-32.81 23.44-59.38 53.12-59.38s53.69 26.56 53.12 59.38c0 32.81-23.44 59.38-53.12 59.38z' fill='%235865F2'/%3E%3C/svg%3E";
 
-const ICON_SWAP =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23aaaaaa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 3L4 7l4 4'/%3E%3Cpath d='M4 7h16'/%3E%3Cpath d='M16 21l4-4-4-4'/%3E%3Cpath d='M20 17H4'/%3E%3C/svg%3E";
+const ICON_TELEGRAM =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23229ED9'/%3E%3Cpath d='M22.987 10.209a.5.5 0 0 0-.644-.627l-14.265 6.263a.5.5 0 0 0 .057 .936l2.942.937a1.5 1.5 0 0 0 1.16-.252l6.632-4.582c.2-.138.418.146.247.322l-4.774 4.922a1 1 0 0 0 .186 1.636l5.345 3.352a1 1 0 0 0 1.483-.726l1.845-11.913z' fill='white'/%3E%3C/svg%3E";
 
-const ICON_SEND =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23aaaaaa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 2L11 13'/%3E%3Cpath d='M22 2l-7 20-4-9-9-4z'/%3E%3C/svg%3E";
-
-const ICON_FILE =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23aaaaaa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpath d='M14 2v6h6'/%3E%3Cpath d='M16 13H8'/%3E%3Cpath d='M16 17H8'/%3E%3C/svg%3E";
-
-const ICON_LINK =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23aaaaaa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71'/%3E%3Cpath d='M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71'/%3E%3C/svg%3E";
-
-const ICON_PLAY =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23aaaaaa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpolygon points='10 8 16 12 10 16 10 8'/%3E%3C/svg%3E";
-
-const ICON_DOLLAR =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23aaaaaa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 1v22'/%3E%3Cpath d='M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6'/%3E%3C/svg%3E";
-
-const ICON_MAIL =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23aaaaaa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2' y='4' width='20' height='16' rx='2'/%3E%3Cpath d='m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7'/%3E%3C/svg%3E";
+// ---------------------------------------------------------------------------
+// Icon mapping rules (matching workflow UI node icon assignment)
+// ---------------------------------------------------------------------------
 
 const ICON_RULES: Array<{ keywords: string[]; icon: string }> = [
   { keywords: ["schedule", "cron", "timer", "interval"], icon: ICON_CLOCK },
-  { keywords: ["webhook", "http", "api", "request"], icon: ICON_LINK },
-  { keywords: ["on-chain", "event", "monitor", "watch"], icon: ICON_ZAP },
-  { keywords: ["condition", "filter", "branch", "if"], icon: ICON_BRANCH },
-  {
-    keywords: ["discord", "slack", "notify", "alert", "notification"],
-    icon: ICON_BELL,
-  },
+  { keywords: ["webhook", "http request"], icon: ICON_WEBHOOK },
+  { keywords: ["on-chain", "event", "monitor", "watch"], icon: ICON_BOXES },
+  { keywords: ["condition", "filter", "branch", "if"], icon: ICON_GIT_BRANCH },
+  { keywords: ["discord"], icon: ICON_DISCORD },
+  { keywords: ["telegram"], icon: ICON_TELEGRAM },
+  { keywords: ["slack", "notify", "alert", "notification"], icon: ICON_BELL },
   { keywords: ["swap", "exchange", "trade"], icon: ICON_SWAP },
-  { keywords: ["transfer", "send discord", "send report"], icon: ICON_SEND },
+  { keywords: ["transfer", "send"], icon: ICON_SEND },
   { keywords: ["email", "sendgrid", "mail"], icon: ICON_MAIL },
-  { keywords: ["log", "record", "report"], icon: ICON_FILE },
+  { keywords: ["execute", "code", "script"], icon: ICON_CODE },
+  { keywords: ["database", "query", "sql"], icon: ICON_DATABASE },
   {
     keywords: ["price", "balance", "fee", "spread", "cost"],
     icon: ICON_DOLLAR,
@@ -88,6 +126,7 @@ const ICON_RULES: Array<{ keywords: string[]; icon: string }> = [
     keywords: ["check", "fetch", "read", "position", "liquidity", "web3"],
     icon: ICON_GLOBE,
   },
+  { keywords: ["api", "request", "http"], icon: ICON_ZAP },
   { keywords: ["manual", "trigger"], icon: ICON_PLAY },
 ];
 
@@ -95,9 +134,9 @@ const HUB_ICONS: Record<string, string> = {
   Schedule: ICON_CLOCK,
   Swap: ICON_SWAP,
   Transfer: ICON_SEND,
-  Monitor: ICON_ZAP,
+  Monitor: ICON_BOXES,
   Notify: ICON_BELL,
-  Condition: ICON_BRANCH,
+  Condition: ICON_GIT_BRANCH,
 };
 
 // ---------------------------------------------------------------------------
@@ -147,6 +186,7 @@ function OGBase({ children }: { children: ReactNode }): React.JSX.Element {
         display: "flex",
         position: "relative",
         backgroundColor: BG_COLOR,
+        fontFamily: "'Anek Latin', sans-serif",
       }}
     >
       {DOTS.map((dot) => (
@@ -188,13 +228,31 @@ function OGBase({ children }: { children: ReactNode }): React.JSX.Element {
   );
 }
 
-function renderOGImage(
+async function renderOGImage(
   content: React.JSX.Element,
   cacheSeconds: number
-): ImageResponse {
+): Promise<ImageResponse> {
+  const [light, regular] = await Promise.all([
+    fontLightPromise,
+    fontRegularPromise,
+  ]);
   return new ImageResponse(content, {
     width: OG_WIDTH,
     height: OG_HEIGHT,
+    fonts: [
+      {
+        name: "Anek Latin",
+        data: light,
+        weight: 300,
+        style: "normal" as const,
+      },
+      {
+        name: "Anek Latin",
+        data: regular,
+        weight: 400,
+        style: "normal" as const,
+      },
+    ],
     headers: {
       "Cache-Control": `public, max-age=${cacheSeconds}, s-maxage=${cacheSeconds * 24}`,
     },
@@ -205,7 +263,7 @@ function renderOGImage(
 // Default OG
 // ---------------------------------------------------------------------------
 
-export function generateDefaultOGImage(): ImageResponse {
+export function generateDefaultOGImage(): Promise<ImageResponse> {
   return renderOGImage(
     <OGBase>
       <div
@@ -234,7 +292,7 @@ export function generateDefaultOGImage(): ImageResponse {
           style={{
             display: "flex",
             fontSize: 64,
-            fontWeight: 700,
+            fontWeight: 400,
             color: "#ffffff",
             marginTop: 8,
           }}
@@ -245,20 +303,11 @@ export function generateDefaultOGImage(): ImageResponse {
           style={{
             display: "flex",
             fontSize: 24,
+            fontWeight: 300,
             color: "rgba(255,255,255,0.45)",
           }}
         >
           Automate anything onchain
-        </div>
-        <div
-          style={{
-            display: "flex",
-            fontSize: 18,
-            color: "rgba(255,255,255,0.3)",
-            marginTop: 4,
-          }}
-        >
-          Build, deploy, and manage Web3 workflow automations
         </div>
       </div>
       <div
@@ -285,15 +334,15 @@ export function generateDefaultOGImage(): ImageResponse {
 type HubCard = { label: string; x: number; y: number };
 
 const HUB_CARDS: HubCard[] = [
-  { label: "Schedule", x: 140, y: 360 },
-  { label: "Swap", x: 310, y: 360 },
-  { label: "Transfer", x: 480, y: 360 },
-  { label: "Monitor", x: 650, y: 360 },
-  { label: "Notify", x: 820, y: 360 },
-  { label: "Condition", x: 990, y: 360 },
+  { label: "Schedule", x: 120, y: 340 },
+  { label: "Swap", x: 300, y: 340 },
+  { label: "Transfer", x: 480, y: 340 },
+  { label: "Monitor", x: 660, y: 340 },
+  { label: "Notify", x: 840, y: 340 },
+  { label: "Condition", x: 1020, y: 340 },
 ];
 
-export function generateHubOGImage(): ImageResponse {
+export function generateHubOGImage(): Promise<ImageResponse> {
   return renderOGImage(
     <OGBase>
       {/* Edge lines connecting cards */}
@@ -304,9 +353,9 @@ export function generateHubOGImage(): ImageResponse {
             key={`edge-${card.label}`}
             style={{
               position: "absolute",
-              left: card.x + 68,
-              top: card.y + 34,
-              width: next.x - card.x - 68,
+              left: card.x + 90,
+              top: card.y + 45,
+              width: next.x - card.x - 90,
               height: 2,
               backgroundColor: EDGE_COLOR,
             }}
@@ -322,9 +371,9 @@ export function generateHubOGImage(): ImageResponse {
             position: "absolute",
             left: card.x,
             top: card.y,
-            width: 68,
-            height: 68,
-            borderRadius: 10,
+            width: 90,
+            height: 90,
+            borderRadius: 12,
             backgroundColor: CARD_COLOR,
             border: `1.5px solid ${NODE_BORDER_GREEN}`,
             display: "flex",
@@ -332,22 +381,22 @@ export function generateHubOGImage(): ImageResponse {
             alignItems: "center",
             justifyContent: "center",
             boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
-            gap: 4,
+            gap: 6,
           }}
         >
           {/* biome-ignore lint/a11y/useAltText: OG image render context */}
           {/* biome-ignore lint/performance/noImgElement: Satori requires img */}
           <img
-            height={20}
+            height={28}
             src={HUB_ICONS[card.label] ?? ICON_ZAP}
-            style={{ width: 20, height: 20 }}
-            width={20}
+            style={{ width: 28, height: 28 }}
+            width={28}
           />
           <div
             style={{
-              fontSize: 8,
+              fontSize: 10,
               color: "rgba(255,255,255,0.55)",
-              fontWeight: 600,
+              fontWeight: 400,
               textAlign: "center",
             }}
           >
@@ -374,7 +423,7 @@ export function generateHubOGImage(): ImageResponse {
           style={{
             display: "flex",
             fontSize: 52,
-            fontWeight: 700,
+            fontWeight: 400,
             color: "#ffffff",
             marginTop: 36,
             lineHeight: 1.15,
@@ -386,6 +435,7 @@ export function generateHubOGImage(): ImageResponse {
           style={{
             display: "flex",
             fontSize: 22,
+            fontWeight: 300,
             color: "rgba(255,255,255,0.5)",
             marginTop: 14,
             lineHeight: 1.4,
@@ -559,9 +609,8 @@ function prepareRenderData(workflowData: {
   };
 }
 
-function renderWorkflowOG(data: OGRenderData): ImageResponse {
+function renderWorkflowOG(data: OGRenderData): Promise<ImageResponse> {
   const { nodes, edges, viewport, ns } = data;
-
   return renderOGImage(
     <OGBase>
       {/* Edge lines - vertical from source */}
@@ -618,10 +667,10 @@ function renderWorkflowOG(data: OGRenderData): ImageResponse {
           node.position.y,
           viewport
         );
-        const nodeSquare = Math.max(ns * 0.55, 88);
+        const nodeSquare = Math.max(ns * 0.65, 100);
         const isTrigger = node.data.type === "trigger";
         const label = node.data.label ?? "";
-        const iconSize = Math.max(nodeSquare * 0.28, 22);
+        const iconSize = Math.max(nodeSquare * 0.3, 26);
 
         return (
           <div
@@ -653,9 +702,9 @@ function renderWorkflowOG(data: OGRenderData): ImageResponse {
             />
             <div
               style={{
-                fontSize: 10,
+                fontSize: 11,
                 color: "rgba(255,255,255,0.55)",
-                fontWeight: 500,
+                fontWeight: 300,
                 textAlign: "center",
                 padding: "0 6px",
               }}
@@ -684,7 +733,7 @@ function renderWorkflowOG(data: OGRenderData): ImageResponse {
           style={{
             display: "flex",
             fontSize: 52,
-            fontWeight: 700,
+            fontWeight: 400,
             color: "#ffffff",
             marginTop: 36,
             lineHeight: 1.15,
@@ -697,6 +746,7 @@ function renderWorkflowOG(data: OGRenderData): ImageResponse {
             style={{
               display: "flex",
               fontSize: 22,
+              fontWeight: 300,
               color: "rgba(255,255,255,0.5)",
               marginTop: 14,
               lineHeight: 1.4,
@@ -762,7 +812,7 @@ export async function generateWorkflowOGImage(
       protocol: workflow.protocol ?? null,
     });
 
-    return renderWorkflowOG(data);
+    return await renderWorkflowOG(data);
   } catch {
     return new Response("Failed to generate image", { status: 500 });
   }
@@ -802,7 +852,7 @@ function Header(): React.JSX.Element {
           style={{
             display: "flex",
             fontSize: 20,
-            fontWeight: 600,
+            fontWeight: 400,
             color: "rgba(255,255,255,0.85)",
           }}
         >
@@ -837,7 +887,7 @@ function Footer({ children }: { children: ReactNode }): React.JSX.Element {
         padding: "0 56px 36px",
         gap: 32,
         fontSize: 18,
-        fontWeight: 500,
+        fontWeight: 300,
         color: "rgba(255,255,255,0.45)",
       }}
     >

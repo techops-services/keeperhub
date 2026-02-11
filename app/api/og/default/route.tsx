@@ -1,7 +1,7 @@
 // start custom keeperhub code //
 import { generateDefaultOGImage } from "@/keeperhub/api/og/generate-og";
 
-export function GET(): Response {
-  return generateDefaultOGImage();
+export async function GET(): Promise<Response> {
+  return await generateDefaultOGImage();
 }
 // end keeperhub code //
