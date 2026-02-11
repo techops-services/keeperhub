@@ -57,6 +57,11 @@ export type ActionConfigFieldBase = {
   // Min value (for number fields)
   min?: number;
 
+  // start custom keeperhub code //
+  // Max value (for number fields)
+  max?: number;
+  // end keeperhub code //
+
   // Whether this field is required (defaults to false)
   required?: boolean;
 
