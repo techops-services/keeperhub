@@ -317,7 +317,7 @@ function renderWorkflowOG(data: OGRenderData): ImageResponse {
           right: 0,
           bottom: 0,
           background:
-            "linear-gradient(180deg, rgba(17,24,39,0.95) 0%, rgba(17,24,39,0.85) 15%, rgba(17,24,39,0.4) 30%, transparent 42%, transparent 78%, rgba(17,24,39,0.6) 88%, rgba(17,24,39,0.95) 100%)",
+            "linear-gradient(180deg, rgba(17,24,39,0.95) 0%, rgba(17,24,39,0.85) 15%, rgba(17,24,39,0.4) 35%, rgba(17,24,39,0.3) 50%, rgba(17,24,39,0.4) 65%, rgba(17,24,39,0.6) 80%, rgba(17,24,39,0.95) 100%)",
         }}
       />
 
