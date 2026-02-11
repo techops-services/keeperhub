@@ -1,16 +1,35 @@
 import { ImageResponse } from "@vercel/og";
 import { eq } from "drizzle-orm";
+import type { ReactNode } from "react";
 import { db } from "@/lib/db";
 import { workflows } from "@/lib/db/schema";
+
+// ---------------------------------------------------------------------------
+// Shared constants
+// ---------------------------------------------------------------------------
+
+const OG_WIDTH = 1200;
+const OG_HEIGHT = 630;
+const DOT_SPACING = 32;
 
 const LOGO_SVG =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 318 500' fill='none'%3E%3Cpath d='M317.77 204.279H226.98V295.069H317.77V204.279Z' fill='%2300FF4F'/%3E%3Cpath d='M204.28 90.79V0H113.49V90.79C113.456 120.879 101.488 149.725 80.2115 171.002C58.9355 192.278 30.0889 204.246 0 204.28V295.07C30.0889 295.104 58.9355 307.072 80.2115 328.348C101.488 349.625 113.456 378.471 113.49 408.56V499.35H204.28V408.56C204.28 378.075 197.445 347.977 184.279 320.482C171.113 292.987 151.95 268.793 128.2 249.68C151.948 230.563 171.109 206.367 184.275 178.871C197.441 151.374 204.277 121.276 204.28 90.79Z' fill='%2300FF4F'/%3E%3C/svg%3E";
 
-const DOT_SPACING = 32;
-
 const NODE_BORDER_GREEN = "rgba(0,255,79,0.45)";
 const NODE_BORDER_GREEN_BRIGHT = "rgba(0,255,79,0.65)";
 const EDGE_COLOR = "rgba(0,255,79,0.15)";
+
+const BG_COLOR = "#111827";
+const CARD_COLOR = "#1e293b";
+const DOT_COLOR = "rgba(255,255,255,0.35)";
+const VIGNETTE =
+  "radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.4) 100%)";
+const GRADIENT =
+  "linear-gradient(180deg, rgba(17,24,39,0.95) 0%, rgba(17,24,39,0.85) 15%, rgba(17,24,39,0.4) 35%, rgba(17,24,39,0.3) 50%, rgba(17,24,39,0.4) 65%, rgba(17,24,39,0.6) 80%, rgba(17,24,39,0.95) 100%)";
+
+// ---------------------------------------------------------------------------
+// Shared icon SVG data URIs
+// ---------------------------------------------------------------------------
 
 const ICON_CLOCK =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23aaaaaa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 6v6l4 2'/%3E%3C/svg%3E";
@@ -72,6 +91,39 @@ const ICON_RULES: Array<{ keywords: string[]; icon: string }> = [
   { keywords: ["manual", "trigger"], icon: ICON_PLAY },
 ];
 
+const HUB_ICONS: Record<string, string> = {
+  Schedule: ICON_CLOCK,
+  Swap: ICON_SWAP,
+  Transfer: ICON_SEND,
+  Monitor: ICON_ZAP,
+  Notify: ICON_BELL,
+  Condition: ICON_BRANCH,
+};
+
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
+type DotPosition = { x: number; y: number };
+
+function generateDots(
+  width: number,
+  height: number,
+  spacing: number
+): DotPosition[] {
+  const dots: DotPosition[] = [];
+  for (let x = spacing; x < width; x += spacing) {
+    for (let y = spacing; y < height; y += spacing) {
+      dots.push({ x, y });
+    }
+  }
+  return dots;
+}
+
+function truncate(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max - 3)}...` : text;
+}
+
 function getNodeIcon(label: string): string {
   const lower = label.toLowerCase();
   const match = ICON_RULES.find((rule) =>
@@ -80,13 +132,287 @@ function getNodeIcon(label: string): string {
   return match?.icon ?? ICON_PLAY;
 }
 
+const DOTS = generateDots(OG_WIDTH, OG_HEIGHT, DOT_SPACING);
+
+// ---------------------------------------------------------------------------
+// Shared base layout - background, dots, vignette, gradient
+// ---------------------------------------------------------------------------
+
+function OGBase({ children }: { children: ReactNode }): React.JSX.Element {
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        position: "relative",
+        backgroundColor: BG_COLOR,
+      }}
+    >
+      {DOTS.map((dot) => (
+        <div
+          key={`dot-${dot.x}-${dot.y}`}
+          style={{
+            position: "absolute",
+            left: dot.x - 1,
+            top: dot.y - 1,
+            width: 2,
+            height: 2,
+            borderRadius: 1,
+            backgroundColor: DOT_COLOR,
+          }}
+        />
+      ))}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: VIGNETTE,
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: GRADIENT,
+        }}
+      />
+      {children}
+    </div>
+  );
+}
+
+function renderOGImage(
+  content: React.JSX.Element,
+  cacheSeconds: number
+): ImageResponse {
+  return new ImageResponse(content, {
+    width: OG_WIDTH,
+    height: OG_HEIGHT,
+    headers: {
+      "Cache-Control": `public, max-age=${cacheSeconds}, s-maxage=${cacheSeconds * 24}`,
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Default OG
+// ---------------------------------------------------------------------------
+
+export function generateDefaultOGImage(): ImageResponse {
+  return renderOGImage(
+    <OGBase>
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 16,
+        }}
+      >
+        {/* biome-ignore lint/a11y/useAltText: OG image render context */}
+        {/* biome-ignore lint/performance/noImgElement: Satori requires img */}
+        <img
+          height={75}
+          src={LOGO_SVG}
+          style={{ width: 48, height: 75 }}
+          width={48}
+        />
+        <div
+          style={{
+            display: "flex",
+            fontSize: 64,
+            fontWeight: 700,
+            color: "#ffffff",
+            marginTop: 8,
+          }}
+        >
+          KeeperHub
+        </div>
+        <div
+          style={{
+            display: "flex",
+            fontSize: 24,
+            color: "rgba(255,255,255,0.45)",
+          }}
+        >
+          Automate anything onchain
+        </div>
+        <div
+          style={{
+            display: "flex",
+            fontSize: 18,
+            color: "rgba(255,255,255,0.3)",
+            marginTop: 4,
+          }}
+        >
+          Build, deploy, and manage Web3 workflow automations
+        </div>
+      </div>
+      <div
+        style={{
+          position: "absolute",
+          top: 40,
+          right: 56,
+          display: "flex",
+          fontSize: 16,
+          color: "rgba(255,255,255,0.3)",
+        }}
+      >
+        app.keeperhub.com
+      </div>
+    </OGBase>,
+    86_400
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Hub OG
+// ---------------------------------------------------------------------------
+
+type HubCard = { label: string; x: number; y: number };
+
+const HUB_CARDS: HubCard[] = [
+  { label: "Schedule", x: 140, y: 360 },
+  { label: "Swap", x: 310, y: 360 },
+  { label: "Transfer", x: 480, y: 360 },
+  { label: "Monitor", x: 650, y: 360 },
+  { label: "Notify", x: 820, y: 360 },
+  { label: "Condition", x: 990, y: 360 },
+];
+
+export function generateHubOGImage(): ImageResponse {
+  return renderOGImage(
+    <OGBase>
+      {/* Edge lines connecting cards */}
+      {HUB_CARDS.slice(0, -1).map((card, i) => {
+        const next = HUB_CARDS[i + 1];
+        return (
+          <div
+            key={`edge-${card.label}`}
+            style={{
+              position: "absolute",
+              left: card.x + 68,
+              top: card.y + 34,
+              width: next.x - card.x - 68,
+              height: 2,
+              backgroundColor: EDGE_COLOR,
+            }}
+          />
+        );
+      })}
+
+      {/* Preview workflow cards */}
+      {HUB_CARDS.map((card) => (
+        <div
+          key={card.label}
+          style={{
+            position: "absolute",
+            left: card.x,
+            top: card.y,
+            width: 68,
+            height: 68,
+            borderRadius: 10,
+            backgroundColor: CARD_COLOR,
+            border: `1.5px solid ${NODE_BORDER_GREEN}`,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
+            gap: 4,
+          }}
+        >
+          {/* biome-ignore lint/a11y/useAltText: OG image render context */}
+          {/* biome-ignore lint/performance/noImgElement: Satori requires img */}
+          <img
+            height={20}
+            src={HUB_ICONS[card.label] ?? ICON_ZAP}
+            style={{ width: 20, height: 20 }}
+            width={20}
+          />
+          <div
+            style={{
+              fontSize: 8,
+              color: "rgba(255,255,255,0.55)",
+              fontWeight: 600,
+              textAlign: "center",
+            }}
+          >
+            {card.label}
+          </div>
+        </div>
+      ))}
+
+      {/* Top content */}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: "60%",
+          display: "flex",
+          flexDirection: "column",
+          padding: "40px 56px 0",
+        }}
+      >
+        <Header />
+        <div
+          style={{
+            display: "flex",
+            fontSize: 52,
+            fontWeight: 700,
+            color: "#ffffff",
+            marginTop: 36,
+            lineHeight: 1.15,
+          }}
+        >
+          Workflow Hub
+        </div>
+        <div
+          style={{
+            display: "flex",
+            fontSize: 22,
+            color: "rgba(255,255,255,0.5)",
+            marginTop: 14,
+            lineHeight: 1.4,
+          }}
+        >
+          Discover and deploy community-built blockchain automations
+        </div>
+      </div>
+
+      <Footer>
+        <div style={{ display: "flex" }}>Featured workflows</div>
+        <div style={{ display: "flex" }}>Community templates</div>
+        <div style={{ display: "flex" }}>One-click deploy</div>
+      </Footer>
+    </OGBase>,
+    86_400
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Workflow OG
+// ---------------------------------------------------------------------------
+
 type WorkflowNode = {
   id: string;
   position: { x: number; y: number };
-  data: {
-    type: "trigger" | "action" | "add";
-    label?: string;
-  };
+  data: { type: "trigger" | "action" | "add"; label?: string };
 };
 
 type WorkflowEdge = {
@@ -95,11 +421,7 @@ type WorkflowEdge = {
   target: string;
 };
 
-type Viewport = {
-  scale: number;
-  offsetX: number;
-  offsetY: number;
-};
+type Viewport = { scale: number; offsetX: number; offsetY: number };
 
 type EdgeLine = {
   id: string;
@@ -110,35 +432,14 @@ type EdgeLine = {
   midY: number;
 };
 
-type DotPosition = {
-  x: number;
-  y: number;
-};
-
-type OGRenderData = {
-  nodes: WorkflowNode[];
-  edges: EdgeLine[];
-  viewport: Viewport;
-  ns: number;
-  dots: DotPosition[];
-  title: string;
-  description: string | null;
-  triggerLabel: string | undefined;
-  actionCount: number;
-  category: string | null;
-  protocol: string | null;
-};
-
 function calculateViewport(
   nodes: WorkflowNode[],
-  width: number,
-  height: number,
   paddingTop: number,
   paddingBottom: number,
   paddingSides: number
 ): Viewport {
   if (nodes.length === 0) {
-    return { scale: 1, offsetX: width / 2, offsetY: height / 2 };
+    return { scale: 1, offsetX: OG_WIDTH / 2, offsetY: OG_HEIGHT / 2 };
   }
 
   const nodeSize = 192;
@@ -156,8 +457,8 @@ function calculateViewport(
 
   const contentWidth = maxX - minX || 1;
   const contentHeight = maxY - minY || 1;
-  const availableWidth = width - paddingSides * 2;
-  const availableHeight = height - paddingTop - paddingBottom;
+  const availableWidth = OG_WIDTH - paddingSides * 2;
+  const availableHeight = OG_HEIGHT - paddingTop - paddingBottom;
 
   const scale = Math.min(
     availableWidth / contentWidth,
@@ -170,7 +471,7 @@ function calculateViewport(
 
   return {
     scale,
-    offsetX: (width - scaledWidth) / 2 - minX * scale,
+    offsetX: (OG_WIDTH - scaledWidth) / 2 - minX * scale,
     offsetY: paddingTop + (availableHeight - scaledHeight) / 2 - minY * scale,
   };
 }
@@ -186,59 +487,54 @@ function transformPosition(
   };
 }
 
-function generateDots(
-  width: number,
-  height: number,
-  spacing: number
-): DotPosition[] {
-  const dots: DotPosition[] = [];
-  for (let x = spacing; x < width; x += spacing) {
-    for (let y = spacing; y < height; y += spacing) {
-      dots.push({ x, y });
-    }
-  }
-  return dots;
-}
-
 function buildEdgeLines(
   edges: WorkflowEdge[],
   nodeCenters: Map<string, { x: number; y: number }>
 ): EdgeLine[] {
   const lines: EdgeLine[] = [];
   for (const edge of edges) {
-    const sourceCenter = nodeCenters.get(edge.source);
-    const targetCenter = nodeCenters.get(edge.target);
-    if (sourceCenter && targetCenter) {
+    const src = nodeCenters.get(edge.source);
+    const tgt = nodeCenters.get(edge.target);
+    if (src && tgt) {
       lines.push({
         id: edge.id,
-        x1: sourceCenter.x,
-        y1: sourceCenter.y,
-        x2: targetCenter.x,
-        y2: targetCenter.y,
-        midY: (sourceCenter.y + targetCenter.y) / 2,
+        x1: src.x,
+        y1: src.y,
+        x2: tgt.x,
+        y2: tgt.y,
+        midY: (src.y + tgt.y) / 2,
       });
     }
   }
   return lines;
 }
 
-function prepareRenderData(
-  workflowData: {
-    name: string;
-    description: string | null;
-    nodes: unknown[];
-    edges: unknown[];
-    category: string | null;
-    protocol: string | null;
-  },
-  width: number,
-  height: number
-): OGRenderData {
+type OGRenderData = {
+  nodes: WorkflowNode[];
+  edges: EdgeLine[];
+  viewport: Viewport;
+  ns: number;
+  title: string;
+  description: string | null;
+  triggerLabel: string | undefined;
+  actionCount: number;
+  category: string | null;
+  protocol: string | null;
+};
+
+function prepareRenderData(workflowData: {
+  name: string;
+  description: string | null;
+  nodes: unknown[];
+  edges: unknown[];
+  category: string | null;
+  protocol: string | null;
+}): OGRenderData {
   const allNodes = (workflowData.nodes ?? []) as WorkflowNode[];
   const nodes = allNodes.filter((n) => n.data?.type !== "add" && n.position);
   const rawEdges = (workflowData.edges ?? []) as WorkflowEdge[];
 
-  const viewport = calculateViewport(nodes, width, height, 260, 120, 100);
+  const viewport = calculateViewport(nodes, 260, 120, 100);
   const ns = 192 * viewport.scale;
 
   const nodeCenters = new Map<string, { x: number; y: number }>();
@@ -254,7 +550,6 @@ function prepareRenderData(
     edges: buildEdgeLines(rawEdges, nodeCenters),
     viewport,
     ns,
-    dots: generateDots(width, height, DOT_SPACING),
     title: workflowData.name,
     description: workflowData.description,
     triggerLabel: triggerNode?.data.label,
@@ -264,63 +559,11 @@ function prepareRenderData(
   };
 }
 
-function truncate(text: string, max: number): string {
-  return text.length > max ? `${text.slice(0, max - 3)}...` : text;
-}
-
 function renderWorkflowOG(data: OGRenderData): ImageResponse {
-  const { nodes, edges, viewport, ns, dots } = data;
+  const { nodes, edges, viewport, ns } = data;
 
-  return new ImageResponse(
-    <div
-      style={{
-        width: "100%",
-        height: "100%",
-        display: "flex",
-        position: "relative",
-        backgroundColor: "#111827",
-      }}
-    >
-      {/* Dot pattern background */}
-      {dots.map((dot) => (
-        <div
-          key={`dot-${dot.x}-${dot.y}`}
-          style={{
-            position: "absolute",
-            left: dot.x - 1,
-            top: dot.y - 1,
-            width: 2,
-            height: 2,
-            borderRadius: 1,
-            backgroundColor: "rgba(255,255,255,0.35)",
-          }}
-        />
-      ))}
-
-      {/* Vignette + top/bottom fade in a single overlay to avoid seam lines */}
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background:
-            "radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.4) 100%)",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background:
-            "linear-gradient(180deg, rgba(17,24,39,0.95) 0%, rgba(17,24,39,0.85) 15%, rgba(17,24,39,0.4) 35%, rgba(17,24,39,0.3) 50%, rgba(17,24,39,0.4) 65%, rgba(17,24,39,0.6) 80%, rgba(17,24,39,0.95) 100%)",
-        }}
-      />
-
+  return renderOGImage(
+    <OGBase>
       {/* Edge lines - vertical from source */}
       {edges.map((line) => (
         <div
@@ -368,7 +611,7 @@ function renderWorkflowOG(data: OGRenderData): ImageResponse {
         />
       ))}
 
-      {/* Workflow nodes - icon + label inside card */}
+      {/* Workflow nodes */}
       {nodes.map((node) => {
         const pos = transformPosition(
           node.position.x,
@@ -390,7 +633,7 @@ function renderWorkflowOG(data: OGRenderData): ImageResponse {
               width: nodeSquare,
               height: nodeSquare,
               borderRadius: 12,
-              backgroundColor: "#1e293b",
+              backgroundColor: CARD_COLOR,
               border: `2px solid ${isTrigger ? NODE_BORDER_GREEN_BRIGHT : NODE_BORDER_GREEN}`,
               display: "flex",
               flexDirection: "column",
@@ -436,54 +679,7 @@ function renderWorkflowOG(data: OGRenderData): ImageResponse {
           padding: "40px 56px 0",
         }}
       >
-        {/* Header: logo + domain */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 10,
-            }}
-          >
-            {/* biome-ignore lint/a11y/useAltText: OG image render context */}
-            {/* biome-ignore lint/performance/noImgElement: Satori requires img */}
-            <img
-              height={28}
-              src={LOGO_SVG}
-              style={{ width: 18, height: 28 }}
-              width={18}
-            />
-            <div
-              style={{
-                display: "flex",
-                fontSize: 20,
-                fontWeight: 600,
-                color: "rgba(255,255,255,0.85)",
-              }}
-            >
-              KeeperHub
-            </div>
-          </div>
-          <div
-            style={{
-              display: "flex",
-              fontSize: 16,
-              color: "rgba(255,255,255,0.3)",
-            }}
-          >
-            app.keeperhub.com
-          </div>
-        </div>
-
-        {/* Title */}
+        <Header />
         <div
           style={{
             display: "flex",
@@ -496,8 +692,6 @@ function renderWorkflowOG(data: OGRenderData): ImageResponse {
         >
           {truncate(data.title, 50)}
         </div>
-
-        {/* Description */}
         {data.description ? (
           <div
             style={{
@@ -513,24 +707,7 @@ function renderWorkflowOG(data: OGRenderData): ImageResponse {
         ) : null}
       </div>
 
-      {/* Footer pinned to bottom */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: "18%",
-          display: "flex",
-          flexDirection: "row",
-          alignItems: "flex-end",
-          padding: "0 56px 36px",
-          gap: 32,
-          fontSize: 18,
-          fontWeight: 500,
-          color: "rgba(255,255,255,0.45)",
-        }}
-      >
+      <Footer>
         {data.triggerLabel ? (
           <div style={{ display: "flex" }}>{data.triggerLabel}</div>
         ) : null}
@@ -543,15 +720,9 @@ function renderWorkflowOG(data: OGRenderData): ImageResponse {
         {data.protocol ? (
           <div style={{ display: "flex" }}>{data.protocol}</div>
         ) : null}
-      </div>
-    </div>,
-    {
-      width: 1200,
-      height: 630,
-      headers: {
-        "Cache-Control": "public, max-age=3600, s-maxage=86400",
-      },
-    }
+      </Footer>
+    </OGBase>,
+    3600
   );
 }
 
@@ -580,23 +751,97 @@ export async function generateWorkflowOGImage(
       return new Response("Workflow is private", { status: 403 });
     }
 
-    const data = prepareRenderData(
-      {
-        name: workflow.name,
-        description: workflow.description,
-        // biome-ignore lint/suspicious/noExplicitAny: JSONB column type from Drizzle schema
-        nodes: workflow.nodes as any[],
-        // biome-ignore lint/suspicious/noExplicitAny: JSONB column type from Drizzle schema
-        edges: workflow.edges as any[],
-        category: workflow.category ?? null,
-        protocol: workflow.protocol ?? null,
-      },
-      1200,
-      630
-    );
+    const data = prepareRenderData({
+      name: workflow.name,
+      description: workflow.description,
+      // biome-ignore lint/suspicious/noExplicitAny: JSONB column type from Drizzle schema
+      nodes: workflow.nodes as any[],
+      // biome-ignore lint/suspicious/noExplicitAny: JSONB column type from Drizzle schema
+      edges: workflow.edges as any[],
+      category: workflow.category ?? null,
+      protocol: workflow.protocol ?? null,
+    });
 
     return renderWorkflowOG(data);
   } catch {
     return new Response("Failed to generate image", { status: 500 });
   }
+}
+
+// ---------------------------------------------------------------------------
+// Shared layout components
+// ---------------------------------------------------------------------------
+
+function Header(): React.JSX.Element {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 10,
+        }}
+      >
+        {/* biome-ignore lint/a11y/useAltText: OG image render context */}
+        {/* biome-ignore lint/performance/noImgElement: Satori requires img */}
+        <img
+          height={28}
+          src={LOGO_SVG}
+          style={{ width: 18, height: 28 }}
+          width={18}
+        />
+        <div
+          style={{
+            display: "flex",
+            fontSize: 20,
+            fontWeight: 600,
+            color: "rgba(255,255,255,0.85)",
+          }}
+        >
+          KeeperHub
+        </div>
+      </div>
+      <div
+        style={{
+          display: "flex",
+          fontSize: 16,
+          color: "rgba(255,255,255,0.3)",
+        }}
+      >
+        app.keeperhub.com
+      </div>
+    </div>
+  );
+}
+
+function Footer({ children }: { children: ReactNode }): React.JSX.Element {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: "18%",
+        display: "flex",
+        flexDirection: "row",
+        alignItems: "flex-end",
+        padding: "0 56px 36px",
+        gap: 32,
+        fontSize: 18,
+        fontWeight: 500,
+        color: "rgba(255,255,255,0.45)",
+      }}
+    >
+      {children}
+    </div>
+  );
 }

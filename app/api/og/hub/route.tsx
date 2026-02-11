@@ -1,5 +1,5 @@
 // start custom keeperhub code //
-import { generateHubOGImage } from "@/keeperhub/api/og/hub/generate-og-hub";
+import { generateHubOGImage } from "@/keeperhub/api/og/generate-og";
 
 export function GET(): Response {
   return generateHubOGImage();

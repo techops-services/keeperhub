@@ -1,9 +1,5 @@
 // start custom keeperhub code //
-// Replaces edge self-fetch approach with direct DB query.
-// Original used: fetch(`${baseUrl}/api/workflows/${workflowId}`) on edge runtime
-// which fails when external crawlers (Discord, Slack) hit it due to loopback/auth issues.
-// New approach queries DB directly from Node.js runtime via keeperhub module.
-import { generateWorkflowOGImage } from "@/keeperhub/api/og/workflow/generate-og-image";
+import { generateWorkflowOGImage } from "@/keeperhub/api/og/generate-og";
 
 export async function GET(
   _request: Request,
