@@ -47,6 +47,7 @@ export const currentWorkflowNameAtom = atom<string>("");
 export const currentWorkflowDescriptionAtom = atom<string>("");
 export const currentWorkflowCategoryAtom = atom<string>("");
 export const currentWorkflowProtocolAtom = atom<string>("");
+export const currentWorkflowProjectIdAtom = atom<string | null>(null);
 // end keeperhub code //
 export const currentWorkflowVisibilityAtom =
   atom<WorkflowVisibility>("private");
@@ -491,6 +492,7 @@ export const resetWorkflowStateForOrgSwitchAtom = atom(null, (_get, set) => {
   set(currentWorkflowDescriptionAtom, "");
   set(currentWorkflowCategoryAtom, "");
   set(currentWorkflowProtocolAtom, "");
+  set(currentWorkflowProjectIdAtom, null);
   set(currentWorkflowVisibilityAtom, "private");
   set(isWorkflowOwnerAtom, true);
   set(isWorkflowEnabled, false);

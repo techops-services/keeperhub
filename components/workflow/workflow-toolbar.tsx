@@ -32,12 +32,15 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { OrgSwitcher } from "@/keeperhub/components/organization/org-switcher";
 // start custom keeperhub code //
 import { Switch } from "@/keeperhub/components/ui/switch";
-import { api } from "@/lib/api-client";
+import { api, type Project } from "@/lib/api-client";
 import { authClient, useSession } from "@/lib/auth-client";
 import { getCustomLogo } from "@/lib/extension-registry";
 import { integrationsAtom } from "@/lib/integrations-store";
@@ -716,16 +719,26 @@ function useWorkflowState() {
       id: string;
       name: string;
       updatedAt: string;
+      projectId?: string | null;
     }>
   >([]);
+  // start custom keeperhub code //
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
+  // end keeperhub code //
   const [isEnabled, setIsEnabled] = useAtom(isWorkflowEnabled);
 
-  // Load all workflows on mount
+  // Load all workflows and projects on mount
   useEffect(() => {
     const loadAllWorkflows = async () => {
       try {
-        const workflows = await api.workflow.getAll();
+        // start custom keeperhub code //
+        const [workflows, projects] = await Promise.all([
+          api.workflow.getAll(),
+          api.project.getAll().catch(() => [] as Project[]),
+        ]);
         setAllWorkflows(workflows);
+        setAllProjects(projects);
+        // end keeperhub code //
       } catch (error) {
         console.error("Failed to load workflows:", error);
       }
@@ -764,6 +777,8 @@ function useWorkflowState() {
     setIsDuplicating,
     allWorkflows,
     setAllWorkflows,
+    allProjects, // keeperhub custom field //
+    setAllProjects, // keeperhub custom field //
     setActiveTab,
     setNodes,
     setEdges,
@@ -793,6 +808,7 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     clearWorkflow,
     setWorkflowVisibility,
     setAllWorkflows,
+    setAllProjects, // keeperhub custom field //
     setIsDownloading,
     setIsDuplicating,
     setActiveTab,
@@ -924,8 +940,14 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
 
   const loadWorkflows = async () => {
     try {
-      const workflows = await api.workflow.getAll();
+      // start custom keeperhub code //
+      const [workflows, projects] = await Promise.all([
+        api.workflow.getAll(),
+        api.project.getAll().catch(() => [] as Project[]),
+      ]);
       setAllWorkflows(workflows);
+      setAllProjects(projects);
+      // end keeperhub code //
     } catch (error) {
       console.error("Failed to load workflows:", error);
     }
@@ -1642,26 +1664,109 @@ function WorkflowMenuComponent({
               </span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            {state.allWorkflows.length === 0 ? (
-              <DropdownMenuItem disabled>No workflows found</DropdownMenuItem>
-            ) : (
-              state.allWorkflows
-                .filter((w) => w.name !== "__current__")
-                .map((workflow) => (
-                  <DropdownMenuItem
-                    className="flex items-center justify-between"
-                    key={workflow.id}
-                    onClick={() =>
-                      state.router.push(`/workflows/${workflow.id}`)
-                    }
-                  >
-                    <span className="truncate">{workflow.name}</span>
-                    {workflow.id === routeWorkflowId && (
-                      <Check className="size-4 shrink-0" />
-                    )}
+            {/* start custom keeperhub code */}
+            {(() => {
+              const visibleWorkflows = state.allWorkflows.filter(
+                (w) => w.name !== "__current__"
+              );
+
+              if (visibleWorkflows.length === 0) {
+                return (
+                  <DropdownMenuItem disabled>
+                    No workflows found
                   </DropdownMenuItem>
-                ))
-            )}
+                );
+              }
+
+              const workflowsByProject: Record<
+                string,
+                typeof visibleWorkflows
+              > = {};
+              const uncategorized: typeof visibleWorkflows = [];
+
+              for (const workflow of visibleWorkflows) {
+                if (workflow.projectId) {
+                  if (!workflowsByProject[workflow.projectId]) {
+                    workflowsByProject[workflow.projectId] = [];
+                  }
+                  workflowsByProject[workflow.projectId].push(workflow);
+                } else {
+                  uncategorized.push(workflow);
+                }
+              }
+
+              const hasProjects = state.allProjects.length > 0;
+
+              return (
+                <>
+                  {hasProjects &&
+                    state.allProjects.map((project) => {
+                      const projectWorkflows =
+                        workflowsByProject[project.id] || [];
+                      return (
+                        <DropdownMenuSub key={project.id}>
+                          <DropdownMenuSubTrigger className="flex items-center gap-2">
+                            <span
+                              className="inline-block size-2.5 shrink-0 rounded-full"
+                              style={{
+                                backgroundColor: project.color ?? "#888",
+                              }}
+                            />
+                            <span className="truncate">{project.name}</span>
+                            <span className="ml-auto rounded-full bg-muted px-1.5 py-0.5 font-medium text-muted-foreground text-xs">
+                              {project.workflowCount}
+                            </span>
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent className="w-56">
+                            {projectWorkflows.length === 0 ? (
+                              <DropdownMenuItem disabled>
+                                No workflows
+                              </DropdownMenuItem>
+                            ) : (
+                              projectWorkflows.map((workflow) => (
+                                <DropdownMenuItem
+                                  className="flex items-center justify-between"
+                                  key={workflow.id}
+                                  onClick={() =>
+                                    state.router.push(
+                                      `/workflows/${workflow.id}`
+                                    )
+                                  }
+                                >
+                                  <span className="truncate">
+                                    {workflow.name}
+                                  </span>
+                                  {workflow.id === routeWorkflowId && (
+                                    <Check className="size-4 shrink-0" />
+                                  )}
+                                </DropdownMenuItem>
+                              ))
+                            )}
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                      );
+                    })}
+                  {hasProjects && uncategorized.length > 0 && (
+                    <DropdownMenuSeparator />
+                  )}
+                  {uncategorized.map((workflow) => (
+                    <DropdownMenuItem
+                      className="flex items-center justify-between"
+                      key={workflow.id}
+                      onClick={() =>
+                        state.router.push(`/workflows/${workflow.id}`)
+                      }
+                    >
+                      <span className="truncate">{workflow.name}</span>
+                      {workflow.id === routeWorkflowId && (
+                        <Check className="size-4 shrink-0" />
+                      )}
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              );
+            })()}
+            {/* end keeperhub code */}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

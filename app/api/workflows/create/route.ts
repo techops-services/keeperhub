@@ -191,6 +191,7 @@ export async function POST(request: Request) {
         // start custom keeperhub code //
         organizationId,
         isAnonymous,
+        projectId: body.projectId || null,
         // end keeperhub code //
       })
       .returning();

@@ -438,6 +438,25 @@ export async function GET(request: Request) {
       },
     },
 
+    // Projects - workflow grouping
+    projects: {
+      description:
+        "Workflows can be organized into projects. Use projectId when creating or updating workflows to assign them to a project.",
+      endpoints: {
+        list: "GET /api/projects - List all projects for the org (includes workflowCount)",
+        create:
+          "POST /api/projects - Create project with { name, description?, color? }",
+        update:
+          "PATCH /api/projects/:id - Update project name/description/color",
+        delete:
+          "DELETE /api/projects/:id - Delete project (workflows become uncategorized)",
+      },
+      workflowFields: {
+        projectId:
+          "string | null - Optional project ID to assign the workflow to. Pass null to unassign.",
+      },
+    },
+
     // Tips for AI workflow generation
     tips: [
       "actionType must match exactly (e.g., 'web3/check-balance', not 'Get Wallet Balance')",
@@ -449,6 +468,7 @@ export async function GET(request: Request) {
       "integrationId is required for actions that need credentials (discord, sendgrid, database)",
       "web3 read actions (check-balance, read-contract) don't require wallet integration",
       "web3 write actions (transfer-funds, write-contract) require wallet integration",
+      "Use projectId to organize related workflows into a project (e.g., all Sky ESM workflows in one project)",
     ],
   };
 
