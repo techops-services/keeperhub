@@ -12,7 +12,7 @@
         "--rm",
         "--pull=always",
         "-e",
-        "KEEPERHUB_API_KEY",
+        "KEEPERHUB_API_KEY=your-api-key-here",
         "-e",
         "KEEPERHUB_API_URL=https://app.keeperhub.com",
         "ghcr.io/techops-services/keeperhub-mcp:latest"

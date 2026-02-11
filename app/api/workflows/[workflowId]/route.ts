@@ -184,6 +184,7 @@ function buildUpdateData(
     "enabled", // keeperhub custom field //
     "category", // keeperhub custom field //
     "protocol", // keeperhub custom field //
+    "projectId", // keeperhub custom field //
   ];
   for (const field of fields) {
     if (body[field] !== undefined) {
