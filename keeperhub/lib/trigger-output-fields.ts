@@ -117,12 +117,40 @@ export function getEventTriggerOutputFields(
 }
 
 /**
+ * Get output fields for Block trigger
+ */
+export function getBlockTriggerOutputFields(): OutputField[] {
+  return [
+    {
+      field: "blockNumber",
+      description: "The block height",
+    },
+    {
+      field: "blockHash",
+      description: "Hash of the block",
+    },
+    {
+      field: "blockTimestamp",
+      description: "Unix timestamp of the block",
+    },
+    {
+      field: "parentHash",
+      description: "Hash of the parent block",
+    },
+  ];
+}
+
+/**
  * Get output fields for a trigger node based on its configuration
  */
 export function getTriggerOutputFields(
   triggerType: string | undefined,
   config: Record<string, unknown>
 ): OutputField[] {
+  if (triggerType === "Block") {
+    return getBlockTriggerOutputFields();
+  }
+
   if (triggerType === "Event") {
     const abi = config.contractABI as string | undefined;
     const eventName = config.eventName as string | undefined;

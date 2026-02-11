@@ -1199,7 +1199,8 @@ function ToolbarActions({
 
   const shouldDisplayEnableWorkflowSwitch =
     triggerType === WorkflowTriggerEnum.EVENT ||
-    triggerType === WorkflowTriggerEnum.SCHEDULE;
+    triggerType === WorkflowTriggerEnum.SCHEDULE ||
+    triggerType === WorkflowTriggerEnum.BLOCK;
 
   return (
     <>
@@ -1481,13 +1482,15 @@ function RunButtonGroup({
   const triggerType = state.nodes.find((node) => node.data.type === "trigger")
     ?.data.config?.triggerType;
 
-  const isEventTrigger = triggerType === WorkflowTriggerEnum.EVENT;
+  const isNonManualTrigger =
+    triggerType === WorkflowTriggerEnum.EVENT ||
+    triggerType === WorkflowTriggerEnum.BLOCK;
 
   const disabled =
     state.isExecuting ||
     state.nodes.length === 0 ||
     state.isGenerating ||
-    isEventTrigger;
+    isNonManualTrigger;
   // end custom keeperhub code //
 
   const button = (
@@ -1508,7 +1511,7 @@ function RunButtonGroup({
   );
 
   // start custom keeperhub code //
-  if (isEventTrigger) {
+  if (isNonManualTrigger) {
     return (
       <TooltipProvider>
         <Tooltip>
@@ -1517,7 +1520,7 @@ function RunButtonGroup({
             <span className="inline-block">{button}</span>
           </TooltipTrigger>
           <TooltipContent align="center" side="bottom">
-            Manual runs are not available for Workflows with Event trigger
+            {`Manual runs are not available for Workflows with ${triggerType} trigger`}
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
