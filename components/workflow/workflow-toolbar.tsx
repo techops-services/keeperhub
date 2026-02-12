@@ -22,7 +22,7 @@ import { nanoid } from "nanoid";
 // start custom KeeperHub code
 import { useParams, usePathname, useRouter } from "next/navigation";
 // end custom KeeperHub code
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
@@ -40,7 +41,7 @@ import {
 import { OrgSwitcher } from "@/keeperhub/components/organization/org-switcher";
 // start custom keeperhub code //
 import { Switch } from "@/keeperhub/components/ui/switch";
-import { api, type Project } from "@/lib/api-client";
+import { api, type Project, type Tag } from "@/lib/api-client";
 import { authClient, useSession } from "@/lib/auth-client";
 import { getCustomLogo } from "@/lib/extension-registry";
 import { integrationsAtom } from "@/lib/integrations-store";
@@ -720,10 +721,12 @@ function useWorkflowState() {
       name: string;
       updatedAt: string;
       projectId?: string | null;
+      tagId?: string | null;
     }>
   >([]);
   // start custom keeperhub code //
   const [allProjects, setAllProjects] = useState<Project[]>([]);
+  const [allTags, setAllTags] = useState<Tag[]>([]);
   // end keeperhub code //
   const [isEnabled, setIsEnabled] = useAtom(isWorkflowEnabled);
 
@@ -732,12 +735,14 @@ function useWorkflowState() {
     const loadAllWorkflows = async () => {
       try {
         // start custom keeperhub code //
-        const [workflows, projects] = await Promise.all([
+        const [workflows, projects, tags] = await Promise.all([
           api.workflow.getAll(),
           api.project.getAll().catch(() => [] as Project[]),
+          api.tag.getAll().catch(() => [] as Tag[]),
         ]);
         setAllWorkflows(workflows);
         setAllProjects(projects);
+        setAllTags(tags);
         // end keeperhub code //
       } catch (error) {
         console.error("Failed to load workflows:", error);
@@ -779,6 +784,8 @@ function useWorkflowState() {
     setAllWorkflows,
     allProjects, // keeperhub custom field //
     setAllProjects, // keeperhub custom field //
+    allTags, // keeperhub custom field //
+    setAllTags, // keeperhub custom field //
     setActiveTab,
     setNodes,
     setEdges,
@@ -809,6 +816,7 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     setWorkflowVisibility,
     setAllWorkflows,
     setAllProjects, // keeperhub custom field //
+    setAllTags, // keeperhub custom field //
     setIsDownloading,
     setIsDuplicating,
     setActiveTab,
@@ -941,12 +949,14 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
   const loadWorkflows = async () => {
     try {
       // start custom keeperhub code //
-      const [workflows, projects] = await Promise.all([
+      const [workflows, projects, tags] = await Promise.all([
         api.workflow.getAll(),
         api.project.getAll().catch(() => [] as Project[]),
+        api.tag.getAll().catch(() => [] as Tag[]),
       ]);
       setAllWorkflows(workflows);
       setAllProjects(projects);
+      setAllTags(tags);
       // end keeperhub code //
     } catch (error) {
       console.error("Failed to load workflows:", error);
@@ -1076,6 +1086,154 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     handleDuplicate,
   };
 }
+
+// start custom keeperhub code //
+type WorkflowEntry = {
+  id: string;
+  name: string;
+  updatedAt: string;
+  projectId?: string | null;
+  tagId?: string | null;
+};
+
+function groupWorkflows(workflows: WorkflowEntry[]): {
+  byProject: Record<string, WorkflowEntry[]>;
+  byTag: Record<string, WorkflowEntry[]>;
+  ungrouped: WorkflowEntry[];
+} {
+  const byProject: Record<string, WorkflowEntry[]> = {};
+  const byTag: Record<string, WorkflowEntry[]> = {};
+  const ungrouped: WorkflowEntry[] = [];
+
+  for (const workflow of workflows) {
+    if (workflow.projectId) {
+      if (!byProject[workflow.projectId]) {
+        byProject[workflow.projectId] = [];
+      }
+      byProject[workflow.projectId].push(workflow);
+    } else if (workflow.tagId) {
+      if (!byTag[workflow.tagId]) {
+        byTag[workflow.tagId] = [];
+      }
+      byTag[workflow.tagId].push(workflow);
+    } else {
+      ungrouped.push(workflow);
+    }
+  }
+
+  return { byProject, byTag, ungrouped };
+}
+
+function WorkflowListItems({
+  workflows,
+  projects,
+  tags,
+  activeWorkflowId,
+  onSelect,
+}: {
+  workflows: WorkflowEntry[];
+  projects: Project[];
+  tags: Tag[];
+  activeWorkflowId: string | undefined;
+  onSelect: (id: string) => void;
+}): React.ReactNode {
+  const visibleWorkflows = workflows.filter((w) => w.name !== "__current__");
+
+  if (visibleWorkflows.length === 0) {
+    return <DropdownMenuItem disabled>No workflows found</DropdownMenuItem>;
+  }
+
+  const { byProject, ungrouped } = groupWorkflows(visibleWorkflows);
+  const tagMap = new Map(tags.map((t) => [t.id, t]));
+  const hasProjects = projects.length > 0;
+
+  const renderItem = (workflow: WorkflowEntry): React.ReactNode => (
+    <DropdownMenuItem
+      className="flex items-center justify-between"
+      key={workflow.id}
+      onClick={() => onSelect(workflow.id)}
+    >
+      <span className="truncate">{workflow.name}</span>
+      {workflow.id === activeWorkflowId && (
+        <Check className="size-4 shrink-0" />
+      )}
+    </DropdownMenuItem>
+  );
+
+  const renderProjectWorkflows = (items: WorkflowEntry[]): React.ReactNode => {
+    const byTagInProject: Record<string, WorkflowEntry[]> = {};
+    const untagged: WorkflowEntry[] = [];
+
+    for (const w of items) {
+      if (w.tagId) {
+        if (!byTagInProject[w.tagId]) {
+          byTagInProject[w.tagId] = [];
+        }
+        byTagInProject[w.tagId].push(w);
+      } else {
+        untagged.push(w);
+      }
+    }
+
+    const tagIds = Object.keys(byTagInProject);
+    if (tagIds.length === 0) {
+      return items.map(renderItem);
+    }
+
+    return (
+      <>
+        {tagIds.map((tagId, index) => {
+          const tag = tagMap.get(tagId);
+          return (
+            <Fragment key={tagId}>
+              {index > 0 && <DropdownMenuSeparator />}
+              <DropdownMenuLabel className="flex items-center gap-1.5 py-1 text-xs">
+                <span
+                  className="inline-block size-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: tag?.color ?? "#888" }}
+                />
+                {tag?.name ?? "Unknown"}
+              </DropdownMenuLabel>
+              {byTagInProject[tagId].map(renderItem)}
+            </Fragment>
+          );
+        })}
+        {untagged.length > 0 && <DropdownMenuSeparator />}
+        {untagged.map(renderItem)}
+      </>
+    );
+  };
+
+  return (
+    <>
+      {hasProjects &&
+        projects.map((project) => {
+          const projectWorkflows = byProject[project.id] || [];
+          return (
+            <DropdownMenuSub key={project.id}>
+              <DropdownMenuSubTrigger className="flex items-center gap-2">
+                <span
+                  className="inline-block size-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: project.color ?? "#888" }}
+                />
+                <span className="truncate">{project.name}</span>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="w-56">
+                {projectWorkflows.length === 0 ? (
+                  <DropdownMenuItem disabled>No workflows</DropdownMenuItem>
+                ) : (
+                  renderProjectWorkflows(projectWorkflows)
+                )}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          );
+        })}
+      {hasProjects && ungrouped.length > 0 && <DropdownMenuSeparator />}
+      {ungrouped.map(renderItem)}
+    </>
+  );
+}
+// end keeperhub code //
 
 // Toolbar Actions Component - handles add step, undo/redo, save, and run buttons
 function ToolbarActions({
@@ -1668,107 +1826,17 @@ function WorkflowMenuComponent({
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             {/* start custom keeperhub code */}
-            {(() => {
-              const visibleWorkflows = state.allWorkflows.filter(
-                (w) => w.name !== "__current__"
-              );
-
-              if (visibleWorkflows.length === 0) {
-                return (
-                  <DropdownMenuItem disabled>
-                    No workflows found
-                  </DropdownMenuItem>
-                );
+            <WorkflowListItems
+              activeWorkflowId={
+                typeof routeWorkflowId === "string"
+                  ? routeWorkflowId
+                  : undefined
               }
-
-              const workflowsByProject: Record<
-                string,
-                typeof visibleWorkflows
-              > = {};
-              const uncategorized: typeof visibleWorkflows = [];
-
-              for (const workflow of visibleWorkflows) {
-                if (workflow.projectId) {
-                  if (!workflowsByProject[workflow.projectId]) {
-                    workflowsByProject[workflow.projectId] = [];
-                  }
-                  workflowsByProject[workflow.projectId].push(workflow);
-                } else {
-                  uncategorized.push(workflow);
-                }
-              }
-
-              const hasProjects = state.allProjects.length > 0;
-
-              return (
-                <>
-                  {hasProjects &&
-                    state.allProjects.map((project) => {
-                      const projectWorkflows =
-                        workflowsByProject[project.id] || [];
-                      return (
-                        <DropdownMenuSub key={project.id}>
-                          <DropdownMenuSubTrigger className="flex items-center gap-2">
-                            <span
-                              className="inline-block size-2.5 shrink-0 rounded-full"
-                              style={{
-                                backgroundColor: project.color ?? "#888",
-                              }}
-                            />
-                            <span className="truncate">{project.name}</span>
-                            <span className="ml-auto rounded-full bg-muted px-1.5 py-0.5 font-medium text-muted-foreground text-xs">
-                              {project.workflowCount}
-                            </span>
-                          </DropdownMenuSubTrigger>
-                          <DropdownMenuSubContent className="w-56">
-                            {projectWorkflows.length === 0 ? (
-                              <DropdownMenuItem disabled>
-                                No workflows
-                              </DropdownMenuItem>
-                            ) : (
-                              projectWorkflows.map((workflow) => (
-                                <DropdownMenuItem
-                                  className="flex items-center justify-between"
-                                  key={workflow.id}
-                                  onClick={() =>
-                                    state.router.push(
-                                      `/workflows/${workflow.id}`
-                                    )
-                                  }
-                                >
-                                  <span className="truncate">
-                                    {workflow.name}
-                                  </span>
-                                  {workflow.id === routeWorkflowId && (
-                                    <Check className="size-4 shrink-0" />
-                                  )}
-                                </DropdownMenuItem>
-                              ))
-                            )}
-                          </DropdownMenuSubContent>
-                        </DropdownMenuSub>
-                      );
-                    })}
-                  {hasProjects && uncategorized.length > 0 && (
-                    <DropdownMenuSeparator />
-                  )}
-                  {uncategorized.map((workflow) => (
-                    <DropdownMenuItem
-                      className="flex items-center justify-between"
-                      key={workflow.id}
-                      onClick={() =>
-                        state.router.push(`/workflows/${workflow.id}`)
-                      }
-                    >
-                      <span className="truncate">{workflow.name}</span>
-                      {workflow.id === routeWorkflowId && (
-                        <Check className="size-4 shrink-0" />
-                      )}
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              );
-            })()}
+              onSelect={(id) => state.router.push(`/workflows/${id}`)}
+              projects={state.allProjects}
+              tags={state.allTags}
+              workflows={state.allWorkflows}
+            />
             {/* end keeperhub code */}
           </DropdownMenuContent>
         </DropdownMenu>
