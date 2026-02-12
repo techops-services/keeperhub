@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import {
   deleteIntegration,
   getIntegration,
+  stripDatabaseSecrets,
   updateIntegration,
 } from "@/lib/db/integrations";
 import type { IntegrationConfig } from "@/lib/types/integration";
@@ -62,14 +63,16 @@ export async function GET(
       );
     }
 
+    // start custom keeperhub code //
     const response: GetIntegrationResponse = {
       id: integration.id,
       name: integration.name,
       type: integration.type,
-      config: integration.config,
+      config: stripDatabaseSecrets(integration.config, integration.type),
       createdAt: integration.createdAt.toISOString(),
       updatedAt: integration.updatedAt.toISOString(),
     };
+    // end keeperhub code //
 
     return NextResponse.json(response);
   } catch (error) {
@@ -109,12 +112,29 @@ export async function PUT(
 
     const body: UpdateIntegrationRequest = await request.json();
 
+    // start custom keeperhub code //
+    // Fetch existing integration so updateIntegration can merge database
+    // secrets without an extra DB round-trip.
+    const existing =
+      body.config !== undefined
+        ? await getIntegration(integrationId, session.user.id, organizationId)
+        : null;
+
+    if (body.config !== undefined && !existing) {
+      return NextResponse.json(
+        { error: "Integration not found" },
+        { status: 404 }
+      );
+    }
+    // end keeperhub code //
+
     const integration = await updateIntegration(
       integrationId,
       session.user.id,
       body,
       // start custom keeperhub code //
-      organizationId
+      organizationId,
+      existing
       // end keeperhub code //
     );
 
@@ -125,14 +145,16 @@ export async function PUT(
       );
     }
 
+    // start custom keeperhub code //
     const response: GetIntegrationResponse = {
       id: integration.id,
       name: integration.name,
       type: integration.type,
-      config: integration.config,
+      config: stripDatabaseSecrets(integration.config, integration.type),
       createdAt: integration.createdAt.toISOString(),
       updatedAt: integration.updatedAt.toISOString(),
     };
+    // end keeperhub code //
 
     return NextResponse.json(response);
   } catch (error) {
