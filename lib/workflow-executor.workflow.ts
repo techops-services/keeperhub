@@ -765,11 +765,10 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
     if (node.data.type === "action") {
       const actionType = node.data.config?.actionType as string;
       if (actionType) {
-        // Look up the human-readable label from the step registry
-        const label = getActionLabel(actionType);
-        if (label) {
-          return label;
-        }
+        // Look up the human-readable label from the step registry;
+        // fall back to actionType itself (system actions like "HTTP Request",
+        // "Database Query", "Condition" use their type name as the label)
+        return getActionLabel(actionType) ?? actionType;
       }
       return "Action";
     }
