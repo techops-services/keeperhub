@@ -1,48 +1,358 @@
 
-> ai-workflow-builder-template@0.1.0 check /Users/taitsengstock/Documents/GitHub/techops-workflow-builder-template
+> ai-workflow-builder-template@0.1.0 check /home/ot/maker/git/techops-services/keeperhub
 > npx ultracite@latest check
 
-components/workflow/node-config-panel.tsx:614:20 lint/suspicious/noEmptyBlockStatements ━━━━━━━━━━━━
+npm warn Unknown env config "verify-deps-before-run". This will stop working in the next major version of npm.
+npm warn Unknown env config "npm-globalconfig". This will stop working in the next major version of npm.
+npm warn Unknown env config "_jsr-registry". This will stop working in the next major version of npm.
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +3
++++
+Progress: resolved 9, reused 3, downloaded 0, added 3, done
+.history/app/(authenticated)/billing/checkout/page_20260119214907.tsx:24:25 lint/complexity/noExcessiveCognitiveComplexity ━━━━━━━━━━
 
-  × Unexpected empty block.
+  × Excessive complexity of 27 detected (max: 15).
   
-    612 │       .getTaxonomy()
-    613 │       .then(setTaxonomyOptions)
-  > 614 │       .catch(() => {});
-        │                    ^^
-    615 │   }, []);
-    616 │ 
+    22 │ const CREDITS_CONTRACT = process.env.NEXT_PUBLIC_CREDITS_CONTRACT_ADDRESS || "";
+    23 │ 
+  > 24 │ export default function CheckoutPage() {
+       │                         ^^^^^^^^^^^^
+    25 │   const searchParams = useSearchParams();
+    26 │   const router = useRouter();
   
-  i Empty blocks are usually the result of an incomplete refactoring. Remove the empty block or add a comment inside it if it is intentional.
-  
-
-keeperhub/api/workflows/taxonomy/route.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  × Formatter would have printed the following content:
-  
-    11 11 │           .from(workflows)
-    12 12 │           .where(
-    13    │ - ··········and(
-    14    │ - ············eq(workflows.visibility,·"public"),
-    15    │ - ············isNotNull(workflows.category)
-    16    │ - ··········)
-       13 │ + ··········and(eq(workflows.visibility,·"public"),·isNotNull(workflows.category))
-    17 14 │           )
-    18 15 │           .then((rows) =>
-    ····· │ 
-    25 22 │           .from(workflows)
-    26 23 │           .where(
-    27    │ - ··········and(
-    28    │ - ············eq(workflows.visibility,·"public"),
-    29    │ - ············isNotNull(workflows.protocol)
-    30    │ - ··········)
-       24 │ + ··········and(eq(workflows.visibility,·"public"),·isNotNull(workflows.protocol))
-    31 25 │           )
-    32 26 │           .then((rows) =>
+  i Please refactor this function to reduce its complexity score from 27 to the max allowed complexity 15.
   
 
-Checked 429 files in 242ms. No fixes applied.
-Found 2 errors.
+.history/app/(authenticated)/billing/checkout/page_20260119214907.tsx:164:26 lint/suspicious/useAwait ━━━━━━━━━━
+
+  × This async function lacks an await expression.
+  
+    162 │   };
+    163 │ 
+  > 164 │   const handlePurchase = async () => {
+        │                          ^^^^^^^^^^^^^
+  > 165 │     if (!(address && ethAmount && organizationId)) return;
+         ...
+  > 200 │     }
+  > 201 │   };
+        │   ^
+    202 │ 
+    203 │   if (hasError) {
+  
+  i Remove this async modifier, or add an await expression in the function.
+  
+    162 │   };
+    163 │ 
+  > 164 │   const handlePurchase = async () => {
+        │                          ^^^^^^^^^^^^^
+  > 165 │     if (!(address && ethAmount && organizationId)) return;
+         ...
+  > 200 │     }
+  > 201 │   };
+        │   ^
+    202 │ 
+    203 │   if (hasError) {
+  
+  i Async functions without await expressions may not need to be declared async.
+  
+
+.history/app/(authenticated)/billing/checkout/page_20260119214907.tsx:165:5 lint/style/useBlockStatements  FIXABLE  ━━━━━━━━━━
+
+  × Block statements are preferred in this position.
+  
+    164 │   const handlePurchase = async () => {
+  > 165 │     if (!(address && ethAmount && organizationId)) return;
+        │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    166 │ 
+    167 │     // Check if user is on the correct network
+  
+  i Unsafe fix: Wrap the statement with a `JsBlockStatement`
+  
+    165 │ ····if·(!(address·&&·ethAmount·&&·organizationId))·{·return;·}
+        │                                                    ++       ++
+
+.history/app/(authenticated)/billing/checkout/page_20260119214943.tsx:24:25 lint/complexity/noExcessiveCognitiveComplexity ━━━━━━━━━━
+
+  × Excessive complexity of 27 detected (max: 15).
+  
+    22 │ const CREDITS_CONTRACT = process.env.NEXT_PUBLIC_CREDITS_CONTRACT_ADDRESS || "";
+    23 │ 
+  > 24 │ export default function CheckoutPage() {
+       │                         ^^^^^^^^^^^^
+    25 │   const searchParams = useSearchParams();
+    26 │   const router = useRouter();
+  
+  i Please refactor this function to reduce its complexity score from 27 to the max allowed complexity 15.
+  
+
+.history/app/(authenticated)/billing/checkout/page_20260119214943.tsx:164:26 lint/suspicious/useAwait ━━━━━━━━━━
+
+  × This async function lacks an await expression.
+  
+    162 │   };
+    163 │ 
+  > 164 │   const handlePurchase = async () => {
+        │                          ^^^^^^^^^^^^^
+  > 165 │     if (!(address && ethAmount && organizationId)) return;
+         ...
+  > 200 │     }
+  > 201 │   };
+        │   ^
+    202 │ 
+    203 │   if (hasError) {
+  
+  i Remove this async modifier, or add an await expression in the function.
+  
+    162 │   };
+    163 │ 
+  > 164 │   const handlePurchase = async () => {
+        │                          ^^^^^^^^^^^^^
+  > 165 │     if (!(address && ethAmount && organizationId)) return;
+         ...
+  > 200 │     }
+  > 201 │   };
+        │   ^
+    202 │ 
+    203 │   if (hasError) {
+  
+  i Async functions without await expressions may not need to be declared async.
+  
+
+.history/app/(authenticated)/billing/checkout/page_20260119214943.tsx:165:5 lint/style/useBlockStatements  FIXABLE  ━━━━━━━━━━
+
+  × Block statements are preferred in this position.
+  
+    164 │   const handlePurchase = async () => {
+  > 165 │     if (!(address && ethAmount && organizationId)) return;
+        │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    166 │ 
+    167 │     // Check if user is on the correct network
+  
+  i Unsafe fix: Wrap the statement with a `JsBlockStatement`
+  
+    165 │ ····if·(!(address·&&·ethAmount·&&·organizationId))·{·return;·}
+        │                                                    ++       ++
+
+.history/app/(authenticated)/billing/checkout/page_20260119214943.tsx lint/style/useFilenamingConvention ━━━━━━━━━━
+
+  × The filename should be in kebab-case.
+  
+  i The filename could be renamed to one of the following names:
+    page-20260119214943.tsx
+  
+
+.history/app/(authenticated)/billing/checkout/page_20260119214943.tsx:129:3 lint/correctness/useExhaustiveDependencies  FIXABLE  ━━━━━━━━━━
+
+  × This hook does not specify its dependency on router.
+  
+    128 │   // Confirm deposit after transaction is mined
+  > 129 │   useEffect(() => {
+        │   ^^^^^^^^^
+    130 │     if (isConfirmed && txHash && organizationId) {
+    131 │       const confirmDeposit = async () => {
+  
+  i This dependency is being used here, but is not specified in the hook dependency list.
+  
+    136 │           );
+    137 │           toast.success(`${result.credits} credits added!`);
+  > 138 │           router.push("/billing");
+        │           ^^^^^^
+    139 │         } catch (error) {
+    140 │           console.error("Failed to confirm:", error);
+  
+  i React relies on hook dependencies to determine when to re-compute Effects.
+    Failing to specify dependencies can result in Effects not updating correctly when state changes.
+    These "stale closures" are a common source of surprising bugs.
+  
+  i Unsafe fix: Add the missing dependency to the list.
+  
+    146 │ ··},·[isConfirmed,·txHash,·organizationId,·router]);
+        │                                          ++++++++   
+
+.history/app/(authenticated)/billing/checkout/page_20260119215116.tsx:24:25 lint/complexity/noExcessiveCognitiveComplexity ━━━━━━━━━━
+
+  × Excessive complexity of 27 detected (max: 15).
+  
+    22 │ const CREDITS_CONTRACT = process.env.NEXT_PUBLIC_CREDITS_CONTRACT_ADDRESS || "";
+    23 │ 
+  > 24 │ export default function CheckoutPage() {
+       │                         ^^^^^^^^^^^^
+    25 │   const searchParams = useSearchParams();
+    26 │   const router = useRouter();
+  
+  i Please refactor this function to reduce its complexity score from 27 to the max allowed complexity 15.
+  
+
+.history/app/(authenticated)/billing/checkout/page_20260119215116.tsx:164:26 lint/suspicious/useAwait ━━━━━━━━━━
+
+  × This async function lacks an await expression.
+  
+    162 │   };
+    163 │ 
+  > 164 │   const handlePurchase = async () => {
+        │                          ^^^^^^^^^^^^^
+  > 165 │     if (!(address && ethAmount && organizationId)) return;
+         ...
+  > 200 │     }
+  > 201 │   };
+        │   ^
+    202 │ 
+    203 │   if (hasError) {
+  
+  i Remove this async modifier, or add an await expression in the function.
+  
+    162 │   };
+    163 │ 
+  > 164 │   const handlePurchase = async () => {
+        │                          ^^^^^^^^^^^^^
+  > 165 │     if (!(address && ethAmount && organizationId)) return;
+         ...
+  > 200 │     }
+  > 201 │   };
+        │   ^
+    202 │ 
+    203 │   if (hasError) {
+  
+  i Async functions without await expressions may not need to be declared async.
+  
+
+.history/app/(authenticated)/billing/checkout/page_20260119215116.tsx:165:5 lint/style/useBlockStatements  FIXABLE  ━━━━━━━━━━
+
+  × Block statements are preferred in this position.
+  
+    164 │   const handlePurchase = async () => {
+  > 165 │     if (!(address && ethAmount && organizationId)) return;
+        │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    166 │ 
+    167 │     // Check if user is on the correct network
+  
+  i Unsafe fix: Wrap the statement with a `JsBlockStatement`
+  
+    165 │ ····if·(!(address·&&·ethAmount·&&·organizationId))·{·return;·}
+        │                                                    ++       ++
+
+.history/app/(authenticated)/billing/checkout/page_20260119215116.tsx lint/style/useFilenamingConvention ━━━━━━━━━━
+
+  × The filename should be in kebab-case.
+  
+  i The filename could be renamed to one of the following names:
+    page-20260119215116.tsx
+  
+
+.history/app/(authenticated)/billing/checkout/page_20260119215116.tsx:129:3 lint/correctness/useExhaustiveDependencies  FIXABLE  ━━━━━━━━━━
+
+  × This hook does not specify its dependency on router.
+  
+    128 │   // Confirm deposit after transaction is mined
+  > 129 │   useEffect(() => {
+        │   ^^^^^^^^^
+    130 │     if (isConfirmed && txHash && organizationId) {
+    131 │       const confirmDeposit = async () => {
+  
+  i This dependency is being used here, but is not specified in the hook dependency list.
+  
+    136 │           );
+    137 │           toast.success(`${result.credits} credits added!`);
+  > 138 │           router.push("/billing");
+        │           ^^^^^^
+    139 │         } catch (error) {
+    140 │           console.error("Failed to confirm:", error);
+  
+  i React relies on hook dependencies to determine when to re-compute Effects.
+    Failing to specify dependencies can result in Effects not updating correctly when state changes.
+    These "stale closures" are a common source of surprising bugs.
+  
+  i Unsafe fix: Add the missing dependency to the list.
+  
+    146 │ ··},·[isConfirmed,·txHash,·organizationId,·router]);
+        │                                          ++++++++   
+
+.history/app/(authenticated)/billing/page_20260119213617.tsx:54:7 lint/style/useBlockStatements  FIXABLE  ━━━━━━━━━━
+
+  × Block statements are preferred in this position.
+  
+    52 │     queryKey: ["billing-balance", organizationId],
+    53 │     queryFn: () => {
+  > 54 │       if (!organizationId) throw new Error("No organization ID");
+       │       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    55 │       return api.billing.getBalance(organizationId);
+    56 │     },
+  
+  i Unsafe fix: Wrap the statement with a `JsBlockStatement`
+  
+    54 │ ······if·(!organizationId)·{·throw·new·Error("No·organization·ID");·}
+       │                            ++                                      ++
+
+.history/app/(authenticated)/billing/page_20260119213617.tsx lint/style/useFilenamingConvention ━━━━━━━━━━
+
+  × The filename should be in kebab-case.
+  
+  i The filename could be renamed to one of the following names:
+    page-20260119213617.tsx
+  
+
+.history/app/(authenticated)/billing/page_20260119215116.tsx:54:7 lint/style/useBlockStatements  FIXABLE  ━━━━━━━━━━
+
+  × Block statements are preferred in this position.
+  
+    52 │     queryKey: ["billing-balance", organizationId],
+    53 │     queryFn: () => {
+  > 54 │       if (!organizationId) throw new Error("No organization ID");
+       │       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    55 │       return api.billing.getBalance(organizationId);
+    56 │     },
+  
+  i Unsafe fix: Wrap the statement with a `JsBlockStatement`
+  
+    54 │ ······if·(!organizationId)·{·throw·new·Error("No·organization·ID");·}
+       │                            ++                                      ++
+
+.history/app/(authenticated)/billing/page_20260119215116.tsx lint/style/useFilenamingConvention ━━━━━━━━━━
+
+  × The filename should be in kebab-case.
+  
+  i The filename could be renamed to one of the following names:
+    page-20260119215116.tsx
+  
+
+.history/keeperhub/lib/billing/wagmi-config_20260119214604.ts lint/style/useFilenamingConvention ━━━━━━━━━━
+
+  × The filename should be in kebab-case.
+  
+  i The filename could be renamed to one of the following names:
+    wagmi-config-20260119214604.ts
+  
+
+.history/keeperhub/lib/billing/wagmi-config_20260119214604.ts:4:10 lint/style/noExportedImports ━━━━━━━━━━
+
+  × An import should not be exported. Use export from instead.
+  
+    3 │ import { createConfig, http } from "wagmi";
+  > 4 │ import { mainnet, sepolia } from "wagmi/chains";
+      │          ^^^^^^^
+    5 │ import { injected, walletConnect } from "wagmi/connectors";
+    6 │ 
+  
+  i export from makes it clearer that the intention is to re-export a variable.
+  
+
+.history/keeperhub/lib/billing/wagmi-config_20260119214604.ts:4:19 lint/style/noExportedImports ━━━━━━━━━━
+
+  × An import should not be exported. Use export from instead.
+  
+    3 │ import { createConfig, http } from "wagmi";
+  > 4 │ import { mainnet, sepolia } from "wagmi/chains";
+      │                   ^^^^^^^
+    5 │ import { injected, walletConnect } from "wagmi/connectors";
+    6 │ 
+  
+  i export from makes it clearer that the intention is to re-export a variable.
+  
+
+The number of diagnostics exceeds the limit allowed. Use --max-diagnostics to increase it.
+Diagnostics not shown: 5.
+Checked 460 files in 244ms. No fixes applied.
+Found 25 errors.
 check ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   × Some errors were emitted while running checks.
