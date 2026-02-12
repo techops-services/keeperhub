@@ -397,10 +397,7 @@ async function stepHandler(
       addressLink,
     };
   } catch (error) {
-    console.warn(
-      "[Check Token Balance] Failed to check token balance:",
-      error
-    );
+    console.warn("[Check Token Balance] Failed to check token balance:", error);
     return {
       success: false,
       error: `Failed to check token balance: ${getErrorMessage(error)}`,
