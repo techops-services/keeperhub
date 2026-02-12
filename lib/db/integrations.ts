@@ -305,7 +305,8 @@ export async function updateIntegration(
     config?: IntegrationConfig;
   },
   // start custom keeperhub code //
-  organizationId?: string | null
+  organizationId?: string | null,
+  existingIntegration?: DecryptedIntegration | null
   // end keeperhub code //
 ): Promise<DecryptedIntegration | null> {
   const updateData: Partial<NewIntegration> = {
@@ -318,14 +319,9 @@ export async function updateIntegration(
 
   // start custom keeperhub code //
   if (updates.config !== undefined) {
-    const existing = await getIntegration(
-      integrationId,
-      userId,
-      organizationId
-    );
-    if (existing?.type === "database") {
+    if (existingIntegration?.type === "database") {
       updateData.config = encryptConfig(
-        mergeDatabaseConfig(existing.config, updates.config)
+        mergeDatabaseConfig(existingIntegration.config, updates.config)
       );
     } else {
       updateData.config = encryptConfig(updates.config);
