@@ -216,35 +216,6 @@ export function EditConnectionOverlay({
     setConfig((prev) => ({ ...prev, [key]: value }));
   };
 
-  const doSave = async () => {
-    try {
-      setSaving(true);
-      // start custom keeperhub code //
-      // Filter out empty values so we only send fields the user actually filled in.
-      // This prevents sending empty strings for secret fields that were stripped
-      // by the server, providing defense-in-depth alongside server-side merge.
-      const nonEmptyConfig: Record<string, string> = {};
-      for (const [key, value] of Object.entries(config)) {
-        if (value && value.length > 0) {
-          nonEmptyConfig[key] = value;
-        }
-      }
-      const hasNewConfig = Object.keys(nonEmptyConfig).length > 0;
-      await api.integration.update(integration.id, {
-        name: name.trim(),
-        ...(hasNewConfig ? { config: nonEmptyConfig } : {}),
-      });
-      // end keeperhub code //
-      toast.success("Connection updated");
-      onSuccess?.();
-      closeAll();
-    } catch {
-      toast.error("Failed to update connection");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   // start custom keeperhub code //
   // For database integrations, secret fields (password, url) are stripped from
   // the server response. We check if the user entered new secret values to
@@ -282,6 +253,26 @@ export function EditConnectionOverlay({
       }
     }
     return result;
+  };
+
+  const doSave = async () => {
+    try {
+      setSaving(true);
+      const nonEmptyConfig = getNonEmptyConfig();
+      const hasNewConfig = Object.keys(nonEmptyConfig).length > 0;
+      await api.integration.update(integration.id, {
+        name: name.trim(),
+        ...(hasNewConfig ? { config: nonEmptyConfig } : {}),
+      });
+      // end keeperhub code //
+      toast.success("Connection updated");
+      onSuccess?.();
+      closeAll();
+    } catch {
+      toast.error("Failed to update connection");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const runConnectionTest = (): Promise<{
