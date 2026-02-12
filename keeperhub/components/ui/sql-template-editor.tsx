@@ -666,18 +666,6 @@ export function SqlTemplateEditor({
 
   return (
     <>
-      <style>{`
-        .sql-template-badge {
-          background-color: rgba(59, 130, 246, 0.1);
-          color: rgb(37, 99, 235) !important;
-          border: 1px solid rgba(59, 130, 246, 0.2);
-          border-radius: 3px;
-          padding: 1px 4px;
-        }
-        .dark .sql-template-badge {
-          color: rgb(96, 165, 250) !important;
-        }
-      `}</style>
       <div className="overflow-hidden rounded-md border">
         <CodeEditor
           defaultLanguage="sql"
