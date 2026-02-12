@@ -652,6 +652,24 @@ describe("AdaptiveGasStrategy", () => {
       expect(config.gasLimit).toBe(BigInt(200_000));
     });
 
+    it("should clamp override to max of 10x", async () => {
+      const strategy = new AdaptiveGasStrategy({
+        gasLimitMultiplier: 2.0,
+      });
+      const provider = createMockProvider();
+
+      const config = await strategy.getGasConfig(
+        provider as unknown as import("ethers").Provider,
+        "manual",
+        BigInt(100_000),
+        1,
+        50.0
+      );
+
+      // Should be clamped to 10x, not 50x
+      expect(config.gasLimit).toBe(BigInt(1_000_000));
+    });
+
     it("should handle NaN override gracefully", async () => {
       const strategy = new AdaptiveGasStrategy({
         gasLimitMultiplier: 2.0,

@@ -53,6 +53,8 @@ export type GasStrategyConfig = {
 
 type ChainGasConfig = GasStrategyConfig;
 
+const MAX_GAS_LIMIT_MULTIPLIER_OVERRIDE = 10;
+
 const DEFAULT_CONFIG: GasStrategyConfig = {
   gasLimitMultiplier: 2.0,
   gasLimitMultiplierConservative: 2.5,
@@ -273,7 +275,10 @@ export class AdaptiveGasStrategy {
   ): bigint {
     let multiplier: number;
     if (gasLimitMultiplierOverride && gasLimitMultiplierOverride > 0) {
-      multiplier = gasLimitMultiplierOverride;
+      multiplier = Math.min(
+        gasLimitMultiplierOverride,
+        MAX_GAS_LIMIT_MULTIPLIER_OVERRIDE
+      );
       console.log(`[GasStrategy] Using override multiplier: ${multiplier}x`);
     } else if (this.isTimeSensitive(triggerType)) {
       multiplier = chainConfig.gasLimitMultiplierConservative;
