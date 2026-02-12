@@ -71,7 +71,7 @@ async function stepHandler(
 
   // Validate address
   if (!ethers.isAddress(address)) {
-    console.error("[Check Balance] Invalid address:", address);
+    console.warn("[Check Balance] Invalid address:", address);
     return {
       success: false,
       error: `Invalid Ethereum address: ${address}`,
@@ -84,7 +84,7 @@ async function stepHandler(
     chainId = getChainIdFromNetwork(network);
     console.log("[Check Balance] Resolved chain ID:", chainId);
   } catch (error) {
-    console.error("[Check Balance] Failed to resolve network:", error);
+    console.warn("[Check Balance] Failed to resolve network:", error);
     return {
       success: false,
       error: getErrorMessage(error),
@@ -106,7 +106,7 @@ async function stepHandler(
       rpcConfig.source
     );
   } catch (error) {
-    console.error("[Check Balance] Failed to resolve RPC config:", error);
+    console.warn("[Check Balance] Failed to resolve RPC config:", error);
     return {
       success: false,
       error: getErrorMessage(error),
@@ -143,7 +143,7 @@ async function stepHandler(
       addressLink,
     };
   } catch (error) {
-    console.error("[Check Balance] Failed to check balance:", error);
+    console.warn("[Check Balance] Failed to check balance:", error);
     return {
       success: false,
       error: `Failed to check balance: ${getErrorMessage(error)}`,

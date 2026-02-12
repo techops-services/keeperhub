@@ -72,7 +72,7 @@ async function stepHandler(
 
   // Validate contract address
   if (!ethers.isAddress(contractAddress)) {
-    console.error("[Read Contract] Invalid contract address:", contractAddress);
+    console.warn("[Read Contract] Invalid contract address:", contractAddress);
     return {
       success: false,
       error: `Invalid contract address: ${contractAddress}`,
@@ -85,7 +85,7 @@ async function stepHandler(
     parsedAbi = JSON.parse(abi);
     console.log("[Read Contract] ABI parsed successfully");
   } catch (error) {
-    console.error("[Read Contract] Failed to parse ABI:", error);
+    console.warn("[Read Contract] Failed to parse ABI:", error);
     return {
       success: false,
       error: `Invalid ABI JSON: ${getErrorMessage(error)}`,
@@ -94,7 +94,7 @@ async function stepHandler(
 
   // Validate ABI is an array
   if (!Array.isArray(parsedAbi)) {
-    console.error("[Read Contract] ABI is not an array");
+    console.warn("[Read Contract] ABI is not an array");
     return {
       success: false,
       error: "ABI must be a JSON array",
@@ -108,7 +108,7 @@ async function stepHandler(
   );
 
   if (!functionAbi) {
-    console.error("[Read Contract] Function not found in ABI:", abiFunction);
+    console.warn("[Read Contract] Function not found in ABI:", abiFunction);
     return {
       success: false,
       error: `Function '${abiFunction}' not found in ABI`,
@@ -121,7 +121,7 @@ async function stepHandler(
     try {
       const parsedArgs = JSON.parse(functionArgs);
       if (!Array.isArray(parsedArgs)) {
-        console.error("[Read Contract] Function args is not an array");
+        console.warn("[Read Contract] Function args is not an array");
         return {
           success: false,
           error: "Function arguments must be a JSON array",
@@ -138,7 +138,7 @@ async function stepHandler(
       });
       console.log("[Read Contract] Function arguments parsed:", args);
     } catch (error) {
-      console.error(
+      console.warn(
         "[Read Contract] Failed to parse function arguments:",
         error
       );
@@ -155,7 +155,7 @@ async function stepHandler(
     chainId = getChainIdFromNetwork(network);
     console.log("[Read Contract] Resolved chain ID:", chainId);
   } catch (error) {
-    console.error("[Read Contract] Failed to resolve network:", error);
+    console.warn("[Read Contract] Failed to resolve network:", error);
     return {
       success: false,
       error: getErrorMessage(error),
@@ -177,7 +177,7 @@ async function stepHandler(
       rpcConfig.source
     );
   } catch (error) {
-    console.error("[Read Contract] Failed to resolve RPC config:", error);
+    console.warn("[Read Contract] Failed to resolve RPC config:", error);
     return {
       success: false,
       error: getErrorMessage(error),
@@ -265,7 +265,7 @@ async function stepHandler(
       addressLink,
     };
   } catch (error) {
-    console.error("[Read Contract] Function call failed:", error);
+    console.warn("[Read Contract] Function call failed:", error);
     return {
       success: false,
       error: `Contract call failed: ${getErrorMessage(error)}`,

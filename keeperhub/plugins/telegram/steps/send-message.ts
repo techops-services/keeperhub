@@ -73,7 +73,7 @@ async function sendMessage(
       const errorData = (await response
         .json()
         .catch(() => ({}))) as TelegramApiResponse;
-      console.error("[Telegram] HTTP error response:", {
+      console.warn("[Telegram] HTTP error response:", {
         status: response.status,
         statusText: response.statusText,
         errorData,
@@ -92,7 +92,7 @@ async function sendMessage(
     console.log("[Telegram] Response data:", data);
 
     if (!data.ok) {
-      console.error("[Telegram] API error in response:", data);
+      console.warn("[Telegram] API error in response:", data);
       return {
         success: false,
         error:
@@ -107,7 +107,7 @@ async function sendMessage(
       messageId: data.result?.message_id || 0,
     };
   } catch (error) {
-    console.error("[Telegram] Fetch error:", error);
+    console.warn("[Telegram] Fetch error:", error);
     return {
       success: false,
       error: `Failed to send Telegram message: ${error instanceof Error ? error.message : String(error)}`,
@@ -127,7 +127,7 @@ async function stepHandler(
   const botToken = credentials.TELEGRAM_BOT_TOKEN;
 
   if (!botToken) {
-    console.error("[Telegram] No bot token provided in integration");
+    console.warn("[Telegram] No bot token provided in integration");
     return {
       success: false,
       error:
@@ -136,7 +136,7 @@ async function stepHandler(
   }
 
   if (!input.chatId) {
-    console.error("[Telegram] No chat ID provided");
+    console.warn("[Telegram] No chat ID provided");
     return {
       success: false,
       error: "Chat ID is required. Please provide a valid chat ID.",
@@ -144,7 +144,7 @@ async function stepHandler(
   }
 
   if (!input.message) {
-    console.error("[Telegram] No message provided");
+    console.warn("[Telegram] No message provided");
     return {
       success: false,
       error: "Message text is required.",
@@ -171,7 +171,7 @@ async function stepHandler(
   try {
     return await sendMessage(apiUrl, params, input.parseMode);
   } catch (error) {
-    console.error("[Telegram] Error sending message:", error);
+    console.warn("[Telegram] Error sending message:", error);
     return {
       success: false,
       error: `Failed to send Telegram message: ${error instanceof Error ? error.message : String(error)}`,

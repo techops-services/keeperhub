@@ -39,7 +39,7 @@ async function stepHandler(
   const webhookUrl = credentials.webhookUrl;
 
   if (!webhookUrl) {
-    console.error("[Discord] No webhook URL provided in integration");
+    console.warn("[Discord] No webhook URL provided in integration");
     return {
       success: false,
       error:
@@ -49,7 +49,7 @@ async function stepHandler(
 
   // Validate webhook URL format
   if (!webhookUrl.includes("discord.com/api/webhooks/")) {
-    console.error("[Discord] Invalid webhook URL format");
+    console.warn("[Discord] Invalid webhook URL format");
     return {
       success: false,
       error: "Invalid Discord webhook URL format",
@@ -73,7 +73,7 @@ async function stepHandler(
       const errorData = (await response
         .json()
         .catch(() => ({}))) as DiscordWebhookResponse;
-      console.error("[Discord] API error:", errorData);
+      console.warn("[Discord] API error:", errorData);
       return {
         success: false,
         error:
@@ -95,7 +95,7 @@ async function stepHandler(
       messageId: result?.id || "sent",
     };
   } catch (error) {
-    console.error("[Discord] Error sending message:", error);
+    console.warn("[Discord] Error sending message:", error);
     return {
       success: false,
       error: `Failed to send Discord message: ${getErrorMessage(error)}`,

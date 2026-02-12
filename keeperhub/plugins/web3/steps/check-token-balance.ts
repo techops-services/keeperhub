@@ -303,7 +303,7 @@ async function stepHandler(
 
   // Validate wallet address
   if (!ethers.isAddress(address)) {
-    console.error("[Check Token Balance] Invalid wallet address:", address);
+    console.warn("[Check Token Balance] Invalid wallet address:", address);
     return {
       success: false,
       error: `Invalid wallet address: ${address}`,
@@ -316,7 +316,7 @@ async function stepHandler(
     chainId = getChainIdFromNetwork(network);
     console.log("[Check Token Balance] Resolved chain ID:", chainId);
   } catch (error) {
-    console.error("[Check Token Balance] Failed to resolve network:", error);
+    console.warn("[Check Token Balance] Failed to resolve network:", error);
     return {
       success: false,
       error: getErrorMessage(error),
@@ -340,7 +340,7 @@ async function stepHandler(
 
   // Validate token address
   if (!ethers.isAddress(tokenAddress)) {
-    console.error("[Check Token Balance] Invalid token address:", tokenAddress);
+    console.warn("[Check Token Balance] Invalid token address:", tokenAddress);
     return {
       success: false,
       error: `Invalid token address: ${tokenAddress}`,
@@ -362,7 +362,7 @@ async function stepHandler(
       rpcConfig.source
     );
   } catch (error) {
-    console.error("[Check Token Balance] Failed to resolve RPC config:", error);
+    console.warn("[Check Token Balance] Failed to resolve RPC config:", error);
     return {
       success: false,
       error: getErrorMessage(error),
@@ -397,7 +397,7 @@ async function stepHandler(
       addressLink,
     };
   } catch (error) {
-    console.error(
+    console.warn(
       "[Check Token Balance] Failed to check token balance:",
       error
     );
