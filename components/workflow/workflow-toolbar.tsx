@@ -1802,34 +1802,6 @@ function WorkflowMenuComponent({
               </a>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="flex items-center justify-between"
-              disabled
-            >
-              <span>All Workflows</span>
-              <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground text-xs">
-                Coming Soon
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="flex items-center justify-between"
-              onClick={() => state.router.push("/hub")}
-            >
-              <span>Hub</span>
-              {/* start custom KeeperHub code */}
-              {isHubPage && <Check className="size-4 shrink-0" />}
-              {/* end custom KeeperHub code */}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="flex items-center justify-between"
-              disabled
-            >
-              <span>Analytics</span>
-              <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground text-xs">
-                Coming Soon
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
             {/* start custom keeperhub code */}
             <WorkflowListItems
               activeWorkflowId={

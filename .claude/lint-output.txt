@@ -1,0 +1,30 @@
+
+> ai-workflow-builder-template@0.1.0 check /Users/taitsengstock/Documents/GitHub/techops-workflow-builder-template
+> npx ultracite@latest check
+
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +2
+++
+Progress: resolved 9, reused 2, downloaded 0, added 2, done
+keeperhub/components/navigation-sidebar.tsx format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+    410 410 │             width: 280,
+    411 411 │             transform:
+    412     │ - ············activePanel·===·"workflows"
+    413     │ - ··············?·"translateX(0)"
+    414     │ - ··············:·"translateX(-100%)",
+        412 │ + ············activePanel·===·"workflows"·?·"translateX(0)"·:·"translateX(-100%)",
+    415 413 │           }}
+    416 414 │         >
+  
+
+Checked 481 files in 243ms. No fixes applied.
+Found 1 error.
+check ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Some errors were emitted while running checks.
+  
+
+ ELIFECYCLE  Command failed with exit code 1.
