@@ -37,6 +37,7 @@ export type TransferFundsInput = StepInput & TransferFundsCoreInput;
 /**
  * Core transfer logic
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Step handler with comprehensive validation and error handling
 async function stepHandler(
   input: TransferFundsInput
 ): Promise<TransferFundsResult> {
@@ -51,9 +52,13 @@ async function stepHandler(
   const { network, amount, recipientAddress, gasLimitMultiplier, _context } =
     input;
 
-  const multiplierOverride = gasLimitMultiplier
+  const parsedMultiplier = gasLimitMultiplier
     ? Number.parseFloat(gasLimitMultiplier)
     : undefined;
+  const multiplierOverride =
+    parsedMultiplier !== undefined && !Number.isNaN(parsedMultiplier)
+      ? Math.max(1.0, Math.min(10.0, parsedMultiplier))
+      : undefined;
 
   // Validate recipient address
   if (!ethers.isAddress(recipientAddress)) {

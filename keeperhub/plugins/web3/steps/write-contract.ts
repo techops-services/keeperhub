@@ -58,9 +58,13 @@ async function stepHandler(
     _context,
   } = input;
 
-  const multiplierOverride = gasLimitMultiplier
+  const parsedMultiplier = gasLimitMultiplier
     ? Number.parseFloat(gasLimitMultiplier)
     : undefined;
+  const multiplierOverride =
+    parsedMultiplier !== undefined && !Number.isNaN(parsedMultiplier)
+      ? Math.max(1.0, Math.min(10.0, parsedMultiplier))
+      : undefined;
 
   // Validate contract address
   if (!ethers.isAddress(contractAddress)) {
