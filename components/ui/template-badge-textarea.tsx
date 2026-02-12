@@ -5,7 +5,9 @@ import { useAtom } from "jotai";
 import type { CSSProperties } from "react";
 // end keeperhub custom code //
 import { useEffect, useRef, useState } from "react";
-import { BUILTIN_NODE_ID } from "@/keeperhub/lib/builtin-variables";
+// start custom keeperhub code //
+import { doesNodeExist } from "@/keeperhub/lib/template-utils";
+// end keeperhub code //
 import { cn } from "@/lib/utils";
 import { nodesAtom, selectedNodeAtom } from "@/lib/workflow-store";
 import { findActionById } from "@/plugins";
@@ -23,18 +25,6 @@ export interface TemplateBadgeTextareaProps {
   /** When set, limits visible height to this many rows and makes content scrollable */
   maxRows?: number;
   // end keeperhub custom code //
-}
-
-// Helper to check if a template references an existing node
-function doesNodeExist(template: string, nodes: ReturnType<typeof useAtom<typeof nodesAtom>>[0]): boolean {
-  const match = template.match(/\{\{@([^:]+):([^}]+)\}\}/);
-  if (!match) return false;
-  
-  const nodeId = match[1];
-  // start custom keeperhub code //
-  if (nodeId === BUILTIN_NODE_ID) return true;
-  // end keeperhub code //
-  return nodes.some((n) => n.id === nodeId);
 }
 
 // Helper to get display text from template by looking up current node label
