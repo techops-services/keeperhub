@@ -173,9 +173,13 @@ async function stepHandler(
   const { network, recipientAddress, amount, gasLimitMultiplier, _context } =
     input;
 
-  const multiplierOverride = gasLimitMultiplier
+  const parsedMultiplier = gasLimitMultiplier
     ? Number.parseFloat(gasLimitMultiplier)
     : undefined;
+  const multiplierOverride =
+    parsedMultiplier !== undefined && !Number.isNaN(parsedMultiplier)
+      ? Math.max(1.0, Math.min(10.0, parsedMultiplier))
+      : undefined;
 
   // Get chain ID first (needed for token config parsing)
   let chainId: number;

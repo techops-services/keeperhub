@@ -124,6 +124,9 @@ function NumberInputField({ field, value, onChange, disabled }: FieldProps) {
       min={field.min}
       onChange={(e) => onChange(e.target.value)}
       placeholder={field.placeholder}
+      // start custom keeperhub code //
+      step={field.step}
+      // end keeperhub code //
       type="number"
       value={value}
     />

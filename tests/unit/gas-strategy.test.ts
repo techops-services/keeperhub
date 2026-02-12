@@ -687,6 +687,26 @@ describe("AdaptiveGasStrategy", () => {
       // NaN is falsy, should fall back to default 2.0x
       expect(config.gasLimit).toBe(BigInt(200_000));
     });
+
+    it("should use override when between 0 and 1 (passes > 0 check but below intended minimum)", async () => {
+      const strategy = new AdaptiveGasStrategy({
+        gasLimitMultiplier: 2.0,
+      });
+      const provider = createMockProvider();
+
+      const config = await strategy.getGasConfig(
+        provider as unknown as import("ethers").Provider,
+        "scheduled",
+        BigInt(100_000),
+        1,
+        0.5
+      );
+
+      // 0.5 passes the > 0 check in calculateGasLimit, so it's used as-is
+      // This means the gas limit is LESS than the estimate (100k * 0.5 = 50k)
+      // Backend step handlers should clamp to >= 1.0 before passing to gas strategy
+      expect(config.gasLimit).toBe(BigInt(50_000));
+    });
   });
 
   describe("gas limit calculation precision", () => {
