@@ -21,12 +21,26 @@ type DatabaseQueryResult =
   | { success: true; rows: unknown; count: number }
   | { success: false; error: string };
 
+// start custom keeperhub code //
+/** Primitive types accepted by postgres.js, plus objects/arrays that get JSON-stringified */
+export type SqlParam =
+  | null
+  | undefined
+  | string
+  | number
+  | boolean
+  | Date
+  | Uint8Array
+  | Record<string, unknown>
+  | readonly SqlParam[];
+// end keeperhub code //
+
 export type DatabaseQueryInput = StepInput & {
   integrationId?: string;
   dbQuery?: string;
   query?: string;
   // start custom keeperhub code //
-  _dbParams?: unknown[];
+  _dbParams?: SqlParam[];
   // end keeperhub code //
 };
 
@@ -52,29 +66,36 @@ function createDatabaseClient(
   });
 }
 
+// start custom keeperhub code //
+/** Serialize template-resolved values into types postgres.js can bind directly */
+export function serializeSqlParams(
+  params: SqlParam[]
+): postgres.Serializable[] {
+  return params.map((p): postgres.Serializable => {
+    if (p === null || p === undefined) {
+      return null;
+    }
+    if (p instanceof Date || p instanceof Uint8Array) {
+      return p;
+    }
+    if (typeof p === "object") {
+      return JSON.stringify(p);
+    }
+    return p;
+  });
+}
+// end keeperhub code //
+
 async function executeQuery(
   client: postgres.Sql,
   queryString: string,
   // start custom keeperhub code //
-  params?: unknown[]
+  params?: SqlParam[]
   // end keeperhub code //
 ): Promise<unknown> {
   // start custom keeperhub code //
   if (params && params.length > 0) {
-    const serialized = params.map((p) => {
-      if (p === null || p === undefined) {
-        return null;
-      }
-      // Date and Uint8Array are natively supported by postgres.js
-      if (p instanceof Date || p instanceof Uint8Array) {
-        return p;
-      }
-      // Objects/arrays must be JSON-stringified for JSONB columns
-      if (typeof p === "object") {
-        return JSON.stringify(p);
-      }
-      return p;
-    });
+    const serialized = serializeSqlParams(params);
     return await client.unsafe(
       queryString,
       serialized as postgres.ParameterOrJSON<never>[]
