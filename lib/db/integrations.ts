@@ -108,7 +108,7 @@ const DB_SECRET_KEYS = new Set(["password", "url"]);
  */
 export function stripDatabaseSecrets(
   config: IntegrationConfig,
-  integrationType: string
+  integrationType: IntegrationType
 ): IntegrationConfig {
   if (integrationType !== "database") {
     return config;
