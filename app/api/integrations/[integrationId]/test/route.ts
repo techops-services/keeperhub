@@ -61,10 +61,17 @@ export async function POST(
     // server can test with updated non-secret fields (e.g. host) without
     // the client needing to send the password.
     let body: { configOverrides?: IntegrationConfig } = {};
-    try {
-      body = await request.json();
-    } catch {
-      // No body or invalid JSON is fine - test with stored config only
+    const contentType = request.headers.get("content-type") ?? "";
+    const hasBody = contentType.includes("application/json");
+    if (hasBody) {
+      try {
+        body = await request.json();
+      } catch {
+        return NextResponse.json(
+          { error: "Invalid JSON in request body" },
+          { status: 400 }
+        );
+      }
     }
 
     const testConfig =
