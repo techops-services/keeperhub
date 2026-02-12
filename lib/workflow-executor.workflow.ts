@@ -632,7 +632,9 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
     }
 
     // start custom keeperhub code //
-    // Inject fresh built-in system variables for each node execution
+    // Inject fresh built-in system variables before each node executes.
+    // Intentionally per-node (not per-workflow) so long-running sequential
+    // workflows get an up-to-date timestamp at each step.
     const builtinSanitizedId = BUILTIN_NODE_ID.replace(/[^a-zA-Z0-9]/g, "_");
     outputs[builtinSanitizedId] = {
       label: BUILTIN_NODE_LABEL,
