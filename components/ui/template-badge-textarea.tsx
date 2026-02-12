@@ -6,11 +6,10 @@ import type { CSSProperties } from "react";
 // end keeperhub custom code //
 import { useEffect, useRef, useState } from "react";
 // start custom keeperhub code //
-import { doesNodeExist } from "@/keeperhub/lib/template-utils";
+import { doesNodeExist, getDisplayTextForTemplate } from "@/keeperhub/lib/template-utils";
 // end keeperhub code //
 import { cn } from "@/lib/utils";
 import { nodesAtom, selectedNodeAtom } from "@/lib/workflow-store";
-import { findActionById } from "@/plugins";
 import { TemplateAutocomplete } from "./template-autocomplete";
 
 export interface TemplateBadgeTextareaProps {
@@ -25,50 +24,6 @@ export interface TemplateBadgeTextareaProps {
   /** When set, limits visible height to this many rows and makes content scrollable */
   maxRows?: number;
   // end keeperhub custom code //
-}
-
-// Helper to get display text from template by looking up current node label
-function getDisplayTextForTemplate(template: string, nodes: ReturnType<typeof useAtom<typeof nodesAtom>>[0]): string {
-  // Extract nodeId and field from template: {{@nodeId:OldLabel.field}}
-  const match = template.match(/\{\{@([^:]+):([^}]+)\}\}/);
-  if (!match) return template;
-  
-  const nodeId = match[1];
-  const rest = match[2]; // e.g., "OldLabel.field" or "OldLabel"
-  
-  // Find the current node
-  const node = nodes.find((n) => n.id === nodeId);
-  if (!node) {
-    // Node not found, return as-is
-    return rest;
-  }
-  
-  // Get display label: custom label > human-readable action label > fallback
-  let displayLabel: string | undefined = node.data.label;
-  if (!displayLabel && node.data.type === "action") {
-    const actionType = node.data.config?.actionType as string | undefined;
-    if (actionType) {
-      const action = findActionById(actionType);
-      displayLabel = action?.label;
-    }
-  }
-  
-  const dotIndex = rest.indexOf(".");
-  
-  if (dotIndex === -1) {
-    // No field, just the node: {{@nodeId:Label}}
-    return displayLabel ?? rest;
-  }
-  
-  // Has field: {{@nodeId:Label.field}}
-  const field = rest.substring(dotIndex + 1);
-  
-  // If no display label, fall back to the original label from the template
-  if (!displayLabel) {
-    return rest;
-  }
-  
-  return `${displayLabel}.${field}`;
 }
 
 // start keeperhub custom code //
