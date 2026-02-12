@@ -182,9 +182,10 @@ function buildUpdateData(
     "edges",
     "visibility",
     "enabled", // keeperhub custom field //
-    "category", // keeperhub custom field //
-    "protocol", // keeperhub custom field //
+    "categoryId", // keeperhub custom field //
+    "protocolId", // keeperhub custom field //
     "projectId", // keeperhub custom field //
+    "tagId", // keeperhub custom field //
   ];
   for (const field of fields) {
     if (body[field] !== undefined) {

@@ -37,20 +37,22 @@ export function FeaturedOverlay({ overlayId }: FeaturedOverlayProps) {
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   const categories = useMemo(() => {
-    const uniqueCategories = new Set<string>();
+    const unique = new Map<string, string>();
     for (const workflow of workflows) {
-      if (workflow.category) {
-        uniqueCategories.add(workflow.category);
+      if (workflow.categoryId && workflow.categoryName) {
+        unique.set(workflow.categoryId, workflow.categoryName);
       }
     }
-    return Array.from(uniqueCategories).sort();
+    return Array.from(unique.entries()).sort(([, a], [, b]) =>
+      a.localeCompare(b)
+    );
   }, [workflows]);
 
   const filteredWorkflows = useMemo(() => {
     let result = workflows;
 
     if (selectedCategory) {
-      result = result.filter((w) => w.category === selectedCategory);
+      result = result.filter((w) => w.categoryId === selectedCategory);
     }
 
     if (debouncedSearchQuery.trim()) {
@@ -142,7 +144,8 @@ export function FeaturedOverlay({ overlayId }: FeaturedOverlayProps) {
             <div className="flex min-h-9 w-full items-center gap-2 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50">
               {selectedCategory && (
                 <Badge className="shrink-0 gap-1 pr-1" variant="secondary">
-                  {selectedCategory}
+                  {categories.find(([id]) => id === selectedCategory)?.[1] ??
+                    selectedCategory}
                   <button
                     aria-label="Remove category filter"
                     className="ml-1 rounded-full p-0.5 hover:bg-muted-foreground/20"
@@ -192,19 +195,19 @@ export function FeaturedOverlay({ overlayId }: FeaturedOverlayProps) {
                 >
                   All
                 </button>
-                {categories.map((category) => (
+                {categories.map(([id, name]) => (
                   <button
                     className={cn(
                       "inline-flex items-center rounded-full border px-3 py-1 font-medium text-xs transition-colors",
-                      selectedCategory === category
+                      selectedCategory === id
                         ? "border-primary bg-primary text-primary-foreground"
                         : "border-input bg-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                     )}
-                    key={category}
-                    onClick={() => setSelectedCategory(category)}
+                    key={id}
+                    onClick={() => setSelectedCategory(id)}
                     type="button"
                   >
-                    {category}
+                    {name}
                   </button>
                 ))}
               </div>
@@ -241,9 +244,9 @@ export function FeaturedOverlay({ overlayId }: FeaturedOverlayProps) {
                         <CardTitle className="line-clamp-1 text-base">
                           {workflow.name}
                         </CardTitle>
-                        {workflow.category && (
+                        {workflow.categoryName && (
                           <Badge className="shrink-0" variant="secondary">
-                            {workflow.category}
+                            {workflow.categoryName}
                           </Badge>
                         )}
                       </div>

@@ -31,8 +31,8 @@ export default function HubPage() {
   const categories = useMemo(() => {
     const unique = new Set<string>();
     for (const workflow of communityWorkflows) {
-      if (workflow.category) {
-        unique.add(workflow.category);
+      if (workflow.categoryName) {
+        unique.add(workflow.categoryName);
       }
     }
     return Array.from(unique).sort();
@@ -41,8 +41,8 @@ export default function HubPage() {
   const protocols = useMemo(() => {
     const unique = new Set<string>();
     for (const workflow of communityWorkflows) {
-      if (workflow.protocol) {
-        unique.add(workflow.protocol);
+      if (workflow.protocolName) {
+        unique.add(workflow.protocolName);
       }
     }
     return Array.from(unique).sort();
@@ -77,13 +77,13 @@ export default function HubPage() {
 
     if (selectedCategories.size > 0) {
       filtered = filtered.filter(
-        (w) => w.category && selectedCategories.has(w.category)
+        (w) => w.categoryName && selectedCategories.has(w.categoryName)
       );
     }
 
     if (selectedProtocols.size > 0) {
       filtered = filtered.filter(
-        (w) => w.protocol && selectedProtocols.has(w.protocol)
+        (w) => w.protocolName && selectedProtocols.has(w.protocolName)
       );
     }
 

@@ -18,9 +18,10 @@ export type WorkflowData = {
   visibility?: WorkflowVisibility;
   enabled?: boolean;
   // start custom keeperhub code //
-  category?: string | null;
-  protocol?: string | null;
+  categoryId?: string | null;
+  protocolId?: string | null;
   projectId?: string | null;
+  tagId?: string | null;
   // end keeperhub code //
 };
 
@@ -34,9 +35,12 @@ export type SavedWorkflow = WorkflowData & {
   isOwner?: boolean;
   // start custom KeeperHub code
   featured?: boolean;
-  category?: string | null;
-  protocol?: string | null;
+  categoryId?: string | null;
+  protocolId?: string | null;
+  categoryName?: string | null;
+  protocolName?: string | null;
   projectId?: string | null;
+  tagId?: string | null;
   featuredOrder?: number;
   // end custom KeeperHub code
 };
@@ -510,11 +514,6 @@ export const workflowApi = {
   // Get featured workflows
   getFeatured: () =>
     apiCall<SavedWorkflow[]>("/api/workflows/public?featured=true"),
-  // Get distinct categories and protocols
-  getTaxonomy: () =>
-    apiCall<{ categories: string[]; protocols: string[] }>(
-      "/api/workflows/taxonomy"
-    ),
   // end custom KeeperHub code
 
   // Get a specific workflow
@@ -750,6 +749,46 @@ export const aiGatewayApi = {
 };
 
 // start custom keeperhub code //
+export type TaxonomyEntry = {
+  id: string;
+  name: string;
+  workflowCount: number;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type Tag = {
+  id: string;
+  name: string;
+  color: string;
+  workflowCount: number;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const tagApi = {
+  getAll: () => apiCall<Tag[]>("/api/tags"),
+
+  create: (data: { name: string; color: string }) =>
+    apiCall<Tag>("/api/tags", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: { name?: string; color?: string }) =>
+    apiCall<Tag>(`/api/tags/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    apiCall<{ success: boolean }>(`/api/tags/${id}`, {
+      method: "DELETE",
+    }),
+};
+
 export type Project = {
   id: string;
   name: string;
@@ -784,6 +823,48 @@ export const projectApi = {
       method: "DELETE",
     }),
 };
+
+export const categoryApi = {
+  getAll: () => apiCall<TaxonomyEntry[]>("/api/categories"),
+
+  create: (data: { name: string }) =>
+    apiCall<TaxonomyEntry>("/api/categories", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: { name?: string }) =>
+    apiCall<TaxonomyEntry>(`/api/categories/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    apiCall<{ success: boolean }>(`/api/categories/${id}`, {
+      method: "DELETE",
+    }),
+};
+
+export const protocolApi = {
+  getAll: () => apiCall<TaxonomyEntry[]>("/api/protocols"),
+
+  create: (data: { name: string }) =>
+    apiCall<TaxonomyEntry>("/api/protocols", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: { name?: string }) =>
+    apiCall<TaxonomyEntry>(`/api/protocols/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    apiCall<{ success: boolean }>(`/api/protocols/${id}`, {
+      method: "DELETE",
+    }),
+};
 // end keeperhub code //
 
 // Export all APIs as a single object
@@ -793,7 +874,10 @@ export const api = {
   integration: integrationApi,
   organization: organizationApi,
   // start custom keeperhub code //
+  category: categoryApi,
   project: projectApi,
+  protocol: protocolApi,
+  tag: tagApi,
   // end keeperhub code //
   user: userApi,
   workflow: workflowApi,

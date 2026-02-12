@@ -4,7 +4,6 @@ import { Eye } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -89,21 +88,8 @@ export function WorkflowTemplateGrid({ workflows }: WorkflowTemplateGridProps) {
                 nodes={workflow.nodes}
                 width={280}
               />
-              {workflow.category && (
-                <Badge
-                  className="absolute top-3 right-3 rounded-full border-none bg-[#09fd671a] px-3 py-1 text-[#09fd67]"
-                  variant="outline"
-                >
-                  {workflow.category}
-                </Badge>
-              )}
             </div>
             <CardHeader className="pb-4">
-              {workflow.protocol && (
-                <p className="font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                  {workflow.protocol}
-                </p>
-              )}
               <CardTitle className="line-clamp-2">{workflow.name}</CardTitle>
               {workflow.description && (
                 <CardDescription className="line-clamp-2">

@@ -4,7 +4,7 @@ import { ImageResponse } from "@vercel/og";
 import { eq } from "drizzle-orm";
 import type { ReactNode } from "react";
 import { db } from "@/lib/db";
-import { workflows } from "@/lib/db/schema";
+import { categories, protocols, workflows } from "@/lib/db/schema";
 
 // ---------------------------------------------------------------------------
 // Font loading (Anek Latin, bundled locally)
@@ -784,18 +784,23 @@ export async function generateWorkflowOGImage(
   workflowId: string
 ): Promise<Response> {
   try {
-    const workflow = await db.query.workflows.findFirst({
-      where: eq(workflows.id, workflowId),
-      columns: {
-        name: true,
-        description: true,
-        nodes: true,
-        edges: true,
-        visibility: true,
-        category: true,
-        protocol: true,
-      },
-    });
+    const rows = await db
+      .select({
+        name: workflows.name,
+        description: workflows.description,
+        nodes: workflows.nodes,
+        edges: workflows.edges,
+        visibility: workflows.visibility,
+        categoryName: categories.name,
+        protocolName: protocols.name,
+      })
+      .from(workflows)
+      .leftJoin(categories, eq(workflows.categoryId, categories.id))
+      .leftJoin(protocols, eq(workflows.protocolId, protocols.id))
+      .where(eq(workflows.id, workflowId))
+      .limit(1);
+
+    const workflow = rows[0];
 
     if (!workflow) {
       return new Response("Workflow not found", { status: 404 });
@@ -812,8 +817,8 @@ export async function generateWorkflowOGImage(
       nodes: workflow.nodes as any[],
       // biome-ignore lint/suspicious/noExplicitAny: JSONB column type from Drizzle schema
       edges: workflow.edges as any[],
-      category: workflow.category ?? null,
-      protocol: workflow.protocol ?? null,
+      category: workflow.categoryName ?? null,
+      protocol: workflow.protocolName ?? null,
     });
 
     return await renderWorkflowOG(data);
