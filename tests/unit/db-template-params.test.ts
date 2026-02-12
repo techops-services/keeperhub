@@ -73,6 +73,33 @@ describe("DB template parameter extraction", () => {
       expect(parameterizedQuery).toBe("SELECT * FROM t WHERE name = $1");
     });
 
+    it("preserves leading quote when trailing quote is missing (asymmetric)", () => {
+      const outputs = makeOutputs();
+      const query =
+        "SELECT * FROM t WHERE name = '{{@abc_123:HTTP Request.data.total}}";
+      const { parameterizedQuery } = extractTemplateParameters(query, outputs);
+
+      expect(parameterizedQuery).toBe("SELECT * FROM t WHERE name = '$1");
+    });
+
+    it("preserves trailing quote when leading quote is missing (asymmetric)", () => {
+      const outputs = makeOutputs();
+      const query =
+        "SELECT * FROM t WHERE name = {{@abc_123:HTTP Request.data.total}}'";
+      const { parameterizedQuery } = extractTemplateParameters(query, outputs);
+
+      expect(parameterizedQuery).toBe("SELECT * FROM t WHERE name = $1'");
+    });
+
+    it("strips quotes on display-format templates symmetrically", () => {
+      const outputs = makeOutputs();
+      const query =
+        "SELECT * FROM t WHERE name = '{{HTTP Request.data.comments[0].body}}'";
+      const { parameterizedQuery } = extractTemplateParameters(query, outputs);
+
+      expect(parameterizedQuery).toBe("SELECT * FROM t WHERE name = $1");
+    });
+
     it("handles multiple templates in one query", () => {
       const outputs = makeOutputs();
       const query =

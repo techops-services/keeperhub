@@ -562,8 +562,10 @@ export function resolveDisplayTemplate(
  *
  * Handles both stored format {{@nodeId:Label.field}} and display format
  * {{Label.field}} (fallback when the editor doesn't convert to stored format).
- * Surrounding SQL single quotes are consumed during replacement (e.g.
- * '{{...}}' -> $N) so the parameter is bound correctly.
+ *
+ * Quote stripping requires symmetric quotes: '{{...}}' strips both quotes
+ * so the parameter binds correctly. Asymmetric quotes (e.g. '{{...}} without
+ * a closing quote) are left intact to avoid silently eating SQL syntax.
  */
 export function extractTemplateParameters(
   query: string,
@@ -572,27 +574,29 @@ export function extractTemplateParameters(
   const paramValues: unknown[] = [];
   let paramIndex = 0;
 
-  // First pass: handle stored format '?{{@nodeId:Label.field}}'? (optional quotes)
-  let result = query.replace(
-    /'?\{\{@([^:]+):([^}]+)\}\}'?/g,
-    (_match: string, nodeId: string, rest: string) => {
-      const resolved = resolveTemplateToRawValue(nodeId, rest, outputs);
-      paramIndex++;
-      paramValues.push(resolved);
-      return `$${paramIndex}`;
-    }
-  );
+  const replaceStored = (
+    _match: string,
+    nodeId: string,
+    rest: string
+  ): string => {
+    paramIndex++;
+    paramValues.push(resolveTemplateToRawValue(nodeId, rest, outputs));
+    return `$${paramIndex}`;
+  };
 
-  // Second pass: handle display format '?{{Label.field}}'? (optional quotes)
-  result = result.replace(
-    /'?\{\{([^@}][^}]*)\}\}'?/g,
-    (_match: string, displayRef: string) => {
-      const resolved = resolveDisplayTemplate(displayRef, outputs);
-      paramIndex++;
-      paramValues.push(resolved);
-      return `$${paramIndex}`;
-    }
-  );
+  const replaceDisplay = (_match: string, displayRef: string): string => {
+    paramIndex++;
+    paramValues.push(resolveDisplayTemplate(displayRef, outputs));
+    return `$${paramIndex}`;
+  };
+
+  // Stored format: fully-quoted first (strip both quotes), then unquoted
+  let result = query.replace(/'\{\{@([^:]+):([^}]+)\}\}'/g, replaceStored);
+  result = result.replace(/\{\{@([^:]+):([^}]+)\}\}/g, replaceStored);
+
+  // Display format: fully-quoted first (strip both quotes), then unquoted
+  result = result.replace(/'\{\{([^@}][^}]*)\}\}'/g, replaceDisplay);
+  result = result.replace(/\{\{([^@}][^}]*)\}\}/g, replaceDisplay);
 
   return { parameterizedQuery: result, paramValues };
 }
