@@ -6,7 +6,7 @@ vi.mock("server-only", () => ({}));
 import {
   BUILTIN_NODE_ID,
   BUILTIN_NODE_LABEL,
-  getBuiltinVariableDefinitions,
+  BUILTIN_VARIABLE_FIELDS,
   getBuiltinVariables,
 } from "@/keeperhub/lib/builtin-variables";
 import { evaluateConditionExpression } from "@/lib/workflow-executor.workflow";
@@ -62,19 +62,17 @@ describe("builtin-variables", () => {
     });
   });
 
-  describe("getBuiltinVariableDefinitions", () => {
-    it("returns definitions for all variables", () => {
-      const defs = getBuiltinVariableDefinitions();
-      expect(defs).toHaveLength(3);
-      const fields = defs.map((d) => d.field);
+  describe("BUILTIN_VARIABLE_FIELDS", () => {
+    it("contains definitions for all variables", () => {
+      expect(BUILTIN_VARIABLE_FIELDS).toHaveLength(3);
+      const fields = BUILTIN_VARIABLE_FIELDS.map((d) => d.field);
       expect(fields).toContain("unixTimestamp");
       expect(fields).toContain("unixTimestampMs");
       expect(fields).toContain("isoTimestamp");
     });
 
     it("each definition has field and description", () => {
-      const defs = getBuiltinVariableDefinitions();
-      for (const def of defs) {
+      for (const def of BUILTIN_VARIABLE_FIELDS) {
         expect(def.field).toBeTruthy();
         expect(def.description).toBeTruthy();
       }

@@ -2,6 +2,7 @@
 
 import { useAtom } from "jotai";
 import { useEffect, useRef, useState } from "react";
+import { BUILTIN_NODE_ID } from "@/keeperhub/lib/builtin-variables";
 import { cn } from "@/lib/utils";
 import { nodesAtom, selectedNodeAtom } from "@/lib/workflow-store";
 import { findActionById } from "@/plugins";
@@ -23,8 +24,7 @@ function doesNodeExist(template: string, nodes: ReturnType<typeof useAtom<typeof
   
   const nodeId = match[1];
   // start custom keeperhub code //
-  // __system is a built-in pseudo-node for system variables
-  if (nodeId === "__system") return true;
+  if (nodeId === BUILTIN_NODE_ID) return true;
   // end keeperhub code //
   return nodes.some((n) => n.id === nodeId);
 }

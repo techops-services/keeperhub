@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 
 import "@/plugins";
 import "@/keeperhub/plugins";
+import {
+  BUILTIN_NODE_ID,
+  BUILTIN_NODE_LABEL,
+} from "@/keeperhub/lib/builtin-variables";
 
 import { db } from "@/lib/db";
 import { chains, explorerConfigs } from "@/lib/db/schema";
@@ -187,7 +191,7 @@ const TEMPLATE_SYNTAX = {
       description: "Reference 'price' from HTTP request response data",
     },
     {
-      template: "{{@__system:System.unixTimestamp}}",
+      template: `{{@${BUILTIN_NODE_ID}:${BUILTIN_NODE_LABEL}.unixTimestamp}}`,
       description:
         "Current Unix timestamp in seconds (built-in, evaluated at execution time)",
     },
@@ -441,27 +445,26 @@ export async function GET(request: Request) {
     // start custom keeperhub code //
     // Built-in system variables (evaluated at runtime)
     builtinVariables: {
-      description:
-        "Built-in variables evaluated at runtime. Reference using {{@__system:System.fieldName}} syntax.",
-      nodeId: "__system",
-      nodeLabel: "System",
+      description: `Built-in variables evaluated at runtime. Reference using {{@${BUILTIN_NODE_ID}:${BUILTIN_NODE_LABEL}.fieldName}} syntax.`,
+      nodeId: BUILTIN_NODE_ID,
+      nodeLabel: BUILTIN_NODE_LABEL,
       variables: {
         unixTimestamp: {
           type: "number",
           description:
             "Current Unix timestamp in seconds (Solidity-compatible, matches block.timestamp)",
-          example: "{{@__system:System.unixTimestamp}}",
+          example: `{{@${BUILTIN_NODE_ID}:${BUILTIN_NODE_LABEL}.unixTimestamp}}`,
         },
         unixTimestampMs: {
           type: "number",
           description:
             "Current Unix timestamp in milliseconds (JavaScript Date.now())",
-          example: "{{@__system:System.unixTimestampMs}}",
+          example: `{{@${BUILTIN_NODE_ID}:${BUILTIN_NODE_LABEL}.unixTimestampMs}}`,
         },
         isoTimestamp: {
           type: "string",
           description: "Current time as ISO 8601 UTC string",
-          example: "{{@__system:System.isoTimestamp}}",
+          example: `{{@${BUILTIN_NODE_ID}:${BUILTIN_NODE_LABEL}.isoTimestamp}}`,
         },
       },
     },
@@ -521,7 +524,7 @@ export async function GET(request: Request) {
       "web3 read actions (check-balance, read-contract) don't require wallet integration",
       "web3 write actions (transfer-funds, write-contract) require wallet integration",
       "Use projectId to organize related workflows into a project (e.g., all Sky ESM workflows in one project)",
-      "Use {{@__system:System.unixTimestamp}} for current time comparisons in conditions (e.g., checking if a contract timestamp has passed)",
+      `Use {{@${BUILTIN_NODE_ID}:${BUILTIN_NODE_LABEL}.unixTimestamp}} for current time comparisons in conditions (e.g., checking if a contract timestamp has passed)`,
     ],
   };
 

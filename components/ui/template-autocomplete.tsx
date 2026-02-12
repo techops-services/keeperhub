@@ -4,6 +4,7 @@ import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { Check } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { BUILTIN_NODE_ID, BUILTIN_NODE_LABEL, BUILTIN_VARIABLE_FIELDS } from "@/keeperhub/lib/builtin-variables";
 import { api } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import {
@@ -495,36 +496,15 @@ export function TemplateAutocomplete({
 
   // start custom keeperhub code //
   // Built-in system variables (available to all nodes, evaluated at execution time)
-  // Constants inlined to avoid importing server-side module into "use client" component
-  {
-    const systemNodeId = "__system";
-    const systemLabel = "System";
-    const builtinFields = [
-      {
-        field: "unixTimestamp",
-        description:
-          "Current time as Unix timestamp in seconds (Solidity-compatible)",
-      },
-      {
-        field: "unixTimestampMs",
-        description: "Current time as Unix timestamp in milliseconds",
-      },
-      {
-        field: "isoTimestamp",
-        description: "Current time as ISO 8601 UTC string",
-      },
-    ];
-
-    for (const field of builtinFields) {
-      options.push({
-        type: "field",
-        nodeId: systemNodeId,
-        nodeName: systemLabel,
-        field: field.field,
-        description: field.description,
-        template: `{{@${systemNodeId}:${systemLabel}.${field.field}}}`,
-      });
-    }
+  for (const field of BUILTIN_VARIABLE_FIELDS) {
+    options.push({
+      type: "field",
+      nodeId: BUILTIN_NODE_ID,
+      nodeName: BUILTIN_NODE_LABEL,
+      field: field.field,
+      description: field.description,
+      template: `{{@${BUILTIN_NODE_ID}:${BUILTIN_NODE_LABEL}.${field.field}}}`,
+    });
   }
   // end keeperhub code //
 
