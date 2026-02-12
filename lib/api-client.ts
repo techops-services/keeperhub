@@ -414,14 +414,23 @@ export const integrationApi = {
       method: "DELETE",
     }),
 
-  // Test existing integration connection
-  testConnection: (integrationId: string) =>
+  // start custom keeperhub code //
+  // Test existing integration connection, optionally with config overrides
+  // that are merged server-side with stored secrets before testing
+  testConnection: (
+    integrationId: string,
+    configOverrides?: IntegrationConfig
+  ) =>
     apiCall<{ status: "success" | "error"; message: string }>(
       `/api/integrations/${integrationId}/test`,
       {
         method: "POST",
+        ...(configOverrides
+          ? { body: JSON.stringify({ configOverrides }) }
+          : {}),
       }
     ),
+  // end keeperhub code //
 
   // Test credentials without saving
   testCredentials: (data: {

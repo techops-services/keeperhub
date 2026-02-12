@@ -26,6 +26,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { SqlTemplateEditor } from "@/keeperhub/components/ui/sql-template-editor";
 // start keeperhub
 import { actionRequiresCredentials } from "@/keeperhub/lib/integration-helpers";
 // end keeperhub
@@ -67,29 +68,21 @@ function DatabaseQueryFields({
 }) {
   return (
     <>
+      {/* start custom keeperhub code */}
       <div className="space-y-2">
         <Label htmlFor="dbQuery">SQL Query</Label>
-        <div className="overflow-hidden rounded-md border">
-          <CodeEditor
-            defaultLanguage="sql"
-            height="150px"
-            onChange={(value) => onUpdateConfig("dbQuery", value || "")}
-            options={{
-              minimap: { enabled: false },
-              lineNumbers: "on",
-              scrollBeyondLastLine: false,
-              fontSize: 12,
-              readOnly: disabled,
-              wordWrap: "off",
-            }}
-            value={(config?.dbQuery as string) || ""}
-          />
-        </div>
+        <SqlTemplateEditor
+          disabled={disabled}
+          height="150px"
+          onChange={(v) => onUpdateConfig("dbQuery", v)}
+          value={(config?.dbQuery as string) || ""}
+        />
         <p className="text-muted-foreground text-xs">
           The selected database connection above will be used to execute this
-          query.
+          query. Use @ to insert values from previous nodes.
         </p>
       </div>
+      {/* end keeperhub code */}
       <div className="space-y-2">
         <Label>Schema (Optional)</Label>
         <SchemaBuilder
