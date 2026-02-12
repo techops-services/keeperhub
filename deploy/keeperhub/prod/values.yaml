@@ -1,7 +1,14 @@
 shared_env: &shared_env
+  NODE_EXTRA_CA_CERTS:
+    type: kv
+    value: "/etc/ssl/certs/rds-combined-ca-bundle.pem"
   DATABASE_URL:
     type: parameterStore
     name: db-url
+    parameter_name: /eks/maker-prod/keeperhub/db-url
+  WORKFLOW_POSTGRES_URL:
+    type: parameterStore
+    name: workflow-postgres-url
     parameter_name: /eks/maker-prod/keeperhub/db-url
   CHAIN_RPC_CONFIG:
     type: parameterStore
@@ -50,6 +57,9 @@ deployment:
         - -c
       args:
         - |
+          echo "Setting up workflow postgres tables..."
+          export WORKFLOW_POSTGRES_URL=$(node scripts/encode-pg-url.mjs)
+          pnpm exec workflow-postgres-setup
           echo "Running database migrations..."
           pnpm db:push
           echo "Seeding chains..."
@@ -114,9 +124,9 @@ env:
   PARA_ENVIRONMENT:
     type: kv
     value: "prod"
-  WORKFLOW_EMBEDDED_DATA_DIR:
+  WORKFLOW_TARGET_WORLD:
     type: kv
-    value: "/tmp/workflow-data"
+    value: "@workflow/world-postgres"
   NEXT_PUBLIC_API_URL:
     type: kv
     value: "http://localhost:3000"

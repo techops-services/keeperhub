@@ -296,7 +296,7 @@ export function generateDefaultOGImage(): Promise<ImageResponse> {
           style={{
             display: "flex",
             fontSize: 72,
-            fontWeight: 600,
+            fontWeight: 400,
             color: "#ffffff",
             marginTop: 8,
           }}
@@ -320,7 +320,7 @@ export function generateDefaultOGImage(): Promise<ImageResponse> {
           top: 40,
           right: 56,
           display: "flex",
-          fontSize: 16,
+          fontSize: 24,
           color: "rgba(255,255,255,0.3)",
         }}
       >
@@ -856,7 +856,7 @@ function Header(): React.JSX.Element {
           style={{
             display: "flex",
             fontSize: 22,
-            fontWeight: 600,
+            fontWeight: 400,
             color: "rgba(255,255,255,0.85)",
           }}
         >
@@ -866,7 +866,7 @@ function Header(): React.JSX.Element {
       <div
         style={{
           display: "flex",
-          fontSize: 18,
+          fontSize: 24,
           color: "rgba(255,255,255,0.3)",
         }}
       >

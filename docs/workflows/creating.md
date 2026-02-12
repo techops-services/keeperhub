@@ -80,6 +80,7 @@ For trigger nodes, you'll also configure:
 - **Schedule**: Interval for scheduled triggers (every 5 minutes, hourly, etc.)
 - **Webhook URL**: Provided URL for webhook triggers
 - **Event Filter**: Event signature for event triggers
+- **Block Interval**: Network and block interval for block triggers (e.g., every 10 blocks on Ethereum)
 
 ### Condition Configuration
 
