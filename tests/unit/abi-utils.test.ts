@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { computeSelector } from "@/keeperhub/lib/abi-utils";
 
+const SELECTOR_PATTERN = /^0x[\da-f]{8}$/;
+
 describe("computeSelector", () => {
   it("returns correct 4-byte selector for transfer(address,uint256)", () => {
     expect(computeSelector("transfer", ["address", "uint256"])).toBe(
@@ -25,6 +27,6 @@ describe("computeSelector", () => {
 
   it("returns a 10-character hex string (0x + 8 hex digits)", () => {
     const result = computeSelector("foo", ["uint256"]);
-    expect(result).toMatch(/^0x[\da-f]{8}$/);
+    expect(result).toMatch(SELECTOR_PATTERN);
   });
 });
