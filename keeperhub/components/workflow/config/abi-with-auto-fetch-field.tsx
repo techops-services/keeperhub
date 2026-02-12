@@ -815,7 +815,7 @@ export function AbiWithAutoFetchField({
 
   const handleManualToggle = (checked: boolean) => {
     setUseManualAbi(checked);
-    onUpdateConfig?.("useManualAbi", checked);
+    onUpdateConfig?.("useManualAbi", String(checked));
     setError(null);
     if (checked) {
       onChange("");
