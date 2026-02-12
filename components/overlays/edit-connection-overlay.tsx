@@ -254,10 +254,12 @@ export function EditConnectionOverlay({
     }
     return result;
   };
+  // end keeperhub code //
 
   const doSave = async () => {
     try {
       setSaving(true);
+      // start custom keeperhub code //
       const nonEmptyConfig = getNonEmptyConfig();
       const hasNewConfig = Object.keys(nonEmptyConfig).length > 0;
       await api.integration.update(integration.id, {
