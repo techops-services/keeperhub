@@ -73,7 +73,12 @@ export async function register() {
       const rawUrl =
         process.env.WORKFLOW_POSTGRES_URL || process.env.DATABASE_URL;
       if (rawUrl) {
-        process.env.WORKFLOW_POSTGRES_URL = encodePostgresPassword(rawUrl);
+        const { ensureExplicitSslMode } = await import(
+          "@/lib/db/connection-utils"
+        );
+        process.env.WORKFLOW_POSTGRES_URL = ensureExplicitSslMode(
+          encodePostgresPassword(rawUrl)
+        );
       }
 
       const { getWorld } = await import("workflow/runtime");

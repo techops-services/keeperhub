@@ -8,6 +8,7 @@
  * Protocol prefix for PostgreSQL connection strings
  */
 const CONNECTION_STRING_PREFIX = /^(postgres(?:ql)?:\/\/)/;
+const SSLMODE_PATTERN = /([?&])sslmode=[^&]*/;
 
 function safeDecodeUriComponent(s: string): string {
   try {
@@ -162,6 +163,40 @@ export function getDatabaseUrl(fallback?: string): string {
     (process.env.DATABASE_URL || fallback) ??
     "postgres://localhost:5432/workflow";
   return ensureEncodedConnectionString(connectionString);
+}
+
+/**
+ * Ensures the connection URL has an explicit sslmode to suppress
+ * pg-connection-string deprecation warnings. In pg v9.0.0, 'require',
+ * 'prefer', and 'verify-ca' will adopt weaker libpq semantics.
+ * This replaces those deprecated aliases with 'verify-full' for remote
+ * hosts, preserving the current (stronger) behavior.
+ *
+ * Uses string manipulation to avoid re-encoding credentials via URL.toString().
+ */
+export function ensureExplicitSslMode(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname;
+    const isLocal =
+      hostname === "localhost" || hostname === "127.0.0.1" || hostname === "";
+    if (isLocal) {
+      return url;
+    }
+
+    const currentMode = parsed.searchParams.get("sslmode");
+    if (currentMode === "verify-full" || currentMode === "disable") {
+      return url;
+    }
+  } catch {
+    return url;
+  }
+
+  if (SSLMODE_PATTERN.test(url)) {
+    return url.replace(SSLMODE_PATTERN, "$1sslmode=verify-full");
+  }
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}sslmode=verify-full`;
 }
 
 export type PostgresSslOption =
