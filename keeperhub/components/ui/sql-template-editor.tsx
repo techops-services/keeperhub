@@ -2,6 +2,7 @@
 
 import type { OnMount } from "@monaco-editor/react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { AlertTriangle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { CodeEditor } from "@/components/ui/code-editor";
 import { getReadContractOutputFields } from "@/keeperhub/lib/action-output-fields";
@@ -69,6 +70,41 @@ function getNodeDisplayName(node: WorkflowNode): string {
     return triggerType || "Manual";
   }
   return "Node";
+}
+
+/**
+ * Find display-format template labels that are shared by multiple workflow
+ * nodes, which would cause ambiguous resolution at runtime.
+ */
+function findDuplicateTemplateLabels(
+  displayValue: string,
+  nodes: WorkflowNode[]
+): string[] {
+  const displayRefs = [...displayValue.matchAll(/\{\{([^@}][^}]*)\}\}/g)];
+  if (displayRefs.length === 0) {
+    return [];
+  }
+
+  const labelCounts = new Map<string, number>();
+  for (const node of nodes) {
+    const name = getNodeDisplayName(node).toLowerCase().trim();
+    labelCounts.set(name, (labelCounts.get(name) ?? 0) + 1);
+  }
+
+  const warnings = new Set<string>();
+  for (const match of displayRefs) {
+    const ref = match[1];
+    const dotIndex = ref.indexOf(".");
+    const label = (dotIndex === -1 ? ref : ref.substring(0, dotIndex))
+      .toLowerCase()
+      .trim();
+    const count = labelCounts.get(label);
+    if (count && count > 1) {
+      const displayLabel = dotIndex === -1 ? ref : ref.substring(0, dotIndex);
+      warnings.add(displayLabel.trim());
+    }
+  }
+  return [...warnings];
 }
 
 type SchemaField = {
@@ -617,6 +653,13 @@ export function SqlTemplateEditor({
     [updateDecorations]
   );
 
+  // Detect display-format templates referencing labels shared by multiple
+  // nodes in the workflow (ambiguous resolution when nodes keep default labels).
+  const duplicateLabelWarnings = useMemo(
+    () => findDuplicateTemplateLabels(displayValue, nodes),
+    [displayValue, nodes]
+  );
+
   return (
     <>
       <style>{`
@@ -648,6 +691,21 @@ export function SqlTemplateEditor({
           value={displayValue}
         />
       </div>
+      {duplicateLabelWarnings.length > 0 && (
+        <div className="flex items-start gap-2 rounded-md border border-yellow-200 bg-yellow-50 p-2 text-xs text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-200">
+          <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+          <span>
+            Multiple nodes share the label{" "}
+            {duplicateLabelWarnings.map((label, i) => (
+              <span key={label}>
+                {i > 0 && ", "}
+                <strong>{label}</strong>
+              </span>
+            ))}
+            . Rename nodes to unique labels to ensure correct value resolution.
+          </span>
+        </div>
+      )}
     </>
   );
 }
