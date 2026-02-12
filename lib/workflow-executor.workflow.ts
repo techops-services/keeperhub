@@ -486,15 +486,12 @@ function replaceConfigTemplate(
     return "";
   }
 
-  const formatted = formatConfigValue(resolved);
-  console.log("[Template] Resolved:", {
-    type: typeof resolved,
-    isArray: Array.isArray(resolved),
-    formattedLength: formatted.length,
-    preview:
-      formatted.length > 100 ? `${formatted.slice(0, 100)}...` : formatted,
-  });
-  return formatted;
+  console.log(
+    "[Template] Resolved, type:",
+    typeof resolved,
+    Array.isArray(resolved) ? "array" : ""
+  );
+  return formatConfigValue(resolved);
 }
 
 /**
@@ -545,30 +542,16 @@ export function resolveDisplayTemplate(
     dotIndex === -1 ? displayRef : displayRef.substring(0, dotIndex);
   const fieldPath = dotIndex === -1 ? "" : displayRef.substring(dotIndex + 1);
 
-  console.log("[DB Template] Resolving display template:", {
-    displayRef,
-    label,
-    fieldPath: fieldPath || "(whole output)",
-    availableLabels: Object.values(outputs).map((e) => e.label),
-  });
-
   const entry = findOutputByLabel(label, outputs);
   if (!entry) {
-    console.log("[DB Template] No node found with label:", label);
     return null;
   }
 
   if (entry.data === null || entry.data === undefined) {
-    console.log("[DB Template] Found node by label but data is null/undefined");
     return null;
   }
 
-  const resolved = resolveFromOutputData(entry.data, fieldPath) ?? null;
-  console.log("[DB Template] Display template resolved:", {
-    type: typeof resolved,
-    isNull: resolved === null,
-  });
-  return resolved;
+  return resolveFromOutputData(entry.data, fieldPath) ?? null;
 }
 
 /**
@@ -586,12 +569,6 @@ export function extractTemplateParameters(
   query: string,
   outputs: NodeOutputs
 ): { parameterizedQuery: string; paramValues: unknown[] } {
-  console.log("[DB Template] Extracting parameters:", {
-    queryPreview: query.length > 200 ? `${query.slice(0, 200)}...` : query,
-    outputNodeCount: Object.keys(outputs).length,
-    outputLabels: Object.values(outputs).map((e) => e.label),
-  });
-
   const paramValues: unknown[] = [];
   let paramIndex = 0;
 
@@ -616,19 +593,6 @@ export function extractTemplateParameters(
       return `$${paramIndex}`;
     }
   );
-
-  console.log("[DB Template] Extraction complete:", {
-    paramCount: paramValues.length,
-    paramTypes: paramValues.map((v) => {
-      if (v === null) {
-        return "null";
-      }
-      if (Array.isArray(v)) {
-        return "array";
-      }
-      return typeof v;
-    }),
-  });
 
   return { parameterizedQuery: result, paramValues };
 }
@@ -670,37 +634,22 @@ export function resolveTemplateToRawValue(
     ? rest.substring(rest.indexOf(".") + 1).trim()
     : "";
 
-  console.log("[DB Template] Resolving stored template:", {
-    nodeId: trimmedNodeId,
-    sanitizedNodeId,
-    fieldPath: fieldPath || "(whole output)",
-    outputKeys: Object.keys(outputs),
-    foundOutput: !!output,
-  });
-
   const resolvedOutput = output ?? findOutputByLabelFallback(rest, outputs);
 
   if (!resolvedOutput) {
-    console.log("[DB Template] No output found for node:", trimmedNodeId);
     return null;
   }
 
   const data = resolvedOutput.data;
   if (data === null || data === undefined) {
-    console.log("[DB Template] Output data is null/undefined");
     return null;
   }
 
-  const resolved = resolveFromOutputData(data, fieldPath);
-  console.log("[DB Template] Stored template resolved:", {
-    type: typeof resolved,
-    isNull: resolved === null || resolved === undefined,
-  });
-  return resolved ?? null;
+  return resolveFromOutputData(data, fieldPath) ?? null;
 }
 
 /**
- * Attempt label-based fallback lookup, logging the result.
+ * Attempt label-based fallback lookup when node ID is not found in outputs.
  */
 function findOutputByLabelFallback(
   rest: string,
@@ -708,11 +657,7 @@ function findOutputByLabelFallback(
 ): { label: string; data: unknown } | undefined {
   const dotIndex = rest.indexOf(".");
   const label = dotIndex === -1 ? rest : rest.substring(0, dotIndex);
-  const result = findOutputByLabel(label, outputs);
-  if (result) {
-    console.log("[DB Template] Found node by label fallback:", label);
-  }
-  return result;
+  return findOutputByLabel(label, outputs);
 }
 // end keeperhub code //
 
