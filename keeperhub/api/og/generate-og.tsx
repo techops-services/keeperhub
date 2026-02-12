@@ -175,6 +175,16 @@ function getNodeIcon(label: string): string {
   return match?.icon ?? ICON_PLAY;
 }
 
+function getNodeLabel(node: WorkflowNode): string {
+  if (node.data.label) {
+    return node.data.label;
+  }
+  if (node.data.type === "trigger") {
+    return node.data.config?.triggerType ?? "Manual";
+  }
+  return node.data.config?.actionType ?? "Action";
+}
+
 const DOTS = generateDots(OG_WIDTH, OG_HEIGHT, DOT_SPACING);
 
 // ---------------------------------------------------------------------------
@@ -466,7 +476,11 @@ export function generateHubOGImage(): Promise<ImageResponse> {
 type WorkflowNode = {
   id: string;
   position: { x: number; y: number };
-  data: { type: "trigger" | "action" | "add"; label?: string };
+  data: {
+    type: "trigger" | "action" | "add";
+    label?: string;
+    config?: { triggerType?: string; actionType?: string };
+  };
 };
 
 type WorkflowEdge = {
@@ -606,7 +620,7 @@ function prepareRenderData(workflowData: {
     ns,
     title: workflowData.name,
     description: workflowData.description,
-    triggerLabel: triggerNode?.data.label,
+    triggerLabel: triggerNode ? getNodeLabel(triggerNode) : undefined,
     actionCount: nodes.filter((n) => n.data.type === "action").length,
     category: workflowData.category,
     protocol: workflowData.protocol,
@@ -673,7 +687,7 @@ function renderWorkflowOG(data: OGRenderData): Promise<ImageResponse> {
         );
         const nodeSquare = Math.max(ns * 0.7, 110);
         const isTrigger = node.data.type === "trigger";
-        const label = node.data.label ?? "";
+        const label = getNodeLabel(node);
         const iconSize = Math.max(nodeSquare * 0.32, 30);
 
         return (
