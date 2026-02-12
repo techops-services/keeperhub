@@ -3,7 +3,13 @@
 import type { OnMount } from "@monaco-editor/react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { AlertTriangle } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import {
+  type MutableRefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+} from "react";
 import { CodeEditor } from "@/components/ui/code-editor";
 import { getReadContractOutputFields } from "@/keeperhub/lib/action-output-fields";
 import { getTriggerOutputFields } from "@/keeperhub/lib/trigger-output-fields";
@@ -21,6 +27,23 @@ import {
   WorkflowTriggerEnum,
 } from "@/lib/workflow-store";
 import { findActionById } from "@/plugins";
+
+// ---------------------------------------------------------------------------
+// Hooks
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns a ref that always holds the latest value of `state`.
+ * Useful for reading current React state inside Monaco callbacks
+ * without re-registering the callback on every state change.
+ */
+function useStableRef<T>(state: T): MutableRefObject<T> {
+  const ref = useRef(state);
+  useEffect(() => {
+    ref.current = state;
+  }, [state]);
+  return ref;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers (same logic as template-autocomplete.tsx to keep upstream node
@@ -299,37 +322,17 @@ export function SqlTemplateEditor({
   const lastExecutionLogs = useAtomValue(lastExecutionLogsAtom);
   const setLastExecutionLogs = useSetAtom(lastExecutionLogsAtom);
 
-  // Refs for Monaco provider access to current React state
-  const nodesRef = useRef(nodes);
-  const edgesRef = useRef(edges);
-  const selectedNodeRef = useRef(selectedNodeId);
-  const executionLogsRef = useRef(executionLogs);
-  const lastExecutionLogsRef = useRef(lastExecutionLogs);
-  const currentWorkflowIdRef = useRef(currentWorkflowId);
+  // Stable refs for Monaco provider access to current React state
+  const nodesRef = useStableRef(nodes);
+  const edgesRef = useStableRef(edges);
+  const selectedNodeRef = useStableRef(selectedNodeId);
+  const executionLogsRef = useStableRef(executionLogs);
+  const lastExecutionLogsRef = useStableRef(lastExecutionLogs);
+  const currentWorkflowIdRef = useStableRef(currentWorkflowId);
   const lastFetchWorkflowIdRef = useRef<string | null>(null);
 
   // Template mapping: "Label.field" -> nodeId (for display <-> stored conversion)
   const templateMapRef = useRef(new Map<string, string>());
-
-  // Keep refs in sync
-  useEffect(() => {
-    nodesRef.current = nodes;
-  }, [nodes]);
-  useEffect(() => {
-    edgesRef.current = edges;
-  }, [edges]);
-  useEffect(() => {
-    selectedNodeRef.current = selectedNodeId;
-  }, [selectedNodeId]);
-  useEffect(() => {
-    executionLogsRef.current = executionLogs;
-  }, [executionLogs]);
-  useEffect(() => {
-    lastExecutionLogsRef.current = lastExecutionLogs;
-  }, [lastExecutionLogs]);
-  useEffect(() => {
-    currentWorkflowIdRef.current = currentWorkflowId;
-  }, [currentWorkflowId]);
 
   // Editor + decoration refs
   // biome-ignore lint/suspicious/noExplicitAny: Monaco editor types are complex and vary across versions
@@ -371,6 +374,7 @@ export function SqlTemplateEditor({
   );
 
   // Lazy-load last execution logs (same pattern as template-autocomplete.tsx)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: currentWorkflowIdRef is a stable ref read at async resolution time, not a reactive dependency
   useEffect(() => {
     const alreadyHaveLogs = lastExecutionLogs.workflowId === currentWorkflowId;
     const fetchAlreadyInProgress =
