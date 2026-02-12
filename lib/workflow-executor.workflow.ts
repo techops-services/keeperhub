@@ -526,6 +526,143 @@ function processTemplates(
 
   return processed;
 }
+
+/**
+ * Resolve a display-format template (e.g. "Label.field") by searching outputs
+ * for a node whose label matches, then resolving the field path from its data.
+ * Uses case-insensitive label matching to stay consistent with the UI-side
+ * findNodeOutputByLabel in lib/utils/template.ts.
+ */
+export function resolveDisplayTemplate(
+  displayRef: string,
+  outputs: NodeOutputs
+): unknown {
+  const dotIndex = displayRef.indexOf(".");
+  const label =
+    dotIndex === -1 ? displayRef : displayRef.substring(0, dotIndex);
+  const fieldPath = dotIndex === -1 ? "" : displayRef.substring(dotIndex + 1);
+
+  const entry = findOutputByLabel(label, outputs);
+  if (!entry) {
+    return null;
+  }
+
+  if (entry.data === null || entry.data === undefined) {
+    return null;
+  }
+
+  return resolveFromOutputData(entry.data, fieldPath) ?? null;
+}
+
+/**
+ * Extract template references from a SQL query string and convert them to
+ * PostgreSQL parameterized query placeholders ($1, $2, ...).
+ * Returns the parameterized SQL and an ordered array of resolved values,
+ * preserving native types for proper SQL parameterization.
+ *
+ * Handles both stored format {{@nodeId:Label.field}} and display format
+ * {{Label.field}} (fallback when the editor doesn't convert to stored format).
+ *
+ * Quote stripping requires symmetric quotes: '{{...}}' strips both quotes
+ * so the parameter binds correctly. Asymmetric quotes (e.g. '{{...}} without
+ * a closing quote) are left intact to avoid silently eating SQL syntax.
+ */
+export function extractTemplateParameters(
+  query: string,
+  outputs: NodeOutputs
+): { parameterizedQuery: string; paramValues: unknown[] } {
+  const paramValues: unknown[] = [];
+  let paramIndex = 0;
+
+  const replaceStored = (
+    _match: string,
+    nodeId: string,
+    rest: string
+  ): string => {
+    paramIndex++;
+    paramValues.push(resolveTemplateToRawValue(nodeId, rest, outputs));
+    return `$${paramIndex}`;
+  };
+
+  const replaceDisplay = (_match: string, displayRef: string): string => {
+    paramIndex++;
+    paramValues.push(resolveDisplayTemplate(displayRef, outputs));
+    return `$${paramIndex}`;
+  };
+
+  // Stored format: fully-quoted first (strip both quotes), then unquoted
+  let result = query.replace(/'\{\{@([^:]+):([^}]+)\}\}'/g, replaceStored);
+  result = result.replace(/\{\{@([^:]+):([^}]+)\}\}/g, replaceStored);
+
+  // Display format: fully-quoted first (strip both quotes), then unquoted
+  result = result.replace(/'\{\{([^@}][^}]*)\}\}'/g, replaceDisplay);
+  result = result.replace(/\{\{([^@}][^}]*)\}\}/g, replaceDisplay);
+
+  return { parameterizedQuery: result, paramValues };
+}
+
+/**
+ * Find a node output by case-insensitive label matching.
+ * Used as a fallback when direct node ID lookup fails.
+ */
+function findOutputByLabel(
+  label: string,
+  outputs: NodeOutputs
+): { label: string; data: unknown } | undefined {
+  const normalizedLabel = label.toLowerCase().trim();
+  for (const entry of Object.values(outputs)) {
+    if (entry.label.toLowerCase().trim() === normalizedLabel) {
+      return entry;
+    }
+  }
+  return;
+}
+
+/**
+ * Resolve a single template to its raw value (preserving native type).
+ * Unlike replaceConfigTemplate which stringifies, this returns the native
+ * type (number, string, boolean, etc.) for proper SQL parameterization.
+ *
+ * Falls back to case-insensitive label matching when the node ID lookup
+ * fails, keeping parity with the display-format resolution path.
+ */
+export function resolveTemplateToRawValue(
+  nodeId: string,
+  rest: string,
+  outputs: NodeOutputs
+): unknown {
+  const trimmedNodeId = nodeId.trim();
+  const sanitizedNodeId = trimmedNodeId.replace(/[^a-zA-Z0-9]/g, "_");
+  const output = outputs[sanitizedNodeId] ?? outputs[trimmedNodeId];
+  const fieldPath = rest.includes(".")
+    ? rest.substring(rest.indexOf(".") + 1).trim()
+    : "";
+
+  const resolvedOutput = output ?? findOutputByLabelFallback(rest, outputs);
+
+  if (!resolvedOutput) {
+    return null;
+  }
+
+  const data = resolvedOutput.data;
+  if (data === null || data === undefined) {
+    return null;
+  }
+
+  return resolveFromOutputData(data, fieldPath) ?? null;
+}
+
+/**
+ * Attempt label-based fallback lookup when node ID is not found in outputs.
+ */
+function findOutputByLabelFallback(
+  rest: string,
+  outputs: NodeOutputs
+): { label: string; data: unknown } | undefined {
+  const dotIndex = rest.indexOf(".");
+  const label = dotIndex === -1 ? rest : rest.substring(0, dotIndex);
+  return findOutputByLabel(label, outputs);
+}
 // end keeperhub code //
 
 /**
@@ -577,11 +714,10 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
     if (node.data.type === "action") {
       const actionType = node.data.config?.actionType as string;
       if (actionType) {
-        // Look up the human-readable label from the step registry
-        const label = getActionLabel(actionType);
-        if (label) {
-          return label;
-        }
+        // Look up the human-readable label from the step registry;
+        // fall back to actionType itself (system actions like "HTTP Request",
+        // "Database Query", "Condition" use their type name as the label)
+        return getActionLabel(actionType) ?? actionType;
       }
       return "Action";
     }
@@ -615,7 +751,7 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
       // Store null output for disabled nodes so downstream templates don't fail
       const sanitizedNodeId = nodeId.replace(/[^a-zA-Z0-9]/g, "_");
       outputs[sanitizedNodeId] = {
-        label: node.data.label || nodeId,
+        label: getNodeName(node),
         data: null,
       };
 
@@ -710,20 +846,43 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
           return;
         }
 
-        // Process templates in config, but keep condition unprocessed for special handling
-        const configWithoutCondition = { ...config };
+        // Process templates in config, but keep condition and dbQuery unprocessed for special handling
+        const configWithoutSpecial = { ...config };
         const originalCondition = config.condition;
-        configWithoutCondition.condition = undefined;
+        configWithoutSpecial.condition = undefined;
+        // start custom keeperhub code //
+        const originalDbQuery = config.dbQuery;
+        if (actionType === "Database Query") {
+          configWithoutSpecial.dbQuery = undefined;
+        }
+        // end keeperhub code //
 
-        const processedConfig = processTemplates(
-          configWithoutCondition,
-          outputs
-        );
+        const processedConfig = processTemplates(configWithoutSpecial, outputs);
 
         // Add back the original condition (unprocessed)
         if (originalCondition !== undefined) {
           processedConfig.condition = originalCondition;
         }
+
+        // start custom keeperhub code //
+        // For Database Query, use parameterized queries instead of raw interpolation
+        if (
+          actionType === "Database Query" &&
+          typeof originalDbQuery === "string"
+        ) {
+          const { parameterizedQuery, paramValues } = extractTemplateParameters(
+            originalDbQuery,
+            outputs
+          );
+          processedConfig.dbQuery = parameterizedQuery;
+          processedConfig._dbParams = paramValues;
+        } else if (
+          actionType === "Database Query" &&
+          originalDbQuery !== undefined
+        ) {
+          processedConfig.dbQuery = originalDbQuery;
+        }
+        // end keeperhub code //
 
         // Build step context for logging (stepHandler will handle the logging)
         const stepContext: StepContext = {
@@ -784,7 +943,7 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
       // Store outputs with sanitized nodeId for template variable lookup
       const sanitizedNodeId = nodeId.replace(/[^a-zA-Z0-9]/g, "_");
       outputs[sanitizedNodeId] = {
-        label: node.data.label || nodeId,
+        label: getNodeName(node),
         data: result.data,
       };
 

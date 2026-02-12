@@ -246,6 +246,18 @@
 .add-step-button:hover + .add-step-connector line {
   stroke: var(--primary);
 }
+
+.sql-template-badge {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: rgb(37, 99, 235) !important;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+
+.dark .sql-template-badge {
+  color: rgb(96, 165, 250) !important;
+}
 /* end keeperhub code */
 
 /* Safe area support for mobile devices */
