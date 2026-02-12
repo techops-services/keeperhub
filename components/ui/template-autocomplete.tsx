@@ -4,6 +4,7 @@ import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { Check } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { BUILTIN_NODE_ID, BUILTIN_NODE_LABEL, BUILTIN_VARIABLE_FIELDS } from "@/keeperhub/lib/builtin-variables";
 import { api } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import {
@@ -492,6 +493,20 @@ export function TemplateAutocomplete({
       }
     }
   }
+
+  // start custom keeperhub code //
+  // Built-in system variables (available to all nodes, evaluated at execution time)
+  for (const field of BUILTIN_VARIABLE_FIELDS) {
+    options.push({
+      type: "field",
+      nodeId: BUILTIN_NODE_ID,
+      nodeName: BUILTIN_NODE_LABEL,
+      field: field.field,
+      description: field.description,
+      template: `{{@${BUILTIN_NODE_ID}:${BUILTIN_NODE_LABEL}.${field.field}}}`,
+    });
+  }
+  // end keeperhub code //
 
   // Filter options based on search term
   const filteredOptions = filter

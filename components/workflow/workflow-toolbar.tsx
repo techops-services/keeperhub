@@ -38,8 +38,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { OrgSwitcher } from "@/keeperhub/components/organization/org-switcher";
-// start custom keeperhub code //
 import { Switch } from "@/keeperhub/components/ui/switch";
+// start custom keeperhub code //
+import { BUILTIN_NODE_ID } from "@/keeperhub/lib/builtin-variables";
 import { api, type Project } from "@/lib/api-client";
 import { authClient, useSession } from "@/lib/auth-client";
 import { getCustomLogo } from "@/lib/extension-registry";
@@ -217,7 +218,11 @@ function getBrokenTemplateReferences(
     }
 
     const allRefs = extractAllTemplateReferences(config);
-    const brokenRefs = allRefs.filter((ref) => !nodeIds.has(ref.nodeId));
+    // start custom keeperhub code //
+    const brokenRefs = allRefs.filter(
+      (ref) => ref.nodeId !== BUILTIN_NODE_ID && !nodeIds.has(ref.nodeId)
+    );
+    // end keeperhub code //
 
     if (brokenRefs.length > 0) {
       // Get action for label lookups
