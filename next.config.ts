@@ -88,6 +88,7 @@ const nextConfig = {
       "./node_modules/undici/**/*",
       "./node_modules/xtend/**/*",
       "./node_modules/zod/**/*",
+      "./node_modules/next/dist/compiled/@vercel/og/**/*",
     ],
   },
   // end keeperhub code //
