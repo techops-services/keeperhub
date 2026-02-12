@@ -258,9 +258,9 @@ export function evaluateConditionExpression(
       ) {
         throw error;
       }
-      // Other errors (syntax errors, etc.) should still fail loudly
-      console.error("[Condition] Failed to evaluate condition:", error);
-      console.error("[Condition] Expression was:", conditionExpression);
+      // Other errors (syntax errors, etc.) are user input errors - log as WARN not ERROR
+      console.warn("[Condition] Failed to evaluate user expression:", error);
+      console.warn("[Condition] Expression was:", conditionExpression);
       throw new Error(
         `Failed to evaluate condition expression: ${error instanceof Error ? error.message : String(error)}`
       );
@@ -826,7 +826,7 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
               mockData
             );
           } catch (error) {
-            console.error(
+            console.warn(
               "[Workflow Executor] Failed to parse webhook mock request:",
               error
             );

@@ -28,7 +28,7 @@ function parseJsonSafely(jsonString: string | undefined): unknown {
   try {
     return JSON.parse(jsonString);
   } catch (error) {
-    console.error("[Webhook] Failed to parse JSON:", error);
+    console.warn("[Webhook] Failed to parse JSON:", error);
     return null;
   }
 }
@@ -46,7 +46,7 @@ async function stepHandler(
   const method = input.webhookMethod || "POST";
 
   if (!url) {
-    console.error("[Webhook] No URL provided");
+    console.warn("[Webhook] No URL provided");
     return {
       success: false,
       error: "Webhook URL is required",
@@ -57,7 +57,7 @@ async function stepHandler(
   try {
     new URL(url);
   } catch {
-    console.error("[Webhook] Invalid URL format");
+    console.warn("[Webhook] Invalid URL format");
     return {
       success: false,
       error: "Invalid webhook URL format",
@@ -122,7 +122,7 @@ async function stepHandler(
     }
 
     if (!response.ok) {
-      console.error("[Webhook] API error:", response.status, responseData);
+      console.warn("[Webhook] API error:", response.status, responseData);
       return {
         success: false,
         error: `HTTP ${response.status}: ${typeof responseData === "string" ? responseData : JSON.stringify(responseData)}`,
@@ -137,7 +137,7 @@ async function stepHandler(
       response: responseData,
     };
   } catch (error) {
-    console.error("[Webhook] Error sending webhook:", error);
+    console.warn("[Webhook] Error sending webhook:", error);
     return {
       success: false,
       error: `Failed to send webhook: ${getErrorMessage(error)}`,
