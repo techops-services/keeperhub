@@ -324,13 +324,32 @@ function ForEachFields({
 // Collect fields component (informational only)
 function CollectFields() {
   return (
-    <div className="rounded-lg border bg-muted/30 p-3">
-      <p className="text-muted-foreground text-sm">
-        This node collects results from the preceding For Each loop. Downstream
-        nodes can reference <code className="text-xs">Collect.results</code> for
-        the collected array and <code className="text-xs">Collect.count</code>{" "}
-        for the number of iterations.
-      </p>
+    <div className="space-y-3">
+      <div className="rounded-lg border bg-muted/30 p-3">
+        <p className="text-muted-foreground text-sm">
+          Place this node after a For Each loop to gather iteration outputs into
+          a single array. The Collect node marks the end of the loop body --
+          nodes connected after Collect run once with the aggregated results.
+        </p>
+      </div>
+      <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+        <p className="font-medium text-sm">Available outputs</p>
+        <ul className="list-disc space-y-1 pl-4 text-muted-foreground text-sm">
+          <li>
+            <code className="text-xs">Collect.results</code> -- Array of
+            outputs, one entry per iteration (from the last body node before
+            Collect)
+          </li>
+          <li>
+            <code className="text-xs">Collect.count</code> -- Number of
+            completed iterations
+          </li>
+        </ul>
+        <p className="text-muted-foreground text-xs">
+          Without a Collect node, the loop runs as fire-and-forget with no
+          aggregated output.
+        </p>
+      </div>
     </div>
   );
 }

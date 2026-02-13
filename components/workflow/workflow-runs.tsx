@@ -43,6 +43,10 @@ type ExecutionLog = {
   input?: unknown;
   output?: unknown;
   error: string | null;
+  // start custom keeperhub code //
+  iterationIndex: number | null;
+  forEachNodeId: string | null;
+  // end keeperhub code //
 };
 
 type WorkflowExecution = {
@@ -100,7 +104,10 @@ function isBase64ImageOutput(output: unknown): output is { base64: string } {
   );
 }
 
-// Helper to convert execution logs to a map by nodeId for the global atom
+// Helper to convert execution logs to a map by nodeId for the global atom.
+// For nodes that appear multiple times (e.g., For Each body nodes),
+// this intentionally keeps only the last entry -- used by template
+// autocomplete which only needs the most recent output.
 function createExecutionLogsMap(logs: ExecutionLog[]): Record<
   string,
   {
@@ -566,6 +573,204 @@ function ExecutionProgress({ execution }: { execution: WorkflowExecution }) {
   );
 }
 
+// start custom keeperhub code //
+
+// ---------------------------------------------------------------------------
+// For Each iteration grouping
+// ---------------------------------------------------------------------------
+
+type IterationGroup = {
+  iterationIndex: number;
+  logs: ExecutionLog[];
+};
+
+type GroupedLogEntry =
+  | { type: "standalone"; log: ExecutionLog }
+  | {
+      type: "for-each-group";
+      forEachLog: ExecutionLog;
+      iterations: IterationGroup[];
+    };
+
+/**
+ * Group child logs by iteration index and sort them chronologically.
+ */
+function buildIterationGroups(childLogs: ExecutionLog[]): IterationGroup[] {
+  const iterationMap = new Map<number, ExecutionLog[]>();
+  for (const child of childLogs) {
+    const idx = child.iterationIndex ?? 0;
+    const existing = iterationMap.get(idx) ?? [];
+    existing.push(child);
+    iterationMap.set(idx, existing);
+  }
+
+  return Array.from(iterationMap.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([index, iterLogs]) => ({
+      iterationIndex: index,
+      logs: iterLogs.sort(
+        (a, b) =>
+          new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime()
+      ),
+    }));
+}
+
+/**
+ * Transform a flat log array into grouped entries where For Each body
+ * node logs are nested under their parent For Each node by iteration.
+ */
+function groupLogsByIteration(logs: ExecutionLog[]): GroupedLogEntry[] {
+  const result: GroupedLogEntry[] = [];
+
+  // Collect logs that belong to a For Each loop body
+  const forEachChildLogs = new Map<string, ExecutionLog[]>();
+  for (const log of logs) {
+    if (log.forEachNodeId !== null && log.iterationIndex !== null) {
+      const existing = forEachChildLogs.get(log.forEachNodeId) ?? [];
+      existing.push(log);
+      forEachChildLogs.set(log.forEachNodeId, existing);
+    }
+  }
+
+  // Build grouped entries
+  for (const log of logs) {
+    // Skip loop body logs -- they'll be attached to their For Each parent
+    if (log.forEachNodeId !== null && log.iterationIndex !== null) {
+      continue;
+    }
+
+    // For Each parent with child logs: build iteration groups
+    if (log.nodeType === "For Each" && forEachChildLogs.has(log.nodeId)) {
+      const childLogs = forEachChildLogs.get(log.nodeId) ?? [];
+      const iterations = buildIterationGroups(childLogs);
+      result.push({ type: "for-each-group", forEachLog: log, iterations });
+    } else {
+      result.push({ type: "standalone", log });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Render a For Each node with its iterations grouped and collapsible.
+ */
+function ForEachLogGroup({
+  forEachLog,
+  iterations,
+  expandedLogs,
+  onToggleLog,
+  getStatusIcon,
+  getStatusDotClass,
+  isFirst,
+  isLast,
+}: {
+  forEachLog: ExecutionLog;
+  iterations: IterationGroup[];
+  expandedLogs: Set<string>;
+  onToggleLog: (id: string) => void;
+  getStatusIcon: (status: string) => JSX.Element;
+  getStatusDotClass: (status: string) => string;
+  isFirst: boolean;
+  isLast: boolean;
+}) {
+  const [expandedIterations, setExpandedIterations] = useState<Set<number>>(
+    new Set()
+  );
+
+  const toggleIteration = useCallback((index: number) => {
+    setExpandedIterations((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  }, []);
+
+  return (
+    <div>
+      <ExecutionLogEntry
+        getStatusDotClass={getStatusDotClass}
+        getStatusIcon={getStatusIcon}
+        isExpanded={expandedLogs.has(forEachLog.id)}
+        isFirst={isFirst}
+        isLast={isLast && iterations.length === 0}
+        log={forEachLog}
+        onToggle={() => onToggleLog(forEachLog.id)}
+      />
+
+      {iterations.length > 0 && (
+        <div className="ml-6 border-border border-l pl-2">
+          {iterations.map((iteration) => {
+            const isIterExpanded = expandedIterations.has(
+              iteration.iterationIndex
+            );
+            const iterHasError = iteration.logs.some(
+              (l) => l.status === "error"
+            );
+            const iterDuration = iteration.logs.reduce(
+              (sum, l) =>
+                sum + (l.duration ? Number.parseInt(l.duration, 10) : 0),
+              0
+            );
+
+            return (
+              <div key={iteration.iterationIndex}>
+                <button
+                  className="group flex w-full items-center gap-2 rounded-lg py-1.5 text-left transition-colors hover:bg-muted/50"
+                  onClick={() => toggleIteration(iteration.iterationIndex)}
+                  type="button"
+                >
+                  {isIterExpanded ? (
+                    <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+                  )}
+                  <span className="font-medium text-muted-foreground text-xs">
+                    Iteration {iteration.iterationIndex + 1}
+                  </span>
+                  {iterHasError && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                  )}
+                  {iterDuration > 0 && (
+                    <span className="ml-auto shrink-0 font-mono text-muted-foreground text-xs tabular-nums">
+                      {iterDuration < 1000
+                        ? `${iterDuration}ms`
+                        : `${(iterDuration / 1000).toFixed(2)}s`}
+                    </span>
+                  )}
+                </button>
+
+                {isIterExpanded && (
+                  <div className="ml-4">
+                    {iteration.logs.map((iterLog, logIdx) => (
+                      <ExecutionLogEntry
+                        getStatusDotClass={getStatusDotClass}
+                        getStatusIcon={getStatusIcon}
+                        isExpanded={expandedLogs.has(iterLog.id)}
+                        isFirst={logIdx === 0}
+                        isLast={logIdx === iteration.logs.length - 1}
+                        key={iterLog.id}
+                        log={iterLog}
+                        onToggle={() => onToggleLog(iterLog.id)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// end keeperhub code //
+
 // Component for rendering individual execution log entries
 function ExecutionLogEntry({
   log,
@@ -749,6 +954,10 @@ export function WorkflowRuns({
         startedAt: Date;
         completedAt: Date | null;
         duration: string | null;
+        // start custom keeperhub code //
+        iterationIndex?: number | null;
+        forEachNodeId?: string | null;
+        // end keeperhub code //
       }>,
       _workflow?: {
         nodes: unknown;
@@ -766,6 +975,10 @@ export function WorkflowRuns({
         input: log.input,
         output: log.output,
         error: log.error,
+        // start custom keeperhub code //
+        iterationIndex: log.iterationIndex ?? null,
+        forEachNodeId: log.forEachNodeId ?? null,
+        // end keeperhub code //
       })),
     []
   );
@@ -1066,18 +1279,39 @@ export function WorkflowRuns({
                   </div>
                 ) : (
                   <div className="p-4">
-                    {executionLogs.map((log, logIndex) => (
-                      <ExecutionLogEntry
-                        getStatusDotClass={getStatusDotClass}
-                        getStatusIcon={getStatusIcon}
-                        isExpanded={expandedLogs.has(log.id)}
-                        isFirst={logIndex === 0}
-                        isLast={logIndex === executionLogs.length - 1}
-                        key={log.id}
-                        log={log}
-                        onToggle={() => toggleLog(log.id)}
-                      />
-                    ))}
+                    {/* start custom keeperhub code */}
+                    {groupLogsByIteration(executionLogs).map(
+                      (entry, entryIndex, entries) => {
+                        if (entry.type === "for-each-group") {
+                          return (
+                            <ForEachLogGroup
+                              expandedLogs={expandedLogs}
+                              forEachLog={entry.forEachLog}
+                              getStatusDotClass={getStatusDotClass}
+                              getStatusIcon={getStatusIcon}
+                              isFirst={entryIndex === 0}
+                              isLast={entryIndex === entries.length - 1}
+                              iterations={entry.iterations}
+                              key={entry.forEachLog.id}
+                              onToggleLog={toggleLog}
+                            />
+                          );
+                        }
+                        return (
+                          <ExecutionLogEntry
+                            getStatusDotClass={getStatusDotClass}
+                            getStatusIcon={getStatusIcon}
+                            isExpanded={expandedLogs.has(entry.log.id)}
+                            isFirst={entryIndex === 0}
+                            isLast={entryIndex === entries.length - 1}
+                            key={entry.log.id}
+                            log={entry.log}
+                            onToggle={() => toggleLog(entry.log.id)}
+                          />
+                        );
+                      }
+                    )}
+                    {/* end keeperhub code */}
                   </div>
                 )}
               </div>
