@@ -1,8 +1,0 @@
-[submodule "keeperhub-scheduler"]
-	path = keeperhub-scheduler
-	url = https://github.com/techops-services/keeperhub-scheduler.git
-	branch = staging
-[submodule "keeperhub-events"]
-	path = keeperhub-events
-	url = https://github.com/techops-services/keeperhub-events.git
-	branch = staging

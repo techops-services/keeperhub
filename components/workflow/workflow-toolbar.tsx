@@ -4,6 +4,7 @@ import { useReactFlow } from "@xyflow/react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import {
   Check,
+  ChevronDown,
   Copy,
   Download,
   Globe,
@@ -19,7 +20,7 @@ import {
 } from "lucide-react";
 import { nanoid } from "nanoid";
 // start custom KeeperHub code
-import { usePathname, useRouter } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 // end custom KeeperHub code
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -30,14 +31,17 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { OrgSwitcher } from "@/keeperhub/components/organization/org-switcher";
-import { GoLiveOverlay } from "@/keeperhub/components/overlays/go-live-overlay";
 import { Switch } from "@/keeperhub/components/ui/switch";
 // start custom keeperhub code //
 import { BUILTIN_NODE_ID } from "@/keeperhub/lib/builtin-variables";
-import { api, type Project, type Tag } from "@/lib/api-client";
+import { api, type Project } from "@/lib/api-client";
 import { authClient, useSession } from "@/lib/auth-client";
 import { getCustomLogo } from "@/lib/extension-registry";
 import { integrationsAtom } from "@/lib/integrations-store";
@@ -50,7 +54,6 @@ import {
   clearWorkflowAtom,
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
-  currentWorkflowPublicTagsAtom,
   currentWorkflowVisibilityAtom,
   deleteEdgeAtom,
   deleteNodeAtom,
@@ -85,6 +88,7 @@ import { Panel } from "../ai-elements/panel";
 import { ConfigurationOverlay } from "../overlays/configuration-overlay";
 import { ConfirmOverlay } from "../overlays/confirm-overlay";
 import { ExportWorkflowOverlay } from "../overlays/export-workflow-overlay";
+import { MakePublicOverlay } from "../overlays/make-public-overlay";
 import { useOverlay } from "../overlays/overlay-provider";
 import { WorkflowIssuesOverlay } from "../overlays/workflow-issues-overlay";
 import {
@@ -93,6 +97,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "../ui/tooltip";
+import { WorkflowIcon } from "../ui/workflow-icon";
 import { UserMenu } from "../workflows/user-menu";
 
 // end keeperhub code //
@@ -694,9 +699,6 @@ function useWorkflowState() {
   const [workflowVisibility, setWorkflowVisibility] = useAtom(
     currentWorkflowVisibilityAtom
   );
-  const [workflowPublicTags, setWorkflowPublicTags] = useAtom(
-    currentWorkflowPublicTagsAtom
-  );
   const isOwner = useAtomValue(isWorkflowOwnerAtom);
   const router = useRouter();
   const [isSaving, setIsSaving] = useAtom(isSavingAtom);
@@ -723,12 +725,10 @@ function useWorkflowState() {
       name: string;
       updatedAt: string;
       projectId?: string | null;
-      tagId?: string | null;
     }>
   >([]);
   // start custom keeperhub code //
   const [allProjects, setAllProjects] = useState<Project[]>([]);
-  const [allTags, setAllTags] = useState<Tag[]>([]);
   // end keeperhub code //
   const [isEnabled, setIsEnabled] = useAtom(isWorkflowEnabled);
 
@@ -737,14 +737,12 @@ function useWorkflowState() {
     const loadAllWorkflows = async () => {
       try {
         // start custom keeperhub code //
-        const [workflows, projects, tags] = await Promise.all([
+        const [workflows, projects] = await Promise.all([
           api.workflow.getAll(),
           api.project.getAll().catch(() => [] as Project[]),
-          api.tag.getAll().catch(() => [] as Tag[]),
         ]);
         setAllWorkflows(workflows);
         setAllProjects(projects);
-        setAllTags(tags);
         // end keeperhub code //
       } catch (error) {
         console.error("Failed to load workflows:", error);
@@ -766,8 +764,6 @@ function useWorkflowState() {
     setCurrentWorkflowName,
     workflowVisibility,
     setWorkflowVisibility,
-    workflowPublicTags, // keeperhub custom field //
-    setWorkflowPublicTags, // keeperhub custom field //
     isOwner,
     router,
     isSaving,
@@ -788,8 +784,6 @@ function useWorkflowState() {
     setAllWorkflows,
     allProjects, // keeperhub custom field //
     setAllProjects, // keeperhub custom field //
-    allTags, // keeperhub custom field //
-    setAllTags, // keeperhub custom field //
     setActiveTab,
     setNodes,
     setEdges,
@@ -818,12 +812,8 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     setHasUnsavedChanges,
     clearWorkflow,
     setWorkflowVisibility,
-    workflowPublicTags, // keeperhub custom field //
-    setWorkflowPublicTags, // keeperhub custom field //
     setAllWorkflows,
-    allTags, // keeperhub custom field //
     setAllProjects, // keeperhub custom field //
-    setAllTags, // keeperhub custom field //
     setIsDownloading,
     setIsDuplicating,
     setActiveTab,
@@ -956,14 +946,12 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
   const loadWorkflows = async () => {
     try {
       // start custom keeperhub code //
-      const [workflows, projects, tags] = await Promise.all([
+      const [workflows, projects] = await Promise.all([
         api.workflow.getAll(),
         api.project.getAll().catch(() => [] as Project[]),
-        api.tag.getAll().catch(() => [] as Tag[]),
       ]);
       setAllWorkflows(workflows);
       setAllProjects(projects);
-      setAllTags(tags);
       // end keeperhub code //
     } catch (error) {
       console.error("Failed to load workflows:", error);
@@ -975,25 +963,24 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
       return;
     }
 
-    // start custom keeperhub code //
-    // Show Go Live overlay when making public
+    // Show confirmation overlay when making public
     if (newVisibility === "public") {
-      openOverlay(GoLiveOverlay, {
-        workflowId: currentWorkflowId,
-        currentName: workflowName,
-        orgTagNames: allTags.map((t) => t.name),
-        onConfirm: ({ name, publicTags }) => {
-          setWorkflowVisibility("public");
-          setWorkflowPublicTags(publicTags);
-          if (name !== workflowName) {
-            state.setCurrentWorkflowName(name);
+      openOverlay(MakePublicOverlay, {
+        onConfirm: async () => {
+          try {
+            await api.workflow.update(currentWorkflowId, {
+              visibility: "public",
+            });
+            setWorkflowVisibility("public");
+            toast.success("Workflow is now public");
+          } catch (error) {
+            console.error("Failed to update visibility:", error);
+            toast.error("Failed to update visibility. Please try again.");
           }
-          toast.success("Workflow is now live");
         },
       });
       return;
     }
-    // end keeperhub code //
 
     // Switch to private immediately (no risks)
     try {
@@ -1001,35 +988,12 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
         visibility: newVisibility,
       });
       setWorkflowVisibility(newVisibility);
-      setWorkflowPublicTags([]); // keeperhub custom field //
       toast.success("Workflow is now private");
     } catch (error) {
       console.error("Failed to update visibility:", error);
       toast.error("Failed to update visibility. Please try again.");
     }
   };
-
-  // start custom keeperhub code //
-  const handleEditPublicSettings = (): void => {
-    if (!currentWorkflowId) {
-      return;
-    }
-    openOverlay(GoLiveOverlay, {
-      workflowId: currentWorkflowId,
-      currentName: workflowName,
-      orgTagNames: allTags.map((t) => t.name),
-      initialTags: workflowPublicTags,
-      isEditing: true,
-      onConfirm: ({ name, publicTags }) => {
-        setWorkflowPublicTags(publicTags);
-        if (name !== workflowName) {
-          state.setCurrentWorkflowName(name);
-        }
-        toast.success("Public settings updated");
-      },
-    });
-  };
-  // end keeperhub code //
 
   // start custom keeperhub code //
   const updateWorkflowEnabled = async (enabled: boolean) => {
@@ -1113,7 +1077,6 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     handleDownload,
     loadWorkflows,
     handleToggleVisibility,
-    handleEditPublicSettings, // keeperhub custom field //
     handleToggleEnabled,
     handleDuplicate,
   };
@@ -1499,23 +1462,14 @@ function VisibilityButton({
           Private
           {!isPublic && <Check className="ml-auto size-4" />}
         </DropdownMenuItem>
-        {isPublic ? (
-          <DropdownMenuItem
-            className="flex items-center gap-2"
-            onClick={() => actions.handleEditPublicSettings()}
-          >
-            <Settings2 className="size-4" />
-            Public Settings
-          </DropdownMenuItem>
-        ) : (
-          <DropdownMenuItem
-            className="flex items-center gap-2"
-            onClick={() => actions.handleToggleVisibility("public")}
-          >
-            <Globe className="size-4" />
-            Public
-          </DropdownMenuItem>
-        )}
+        <DropdownMenuItem
+          className="flex items-center gap-2"
+          onClick={() => actions.handleToggleVisibility("public")}
+        >
+          <Globe className="size-4" />
+          Public
+          {isPublic && <Check className="ml-auto size-4" />}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -1628,6 +1582,7 @@ function DuplicateButton({
 function WorkflowMenuComponent({
   workflowId,
   state,
+  actions,
 }: {
   workflowId?: string;
   state: ReturnType<typeof useWorkflowState>;
@@ -1635,12 +1590,194 @@ function WorkflowMenuComponent({
 }) {
   // start custom KeeperHub code
   const pathname = usePathname();
+  const isHubPage = pathname === "/hub";
   const isWorkflowRoute =
     pathname === "/workflows" || pathname.startsWith("/workflows/");
+
+  // validate against route workflow id as the state can be out of date
+  const { workflowId: routeWorkflowId } = useParams();
   // end custom KeeperHub code
 
   return (
     <div className="flex flex-col gap-1">
+      <div className="flex h-9 max-w-[160px] items-center overflow-hidden rounded-md border bg-secondary text-secondary-foreground sm:max-w-none">
+        <DropdownMenu onOpenChange={(open) => open && actions.loadWorkflows()}>
+          <DropdownMenuTrigger className="flex h-full cursor-pointer items-center gap-2 px-3 font-medium text-sm transition-all hover:bg-black/5 dark:hover:bg-white/5">
+            {/* start custom KeeperHub code */}
+            {isHubPage ? (
+              <Globe className="size-4 shrink-0" />
+            ) : (
+              <WorkflowIcon className="size-4 shrink-0" />
+            )}
+            {/* end custom KeeperHub code */}
+            <p className="truncate font-medium text-sm">
+              {/* start custom KeeperHub code */}
+              {(() => {
+                if (isHubPage) {
+                  return "Hub";
+                }
+                if (workflowId) {
+                  return state.workflowName;
+                }
+                return (
+                  <>
+                    <span className="sm:hidden">New</span>
+                    <span className="hidden sm:inline">New Workflow</span>
+                  </>
+                );
+              })()}
+              {/* end custom KeeperHub code */}
+            </p>
+            <ChevronDown className="size-3 shrink-0 opacity-50" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-64">
+            <DropdownMenuItem
+              asChild
+              className="flex items-center justify-between"
+            >
+              <a href="/">
+                New Workflow {/* start custom KeeperHub code */}
+                {!(workflowId || isHubPage) && (
+                  <Check className="size-4 shrink-0" />
+                )}
+                {/* end custom KeeperHub code */}
+              </a>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="flex items-center justify-between"
+              disabled
+            >
+              <span>All Workflows</span>
+              <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground text-xs">
+                Coming Soon
+              </span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="flex items-center justify-between"
+              onClick={() => state.router.push("/hub")}
+            >
+              <span>Hub</span>
+              {/* start custom KeeperHub code */}
+              {isHubPage && <Check className="size-4 shrink-0" />}
+              {/* end custom KeeperHub code */}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="flex items-center justify-between"
+              disabled
+            >
+              <span>Analytics</span>
+              <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground text-xs">
+                Coming Soon
+              </span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {/* start custom keeperhub code */}
+            {(() => {
+              const visibleWorkflows = state.allWorkflows.filter(
+                (w) => w.name !== "__current__"
+              );
+
+              if (visibleWorkflows.length === 0) {
+                return (
+                  <DropdownMenuItem disabled>
+                    No workflows found
+                  </DropdownMenuItem>
+                );
+              }
+
+              const workflowsByProject: Record<
+                string,
+                typeof visibleWorkflows
+              > = {};
+              const uncategorized: typeof visibleWorkflows = [];
+
+              for (const workflow of visibleWorkflows) {
+                if (workflow.projectId) {
+                  if (!workflowsByProject[workflow.projectId]) {
+                    workflowsByProject[workflow.projectId] = [];
+                  }
+                  workflowsByProject[workflow.projectId].push(workflow);
+                } else {
+                  uncategorized.push(workflow);
+                }
+              }
+
+              const hasProjects = state.allProjects.length > 0;
+
+              return (
+                <>
+                  {hasProjects &&
+                    state.allProjects.map((project) => {
+                      const projectWorkflows =
+                        workflowsByProject[project.id] || [];
+                      return (
+                        <DropdownMenuSub key={project.id}>
+                          <DropdownMenuSubTrigger className="flex items-center gap-2">
+                            <span
+                              className="inline-block size-2.5 shrink-0 rounded-full"
+                              style={{
+                                backgroundColor: project.color ?? "#888",
+                              }}
+                            />
+                            <span className="truncate">{project.name}</span>
+                            <span className="ml-auto rounded-full bg-muted px-1.5 py-0.5 font-medium text-muted-foreground text-xs">
+                              {project.workflowCount}
+                            </span>
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent className="w-56">
+                            {projectWorkflows.length === 0 ? (
+                              <DropdownMenuItem disabled>
+                                No workflows
+                              </DropdownMenuItem>
+                            ) : (
+                              projectWorkflows.map((workflow) => (
+                                <DropdownMenuItem
+                                  className="flex items-center justify-between"
+                                  key={workflow.id}
+                                  onClick={() =>
+                                    state.router.push(
+                                      `/workflows/${workflow.id}`
+                                    )
+                                  }
+                                >
+                                  <span className="truncate">
+                                    {workflow.name}
+                                  </span>
+                                  {workflow.id === routeWorkflowId && (
+                                    <Check className="size-4 shrink-0" />
+                                  )}
+                                </DropdownMenuItem>
+                              ))
+                            )}
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                      );
+                    })}
+                  {hasProjects && uncategorized.length > 0 && (
+                    <DropdownMenuSeparator />
+                  )}
+                  {uncategorized.map((workflow) => (
+                    <DropdownMenuItem
+                      className="flex items-center justify-between"
+                      key={workflow.id}
+                      onClick={() =>
+                        state.router.push(`/workflows/${workflow.id}`)
+                      }
+                    >
+                      <span className="truncate">{workflow.name}</span>
+                      {workflow.id === routeWorkflowId && (
+                        <Check className="size-4 shrink-0" />
+                      )}
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              );
+            })()}
+            {/* end keeperhub code */}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
       {isWorkflowRoute && workflowId && !state.isOwner && (
         <ReadOnlyBadge className="lg:hidden" />
       )}

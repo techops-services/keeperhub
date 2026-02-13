@@ -157,19 +157,6 @@
   }
 }
 
-/* start custom keeperhub code */
-@keyframes flyout-in {
-  from {
-    opacity: 0;
-    transform: translateX(-6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-/* end keeperhub code */
-
 @keyframes dashdraw {
   from {
     stroke-dashoffset: 10;

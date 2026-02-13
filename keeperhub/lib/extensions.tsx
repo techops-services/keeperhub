@@ -52,7 +52,6 @@ registerFieldRenderer(
           field={field}
           networkField={networkField}
           onChange={(val: unknown) => onUpdateConfig(field.key, val)}
-          onUpdateConfig={onUpdateConfig}
           value={value}
         />
       </div>

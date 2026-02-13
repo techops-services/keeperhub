@@ -169,27 +169,6 @@ export const projects = pgTable(
   },
   (table) => [index("idx_projects_org").on(table.organizationId)]
 );
-
-export const tags = pgTable(
-  "tags",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => generateId()),
-    name: text("name").notNull(),
-    color: text("color").notNull(),
-    organizationId: text("organization_id")
-      .notNull()
-      .references(() => organization.id, { onDelete: "cascade" }),
-    userId: text("user_id")
-      .notNull()
-      .references(() => users.id),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  },
-  (table) => [index("idx_tags_org").on(table.organizationId)]
-);
-
 // end keeperhub code //
 
 // Workflow visibility type
@@ -211,11 +190,10 @@ export const workflows = pgTable("workflows", {
   }),
   isAnonymous: boolean("is_anonymous").default(false).notNull(),
   featured: boolean("featured").default(false).notNull(),
+  category: text("category"),
+  protocol: text("protocol"),
   featuredOrder: integer("featured_order").default(0),
   projectId: text("project_id").references(() => projects.id, {
-    onDelete: "set null",
-  }),
-  tagId: text("tag_id").references(() => tags.id, {
     onDelete: "set null",
   }),
   // end keeperhub code //
@@ -321,25 +299,19 @@ export {
   type NewOrganizationApiKey,
   type NewOrganizationToken,
   type NewParaWallet,
-  type NewPublicTag,
   type NewSupportedToken,
-  type NewWorkflowPublicTag,
   type OrganizationApiKey,
   type OrganizationToken,
   organizationApiKeys,
   organizationTokens,
   type ParaWallet,
   type PendingTransaction,
-  type PublicTag,
   paraWallets,
   pendingTransactions,
-  publicTags,
   type SupportedToken,
   supportedTokens,
   type WalletLock,
-  type WorkflowPublicTag,
   walletLocks,
-  workflowPublicTags,
 } from "../../keeperhub/db/schema-extensions";
 
 // API Keys table for webhook authentication
@@ -501,7 +473,6 @@ export const organizationRelations = relations(organization, ({ many }) => ({
   invitations: many(invitation),
   addressBookEntries: many(addressBookEntry),
   projects: many(projects),
-  tags: many(tags),
 }));
 
 export const memberRelations = relations(member, ({ one }) => ({
@@ -558,18 +529,6 @@ export const workflowsRelations = relations(workflows, ({ one }) => ({
     references: [projects.id],
   }),
 }));
-
-export const tagsRelations = relations(tags, ({ one }) => ({
-  organization: one(organization, {
-    fields: [tags.organizationId],
-    references: [organization.id],
-  }),
-  creator: one(users, {
-    fields: [tags.userId],
-    references: [users.id],
-  }),
-}));
-
 // end keeperhub code //
 
 export const chainsRelations = relations(chains, ({ one, many }) => ({
@@ -628,8 +587,6 @@ export type AddressBookEntry = typeof addressBookEntry.$inferSelect;
 export type NewAddressBookEntry = typeof addressBookEntry.$inferInsert;
 export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;
-export type Tag = typeof tags.$inferSelect;
-export type NewTag = typeof tags.$inferInsert;
 // end keeperhub code //
 export type Chain = typeof chains.$inferSelect;
 export type NewChain = typeof chains.$inferInsert;
