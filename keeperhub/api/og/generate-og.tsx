@@ -175,6 +175,16 @@ function getNodeIcon(label: string): string {
   return match?.icon ?? ICON_PLAY;
 }
 
+function getNodeLabel(node: WorkflowNode): string {
+  if (node.data.label) {
+    return node.data.label;
+  }
+  if (node.data.type === "trigger") {
+    return node.data.config?.triggerType ?? "Manual";
+  }
+  return node.data.config?.actionType ?? "Action";
+}
+
 const DOTS = generateDots(OG_WIDTH, OG_HEIGHT, DOT_SPACING);
 
 // ---------------------------------------------------------------------------
@@ -466,7 +476,11 @@ export function generateHubOGImage(): Promise<ImageResponse> {
 type WorkflowNode = {
   id: string;
   position: { x: number; y: number };
-  data: { type: "trigger" | "action" | "add"; label?: string };
+  data: {
+    type: "trigger" | "action" | "add";
+    label?: string;
+    config?: { triggerType?: string; actionType?: string };
+  };
 };
 
 type WorkflowEdge = {
@@ -572,8 +586,6 @@ type OGRenderData = {
   description: string | null;
   triggerLabel: string | undefined;
   actionCount: number;
-  category: string | null;
-  protocol: string | null;
 };
 
 function prepareRenderData(workflowData: {
@@ -581,8 +593,6 @@ function prepareRenderData(workflowData: {
   description: string | null;
   nodes: unknown[];
   edges: unknown[];
-  category: string | null;
-  protocol: string | null;
 }): OGRenderData {
   const allNodes = (workflowData.nodes ?? []) as WorkflowNode[];
   const nodes = allNodes.filter((n) => n.data?.type !== "add" && n.position);
@@ -606,10 +616,8 @@ function prepareRenderData(workflowData: {
     ns,
     title: workflowData.name,
     description: workflowData.description,
-    triggerLabel: triggerNode?.data.label,
+    triggerLabel: triggerNode ? getNodeLabel(triggerNode) : undefined,
     actionCount: nodes.filter((n) => n.data.type === "action").length,
-    category: workflowData.category,
-    protocol: workflowData.protocol,
   };
 }
 
@@ -673,7 +681,7 @@ function renderWorkflowOG(data: OGRenderData): Promise<ImageResponse> {
         );
         const nodeSquare = Math.max(ns * 0.7, 110);
         const isTrigger = node.data.type === "trigger";
-        const label = node.data.label ?? "";
+        const label = getNodeLabel(node);
         const iconSize = Math.max(nodeSquare * 0.32, 30);
 
         return (
@@ -768,12 +776,6 @@ function renderWorkflowOG(data: OGRenderData): Promise<ImageResponse> {
         <div style={{ display: "flex" }}>
           {data.actionCount} {data.actionCount === 1 ? "action" : "actions"}
         </div>
-        {data.category ? (
-          <div style={{ display: "flex" }}>{data.category}</div>
-        ) : null}
-        {data.protocol ? (
-          <div style={{ display: "flex" }}>{data.protocol}</div>
-        ) : null}
       </Footer>
     </OGBase>,
     3600
@@ -784,18 +786,19 @@ export async function generateWorkflowOGImage(
   workflowId: string
 ): Promise<Response> {
   try {
-    const workflow = await db.query.workflows.findFirst({
-      where: eq(workflows.id, workflowId),
-      columns: {
-        name: true,
-        description: true,
-        nodes: true,
-        edges: true,
-        visibility: true,
-        category: true,
-        protocol: true,
-      },
-    });
+    const rows = await db
+      .select({
+        name: workflows.name,
+        description: workflows.description,
+        nodes: workflows.nodes,
+        edges: workflows.edges,
+        visibility: workflows.visibility,
+      })
+      .from(workflows)
+      .where(eq(workflows.id, workflowId))
+      .limit(1);
+
+    const workflow = rows[0];
 
     if (!workflow) {
       return new Response("Workflow not found", { status: 404 });
@@ -812,8 +815,6 @@ export async function generateWorkflowOGImage(
       nodes: workflow.nodes as any[],
       // biome-ignore lint/suspicious/noExplicitAny: JSONB column type from Drizzle schema
       edges: workflow.edges as any[],
-      category: workflow.category ?? null,
-      protocol: workflow.protocol ?? null,
     });
 
     return await renderWorkflowOG(data);

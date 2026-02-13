@@ -25,12 +25,12 @@ import {
 } from "@/lib/integrations-store";
 import type { IntegrationType } from "@/lib/types/integration";
 import {
-  currentWorkflowCategoryAtom,
   currentWorkflowDescriptionAtom,
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
   currentWorkflowProjectIdAtom,
-  currentWorkflowProtocolAtom,
+  currentWorkflowPublicTagsAtom,
+  currentWorkflowTagIdAtom,
   currentWorkflowVisibilityAtom,
   edgesAtom,
   hasSidebarBeenShownAtom,
@@ -148,9 +148,8 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   const setCurrentWorkflowDescription = useSetAtom(
     currentWorkflowDescriptionAtom
   );
-  const setCurrentWorkflowCategory = useSetAtom(currentWorkflowCategoryAtom);
-  const setCurrentWorkflowProtocol = useSetAtom(currentWorkflowProtocolAtom);
   const setCurrentWorkflowProjectId = useSetAtom(currentWorkflowProjectIdAtom);
+  const setCurrentWorkflowTagId = useSetAtom(currentWorkflowTagIdAtom);
   const updateNodeData = useSetAtom(updateNodeDataAtom);
   const setHasUnsavedChanges = useSetAtom(hasUnsavedChangesAtom);
   const [workflowNotFound, setWorkflowNotFound] = useAtom(workflowNotFoundAtom);
@@ -166,6 +165,9 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   );
   const [isOwner, setIsWorkflowOwner] = useAtom(isWorkflowOwnerAtom);
   const setIsWorkflowEnabled = useSetAtom(isWorkflowEnabled); // keeperhub custom field //
+  const setCurrentWorkflowPublicTags = useSetAtom(
+    currentWorkflowPublicTagsAtom
+  );
   // start custom keeperhub code //
   const setSelectedNode = useSetAtom(selectedNodeAtom);
   const setActiveTab = useSetAtom(propertiesPanelActiveTabAtom);
@@ -415,9 +417,9 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
       );
       setIsWorkflowOwner(workflow.isOwner !== false); // Default to true if not set
       setIsWorkflowEnabled(workflow.enabled ?? false); // keeperhub custom field //
-      setCurrentWorkflowCategory(workflow.category ?? "");
-      setCurrentWorkflowProtocol(workflow.protocol ?? "");
       setCurrentWorkflowProjectId(workflow.projectId ?? null);
+      setCurrentWorkflowTagId(workflow.tagId ?? null);
+      setCurrentWorkflowPublicTags(workflow.publicTags ?? []);
       setHasUnsavedChanges(false);
       setWorkflowNotFound(false);
 
@@ -452,9 +454,9 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
     setCurrentWorkflowVisibility,
     setIsWorkflowOwner,
     setIsWorkflowEnabled, // keeperhub custom field //
-    setCurrentWorkflowCategory,
-    setCurrentWorkflowProtocol,
     setCurrentWorkflowProjectId,
+    setCurrentWorkflowPublicTags,
+    setCurrentWorkflowTagId,
     setHasUnsavedChanges,
     setWorkflowNotFound,
     setCurrentWorkflowDescription,
