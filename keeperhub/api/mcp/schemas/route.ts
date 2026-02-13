@@ -77,6 +77,47 @@ const SYSTEM_ACTIONS = {
       rowCount: "number - Number of rows returned",
     },
   },
+  "For Each": {
+    actionType: "For Each",
+    label: "For Each",
+    description:
+      "Loop over an array - executes connected body nodes once per element. Optionally pair with a downstream Collect node to aggregate results. Without Collect, the loop runs as fire-and-forget (side effects only).",
+    category: "System",
+    requiredFields: {
+      arraySource:
+        'string - Template reference to an array, e.g., "{{@db-query-1:Database Query.rows}}" or "{{@http-1:HTTP Request.data.items}}"',
+    },
+    optionalFields: {
+      maxIterations:
+        "number - Safety limit on iterations (default: processes entire array)",
+      mapExpression:
+        'string - Dot-path to extract from each element, e.g., "address" or "data.name". When set, the iteration output is transformed before being collected.',
+    },
+    outputFields: {
+      currentItem:
+        "unknown - Current array element (available inside loop body only via {{@forEachNodeId:For Each.currentItem}})",
+      index:
+        "number - Current zero-based iteration index (available inside loop body only)",
+      totalItems:
+        "number - Total number of items being iterated (available inside loop body only)",
+    },
+    behavior:
+      "LOOP - executes all downstream nodes once per array element. Optionally end with a Collect node to aggregate results. Without Collect, all downstream nodes run as fire-and-forget.",
+  },
+  Collect: {
+    actionType: "Collect",
+    label: "Collect",
+    description:
+      "Gathers results from a preceding For Each loop into an array. Place downstream of a For Each node to mark the end of the loop body and enable result aggregation.",
+    category: "System",
+    requiredFields: {},
+    optionalFields: {},
+    outputFields: {
+      results:
+        "array - Array of outputs from each iteration (one entry per element)",
+      count: "number - Number of iterations completed",
+    },
+  },
 } as const;
 
 // =============================================================================
