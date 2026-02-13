@@ -379,6 +379,9 @@ function traverseDotPath(root: unknown, path: string): unknown {
   for (const part of path.split(".")) {
     if (data && typeof data === "object" && !Array.isArray(data)) {
       data = (data as Record<string, unknown>)[part];
+      if (data === undefined) {
+        return null;
+      }
     } else {
       return null;
     }

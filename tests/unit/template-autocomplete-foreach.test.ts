@@ -32,6 +32,9 @@ function traverseDotPath(root: unknown, path: string): unknown {
   for (const part of path.split(".")) {
     if (data && typeof data === "object" && !Array.isArray(data)) {
       data = (data as Record<string, unknown>)[part];
+      if (data === undefined) {
+        return null;
+      }
     } else {
       return null;
     }
@@ -128,10 +131,8 @@ describe("traverseDotPath", () => {
     expect(traverseDotPath({ a: { b: { c: 42 } } }, "a.b.c")).toBe(42);
   });
 
-  it("returns undefined for a missing key at the leaf level", () => {
-    // The object is valid so traversal enters the if-branch and does obj["b"]
-    // which yields undefined. The loop ends and returns that undefined value.
-    expect(traverseDotPath({ a: 1 }, "b")).toBeUndefined();
+  it("returns null for a missing key at the leaf level", () => {
+    expect(traverseDotPath({ a: 1 }, "b")).toBeNull();
   });
 
   it("returns null when the path traverses through an array", () => {
@@ -142,11 +143,10 @@ describe("traverseDotPath", () => {
     expect(traverseDotPath({ a: "hello" }, "a.b")).toBeNull();
   });
 
-  it("returns the root object when path is an empty string", () => {
+  it("returns null when path is an empty string", () => {
     const root = { x: 10 };
     // An empty string split by "." produces [""], so root[""] is undefined.
-    // The function returns whatever root[""] resolves to, which is undefined.
-    expect(traverseDotPath(root, "")).toBeUndefined();
+    expect(traverseDotPath(root, "")).toBeNull();
   });
 
   it("returns null when root is null", () => {
@@ -423,7 +423,7 @@ describe("resolveForEachSyntheticOutput", () => {
     });
   });
 
-  it("sets currentItem to undefined when mapExpression targets a missing field", () => {
+  it("keeps full element when mapExpression targets a missing field", () => {
     const node = makeNode("n1", "For Each", {
       arraySource: "{{@src:Source.items}}",
       mapExpression: "nonExistent",
@@ -431,10 +431,10 @@ describe("resolveForEachSyntheticOutput", () => {
     const items = [{ name: "Alice" }, { name: "Bob" }];
     const executionLogs = { src: { output: { items } } };
     const result = resolveForEachSyntheticOutput(node, executionLogs, {});
-    // traverseDotPath returns undefined (not null) for a missing leaf key,
-    // so the `mapped !== null` guard passes and currentItem becomes undefined.
+    // traverseDotPath returns null for missing keys, so the guard
+    // catches it and currentItem stays as the full element.
     expect(result).toEqual({
-      currentItem: undefined,
+      currentItem: { name: "Alice" },
       index: 0,
       totalItems: 2,
     });
