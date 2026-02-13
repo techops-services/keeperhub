@@ -709,6 +709,122 @@ describe("AdaptiveGasStrategy", () => {
     });
   });
 
+  describe("gas limit override (absolute)", () => {
+    it("should use absolute gas limit override when provided", async () => {
+      const strategy = new AdaptiveGasStrategy({
+        gasLimitMultiplier: 2.0,
+      });
+      const provider = createMockProvider();
+
+      const config = await strategy.getGasConfig(
+        provider as unknown as import("ethers").Provider,
+        "manual",
+        BigInt(100_000),
+        1,
+        undefined,
+        BigInt(500_000)
+      );
+
+      // Absolute override should be used directly, ignoring multiplier
+      expect(config.gasLimit).toBe(BigInt(500_000));
+    });
+
+    it("should prefer absolute override over multiplier override", async () => {
+      const strategy = new AdaptiveGasStrategy({
+        gasLimitMultiplier: 2.0,
+      });
+      const provider = createMockProvider();
+
+      const config = await strategy.getGasConfig(
+        provider as unknown as import("ethers").Provider,
+        "manual",
+        BigInt(100_000),
+        1,
+        5.0,
+        BigInt(300_000)
+      );
+
+      // Absolute override takes precedence
+      expect(config.gasLimit).toBe(BigInt(300_000));
+    });
+
+    it("should ignore absolute override when zero", async () => {
+      const strategy = new AdaptiveGasStrategy({
+        gasLimitMultiplier: 2.0,
+      });
+      const provider = createMockProvider();
+
+      const config = await strategy.getGasConfig(
+        provider as unknown as import("ethers").Provider,
+        "scheduled",
+        BigInt(100_000),
+        1,
+        undefined,
+        BigInt(0)
+      );
+
+      // Should fall back to default 2.0x multiplier
+      expect(config.gasLimit).toBe(BigInt(200_000));
+    });
+
+    it("should ignore absolute override when negative", async () => {
+      const strategy = new AdaptiveGasStrategy({
+        gasLimitMultiplier: 2.0,
+      });
+      const provider = createMockProvider();
+
+      const config = await strategy.getGasConfig(
+        provider as unknown as import("ethers").Provider,
+        "scheduled",
+        BigInt(100_000),
+        1,
+        undefined,
+        BigInt(-1)
+      );
+
+      // Negative bigint is not > 0, should fall back to default 2.0x multiplier
+      expect(config.gasLimit).toBe(BigInt(200_000));
+    });
+
+    it("should work with absolute override for time-sensitive triggers", async () => {
+      const strategy = new AdaptiveGasStrategy({
+        gasLimitMultiplierConservative: 2.5,
+      });
+      const provider = createMockProvider();
+
+      const config = await strategy.getGasConfig(
+        provider as unknown as import("ethers").Provider,
+        "event",
+        BigInt(100_000),
+        1,
+        undefined,
+        BigInt(150_000)
+      );
+
+      // Absolute override bypasses trigger-type-based multiplier selection
+      expect(config.gasLimit).toBe(BigInt(150_000));
+    });
+
+    it("should still calculate fees normally when using absolute gas limit", async () => {
+      const strategy = new AdaptiveGasStrategy();
+      const provider = createMockProvider();
+
+      const config = await strategy.getGasConfig(
+        provider as unknown as import("ethers").Provider,
+        "manual",
+        BigInt(100_000),
+        1,
+        undefined,
+        BigInt(500_000)
+      );
+
+      // Gas limit is overridden but fees should still be calculated
+      expect(config.gasLimit).toBe(BigInt(500_000));
+      expect(config.maxFeePerGas).toBeGreaterThan(BigInt(0));
+      expect(config.maxPriorityFeePerGas).toBeGreaterThan(BigInt(0));
+    });
+  });
+
   describe("gas limit calculation precision", () => {
     it("should maintain precision for large gas estimates", async () => {
       const strategy = new AdaptiveGasStrategy({

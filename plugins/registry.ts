@@ -66,6 +66,9 @@ export type ActionConfigFieldBase = {
 
   // Step increment (for number fields)
   step?: number;
+
+  // For gas-limit-multiplier: which action slug to use for gas estimation
+  actionSlug?: string;
   // end keeperhub code //
 
   // Whether this field is required (defaults to false)

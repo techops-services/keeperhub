@@ -8,10 +8,51 @@
  * This file is purely informational for the UI.
  */
 
-type ChainGasDefaults = {
+export type ChainGasDefaults = {
   multiplier: number;
   conservative: number;
 };
+
+/**
+ * Gas limit configuration - supports both multiplier and absolute gas limit modes
+ */
+export type GasLimitConfig =
+  | { mode: "multiplier"; value: string }
+  | { mode: "maxGasLimit"; value: string };
+
+/**
+ * Parse gas limit config from the stored string value.
+ *
+ * Supports:
+ * - New JSON format: '{"mode":"multiplier","value":"2.5"}' or '{"mode":"maxGasLimit","value":"500000"}'
+ * - Legacy plain string: "2.5" → treated as { mode: "multiplier", value: "2.5" }
+ * - Empty/undefined: returns undefined
+ */
+export function parseGasLimitConfig(
+  raw: string | undefined
+): GasLimitConfig | undefined {
+  if (!raw || raw.trim() === "") {
+    return;
+  }
+
+  // Try parsing as JSON first (new format)
+  if (raw.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(raw) as {
+        mode?: string;
+        value?: string;
+      };
+      if (parsed.mode === "multiplier" || parsed.mode === "maxGasLimit") {
+        return { mode: parsed.mode, value: parsed.value ?? "" };
+      }
+    } catch {
+      // Fall through to legacy handling
+    }
+  }
+
+  // Legacy format: plain numeric string → multiplier mode
+  return { mode: "multiplier", value: raw };
+}
 
 const CHAIN_GAS_DEFAULTS: Record<number, ChainGasDefaults> = {
   // Ethereum mainnet

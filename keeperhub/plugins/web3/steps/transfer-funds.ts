@@ -7,6 +7,7 @@ import {
   getOrganizationWalletAddress,
   initializeParaSigner,
 } from "@/keeperhub/lib/para/wallet-helpers";
+import { parseGasLimitConfig } from "@/keeperhub/lib/web3/gas-defaults";
 import { getGasStrategy } from "@/keeperhub/lib/web3/gas-strategy";
 import { getNonceManager } from "@/keeperhub/lib/web3/nonce-manager";
 import {
@@ -52,13 +53,21 @@ async function stepHandler(
   const { network, amount, recipientAddress, gasLimitMultiplier, _context } =
     input;
 
-  const parsedMultiplier = gasLimitMultiplier
-    ? Number.parseFloat(gasLimitMultiplier)
-    : undefined;
-  const multiplierOverride =
-    parsedMultiplier !== undefined && !Number.isNaN(parsedMultiplier)
-      ? Math.max(1.0, Math.min(10.0, parsedMultiplier))
-      : undefined;
+  const gasLimitConfig = parseGasLimitConfig(gasLimitMultiplier);
+  let multiplierOverride: number | undefined;
+  let gasLimitOverride: bigint | undefined;
+
+  if (gasLimitConfig?.mode === "maxGasLimit") {
+    const parsed = Number.parseFloat(gasLimitConfig.value);
+    if (!Number.isNaN(parsed) && parsed > 0) {
+      gasLimitOverride = BigInt(Math.floor(parsed));
+    }
+  } else if (gasLimitConfig?.mode === "multiplier") {
+    const parsed = Number.parseFloat(gasLimitConfig.value);
+    if (!Number.isNaN(parsed)) {
+      multiplierOverride = Math.max(1.0, Math.min(10.0, parsed));
+    }
+  }
 
   // Validate recipient address
   if (!ethers.isAddress(recipientAddress)) {
@@ -238,28 +247,29 @@ async function stepHandler(
       });
 
       // Get gas configuration from strategy
-      const gasConfig = await gasStrategy.getGasConfig(
+      const txGasConfig = await gasStrategy.getGasConfig(
         provider,
         txContext.triggerType ?? "manual",
         estimatedGas,
         chainId,
-        multiplierOverride
+        multiplierOverride,
+        gasLimitOverride
       );
 
       console.log("[Transfer Funds] Gas config:", {
         estimatedGas: estimatedGas.toString(),
-        gasLimit: gasConfig.gasLimit.toString(),
-        maxFeePerGas: `${ethers.formatUnits(gasConfig.maxFeePerGas, "gwei")} gwei`,
-        maxPriorityFeePerGas: `${ethers.formatUnits(gasConfig.maxPriorityFeePerGas, "gwei")} gwei`,
+        gasLimit: txGasConfig.gasLimit.toString(),
+        maxFeePerGas: `${ethers.formatUnits(txGasConfig.maxFeePerGas, "gwei")} gwei`,
+        maxPriorityFeePerGas: `${ethers.formatUnits(txGasConfig.maxPriorityFeePerGas, "gwei")} gwei`,
       });
 
       // Send transaction with nonce and gas config
       const tx = await signer.sendTransaction({
         ...baseTx,
         nonce,
-        gasLimit: gasConfig.gasLimit,
-        maxFeePerGas: gasConfig.maxFeePerGas,
-        maxPriorityFeePerGas: gasConfig.maxPriorityFeePerGas,
+        gasLimit: txGasConfig.gasLimit,
+        maxFeePerGas: txGasConfig.maxFeePerGas,
+        maxPriorityFeePerGas: txGasConfig.maxPriorityFeePerGas,
       });
 
       // Record pending transaction
@@ -268,7 +278,7 @@ async function stepHandler(
         nonce,
         tx.hash,
         workflowId,
-        gasConfig.maxFeePerGas.toString()
+        txGasConfig.maxFeePerGas.toString()
       );
 
       // Wait for transaction to be mined

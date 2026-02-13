@@ -209,9 +209,10 @@ const web3Plugin: IntegrationPlugin = {
           fields: [
             {
               key: "gasLimitMultiplier",
-              label: "Gas Limit Multiplier",
+              label: "Gas Limit",
               type: "gas-limit-multiplier",
               networkField: "network",
+              actionSlug: "transfer-funds",
               step: 0.01,
               min: 1,
               max: 10,
@@ -297,9 +298,10 @@ const web3Plugin: IntegrationPlugin = {
           fields: [
             {
               key: "gasLimitMultiplier",
-              label: "Gas Limit Multiplier",
+              label: "Gas Limit",
               type: "gas-limit-multiplier",
               networkField: "network",
+              actionSlug: "transfer-token",
               step: 0.01,
               min: 1,
               max: 10,
@@ -692,9 +694,10 @@ const web3Plugin: IntegrationPlugin = {
           fields: [
             {
               key: "gasLimitMultiplier",
-              label: "Gas Limit Multiplier",
+              label: "Gas Limit",
               type: "gas-limit-multiplier",
               networkField: "network",
+              actionSlug: "write-contract",
               step: 0.01,
               min: 1,
               max: 10,
