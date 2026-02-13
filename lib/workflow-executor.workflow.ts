@@ -956,7 +956,8 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
     scopedOutputs: NodeOutputs,
     bodyResults: Record<string, ExecutionResult>,
     bodyEdgesBySource: Map<string, string[]>,
-    collectNodeId: string | undefined
+    collectNodeId: string | undefined,
+    iterationMeta?: { iterationIndex: number; forEachNodeId: string }
   ): Promise<void> {
     if (bodyVisited.has(nodeId)) {
       return;
@@ -987,7 +988,8 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
             scopedOutputs,
             bodyResults,
             bodyEdgesBySource,
-            collectNodeId
+            collectNodeId,
+            iterationMeta
           )
         )
       );
@@ -1052,6 +1054,8 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
         nodeId: node.id,
         nodeName: getNodeName(node),
         nodeType: actionType,
+        iterationIndex: iterationMeta?.iterationIndex,
+        forEachNodeId: iterationMeta?.forEachNodeId,
       };
 
       const stepResult = await executeActionStep({
@@ -1107,7 +1111,8 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
                   scopedOutputs,
                   bodyResults,
                   bodyEdgesBySource,
-                  collectNodeId
+                  collectNodeId,
+                  iterationMeta
                 )
               )
             );
@@ -1135,7 +1140,8 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
             scopedOutputs,
             bodyResults,
             bodyEdgesBySource,
-            collectNodeId
+            collectNodeId,
+            iterationMeta
           )
         )
       );
@@ -1211,6 +1217,7 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
       // Execute body starting from For Each's direct children
       const bodyVisited = new Set<string>();
       const firstBodyNodes = bodyEdgesBySource.get(forEachNodeId) ?? [];
+      const iterationMeta = { iterationIndex: index, forEachNodeId };
 
       await Promise.all(
         firstBodyNodes.map((bodyNodeId) =>
@@ -1220,7 +1227,8 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
             scopedOutputs,
             bodyResults,
             bodyEdgesBySource,
-            collectNodeId
+            collectNodeId,
+            iterationMeta
           )
         )
       );

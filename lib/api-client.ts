@@ -680,6 +680,10 @@ export const workflowApi = {
         startedAt: Date;
         completedAt: Date | null;
         duration: string | null;
+        // start custom keeperhub code //
+        iterationIndex: number | null;
+        forEachNodeId: string | null;
+        // end keeperhub code //
       }>;
     }>(`/api/workflows/executions/${executionId}/logs`),
 
