@@ -1,84 +1,10 @@
 import { describe, expect, it } from "vitest";
-
-/**
- * Re-implementations of pure helper functions from
- * components/workflow/config/action-config.tsx for isolated unit testing.
- */
-
-const ARRAY_SOURCE_RE = /^\{\{@([^:]+):([^.}]+)\.?([^}]*)\}\}$/;
-
-function extractObjectPaths(
-  obj: Record<string, unknown>,
-  prefix: string,
-  depth: number,
-  paths: string[]
-): void {
-  if (depth > 3) {
-    return;
-  }
-  for (const key of Object.keys(obj)) {
-    const path = prefix ? `${prefix}.${key}` : key;
-    paths.push(path);
-    const val = obj[key];
-    if (val && typeof val === "object" && !Array.isArray(val)) {
-      extractObjectPaths(
-        val as Record<string, unknown>,
-        path,
-        depth + 1,
-        paths
-      );
-    }
-  }
-}
-
-function traverseFieldPath(root: unknown, fieldPath: string): unknown {
-  let data: unknown = root;
-  for (const part of fieldPath.split(".")) {
-    if (data && typeof data === "object" && !Array.isArray(data)) {
-      data = (data as Record<string, unknown>)[part];
-      if (data === undefined) {
-        return null;
-      }
-    } else {
-      return null;
-    }
-  }
-  return data;
-}
-
-function resolveArraySourceElement(
-  arraySource: string,
-  executionLogs: Record<string, { output?: unknown }>,
-  lastLogs: Record<string, { output?: unknown }>
-): Record<string, unknown> | null {
-  const match = ARRAY_SOURCE_RE.exec(arraySource);
-  if (!match) {
-    return null;
-  }
-
-  const sourceNodeId = match[1];
-  const fieldPath = match[3] || "";
-
-  const sourceOutput =
-    executionLogs[sourceNodeId]?.output ?? lastLogs[sourceNodeId]?.output;
-  if (sourceOutput == null) {
-    return null;
-  }
-
-  const data = fieldPath
-    ? traverseFieldPath(sourceOutput, fieldPath)
-    : sourceOutput;
-  if (!Array.isArray(data) || data.length === 0) {
-    return null;
-  }
-
-  const first = data[0];
-  if (!first || typeof first !== "object" || Array.isArray(first)) {
-    return null;
-  }
-
-  return first as Record<string, unknown>;
-}
+import {
+  ARRAY_SOURCE_RE,
+  extractObjectPaths,
+  resolveArraySourceElement,
+  traverseDotPath,
+} from "@/keeperhub/lib/for-each-utils";
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -226,45 +152,45 @@ describe("action-config helpers", () => {
   });
 
   // -----------------------------------------------------------------------
-  // traverseFieldPath
+  // traverseDotPath (aliased as traverseFieldPath in action-config)
   // -----------------------------------------------------------------------
-  describe("traverseFieldPath", () => {
+  describe("traverseDotPath", () => {
     it("returns the value for a single key", () => {
-      expect(traverseFieldPath({ a: 1 }, "a")).toBe(1);
+      expect(traverseDotPath({ a: 1 }, "a")).toBe(1);
     });
 
     it("returns the value for a nested path", () => {
-      expect(traverseFieldPath({ a: { b: 2 } }, "a.b")).toBe(2);
+      expect(traverseDotPath({ a: { b: 2 } }, "a.b")).toBe(2);
     });
 
-    it("returns undefined for a missing key at the last level", () => {
-      expect(traverseFieldPath({ a: 1 }, "b")).toBeNull();
+    it("returns null for a missing key at the last level", () => {
+      expect(traverseDotPath({ a: 1 }, "b")).toBeNull();
     });
 
     it("returns null when an array is encountered along the path", () => {
-      expect(traverseFieldPath({ a: [1, 2] }, "a.0")).toBeNull();
+      expect(traverseDotPath({ a: [1, 2] }, "a.0")).toBeNull();
     });
 
     it("returns null for a null root", () => {
-      expect(traverseFieldPath(null, "a")).toBeNull();
+      expect(traverseDotPath(null, "a")).toBeNull();
     });
 
     it("returns null for an undefined root", () => {
-      expect(traverseFieldPath(undefined, "a")).toBeNull();
+      expect(traverseDotPath(undefined, "a")).toBeNull();
     });
 
     it("traverses deep nested paths (a.b.c.d)", () => {
       const obj = { a: { b: { c: { d: "found" } } } };
-      expect(traverseFieldPath(obj, "a.b.c.d")).toBe("found");
+      expect(traverseDotPath(obj, "a.b.c.d")).toBe("found");
     });
 
     it("returns null when a mid-level key is missing", () => {
-      expect(traverseFieldPath({ a: { b: 1 } }, "a.x.y")).toBeNull();
+      expect(traverseDotPath({ a: { b: 1 } }, "a.x.y")).toBeNull();
     });
 
     it("returns the nested object when path stops at an intermediate level", () => {
       const obj = { a: { b: { c: 3 } } };
-      expect(traverseFieldPath(obj, "a.b")).toEqual({ c: 3 });
+      expect(traverseDotPath(obj, "a.b")).toEqual({ c: 3 });
     });
   });
 

@@ -40,6 +40,12 @@ import {
 import type { IntegrationType } from "@/lib/types/integration";
 // start custom keeperhub code //
 import {
+  ARRAY_SOURCE_RE,
+  extractObjectPaths,
+  resolveArraySourceElement,
+  traverseDotPath,
+} from "@/keeperhub/lib/for-each-utils";
+import {
   executionLogsAtom,
   lastExecutionLogsAtom,
   nodesAtom,
@@ -258,89 +264,6 @@ function ConditionFields({
 }
 
 // start custom keeperhub code //
-const ARRAY_SOURCE_RE = /^\{\{@([^:]+):([^.}]+)\.?([^}]*)\}\}$/;
-
-/**
- * Recursively extract dot-paths from an object up to a max depth.
- */
-function extractObjectPaths(
-  obj: Record<string, unknown>,
-  prefix: string,
-  depth: number,
-  paths: string[]
-): void {
-  if (depth > 3) {
-    return;
-  }
-  for (const key of Object.keys(obj)) {
-    const path = prefix ? `${prefix}.${key}` : key;
-    paths.push(path);
-    const val = obj[key];
-    if (val && typeof val === "object" && !Array.isArray(val)) {
-      extractObjectPaths(
-        val as Record<string, unknown>,
-        path,
-        depth + 1,
-        paths
-      );
-    }
-  }
-}
-
-/**
- * Traverse a dot-path into a nested object, returning null if any step fails.
- */
-function traverseFieldPath(root: unknown, fieldPath: string): unknown {
-  let data: unknown = root;
-  for (const part of fieldPath.split(".")) {
-    if (data && typeof data === "object" && !Array.isArray(data)) {
-      data = (data as Record<string, unknown>)[part];
-      if (data === undefined) {
-        return null;
-      }
-    } else {
-      return null;
-    }
-  }
-  return data;
-}
-
-/**
- * Resolve the array source output to get the first element.
- */
-function resolveArraySourceElement(
-  arraySource: string,
-  executionLogs: Record<string, { output?: unknown }>,
-  lastLogs: Record<string, { output?: unknown }>
-): Record<string, unknown> | null {
-  const match = ARRAY_SOURCE_RE.exec(arraySource);
-  if (!match) {
-    return null;
-  }
-
-  const sourceNodeId = match[1];
-  const fieldPath = match[3] || "";
-
-  const sourceOutput =
-    executionLogs[sourceNodeId]?.output ?? lastLogs[sourceNodeId]?.output;
-  if (sourceOutput == null) {
-    return null;
-  }
-
-  const data = fieldPath
-    ? traverseFieldPath(sourceOutput, fieldPath)
-    : sourceOutput;
-  if (!Array.isArray(data) || data.length === 0) {
-    return null;
-  }
-
-  const first = data[0];
-  if (!first || typeof first !== "object" || Array.isArray(first)) {
-    return null;
-  }
-
-  return first as Record<string, unknown>;
-}
 
 /**
  * Extract dot-paths from the first element of the array referenced by arraySource.
