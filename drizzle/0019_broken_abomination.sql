@@ -32,5 +32,5 @@ CREATE INDEX "idx_tags_org" ON "tags" USING btree ("organization_id");--> statem
 CREATE INDEX "idx_workflow_public_tags_workflow" ON "workflow_public_tags" USING btree ("workflow_id");--> statement-breakpoint
 CREATE INDEX "idx_workflow_public_tags_tag" ON "workflow_public_tags" USING btree ("public_tag_id");--> statement-breakpoint
 ALTER TABLE "workflows" ADD CONSTRAINT "workflows_tag_id_tags_id_fk" FOREIGN KEY ("tag_id") REFERENCES "public"."tags"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "workflows" DROP COLUMN "category";--> statement-breakpoint
-ALTER TABLE "workflows" DROP COLUMN "protocol";
+ALTER TABLE "workflows" DROP COLUMN IF EXISTS "category";--> statement-breakpoint
+ALTER TABLE "workflows" DROP COLUMN IF EXISTS "protocol";
