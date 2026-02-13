@@ -703,7 +703,7 @@ export const workflowApi = {
 
       autosaveTimeout = setTimeout(() => {
         workflowApi.saveCurrent(nodes, edges).catch((error) => {
-          console.error("Auto-save failed:", error);
+          console.warn("Auto-save failed:", error);
         });
       }, AUTOSAVE_DELAY);
     };
@@ -729,7 +729,7 @@ export const workflowApi = {
 
       autosaveTimeout = setTimeout(() => {
         workflowApi.update(id, data).catch((error) => {
-          console.error("Auto-save failed:", error);
+          console.warn("Auto-save failed:", error);
         });
       }, AUTOSAVE_DELAY);
     };

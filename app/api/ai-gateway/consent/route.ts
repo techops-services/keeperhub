@@ -66,7 +66,7 @@ async function createVercelApiKey(
   );
 
   if (!response.ok) {
-    console.error(
+    console.warn(
       "[ai-gateway] Failed to create API key:",
       await response.text()
     );
@@ -203,7 +203,7 @@ export async function POST(request: Request) {
       managedIntegrationId: integrationId,
     });
   } catch (e) {
-    console.error("[ai-gateway] Error creating API key:", e);
+    console.warn("[ai-gateway] Error creating API key:", e);
     return Response.json(
       { error: "Failed to create API key" },
       { status: 500 }
@@ -256,7 +256,7 @@ export async function DELETE(request: Request) {
       const decrypted = decrypt(managedIntegration.config as string);
       config = JSON.parse(decrypted);
     } catch (e) {
-      console.error("[ai-gateway] Failed to decrypt config:", e);
+      console.warn("[ai-gateway] Failed to decrypt config:", e);
     }
   }
 
@@ -273,7 +273,7 @@ export async function DELETE(request: Request) {
           config.teamId
         );
       } catch (e) {
-        console.error("[ai-gateway] Failed to delete API key from Vercel:", e);
+        console.warn("[ai-gateway] Failed to delete API key from Vercel:", e);
       }
     }
   }

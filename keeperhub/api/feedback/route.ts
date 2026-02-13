@@ -8,7 +8,7 @@ export async function POST(request: Request) {
   try {
     // Validate configuration
     if (!FEEDBACK_SERVICE_URL) {
-      console.error("[Feedback] FEEDBACK_SERVICE_URL not configured");
+      console.warn("[Feedback] FEEDBACK_SERVICE_URL not configured");
       return NextResponse.json(
         { error: "Feedback service not configured" },
         { status: 500 }
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     }
 
     if (!FEEDBACK_API_KEY) {
-      console.error("[Feedback] FEEDBACK_API_KEY not configured");
+      console.warn("[Feedback] FEEDBACK_API_KEY not configured");
       return NextResponse.json(
         { error: "Feedback service not configured" },
         { status: 500 }

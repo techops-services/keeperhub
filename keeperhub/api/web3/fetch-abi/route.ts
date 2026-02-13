@@ -59,7 +59,7 @@ function parseEtherscanError(
   const lowerMessage = errorMessage.toLowerCase();
 
   // Log the full response for debugging
-  console.error("[Etherscan] API error response:", {
+  console.warn("[Etherscan] API error response:", {
     status: data.status,
     message: data.message,
     result: data.result,
@@ -160,7 +160,7 @@ async function fetchAbiFromAddress(
   const response = await fetch(requestUrl);
 
   if (!response.ok) {
-    console.error("[Etherscan] HTTP error response:", {
+    console.warn("[Etherscan] HTTP error response:", {
       status: response.status,
       statusText: response.statusText,
     });
@@ -366,7 +366,7 @@ function processAbiString(
   } catch (error) {
     console.warn(
       "[Diamond] Failed to parse ABI:",
-      error instanceof Error ? error.message : "Unknown error"
+      error instanceof Error ? error.message : "Unknown"
     );
     return [];
   }
@@ -673,12 +673,12 @@ async function handleDiamondContract(
  */
 function validateAbiFetchInputs(contractAddress: string): void {
   if (!ETHERSCAN_API_KEY) {
-    console.error("[Etherscan] API key not configured");
+    console.warn("[Etherscan] API key not configured");
     throw new Error("Etherscan API key not configured");
   }
 
   if (!ethers.isAddress(contractAddress)) {
-    console.error("[Etherscan] Invalid contract address:", contractAddress);
+    console.warn("[Etherscan] Invalid contract address:", contractAddress);
     throw new Error(`Invalid contract address: ${contractAddress}`);
   }
 }
@@ -807,7 +807,7 @@ function abiLooksLikeProxy(abi: string): boolean {
   } catch (error) {
     console.warn(
       "[Proxy Detection] Failed to parse ABI for proxy pattern check:",
-      error instanceof Error ? error.message : "Unknown error"
+      error instanceof Error ? error.message : "Unknown"
     );
     return false;
   }
@@ -1160,7 +1160,7 @@ async function handleEtherscanExplorer(
   );
 
   if (!sourceCodeResult.success) {
-    console.error(
+    console.warn(
       "[Etherscan] Failed to fetch source code:",
       sourceCodeResult.error
     );

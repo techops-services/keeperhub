@@ -127,7 +127,7 @@ export async function executeTransaction(
       nonce,
     };
   } catch (error) {
-    console.error("[TransactionManager] Transaction failed:", error);
+    console.warn("[TransactionManager] Transaction failed:", error);
 
     return {
       success: false,
@@ -215,7 +215,7 @@ export async function executeContractTransaction(
       nonce,
     };
   } catch (error) {
-    console.error("[TransactionManager] Contract transaction failed:", error);
+    console.warn("[TransactionManager] Contract transaction failed:", error);
 
     return {
       success: false,

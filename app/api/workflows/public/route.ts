@@ -1,5 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { logDatabaseError } from "@/keeperhub/lib/logging";
 import { db } from "@/lib/db";
 import { workflows } from "@/lib/db/schema";
 
@@ -32,7 +33,10 @@ export async function GET(request: Request) {
 
     return NextResponse.json(mappedWorkflows);
   } catch (error) {
-    console.error("Failed to get public workflows:", error);
+    logDatabaseError("Failed to get public workflows", error, {
+      endpoint: "/api/workflows/public",
+      operation: "get",
+    });
     return NextResponse.json(
       {
         error:
