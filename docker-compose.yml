@@ -77,6 +77,7 @@ services:
     profiles:
       - dev
       - minikube
+      - prod
       - profile-workflows
 
   # ===========================================================================
@@ -148,71 +149,34 @@ services:
       <<: [*env_db_connection, *env_aws, *env_sqs, *env_service_keys]
       HOSTNAME: "0.0.0.0"
       KEEPERHUB_API_KEY: ${KEEPERHUB_API_KEY:-some-random-api-key}
+      NODE_OPTIONS: "--max-old-space-size=3072"
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+          cpus: "2.0"
     depends_on:
       db:
         condition: service_healthy
       localstack:
         condition: service_healthy
-    command: sh -c "npm install -g pnpm && pnpm install && pnpm dev --hostname 0.0.0.0"
+    command: sh -c "npm install -g pnpm && CI=true pnpm install && pnpm dev --hostname 0.0.0.0"
     profiles:
       - dev
       - minikube
 
   # ===========================================================================
-  # Schedule Dispatcher (CronJob alternative for Docker)
+  # Schedule Dispatcher (keeperhub-scheduler submodule)
   # Runs every minute to check for due schedules and send messages to SQS
-  # NOTE: In minikube profile, this runs as a K8s CronJob instead
   # ===========================================================================
   dispatcher:
     build:
-      context: .
+      context: ./keeperhub-scheduler
       dockerfile: Dockerfile
-      target: scheduler
-    image: keeperhub-scheduler:latest
+      target: dispatcher
+    image: keeperhub-dispatcher:latest
     container_name: keeperhub-dispatcher
     restart: unless-stopped
-    working_dir: /app
-    environment:
-      AWS_REGION: us-east-1
-      AWS_ACCESS_KEY_ID: test
-      AWS_SECRET_ACCESS_KEY: test
-      AWS_ENDPOINT_URL: http://localstack:4566
-      SQS_QUEUE_URL: http://localstack:4566/000000000000/keeperhub-workflow-queue
-      KEEPERHUB_API_URL: http://keeperhub:3000
-      KEEPERHUB_API_KEY: local-scheduler-key-for-dev
-    depends_on:
-      db:
-        condition: service_healthy
-      localstack:
-        condition: service_healthy
-      app-dev:
-        condition: service_started
-    # Run dispatcher every minute using a simple loop
-    # (Docker doesn't have native cron, so we simulate it)
-    command: |
-      sh -c 'while true; do
-        echo "[Dispatcher] Running at $$(date)"
-        tsx scripts/schedule-dispatcher.ts
-        echo "[Dispatcher] Sleeping 60s..."
-        sleep 60
-      done'
-    profiles:
-      - dev # Only in dev profile (not minikube - uses K8s CronJob)
-
-  # ===========================================================================
-  # Schedule Executor (Direct execution for dev profile)
-  # Polls SQS and executes workflows directly (no K8s Jobs)
-  # NOTE: In minikube profile, job-spawner runs in K8s instead
-  # ===========================================================================
-  executor:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: scheduler
-    image: keeperhub-scheduler:latest
-    container_name: keeperhub-executor
-    restart: unless-stopped
-    working_dir: /app
     environment:
       <<: *env_db_connection
       AWS_REGION: us-east-1
@@ -229,9 +193,81 @@ services:
         condition: service_healthy
       app-dev:
         condition: service_started
-    command: tsx scripts/schedule-executor.ts
+    command: >
+      sh -c 'while true; do
+        echo "[Dispatcher] Running at $$(date)";
+        tsx schedule-dispatcher/index.ts;
+        echo "[Dispatcher] Sleeping 60s...";
+        sleep 60;
+      done'
     profiles:
-      - dev # Only in dev profile (minikube uses job-spawner in K8s)
+      - dev
+      - minikube
+
+  # ===========================================================================
+  # Event Worker (keeperhub-events submodule)
+  # Fetches workflows from KeeperHub API and dispatches executions
+  # ===========================================================================
+  sc-event-worker:
+    build:
+      context: ./keeperhub-events/sc-event-worker
+      dockerfile: Dockerfile
+    container_name: keeperhub-event-worker
+    hostname: sc-event-worker
+    restart: unless-stopped
+    ports:
+      - "3010:3010"
+    environment:
+      WATCH_MODE: "true"
+      PORT: 3010
+      TIMEOUT_BETWEEN_SYNC: 30000
+      KEEPERHUB_API_URL: http://keeperhub:3000
+      KEEPERHUB_API_KEY: local-events-key-for-dev
+      JWT_TOKEN_USERNAME: ${JWT_TOKEN_USERNAME:-}
+      JWT_TOKEN_PASSWORD: ${JWT_TOKEN_PASSWORD:-}
+      NODE_ENV: development
+    depends_on:
+      app-dev:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3010/data"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    profiles:
+      - dev
+      - minikube
+
+  # ===========================================================================
+  # Event Tracker (keeperhub-events submodule)
+  # Monitors blockchain events and synchronizes with the system
+  # ===========================================================================
+  sc-event-tracker:
+    build:
+      context: ./keeperhub-events/sc-event-tracker
+      dockerfile: Dockerfile
+    container_name: keeperhub-event-tracker
+    restart: unless-stopped
+    environment:
+      WATCH_MODE: "true"
+      KEEPERHUB_API_URL: http://keeperhub:3000
+      WORKER_URL: http://sc-event-worker:3010
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_TOKEN_USERNAME: ${JWT_TOKEN_USERNAME:-}
+      JWT_TOKEN_PASSWORD: ${JWT_TOKEN_PASSWORD:-}
+      KEEPERHUB_API_KEY: local-events-key-for-dev
+      ETHERSCAN_API_KEY: ${ETHERSCAN_API_KEY:-}
+      NODE_ENV: development
+    depends_on:
+      redis:
+        condition: service_started
+      sc-event-worker:
+        condition: service_healthy
+    profiles:
+      - dev
+      - minikube
 
   # ===========================================================================
   # Database Migrator (one-shot)
