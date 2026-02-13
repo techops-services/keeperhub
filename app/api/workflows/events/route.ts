@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     const expectedToken = process.env.EVENTS_SERVICE_API_KEY;
 
     if (!expectedToken) {
-      console.error("[Workflows Events] EVENTS_SERVICE_API_KEY not configured");
+      console.warn("[Workflows Events] EVENTS_SERVICE_API_KEY not configured");
       return NextResponse.json(
         { error: "Internal endpoint not configured" },
         { status: 500 }

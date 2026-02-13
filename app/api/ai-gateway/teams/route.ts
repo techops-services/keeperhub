@@ -113,7 +113,7 @@ export async function GET(request: Request) {
 
     return Response.json({ teams: sortedTeams });
   } catch (e) {
-    console.error("[ai-gateway] Error fetching teams:", e);
+    console.warn("[ai-gateway] Error fetching teams:", e);
     return Response.json({ error: "Failed to fetch teams" }, { status: 500 });
   }
 }

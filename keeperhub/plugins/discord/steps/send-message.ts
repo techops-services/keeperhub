@@ -1,5 +1,10 @@
 import "server-only";
 
+import {
+  logConfigurationError,
+  logExternalServiceError,
+  logValidationError,
+} from "@/keeperhub/lib/logging";
 import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 import { fetchCredentials } from "@/lib/credential-fetcher";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
@@ -39,7 +44,14 @@ async function stepHandler(
   const webhookUrl = credentials.webhookUrl;
 
   if (!webhookUrl) {
-    console.warn("[Discord] No webhook URL provided in integration");
+    logConfigurationError(
+      "[Discord] No webhook URL provided in integration",
+      undefined,
+      {
+        plugin_name: "discord",
+        action_name: "send-message",
+      }
+    );
     return {
       success: false,
       error:
@@ -49,7 +61,10 @@ async function stepHandler(
 
   // Validate webhook URL format
   if (!webhookUrl.includes("discord.com/api/webhooks/")) {
-    console.warn("[Discord] Invalid webhook URL format");
+    logValidationError("[Discord] Invalid webhook URL format", webhookUrl, {
+      plugin_name: "discord",
+      action_name: "send-message",
+    });
     return {
       success: false,
       error: "Invalid Discord webhook URL format",
@@ -73,7 +88,11 @@ async function stepHandler(
       const errorData = (await response
         .json()
         .catch(() => ({}))) as DiscordWebhookResponse;
-      console.warn("[Discord] API error:", errorData);
+      logExternalServiceError("[Discord] API error:", errorData, {
+        plugin_name: "discord",
+        action_name: "send-message",
+        service: "discord",
+      });
       return {
         success: false,
         error:
@@ -95,7 +114,11 @@ async function stepHandler(
       messageId: result?.id || "sent",
     };
   } catch (error) {
-    console.warn("[Discord] Error sending message:", error);
+    logExternalServiceError("[Discord] Error sending message:", error, {
+      plugin_name: "discord",
+      action_name: "send-message",
+      service: "discord",
+    });
     return {
       success: false,
       error: `Failed to send Discord message: ${getErrorMessage(error)}`,

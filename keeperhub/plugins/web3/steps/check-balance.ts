@@ -2,6 +2,11 @@ import "server-only";
 
 import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
+import {
+  logConfigurationError,
+  logNetworkError,
+  logValidationError,
+} from "@/keeperhub/lib/logging";
 import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 import { db } from "@/lib/db";
 import { explorerConfigs, workflowExecutions } from "@/lib/db/schema";
@@ -71,7 +76,10 @@ async function stepHandler(
 
   // Validate address
   if (!ethers.isAddress(address)) {
-    console.warn("[Check Balance] Invalid address:", address);
+    logValidationError("[Check Balance] Invalid address:", address, {
+      plugin_name: "web3",
+      action_name: "check-balance",
+    });
     return {
       success: false,
       error: `Invalid Ethereum address: ${address}`,
@@ -84,7 +92,10 @@ async function stepHandler(
     chainId = getChainIdFromNetwork(network);
     console.log("[Check Balance] Resolved chain ID:", chainId);
   } catch (error) {
-    console.warn("[Check Balance] Failed to resolve network:", error);
+    logConfigurationError("[Check Balance] Failed to resolve network:", error, {
+      plugin_name: "web3",
+      action_name: "check-balance",
+    });
     return {
       success: false,
       error: getErrorMessage(error),
@@ -106,7 +117,15 @@ async function stepHandler(
       rpcConfig.source
     );
   } catch (error) {
-    console.warn("[Check Balance] Failed to resolve RPC config:", error);
+    logConfigurationError(
+      "[Check Balance] Failed to resolve RPC config:",
+      error,
+      {
+        plugin_name: "web3",
+        action_name: "check-balance",
+        chain_id: String(chainId),
+      }
+    );
     return {
       success: false,
       error: getErrorMessage(error),
@@ -143,7 +162,11 @@ async function stepHandler(
       addressLink,
     };
   } catch (error) {
-    console.warn("[Check Balance] Failed to check balance:", error);
+    logNetworkError("[Check Balance] Failed to check balance:", error, {
+      plugin_name: "web3",
+      action_name: "check-balance",
+      chain_id: String(chainId),
+    });
     return {
       success: false,
       error: `Failed to check balance: ${getErrorMessage(error)}`,

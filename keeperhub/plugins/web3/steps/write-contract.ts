@@ -2,6 +2,10 @@ import "server-only";
 
 import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
+import {
+  logConfigurationError,
+  logNetworkError,
+} from "@/keeperhub/lib/logging";
 import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 import {
   getOrganizationWalletAddress,
@@ -155,7 +159,14 @@ async function stepHandler(
   try {
     organizationId = await getOrganizationIdFromExecution(_context.executionId);
   } catch (error) {
-    console.error("[Write Contract] Failed to get organization ID:", error);
+    logConfigurationError(
+      "[Write Contract] Failed to get organization ID:",
+      error,
+      {
+        plugin_name: "web3",
+        action_name: "write-contract",
+      }
+    );
     return {
       success: false,
       error: `Failed to get organization ID: ${getErrorMessage(error)}`,
@@ -175,7 +186,10 @@ async function stepHandler(
     }
     userId = execution.userId;
   } catch (error) {
-    console.error("[Write Contract] Failed to get user ID:", error);
+    logConfigurationError("[Write Contract] Failed to get user ID:", error, {
+      plugin_name: "web3",
+      action_name: "write-contract",
+    });
     return {
       success: false,
       error: `Failed to get user ID: ${getErrorMessage(error)}`,
@@ -202,7 +216,14 @@ async function stepHandler(
       rpcConfig.source
     );
   } catch (error) {
-    console.error("[Write Contract] Failed to resolve RPC config:", error);
+    logConfigurationError(
+      "[Write Contract] Failed to resolve RPC config:",
+      error,
+      {
+        plugin_name: "web3",
+        action_name: "write-contract",
+      }
+    );
     return {
       success: false,
       error: getErrorMessage(error),
@@ -362,7 +383,11 @@ async function stepHandler(
         result: undefined,
       };
     } catch (error) {
-      console.error("[Write Contract] Function call failed:", error);
+      logNetworkError("[Write Contract] Function call failed:", error, {
+        plugin_name: "web3",
+        action_name: "write-contract",
+        chain_id: String(chainId),
+      });
       return {
         success: false,
         error: `Contract call failed: ${getErrorMessage(error)}`,

@@ -6,6 +6,7 @@ import {
   sendOAuthPasswordResetEmail,
   sendVerificationOTP,
 } from "@/keeperhub/lib/email";
+import { logAuthError } from "@/keeperhub/lib/logging";
 import { hashPassword } from "@/keeperhub/lib/password";
 import { db } from "@/lib/db";
 import { accounts, users, verifications } from "@/lib/db/schema";
@@ -47,7 +48,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     // Default to request action
     return handleRequest(normalizedEmail);
   } catch (error) {
-    console.error("Forgot password error:", error);
+    logAuthError("[Forgot Password] Failed to process request:", error, {
+      endpoint: "/api/user/forgot-password",
+      status_code: "500",
+    });
     return NextResponse.json(
       {
         error:

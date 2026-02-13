@@ -1,5 +1,129 @@
 
-> ai-workflow-builder-template@0.1.0 check /Users/taitsengstock/Documents/GitHub/techops-workflow-builder-template
+> ai-workflow-builder-template@0.1.0 check /home/ot/maker/git/techops-services/keeperhub
 > npx ultracite@latest check
 
-Checked 474 files in 239ms. No fixes applied.
+npm warn Unknown env config "verify-deps-before-run". This will stop working in the next major version of npm.
+npm warn Unknown env config "npm-globalconfig". This will stop working in the next major version of npm.
+npm warn Unknown env config "_jsr-registry". This will stop working in the next major version of npm.
+npm warn Unknown project config "public-hoist-pattern". This will stop working in the next major version of npm.
+keeperhub/plugins/web3/steps/transfer-funds.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+    302 302 │         // Fetch explorer config for transaction link
+    303 303 │         const explorerConfig = await db.query.explorerConfigs.findFirst({
+    304     │ - ········where:·eq(explorerConfigs.chainId,·chainId)
+        304 │ + ········where:·eq(explorerConfigs.chainId,·chainId),
+    305 305 │         });
+    306 306 │         const transactionLink = explorerConfig
+    ······· │ 
+    342 342 │       const chainId = getChainIdFromNetwork(input.network);
+    343 343 │       const explorerConfig = await db.query.explorerConfigs.findFirst({
+    344     │ - ······where:·eq(explorerConfigs.chainId,·chainId)
+        344 │ + ······where:·eq(explorerConfigs.chainId,·chainId),
+    345 345 │       });
+    346 346 │       if (explorerConfig) {
+  
+
+keeperhub/plugins/web3/steps/transfer-token.ts:83:13 parse ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × expected `,` but instead found `eq`
+  
+    81 │           and(
+    82 │             eq(supportedTokens.chainId, chainId)
+  > 83 │             eq(supportedTokens.id, parsed.supportedTokenId)
+       │             ^^
+    84 │           )
+    85 │         )
+  
+  i Remove eq
+  
+
+keeperhub/plugins/web3/steps/transfer-token.ts:103:13 parse ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × expected `,` but instead found `inArray`
+  
+    101 │           and(
+    102 │             eq(supportedTokens.chainId, chainId)
+  > 103 │             inArray(supportedTokens.id, parsed.supportedTokenIds)
+        │             ^^^^^^^
+    104 │           )
+    105 │         )
+  
+  i Remove inArray
+  
+
+keeperhub/plugins/web3/steps/transfer-token.ts:83:13 parse ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × expected `,` but instead found `eq`
+  
+    81 │           and(
+    82 │             eq(supportedTokens.chainId, chainId)
+  > 83 │             eq(supportedTokens.id, parsed.supportedTokenId)
+       │             ^^
+    84 │           )
+    85 │         )
+  
+  i Remove eq
+  
+
+keeperhub/plugins/web3/steps/transfer-token.ts:103:13 parse ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × expected `,` but instead found `inArray`
+  
+    101 │           and(
+    102 │             eq(supportedTokens.chainId, chainId)
+  > 103 │             inArray(supportedTokens.id, parsed.supportedTokenIds)
+        │             ^^^^^^^
+    104 │           )
+    105 │         )
+  
+  i Remove inArray
+  
+
+keeperhub/plugins/web3/steps/transfer-token.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+    470 470 │         // Fetch explorer config for transaction link
+    471 471 │         const explorerConfig = await db.query.explorerConfigs.findFirst({
+    472     │ - ········where:·eq(explorerConfigs.chainId,·chainId)
+        472 │ + ········where:·eq(explorerConfigs.chainId,·chainId),
+    473 473 │         });
+    474 474 │         const transactionLink = explorerConfig
+    ······· │ 
+    512 512 │       const chainId = getChainIdFromNetwork(input.network);
+    513 513 │       const explorerConfig = await db.query.explorerConfigs.findFirst({
+    514     │ - ······where:·eq(explorerConfigs.chainId,·chainId)
+        514 │ + ······where:·eq(explorerConfigs.chainId,·chainId),
+    515 515 │       });
+    516 516 │       if (explorerConfig) {
+  
+
+keeperhub/plugins/web3/steps/write-contract.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+    344 344 │         // Fetch explorer config for transaction link
+    345 345 │         const explorerConfig = await db.query.explorerConfigs.findFirst({
+    346     │ - ········where:·eq(explorerConfigs.chainId,·chainId)
+        346 │ + ········where:·eq(explorerConfigs.chainId,·chainId),
+    347 347 │         });
+    348 348 │         const transactionLink = explorerConfig
+    ······· │ 
+    385 385 │       const chainId = getChainIdFromNetwork(input.network);
+    386 386 │       const explorerConfig = await db.query.explorerConfigs.findFirst({
+    387     │ - ······where:·eq(explorerConfigs.chainId,·chainId)
+        387 │ + ······where:·eq(explorerConfigs.chainId,·chainId),
+    388 388 │       });
+    389 389 │       if (explorerConfig) {
+  
+
+Checked 465 files in 225ms. No fixes applied.
+Found 7 errors.
+check ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Some errors were emitted while running checks.
+  
+
+ ELIFECYCLE  Command failed with exit code 1.

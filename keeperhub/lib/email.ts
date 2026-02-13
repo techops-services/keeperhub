@@ -34,7 +34,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
   const toAddress = normalizeEmail(options.to);
 
   if (!apiKey) {
-    console.error("[Email] SENDGRID_API_KEY not configured");
+    console.warn("[Email] SENDGRID_API_KEY not configured");
     return false;
   }
 
@@ -74,13 +74,13 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("[Email] SendGrid error:", response.status, errorText);
+      console.warn("[Email] SendGrid error:", response.status, errorText);
       return false;
     }
 
     return true;
   } catch (error) {
-    console.error("[Email] Failed to send:", error);
+    console.warn("[Email] Failed to send:", error);
     return false;
   }
 }
@@ -192,7 +192,7 @@ KeeperHub - Blockchain Workflow Automation
   if (success) {
     console.log(`[Email] OTP sent to ${email} for ${type}`);
   } else {
-    console.error(`[Email] Failed to send OTP to ${email}`);
+    console.warn(`[Email] Failed to send OTP to ${email}`);
   }
 
   return success;
@@ -282,7 +282,7 @@ KeeperHub - Blockchain Workflow Automation
   if (success) {
     console.log(`[Email] OAuth password reset info sent to ${email}`);
   } else {
-    console.error(`[Email] Failed to send OAuth info to ${email}`);
+    console.warn(`[Email] Failed to send OAuth info to ${email}`);
   }
 
   return success;
@@ -364,7 +364,7 @@ KeeperHub - Blockchain Workflow Automation
   if (success) {
     console.log(`[Email] Invitation sent to ${inviteeEmail}`);
   } else {
-    console.error(`[Email] Failed to send invitation to ${inviteeEmail}`);
+    console.warn(`[Email] Failed to send invitation to ${inviteeEmail}`);
   }
 
   return success;

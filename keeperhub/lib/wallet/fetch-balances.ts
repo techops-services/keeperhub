@@ -122,7 +122,7 @@ export async function fetchNativeBalance(
       explorerUrl: buildExplorerAddressUrl(chain, address),
     };
   } catch (error) {
-    console.error(`Failed to fetch balance for ${chain.name}:`, error);
+    console.warn(`Failed to fetch balance for ${chain.name}:`, error);
     return {
       chainId: chain.chainId,
       name: chain.name,
@@ -199,7 +199,7 @@ export async function fetchTokenBalance(
       loading: false,
     };
   } catch (error) {
-    console.error(`Failed to fetch balance for ${token.symbol}:`, error);
+    console.warn(`Failed to fetch balance for ${token.symbol}:`, error);
     return {
       tokenId: token.id,
       chainId: token.chainId,
@@ -346,7 +346,7 @@ export function fetchSupportedTokenBalance(
         return makeRequest(attempt + 1);
       }
 
-      console.error(`Failed to fetch balance for ${token.symbol}:`, error);
+      console.warn(`Failed to fetch balance for ${token.symbol}:`, error);
       return {
         chainId: token.chainId,
         tokenAddress: token.tokenAddress,

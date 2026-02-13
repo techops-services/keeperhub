@@ -2,6 +2,11 @@ import "server-only";
 
 import { and, eq } from "drizzle-orm";
 import { ethers } from "ethers";
+import {
+  logConfigurationError,
+  logNetworkError,
+  logValidationError,
+} from "@/keeperhub/lib/logging";
 import type {
   CustomToken,
   TokenFieldValue,
@@ -336,7 +341,14 @@ async function stepHandler(
 
   // Validate wallet address
   if (!ethers.isAddress(address)) {
-    console.warn("[Check Token Balance] Invalid wallet address:", address);
+    logValidationError(
+      "[Check Token Balance] Invalid wallet address:",
+      address,
+      {
+        plugin_name: "web3",
+        action_name: "check-token-balance",
+      }
+    );
     return {
       success: false,
       error: `Invalid wallet address: ${address}`,
@@ -349,7 +361,14 @@ async function stepHandler(
     chainId = getChainIdFromNetwork(network);
     console.log("[Check Token Balance] Resolved chain ID:", chainId);
   } catch (error) {
-    console.warn("[Check Token Balance] Failed to resolve network:", error);
+    logConfigurationError(
+      "[Check Token Balance] Failed to resolve network:",
+      error,
+      {
+        plugin_name: "web3",
+        action_name: "check-token-balance",
+      }
+    );
     return {
       success: false,
       error: getErrorMessage(error),
@@ -373,7 +392,14 @@ async function stepHandler(
 
   // Validate token address
   if (!ethers.isAddress(tokenAddress)) {
-    console.warn("[Check Token Balance] Invalid token address:", tokenAddress);
+    logValidationError(
+      "[Check Token Balance] Invalid token address:",
+      tokenAddress,
+      {
+        plugin_name: "web3",
+        action_name: "check-token-balance",
+      }
+    );
     return {
       success: false,
       error: `Invalid token address: ${tokenAddress}`,
@@ -395,7 +421,15 @@ async function stepHandler(
       rpcConfig.source
     );
   } catch (error) {
-    console.warn("[Check Token Balance] Failed to resolve RPC config:", error);
+    logConfigurationError(
+      "[Check Token Balance] Failed to resolve RPC config:",
+      error,
+      {
+        plugin_name: "web3",
+        action_name: "check-token-balance",
+        chain_id: String(chainId),
+      }
+    );
     return {
       success: false,
       error: getErrorMessage(error),
@@ -430,7 +464,15 @@ async function stepHandler(
       addressLink,
     };
   } catch (error) {
-    console.warn("[Check Token Balance] Failed to check token balance:", error);
+    logNetworkError(
+      "[Check Token Balance] Failed to check token balance:",
+      error,
+      {
+        plugin_name: "web3",
+        action_name: "check-token-balance",
+        chain_id: String(chainId),
+      }
+    );
     return {
       success: false,
       error: `Failed to check token balance: ${getErrorMessage(error)}`,
