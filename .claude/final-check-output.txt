@@ -1,4 +1,0 @@
-
-> ai-workflow-builder-template@0.1.0 type-check /home/ot/maker/git/techops-services/keeperhub
-> tsc --noEmit
-
