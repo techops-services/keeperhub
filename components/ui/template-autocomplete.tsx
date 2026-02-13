@@ -350,11 +350,40 @@ function resolveForEachSyntheticOutput(
     return null;
   }
 
+  // Apply mapExpression to transform currentItem, matching executor behavior
+  let currentItem: unknown = data[0];
+  const mapExpression = node.data.config?.mapExpression as string | undefined;
+  if (
+    mapExpression &&
+    currentItem &&
+    typeof currentItem === "object"
+  ) {
+    const mapped = traverseDotPath(currentItem, mapExpression);
+    if (mapped !== null) {
+      currentItem = mapped;
+    }
+  }
+
   return {
-    currentItem: data[0],
+    currentItem,
     index: 0,
     totalItems: data.length,
   };
+}
+
+/**
+ * Traverse a dot-path into a nested value, returning null on failure.
+ */
+function traverseDotPath(root: unknown, path: string): unknown {
+  let data: unknown = root;
+  for (const part of path.split(".")) {
+    if (data && typeof data === "object" && !Array.isArray(data)) {
+      data = (data as Record<string, unknown>)[part];
+    } else {
+      return null;
+    }
+  }
+  return data;
 }
 // end keeperhub code //
 
