@@ -16,6 +16,8 @@ const MULTIPLE_COLLECT_REGEX = /multiple Collect nodes/;
 const ARRAY_SOURCE_REQUIRED_REGEX = /arraySource is required/;
 const NOT_VALID_TEMPLATE_REGEX = /not a valid template reference/;
 const RESOLVED_TO_NULL_REGEX = /resolved to null/;
+const NODE_NOT_FOUND_REGEX = /was not found in outputs/;
+const OUTPUT_RESOLVED_NULL_REGEX = /output resolved to null/;
 const MUST_RESOLVE_TO_ARRAY_REGEX = /must resolve to an array/;
 
 // ---------------------------------------------------------------------------
@@ -400,7 +402,16 @@ describe("resolveArraySource", () => {
   it("throws when referenced node is missing from outputs", () => {
     expect(() =>
       resolveArraySource("{{@missing_node:Label.items}}", {})
-    ).toThrow(RESOLVED_TO_NULL_REGEX);
+    ).toThrow(NODE_NOT_FOUND_REGEX);
+  });
+
+  it("throws with distinct message when node exists but output is null", () => {
+    const outputs = {
+      node_1: { label: "Step", data: null },
+    };
+    expect(() => resolveArraySource("{{@node_1:Step.items}}", outputs)).toThrow(
+      OUTPUT_RESOLVED_NULL_REGEX
+    );
   });
 
   it("resolves array of objects", () => {

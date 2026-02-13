@@ -826,9 +826,15 @@ export function resolveArraySource(
   const raw = resolveTemplateToRawValue(nodeId, rest, outputs);
 
   if (raw === null || raw === undefined) {
+    const sanitizedId = nodeId.trim().replace(/[^a-zA-Z0-9]/g, "_");
+    const nodeExists =
+      outputs[sanitizedId] !== undefined ||
+      outputs[nodeId.trim()] !== undefined;
+    const detail = nodeExists
+      ? "The referenced node executed but its output resolved to null."
+      : `Node "${nodeId.trim()}" was not found in outputs. Ensure it has executed before this For Each.`;
     throw new Error(
-      `For Each: arraySource resolved to ${String(raw)}. ` +
-        "Ensure the referenced node has executed and produced output."
+      `For Each: arraySource resolved to ${String(raw)}. ${detail}`
     );
   }
 
@@ -1128,7 +1134,11 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
     currentVisited: Set<string>;
     currentEdgesBySource: Map<string, string[]>;
     continueAfterCollect?: (collectNodeId: string) => Promise<void>;
-  }): Promise<void> {
+  }): Promise<{
+    arrayLength: number;
+    maxIterations: number;
+    iterationsRan: number;
+  }> {
     const {
       forEachNodeId,
       forEachNode,
@@ -1216,9 +1226,13 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
         };
       }
 
-      // Capture output from the last body node(s) before Collect
+      // Capture output from the last body node(s) that produced data.
+      // First check nodes directly before Collect; if those were skipped
+      // (e.g., a Condition that evaluated false), fall back to the last
+      // body node that actually produced output.
       let iterationOutput: unknown;
       if (collectNodeId) {
+        // Primary: nodes whose edges target Collect
         for (const bodyNodeId of bodyNodeIds) {
           const targets = bodyEdgesBySource.get(bodyNodeId) ?? [];
           if (targets.includes(collectNodeId)) {
@@ -1229,9 +1243,20 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
             }
           }
         }
+
+        // Fallback: last body node with output (handles skipped Conditions)
+        if (iterationOutput === undefined) {
+          for (const bodyNodeId of bodyNodeIds) {
+            const sanitizedBodyId = bodyNodeId.replace(/[^a-zA-Z0-9]/g, "_");
+            const output = scopedOutputs[sanitizedBodyId];
+            if (output?.data !== undefined) {
+              iterationOutput = output.data;
+            }
+          }
+        }
       }
 
-      // If no body nodes produced output, use the mapped item itself
+      // Final fallback: use the mapped item itself
       if (iterationOutput === undefined) {
         iterationOutput = currentItem;
       }
@@ -1292,6 +1317,12 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
         await continueAfterCollect(collectNodeId);
       }
     }
+
+    return {
+      arrayLength: resolvedArray.length,
+      maxIterations,
+      iterationsRan: itemsToProcess.length,
+    };
   }
 
   // end keeperhub code //
@@ -1547,7 +1578,7 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
             node.data.config ?? {},
             outputs
           );
-          await handleForEachExecution({
+          const iterationSummary = await handleForEachExecution({
             forEachNodeId: nodeId,
             forEachNode: node,
             processedConfig: forEachConfig,
@@ -1562,6 +1593,14 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
               );
             },
           });
+
+          // Update the For Each node's output with resolved iteration metadata
+          const sanitizedFEId = nodeId.replace(/[^a-zA-Z0-9]/g, "_");
+          outputs[sanitizedFEId] = {
+            label: getNodeName(node),
+            data: iterationSummary,
+          };
+          results[nodeId] = { success: true, data: iterationSummary };
         } else if (currentActionType === "Condition") {
           // end keeperhub code //
           // For condition nodes, only execute next nodes if condition is true
