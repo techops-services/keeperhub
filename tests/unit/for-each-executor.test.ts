@@ -357,4 +357,168 @@ describe("resolveArraySource", () => {
       NOT_VALID_TEMPLATE_REGEX
     );
   });
+
+  it("resolves deeply nested field paths", () => {
+    const outputs = {
+      node_1: {
+        label: "API",
+        data: { response: { body: { items: [10, 20] } } },
+      },
+    };
+
+    const result = resolveArraySource(
+      "{{@node_1:API.response.body.items}}",
+      outputs
+    );
+    expect(result).toEqual([10, 20]);
+  });
+
+  it("resolves a single-element array", () => {
+    const outputs = {
+      node_1: {
+        label: "Step",
+        data: { list: ["only-one"] },
+      },
+    };
+
+    const result = resolveArraySource("{{@node_1:Step.list}}", outputs);
+    expect(result).toEqual(["only-one"]);
+  });
+
+  it("resolves when node ID has underscores", () => {
+    const outputs = {
+      node_abc_123: {
+        label: "Step",
+        data: [1, 2, 3],
+      },
+    };
+
+    const result = resolveArraySource("{{@node_abc_123:Step}}", outputs);
+    expect(result).toEqual([1, 2, 3]);
+  });
+
+  it("throws when referenced node is missing from outputs", () => {
+    expect(() =>
+      resolveArraySource("{{@missing_node:Label.items}}", {})
+    ).toThrow(RESOLVED_TO_NULL_REGEX);
+  });
+
+  it("resolves array of objects", () => {
+    const outputs = {
+      node_1: {
+        label: "DB",
+        data: {
+          rows: [
+            { id: 1, name: "Alice" },
+            { id: 2, name: "Bob" },
+          ],
+        },
+      },
+    };
+
+    const result = resolveArraySource("{{@node_1:DB.rows}}", outputs);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({ id: 1, name: "Alice" });
+  });
+
+  it("throws for nested field that is a string", () => {
+    const outputs = {
+      node_1: {
+        label: "Step",
+        data: { nested: { value: "not-array" } },
+      },
+    };
+
+    expect(() =>
+      resolveArraySource("{{@node_1:Step.nested.value}}", outputs)
+    ).toThrow(MUST_RESOLVE_TO_ARRAY_REGEX);
+  });
+
+  it("throws for nested field that is a number", () => {
+    const outputs = {
+      node_1: {
+        label: "Step",
+        data: { count: 42 },
+      },
+    };
+
+    expect(() => resolveArraySource("{{@node_1:Step.count}}", outputs)).toThrow(
+      MUST_RESOLVE_TO_ARRAY_REGEX
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// identifyLoopBody - additional edge cases
+// ---------------------------------------------------------------------------
+
+describe("identifyLoopBody - edge cases", () => {
+  it("handles diamond pattern: ForEach -> A,B -> C -> Collect", () => {
+    const nodes = [
+      makeActionNode("fe-1", "For Each"),
+      makeActionNode("a-1", "HTTP Request"),
+      makeActionNode("b-1", "Execute Code"),
+      makeActionNode("c-1", "Database Query"),
+      makeActionNode("col-1", "Collect"),
+    ];
+    const edges = buildEdgeMap([
+      ["fe-1", "a-1"],
+      ["fe-1", "b-1"],
+      ["a-1", "c-1"],
+      ["b-1", "c-1"],
+      ["c-1", "col-1"],
+    ]);
+
+    const result = identifyLoopBody("fe-1", edges, buildNodeMap(nodes));
+
+    expect(result.collectNodeId).toBe("col-1");
+    expect(result.bodyNodeIds).toContain("a-1");
+    expect(result.bodyNodeIds).toContain("b-1");
+    expect(result.bodyNodeIds).toContain("c-1");
+    expect(result.bodyNodeIds).not.toContain("col-1");
+  });
+
+  it("handles single body node with no Collect", () => {
+    const nodes = [
+      makeActionNode("fe-1", "For Each"),
+      makeActionNode("a-1", "Discord"),
+    ];
+    const edges = buildEdgeMap([["fe-1", "a-1"]]);
+
+    const result = identifyLoopBody("fe-1", edges, buildNodeMap(nodes));
+
+    expect(result.collectNodeId).toBeUndefined();
+    expect(result.bodyNodeIds).toEqual(["a-1"]);
+  });
+
+  it("handles deeply nested For Each chains", () => {
+    // Outer ForEach -> Inner ForEach -> Innermost ForEach -> A -> Collect(innermost) -> Collect(inner) -> Collect(outer)
+    const nodes = [
+      makeActionNode("fe-1", "For Each"),
+      makeActionNode("fe-2", "For Each"),
+      makeActionNode("fe-3", "For Each"),
+      makeActionNode("a-1", "HTTP Request"),
+      makeActionNode("c-3", "Collect"),
+      makeActionNode("c-2", "Collect"),
+      makeActionNode("c-1", "Collect"),
+    ];
+    const edges = buildEdgeMap([
+      ["fe-1", "fe-2"],
+      ["fe-2", "fe-3"],
+      ["fe-3", "a-1"],
+      ["a-1", "c-3"],
+      ["c-3", "c-2"],
+      ["c-2", "c-1"],
+    ]);
+
+    const result = identifyLoopBody("fe-1", edges, buildNodeMap(nodes));
+
+    expect(result.collectNodeId).toBe("c-1");
+    expect(result.bodyNodeIds).toContain("fe-2");
+    expect(result.bodyNodeIds).toContain("fe-3");
+    expect(result.bodyNodeIds).toContain("a-1");
+    expect(result.bodyNodeIds).toContain("c-3");
+    expect(result.bodyNodeIds).toContain("c-2");
+    expect(result.bodyNodeIds).not.toContain("c-1");
+  });
 });
