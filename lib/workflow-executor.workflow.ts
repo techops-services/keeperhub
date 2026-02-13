@@ -1182,8 +1182,8 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
       processedConfig.arraySource,
       currentOutputs
     );
-    const maxIterations =
-      Number(processedConfig.maxIterations) || resolvedArray.length;
+    const parsedMax = Number(processedConfig.maxIterations);
+    const maxIterations = parsedMax > 0 ? parsedMax : resolvedArray.length;
     const itemsToProcess = resolvedArray.slice(0, maxIterations);
 
     // 2. Identify body subgraph
@@ -1196,6 +1196,8 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
     const sanitizedForEachId = forEachNodeId.replace(/[^a-zA-Z0-9]/g, "_");
 
     // 3. Single iteration executor
+    const mapExpression = processedConfig.mapExpression as string | undefined;
+
     // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: iteration logic has inherent complexity from scoped output capture, body execution, and map expression
     async function executeIteration(
       item: unknown,
@@ -1204,11 +1206,17 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
       const scopedOutputs: NodeOutputs = { ...currentOutputs };
       const bodyResults: Record<string, ExecutionResult> = {};
 
+      // Apply map expression to transform each item before body execution
+      let currentItem: unknown = item;
+      if (mapExpression && typeof item === "object" && item !== null) {
+        currentItem = resolveFromOutputData(item, mapExpression) ?? item;
+      }
+
       // Inject loop variables
       scopedOutputs[sanitizedForEachId] = {
         label: getNodeName(forEachNode),
         data: {
-          currentItem: item,
+          currentItem,
           index,
           totalItems: itemsToProcess.length,
         },
@@ -1248,21 +1256,9 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
         }
       }
 
-      // If no body nodes produced output, use the current item itself
+      // If no body nodes produced output, use the mapped item itself
       if (iterationOutput === undefined) {
-        iterationOutput = item;
-      }
-
-      // Apply optional map expression to extract/transform the output
-      const mapExpression = processedConfig.mapExpression as string | undefined;
-      if (
-        mapExpression &&
-        typeof iterationOutput === "object" &&
-        iterationOutput !== null
-      ) {
-        iterationOutput =
-          resolveFromOutputData(iterationOutput, mapExpression) ??
-          iterationOutput;
+        iterationOutput = currentItem;
       }
 
       return iterationOutput;
