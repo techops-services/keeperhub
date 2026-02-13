@@ -8,6 +8,7 @@ import { AiGatewayConsentOverlay } from "@/components/overlays/ai-gateway-consen
 import { useOverlay } from "@/components/overlays/overlay-provider";
 import { Button } from "@/components/ui/button";
 import { CodeEditor } from "@/components/ui/code-editor";
+import { Input } from "@/components/ui/input";
 import { IntegrationIcon } from "@/components/ui/integration-icon";
 import { IntegrationSelector } from "@/components/ui/integration-selector";
 import { Label } from "@/components/ui/label";
@@ -249,6 +250,93 @@ function ConditionFields({
   );
 }
 
+// start custom keeperhub code //
+
+// For Each fields component
+function ForEachFields({
+  config,
+  onUpdateConfig,
+  disabled,
+}: {
+  config: Record<string, unknown>;
+  onUpdateConfig: (key: string, value: string) => void;
+  disabled: boolean;
+}) {
+  return (
+    <>
+      <div className="space-y-2">
+        <Label htmlFor="arraySource">Array Source</Label>
+        <TemplateBadgeInput
+          disabled={disabled}
+          id="arraySource"
+          onChange={(value) => onUpdateConfig("arraySource", value)}
+          placeholder="e.g., {{Database Query.rows}} or {{HTTP Request.data.items}}"
+          value={(config?.arraySource as string) || ""}
+        />
+        <p className="text-muted-foreground text-xs">
+          Reference an array from a previous node. Use @ to select a field.
+        </p>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="mapExpression">Map Expression (optional)</Label>
+        <Input
+          disabled={disabled}
+          id="mapExpression"
+          onChange={(e) => onUpdateConfig("mapExpression", e.target.value)}
+          placeholder="e.g., address or data.items[0].name"
+          value={(config?.mapExpression as string) || ""}
+        />
+        <p className="text-muted-foreground text-xs">
+          Dot-path to extract from each element. Leave empty to use the full
+          element.
+        </p>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="maxIterations">Max Items (optional)</Label>
+        <Input
+          disabled={disabled}
+          id="maxIterations"
+          min={1}
+          onChange={(e) => onUpdateConfig("maxIterations", e.target.value)}
+          placeholder="All"
+          type="number"
+          value={(config?.maxIterations as string) || ""}
+        />
+        <p className="text-muted-foreground text-xs">
+          Leave empty to process all items
+        </p>
+      </div>
+      <div className="rounded-lg border bg-muted/30 p-3">
+        <p className="text-muted-foreground text-sm">
+          Connect action nodes after this For Each to define the loop body.
+          Optionally end with a Collect node to aggregate results. Without
+          Collect, the loop runs as fire-and-forget. Inside the loop, use @ to
+          reference <code className="text-xs">For Each.currentItem</code> for
+          the current element and{" "}
+          <code className="text-xs">For Each.index</code> for the iteration
+          index.
+        </p>
+      </div>
+    </>
+  );
+}
+
+// Collect fields component (informational only)
+function CollectFields() {
+  return (
+    <div className="rounded-lg border bg-muted/30 p-3">
+      <p className="text-muted-foreground text-sm">
+        This node collects results from the preceding For Each loop. Downstream
+        nodes can reference <code className="text-xs">Collect.results</code> for
+        the collected array and <code className="text-xs">Collect.count</code>{" "}
+        for the number of iterations.
+      </p>
+    </div>
+  );
+}
+
+// end keeperhub code //
+
 // System action fields wrapper - extracts conditional rendering to reduce complexity
 function SystemActionFields({
   actionType,
@@ -286,6 +374,18 @@ function SystemActionFields({
           onUpdateConfig={onUpdateConfig}
         />
       );
+    // start custom keeperhub code //
+    case "For Each":
+      return (
+        <ForEachFields
+          config={config}
+          disabled={disabled}
+          onUpdateConfig={onUpdateConfig}
+        />
+      );
+    case "Collect":
+      return <CollectFields />;
+    // end keeperhub code //
     default:
       return null;
   }
@@ -296,6 +396,10 @@ const SYSTEM_ACTIONS: Array<{ id: string; label: string }> = [
   { id: "HTTP Request", label: "HTTP Request" },
   { id: "Database Query", label: "Database Query" },
   { id: "Condition", label: "Condition" },
+  // start custom keeperhub code //
+  { id: "For Each", label: "For Each" },
+  { id: "Collect", label: "Collect" },
+  // end keeperhub code //
 ];
 
 const SYSTEM_ACTION_IDS = SYSTEM_ACTIONS.map((a) => a.id);

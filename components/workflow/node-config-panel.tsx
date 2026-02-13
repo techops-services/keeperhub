@@ -329,8 +329,13 @@ export const PanelInner = () => {
     const isManualTrigger =
       selectedNode.data.type === "trigger" &&
       selectedNode.data.config?.triggerType === "Manual";
+    // start custom keeperhub code //
+    const isForEachOrCollect =
+      selectedNode.data.config?.actionType === "For Each" ||
+      selectedNode.data.config?.actionType === "Collect";
+    // end keeperhub code //
 
-    if (isConditionAction || isManualTrigger) {
+    if (isConditionAction || isManualTrigger || isForEachOrCollect) {
       setActiveTab("properties");
     }
   }, [selectedNode, activeTab, setActiveTab]);
@@ -999,7 +1004,11 @@ export const PanelInner = () => {
           </TabsTrigger>
           {(selectedNode.data.type !== "trigger" ||
             (selectedNode.data.config?.triggerType as string) !== "Manual") &&
-          selectedNode.data.config?.actionType !== "Condition" ? (
+          selectedNode.data.config?.actionType !== "Condition" &&
+          // start custom keeperhub code //
+          selectedNode.data.config?.actionType !== "For Each" &&
+          selectedNode.data.config?.actionType !== "Collect" ? (
+            // end keeperhub code //
             <TabsTrigger
               className="bg-transparent text-muted-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none"
               value="code"

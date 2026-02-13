@@ -59,6 +59,20 @@ const SYSTEM_ACTIONS: ActionType[] = [
     description: "Branch based on a condition",
     category: "System",
   },
+  // start custom keeperhub code //
+  {
+    id: "For Each",
+    label: "For Each",
+    description: "Loop over an array from a previous step",
+    category: "System",
+  },
+  {
+    id: "Collect",
+    label: "Collect",
+    description: "Gather results from a For Each loop",
+    category: "System",
+  },
+  // end keeperhub code //
 ];
 
 // Combine System actions with plugin actions
