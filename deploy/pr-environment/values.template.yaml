@@ -62,7 +62,7 @@ deployment:
           export WORKFLOW_POSTGRES_URL=$(node scripts/encode-pg-url.mjs)
           pnpm exec workflow-postgres-setup
           echo "Running database migrations..."
-          pnpm db:push
+          pnpm db:migrate
           echo "Seeding chains..."
           pnpm db:seed
           echo "Migrations and seeding completed successfully"
