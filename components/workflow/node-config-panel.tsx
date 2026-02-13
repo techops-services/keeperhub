@@ -312,6 +312,12 @@ export const PanelInner = () => {
   const autoSelectAbortControllersRef = useRef<Record<string, AbortController>>(
     {}
   );
+  // start custom keeperhub code //
+  // Tracks in-flight config so multiple synchronous onUpdateConfig calls
+  // within the same event (e.g. toggling manual ABI + clearing the field)
+  // don't overwrite each other due to stale selectedNode closure.
+  const pendingConfigRef = useRef<Record<string, unknown> | null>(null);
+  // end keeperhub code //
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
   const selectedEdge = edges.find((edge) => edge.id === selectedEdgeId);
 
@@ -541,13 +547,22 @@ export const PanelInner = () => {
 
   const handleUpdateConfig = (key: string, value: string) => {
     if (selectedNode) {
-      let newConfig = { ...selectedNode.data.config, [key]: value };
+      // start custom keeperhub code //
+      const baseConfig = pendingConfigRef.current ?? selectedNode.data.config;
+      let newConfig = { ...baseConfig, [key]: value };
+      // end keeperhub code //
 
       // When action type changes, clear the integrationId since it may not be valid for the new action
-      if (key === "actionType" && selectedNode.data.config?.integrationId) {
+      if (key === "actionType" && baseConfig?.integrationId) {
         newConfig = { ...newConfig, integrationId: undefined };
       }
 
+      // start custom keeperhub code //
+      pendingConfigRef.current = newConfig;
+      queueMicrotask(() => {
+        pendingConfigRef.current = null;
+      });
+      // end keeperhub code //
       updateNodeData({ id: selectedNode.id, data: { config: newConfig } });
 
       // When action type changes, auto-select integration if only one exists
