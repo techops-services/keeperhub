@@ -9,6 +9,8 @@ import {
   Database,
   EyeOff,
   GitBranch,
+  ListEnd,
+  Repeat,
   XCircle,
   Zap,
 } from "lucide-react";
@@ -76,6 +78,10 @@ const SYSTEM_ACTION_LABELS: Record<string, string> = {
   "Database Query": "Database",
   Condition: "Condition",
   "Execute Code": "System",
+  // start custom keeperhub code //
+  "For Each": "Loop",
+  Collect: "Loop",
+  // end keeperhub code //
 };
 
 // Helper to get integration name from action type
@@ -137,6 +143,12 @@ const getProviderLogo = (actionType: string) => {
       return <Code className="size-12 text-green-300" strokeWidth={1.5} />;
     case "Condition":
       return <GitBranch className="size-12 text-pink-300" strokeWidth={1.5} />;
+    // start custom keeperhub code //
+    case "For Each":
+      return <Repeat className="size-12 text-purple-300" strokeWidth={1.5} />;
+    case "Collect":
+      return <ListEnd className="size-12 text-purple-300" strokeWidth={1.5} />;
+    // end keeperhub code //
     default:
       // Not a system action, continue to check plugin registry
       break;

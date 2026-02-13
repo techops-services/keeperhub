@@ -11,6 +11,7 @@ import {
   Settings,
   Zap,
 } from "lucide-react";
+import { useAtomValue } from "jotai";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +30,9 @@ import {
 } from "@/components/ui/tooltip";
 import { useIsTouch } from "@/hooks/use-touch";
 import { cn } from "@/lib/utils";
+// start custom keeperhub code //
+import { nodesAtom } from "@/lib/workflow-store";
+// end keeperhub code //
 import { getAllActions } from "@/plugins";
 
 type ActionType = {
@@ -59,14 +63,34 @@ const SYSTEM_ACTIONS: ActionType[] = [
     description: "Branch based on a condition",
     category: "System",
   },
+  // start custom keeperhub code //
+  {
+    id: "For Each",
+    label: "For Each",
+    description: "Loop over an array from a previous step",
+    category: "System",
+  },
+  {
+    id: "Collect",
+    label: "Collect",
+    description: "Gather results from a For Each loop",
+    category: "System",
+  },
+  // end keeperhub code //
 ];
 
 // Combine System actions with plugin actions
 function useAllActions(): ActionType[] {
+  // start custom keeperhub code //
+  const nodes = useAtomValue(nodesAtom);
+  const hasForEach = nodes.some(
+    (n) => n.data?.config?.actionType === "For Each"
+  );
+  // end keeperhub code //
+
   return useMemo(() => {
     const pluginActions = getAllActions();
 
-    // Map plugin actions to ActionType format
     const mappedPluginActions: ActionType[] = pluginActions.map((action) => ({
       id: action.id,
       label: action.label,
@@ -75,8 +99,14 @@ function useAllActions(): ActionType[] {
       integration: action.integration,
     }));
 
-    return [...SYSTEM_ACTIONS, ...mappedPluginActions];
-  }, []);
+    // start custom keeperhub code //
+    const systemActions = hasForEach
+      ? SYSTEM_ACTIONS
+      : SYSTEM_ACTIONS.filter((a) => a.id !== "Collect");
+    // end keeperhub code //
+
+    return [...systemActions, ...mappedPluginActions];
+  }, [hasForEach]);
 }
 
 type ActionGridProps = {
