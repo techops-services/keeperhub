@@ -2,6 +2,9 @@
 # Variables to be replaced: ${PR_NUMBER}, ${ECR_REGISTRY}, ${IMAGE_TAG}, ${DB_PASSWORD}
 
 shared_env: &shared_env
+  NODE_EXTRA_CA_CERTS:
+    type: kv
+    value: "/etc/ssl/certs/rds-combined-ca-bundle.pem"
   DATABASE_URL:
     type: kv
     value: "postgresql://keeperhub:${DB_PASSWORD}@keeperhub-pr-${PR_NUMBER}-db-rw.pr-${PR_NUMBER}.svc.cluster.local:5432/keeperhub"
@@ -59,7 +62,7 @@ deployment:
           export WORKFLOW_POSTGRES_URL=$(node scripts/encode-pg-url.mjs)
           pnpm exec workflow-postgres-setup
           echo "Running database migrations..."
-          pnpm db:push
+          pnpm db:migrate
           echo "Seeding chains..."
           pnpm db:seed
           echo "Migrations and seeding completed successfully"
