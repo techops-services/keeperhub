@@ -240,14 +240,14 @@ function AbiFunctionSelectField({
         {functions.map((func) => (
           <SelectItem key={func.label} value={func.name}>
             <div className="flex flex-col items-start">
-              {/* start custom keeperhub code // */}
+              {/* start custom keeperhub code */}
               <span>
                 {func.label}{" "}
                 <code className="text-muted-foreground text-xs">
                   ({func.selector})
                 </code>
               </span>
-              {/* end keeperhub code // */}
+              {/* end keeperhub code */}
               <span className="text-muted-foreground text-xs">
                 {func.stateMutability}
               </span>
