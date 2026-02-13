@@ -1118,11 +1118,7 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
             );
           },
         });
-        return;
-      }
-
-      // Condition gating
-      if (actionType === "Condition") {
+      } else if (actionType === "Condition") {
         const conditionValue = (result.data as { condition?: boolean })
           ?.condition;
         if (conditionValue !== true) {
@@ -1203,7 +1199,7 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
       item: unknown,
       index: number
     ): Promise<unknown> {
-      const scopedOutputs: NodeOutputs = { ...currentOutputs };
+      const scopedOutputs: NodeOutputs = structuredClone(currentOutputs);
       const bodyResults: Record<string, ExecutionResult> = {};
 
       // Apply map expression to transform each item before body execution
@@ -1240,6 +1236,18 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
           )
         )
       );
+
+      // If any body node failed, surface the error in the iteration result
+      const bodyFailure = Object.entries(bodyResults).find(
+        ([, r]) => !r.success
+      );
+      if (bodyFailure) {
+        return {
+          success: false as const,
+          error: bodyFailure[1].error ?? "Body node failed",
+          nodeId: bodyFailure[0],
+        };
+      }
 
       // Capture output from the last body node(s) before Collect
       let iterationOutput: unknown;
