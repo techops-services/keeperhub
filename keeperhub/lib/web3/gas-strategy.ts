@@ -240,7 +240,8 @@ export class AdaptiveGasStrategy {
     triggerType: TriggerType,
     estimatedGas: bigint,
     chainId: number,
-    gasLimitMultiplierOverride?: number
+    gasLimitMultiplierOverride?: number,
+    gasLimitOverride?: bigint
   ): Promise<GasConfig> {
     // Apply chain-specific overrides (from DB with hardcoded fallback)
     const chainConfig = await this.getChainConfig(chainId);
@@ -250,7 +251,8 @@ export class AdaptiveGasStrategy {
       estimatedGas,
       triggerType,
       chainConfig,
-      gasLimitMultiplierOverride
+      gasLimitMultiplierOverride,
+      gasLimitOverride
     );
 
     // Get fee configuration based on strategy
@@ -271,8 +273,17 @@ export class AdaptiveGasStrategy {
     estimatedGas: bigint,
     triggerType: TriggerType,
     chainConfig: ChainGasConfig,
-    gasLimitMultiplierOverride?: number
+    gasLimitMultiplierOverride?: number,
+    gasLimitOverride?: bigint
   ): bigint {
+    // If an absolute gas limit is provided, use it directly (no multiplication)
+    if (gasLimitOverride !== undefined && gasLimitOverride > BigInt(0)) {
+      console.log(
+        `[GasStrategy] Using absolute gas limit override: ${gasLimitOverride.toString()}`
+      );
+      return gasLimitOverride;
+    }
+
     let multiplier: number;
     if (gasLimitMultiplierOverride && gasLimitMultiplierOverride > 0) {
       multiplier = Math.min(
