@@ -1,118 +1,28 @@
 import { describe, expect, it } from "vitest";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-type ExecutionLogEntry = { output?: unknown };
-
-type WorkflowNode = {
-  id: string;
-  type: string;
-  position: { x: number; y: number };
-  data: {
-    label: string;
-    type: string;
-    config?: Record<string, unknown>;
-  };
-};
-
-// ---------------------------------------------------------------------------
-// Top-level regex patterns (biome: useTopLevelRegex)
-// ---------------------------------------------------------------------------
-
-const ARRAY_SOURCE_TEMPLATE_RE = /^\{\{@([^:]+):([^.}]+)\.?([^}]*)\}\}$/;
-
-// ---------------------------------------------------------------------------
-// Re-implemented private functions under test
-// ---------------------------------------------------------------------------
-
-function traverseDotPath(root: unknown, path: string): unknown {
-  let data: unknown = root;
-  for (const part of path.split(".")) {
-    if (data && typeof data === "object" && !Array.isArray(data)) {
-      data = (data as Record<string, unknown>)[part];
-      if (data === undefined) {
-        return null;
-      }
-    } else {
-      return null;
-    }
-  }
-  return data;
-}
-
-function resolveForEachSyntheticOutput(
-  node: WorkflowNode,
-  executionLogs: Record<string, ExecutionLogEntry>,
-  lastLogs: Record<string, ExecutionLogEntry>
-): Record<string, unknown> | null {
-  const arraySource = node.data.config?.arraySource as string | undefined;
-  if (!arraySource) {
-    return null;
-  }
-
-  const match = ARRAY_SOURCE_TEMPLATE_RE.exec(arraySource);
-  if (!match) {
-    return null;
-  }
-
-  const sourceNodeId = match[1];
-  const fieldPath = match[3] || "";
-
-  const sourceOutput =
-    executionLogs[sourceNodeId]?.output ?? lastLogs[sourceNodeId]?.output;
-  if (sourceOutput === undefined || sourceOutput === null) {
-    return null;
-  }
-
-  let data: unknown = sourceOutput;
-  if (fieldPath) {
-    for (const part of fieldPath.split(".")) {
-      if (data && typeof data === "object" && !Array.isArray(data)) {
-        data = (data as Record<string, unknown>)[part];
-      } else {
-        return null;
-      }
-    }
-  }
-
-  if (!Array.isArray(data) || data.length === 0) {
-    return null;
-  }
-
-  let currentItem: unknown = data[0];
-  const mapExpression = node.data.config?.mapExpression as string | undefined;
-  if (mapExpression && currentItem && typeof currentItem === "object") {
-    const mapped = traverseDotPath(currentItem, mapExpression);
-    if (mapped !== null) {
-      currentItem = mapped;
-    }
-  }
-
-  return {
-    currentItem,
-    index: 0,
-    totalItems: data.length,
-  };
-}
+import {
+  resolveForEachSyntheticOutput,
+  traverseDotPath,
+} from "@/keeperhub/lib/for-each-utils";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
+type ForEachNode = {
+  id: string;
+  data: {
+    config?: Record<string, unknown>;
+  };
+};
+
 function makeNode(
   id: string,
-  label: string,
+  _label: string,
   config?: Record<string, unknown>
-): WorkflowNode {
+): ForEachNode {
   return {
     id,
-    type: "action",
-    position: { x: 0, y: 0 },
     data: {
-      label,
-      type: "forEach",
       config,
     },
   };
