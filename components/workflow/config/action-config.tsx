@@ -38,6 +38,13 @@ import {
   integrationsVersionAtom,
 } from "@/lib/integrations-store";
 import type { IntegrationType } from "@/lib/types/integration";
+// start custom keeperhub code //
+import {
+  executionLogsAtom,
+  lastExecutionLogsAtom,
+  nodesAtom,
+} from "@/lib/workflow-store";
+// end keeperhub code //
 import {
   findActionById,
   getActionsByCategory,
@@ -251,6 +258,114 @@ function ConditionFields({
 }
 
 // start custom keeperhub code //
+const ARRAY_SOURCE_RE = /^\{\{@([^:]+):([^.}]+)\.?([^}]*)\}\}$/;
+
+/**
+ * Recursively extract dot-paths from an object up to a max depth.
+ */
+function extractObjectPaths(
+  obj: Record<string, unknown>,
+  prefix: string,
+  depth: number,
+  paths: string[]
+): void {
+  if (depth > 3) {
+    return;
+  }
+  for (const key of Object.keys(obj)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    paths.push(path);
+    const val = obj[key];
+    if (val && typeof val === "object" && !Array.isArray(val)) {
+      extractObjectPaths(
+        val as Record<string, unknown>,
+        path,
+        depth + 1,
+        paths
+      );
+    }
+  }
+}
+
+/**
+ * Traverse a dot-path into a nested object, returning null if any step fails.
+ */
+function traverseFieldPath(root: unknown, fieldPath: string): unknown {
+  let data: unknown = root;
+  for (const part of fieldPath.split(".")) {
+    if (data && typeof data === "object" && !Array.isArray(data)) {
+      data = (data as Record<string, unknown>)[part];
+    } else {
+      return null;
+    }
+  }
+  return data;
+}
+
+/**
+ * Resolve the array source output to get the first element.
+ */
+function resolveArraySourceElement(
+  arraySource: string,
+  executionLogs: Record<string, { output?: unknown }>,
+  lastLogs: Record<string, { output?: unknown }>
+): Record<string, unknown> | null {
+  const match = ARRAY_SOURCE_RE.exec(arraySource);
+  if (!match) {
+    return null;
+  }
+
+  const sourceNodeId = match[1];
+  const fieldPath = match[3] || "";
+
+  const sourceOutput =
+    executionLogs[sourceNodeId]?.output ?? lastLogs[sourceNodeId]?.output;
+  if (sourceOutput == null) {
+    return null;
+  }
+
+  const data = fieldPath
+    ? traverseFieldPath(sourceOutput, fieldPath)
+    : sourceOutput;
+  if (!Array.isArray(data) || data.length === 0) {
+    return null;
+  }
+
+  const first = data[0];
+  if (!first || typeof first !== "object" || Array.isArray(first)) {
+    return null;
+  }
+
+  return first as Record<string, unknown>;
+}
+
+/**
+ * Extract dot-paths from the first element of the array referenced by arraySource.
+ */
+function useArrayItemFields(arraySource: string | undefined): string[] {
+  const executionLogs = useAtomValue(executionLogsAtom);
+  const lastExecutionLogs = useAtomValue(lastExecutionLogsAtom);
+
+  return useMemo(() => {
+    if (!arraySource) {
+      return [];
+    }
+
+    const first = resolveArraySourceElement(
+      arraySource,
+      executionLogs,
+      lastExecutionLogs.logs
+    );
+    if (!first) {
+      return [];
+    }
+
+    const paths: string[] = [];
+    extractObjectPaths(first, "", 0, paths);
+    return paths;
+  }, [arraySource, executionLogs, lastExecutionLogs]);
+}
+// end keeperhub code //
 
 // For Each fields component
 function ForEachFields({
@@ -262,6 +377,11 @@ function ForEachFields({
   onUpdateConfig: (key: string, value: string) => void;
   disabled: boolean;
 }) {
+  // start custom keeperhub code //
+  const itemFields = useArrayItemFields(
+    config?.arraySource as string | undefined
+  );
+  // end keeperhub code //
   return (
     <>
       <div className="space-y-2">
@@ -286,6 +406,23 @@ function ForEachFields({
           placeholder="e.g., address or data.items[0].name"
           value={(config?.mapExpression as string) || ""}
         />
+        {/* start custom keeperhub code */}
+        {itemFields.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {itemFields.map((field) => (
+              <button
+                className="rounded border bg-muted/50 px-1.5 py-0.5 font-mono text-muted-foreground text-xs transition-colors hover:bg-muted hover:text-foreground"
+                disabled={disabled}
+                key={field}
+                onClick={() => onUpdateConfig("mapExpression", field)}
+                type="button"
+              >
+                {field}
+              </button>
+            ))}
+          </div>
+        )}
+        {/* end keeperhub code */}
         <p className="text-muted-foreground text-xs">
           Dot-path to extract from each element. Leave empty to use the full
           element.
@@ -430,15 +567,27 @@ const SYSTEM_ACTION_INTEGRATIONS: Record<string, IntegrationType> = {
 
 // Build category mapping dynamically from plugins + System
 function useCategoryData() {
+  // start custom keeperhub code //
+  const nodes = useAtomValue(nodesAtom);
+  const hasForEach = nodes.some(
+    (n) => n.data?.config?.actionType === "For Each"
+  );
+  // end keeperhub code //
+
   return useMemo(() => {
     const pluginCategories = getActionsByCategory();
 
-    // Build category map including System with both id and label
+    // start custom keeperhub code //
+    const systemActions = hasForEach
+      ? SYSTEM_ACTIONS
+      : SYSTEM_ACTIONS.filter((a) => a.id !== "Collect");
+    // end keeperhub code //
+
     const allCategories: Record<
       string,
       Array<{ id: string; label: string }>
     > = {
-      System: SYSTEM_ACTIONS,
+      System: systemActions,
     };
 
     for (const [category, actions] of Object.entries(pluginCategories)) {
@@ -449,7 +598,7 @@ function useCategoryData() {
     }
 
     return allCategories;
-  }, []);
+  }, [hasForEach]);
 }
 
 // Get category for an action type (supports both new IDs, labels, and legacy labels)
