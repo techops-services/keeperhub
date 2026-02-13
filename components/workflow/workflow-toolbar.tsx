@@ -33,6 +33,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { OrgSwitcher } from "@/keeperhub/components/organization/org-switcher";
+import { GoLiveOverlay } from "@/keeperhub/components/overlays/go-live-overlay";
 import { Switch } from "@/keeperhub/components/ui/switch";
 // start custom keeperhub code //
 import { BUILTIN_NODE_ID } from "@/keeperhub/lib/builtin-variables";
@@ -49,6 +50,7 @@ import {
   clearWorkflowAtom,
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
+  currentWorkflowPublicTagsAtom,
   currentWorkflowVisibilityAtom,
   deleteEdgeAtom,
   deleteNodeAtom,
@@ -83,7 +85,6 @@ import { Panel } from "../ai-elements/panel";
 import { ConfigurationOverlay } from "../overlays/configuration-overlay";
 import { ConfirmOverlay } from "../overlays/confirm-overlay";
 import { ExportWorkflowOverlay } from "../overlays/export-workflow-overlay";
-import { MakePublicOverlay } from "../overlays/make-public-overlay";
 import { useOverlay } from "../overlays/overlay-provider";
 import { WorkflowIssuesOverlay } from "../overlays/workflow-issues-overlay";
 import {
@@ -693,6 +694,9 @@ function useWorkflowState() {
   const [workflowVisibility, setWorkflowVisibility] = useAtom(
     currentWorkflowVisibilityAtom
   );
+  const [workflowPublicTags, setWorkflowPublicTags] = useAtom(
+    currentWorkflowPublicTagsAtom
+  );
   const isOwner = useAtomValue(isWorkflowOwnerAtom);
   const router = useRouter();
   const [isSaving, setIsSaving] = useAtom(isSavingAtom);
@@ -762,6 +766,8 @@ function useWorkflowState() {
     setCurrentWorkflowName,
     workflowVisibility,
     setWorkflowVisibility,
+    workflowPublicTags, // keeperhub custom field //
+    setWorkflowPublicTags, // keeperhub custom field //
     isOwner,
     router,
     isSaving,
@@ -812,7 +818,10 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     setHasUnsavedChanges,
     clearWorkflow,
     setWorkflowVisibility,
+    workflowPublicTags, // keeperhub custom field //
+    setWorkflowPublicTags, // keeperhub custom field //
     setAllWorkflows,
+    allTags, // keeperhub custom field //
     setAllProjects, // keeperhub custom field //
     setAllTags, // keeperhub custom field //
     setIsDownloading,
@@ -966,24 +975,25 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
       return;
     }
 
-    // Show confirmation overlay when making public
+    // start custom keeperhub code //
+    // Show Go Live overlay when making public
     if (newVisibility === "public") {
-      openOverlay(MakePublicOverlay, {
-        onConfirm: async () => {
-          try {
-            await api.workflow.update(currentWorkflowId, {
-              visibility: "public",
-            });
-            setWorkflowVisibility("public");
-            toast.success("Workflow is now public");
-          } catch (error) {
-            console.error("Failed to update visibility:", error);
-            toast.error("Failed to update visibility. Please try again.");
+      openOverlay(GoLiveOverlay, {
+        workflowId: currentWorkflowId,
+        currentName: workflowName,
+        orgTagNames: allTags.map((t) => t.name),
+        onConfirm: ({ name, publicTags }) => {
+          setWorkflowVisibility("public");
+          setWorkflowPublicTags(publicTags);
+          if (name !== workflowName) {
+            state.setCurrentWorkflowName(name);
           }
+          toast.success("Workflow is now live");
         },
       });
       return;
     }
+    // end keeperhub code //
 
     // Switch to private immediately (no risks)
     try {
@@ -991,12 +1001,35 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
         visibility: newVisibility,
       });
       setWorkflowVisibility(newVisibility);
+      setWorkflowPublicTags([]); // keeperhub custom field //
       toast.success("Workflow is now private");
     } catch (error) {
       console.error("Failed to update visibility:", error);
       toast.error("Failed to update visibility. Please try again.");
     }
   };
+
+  // start custom keeperhub code //
+  const handleEditPublicSettings = (): void => {
+    if (!currentWorkflowId) {
+      return;
+    }
+    openOverlay(GoLiveOverlay, {
+      workflowId: currentWorkflowId,
+      currentName: workflowName,
+      orgTagNames: allTags.map((t) => t.name),
+      initialTags: workflowPublicTags,
+      isEditing: true,
+      onConfirm: ({ name, publicTags }) => {
+        setWorkflowPublicTags(publicTags);
+        if (name !== workflowName) {
+          state.setCurrentWorkflowName(name);
+        }
+        toast.success("Public settings updated");
+      },
+    });
+  };
+  // end keeperhub code //
 
   // start custom keeperhub code //
   const updateWorkflowEnabled = async (enabled: boolean) => {
@@ -1080,6 +1113,7 @@ function useWorkflowActions(state: ReturnType<typeof useWorkflowState>) {
     handleDownload,
     loadWorkflows,
     handleToggleVisibility,
+    handleEditPublicSettings, // keeperhub custom field //
     handleToggleEnabled,
     handleDuplicate,
   };
@@ -1465,14 +1499,23 @@ function VisibilityButton({
           Private
           {!isPublic && <Check className="ml-auto size-4" />}
         </DropdownMenuItem>
-        <DropdownMenuItem
-          className="flex items-center gap-2"
-          onClick={() => actions.handleToggleVisibility("public")}
-        >
-          <Globe className="size-4" />
-          Public
-          {isPublic && <Check className="ml-auto size-4" />}
-        </DropdownMenuItem>
+        {isPublic ? (
+          <DropdownMenuItem
+            className="flex items-center gap-2"
+            onClick={() => actions.handleEditPublicSettings()}
+          >
+            <Settings2 className="size-4" />
+            Public Settings
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuItem
+            className="flex items-center gap-2"
+            onClick={() => actions.handleToggleVisibility("public")}
+          >
+            <Globe className="size-4" />
+            Public
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -804,6 +804,9 @@ export const PanelInner = () => {
               </div>
               <div className="space-y-2">
                 <Label className="ml-1">Tag</Label>
+                <p className="ml-1 text-muted-foreground text-xs">
+                  Add a tag to organise your workflow within your project.
+                </p>
                 <TagSelect
                   disabled={!isOwner}
                   onChange={handleUpdateWorkflowTag}

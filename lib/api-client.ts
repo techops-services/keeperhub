@@ -23,6 +23,16 @@ export type WorkflowData = {
   // end keeperhub code //
 };
 
+// start custom keeperhub code //
+export type PublicTag = {
+  id: string;
+  name: string;
+  slug: string;
+  workflowCount?: number;
+  createdAt?: string;
+};
+// end keeperhub code //
+
 export type SavedWorkflow = WorkflowData & {
   id: string;
   name: string;
@@ -36,6 +46,7 @@ export type SavedWorkflow = WorkflowData & {
   projectId?: string | null;
   tagId?: string | null;
   featuredOrder?: number;
+  publicTags?: PublicTag[];
   // end custom KeeperHub code
 };
 
@@ -554,6 +565,12 @@ export const workflowApi = {
       method: "POST",
       body: JSON.stringify({}),
     }),
+
+  goLive: (id: string, data: { name: string; publicTagIds: string[] }) =>
+    apiCall<SavedWorkflow>(`/api/workflows/${id}/go-live`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
   // end keeperhub code //
 
   // Get current workflow state
@@ -794,6 +811,16 @@ export type Project = {
   updatedAt: string;
 };
 
+export const publicTagApi = {
+  getAll: () => apiCall<PublicTag[]>("/api/public-tags"),
+
+  create: (data: { name: string }) =>
+    apiCall<PublicTag>("/api/public-tags", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+};
+
 export const projectApi = {
   getAll: () => apiCall<Project[]>("/api/projects"),
 
@@ -828,6 +855,7 @@ export const api = {
   organization: organizationApi,
   // start custom keeperhub code //
   project: projectApi,
+  publicTag: publicTagApi,
   tag: tagApi,
   // end keeperhub code //
   user: userApi,

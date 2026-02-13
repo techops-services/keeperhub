@@ -88,6 +88,7 @@ function ProjectFlyout({
   tags,
   activeWorkflowId,
   leftOffset,
+  projectName,
   cancelClose,
   scheduleClose,
 }: {
@@ -95,6 +96,7 @@ function ProjectFlyout({
   tags: Tag[];
   activeWorkflowId: string | undefined;
   leftOffset: number;
+  projectName: string;
   cancelClose: () => void;
   scheduleClose: () => void;
 }): React.ReactNode {
@@ -126,6 +128,9 @@ function ProjectFlyout({
     >
       <div className="flex h-full flex-col">
         <div className="flex-1 overflow-y-auto p-2">
+          <p className="px-2 pt-1 pb-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+            {projectName}
+          </p>
           {workflows.length === 0 && (
             <p className="py-4 text-center text-muted-foreground text-sm">
               No workflows
@@ -155,8 +160,14 @@ function ProjectFlyout({
                   </Fragment>
                 );
               })}
-              {tagIds.length > 0 && untagged.length > 0 && (
-                <div className="my-1 border-t" />
+              {untagged.length > 0 && (
+                <>
+                  {tagIds.length > 0 && <div className="my-1 border-t" />}
+                  <div className="flex items-center gap-1.5 px-2 pt-2 pb-1 text-muted-foreground text-xs">
+                    <span className="inline-block size-2 shrink-0 rounded-full bg-muted-foreground/30" />
+                    Untagged
+                  </div>
+                </>
               )}
               {untagged.map((w) => (
                 <WorkflowItem
@@ -226,6 +237,11 @@ function WorkflowsFlyout({
             )}
             {!loading && visibleWorkflows.length > 0 && (
               <div className="flex flex-col gap-0.5">
+                {projects.length > 0 && (
+                  <p className="px-2 pt-1 pb-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                    Projects
+                  </p>
+                )}
                 {projects.map((project) => {
                   const projectWorkflows = byProject[project.id] ?? [];
                   const isActive = project.id === activeProjectId;
@@ -271,7 +287,14 @@ function WorkflowsFlyout({
 
                 {ungrouped.length > 0 && (
                   <>
-                    {projects.length > 0 && <div className="my-1 border-t" />}
+                    {projects.length > 0 && (
+                      <>
+                        <div className="my-1 border-t" />
+                        <p className="px-2 pt-1 pb-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                          Other Workflows
+                        </p>
+                      </>
+                    )}
                     {ungrouped.map((w) => (
                       <WorkflowItem
                         activeWorkflowId={activeWorkflowId}
@@ -292,6 +315,7 @@ function WorkflowsFlyout({
           activeWorkflowId={activeWorkflowId}
           cancelClose={cancelClose}
           leftOffset={projectFlyoutLeft}
+          projectName={activeProject.name}
           scheduleClose={scheduleClose}
           tags={tags}
           workflows={byProject[activeProject.id] ?? []}

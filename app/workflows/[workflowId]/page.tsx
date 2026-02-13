@@ -29,6 +29,7 @@ import {
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
   currentWorkflowProjectIdAtom,
+  currentWorkflowPublicTagsAtom,
   currentWorkflowTagIdAtom,
   currentWorkflowVisibilityAtom,
   edgesAtom,
@@ -164,6 +165,9 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   );
   const [isOwner, setIsWorkflowOwner] = useAtom(isWorkflowOwnerAtom);
   const setIsWorkflowEnabled = useSetAtom(isWorkflowEnabled); // keeperhub custom field //
+  const setCurrentWorkflowPublicTags = useSetAtom(
+    currentWorkflowPublicTagsAtom
+  );
   // start custom keeperhub code //
   const setSelectedNode = useSetAtom(selectedNodeAtom);
   const setActiveTab = useSetAtom(propertiesPanelActiveTabAtom);
@@ -415,6 +419,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
       setIsWorkflowEnabled(workflow.enabled ?? false); // keeperhub custom field //
       setCurrentWorkflowProjectId(workflow.projectId ?? null);
       setCurrentWorkflowTagId(workflow.tagId ?? null);
+      setCurrentWorkflowPublicTags(workflow.publicTags ?? []);
       setHasUnsavedChanges(false);
       setWorkflowNotFound(false);
 
@@ -450,6 +455,7 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
     setIsWorkflowOwner,
     setIsWorkflowEnabled, // keeperhub custom field //
     setCurrentWorkflowProjectId,
+    setCurrentWorkflowPublicTags,
     setCurrentWorkflowTagId,
     setHasUnsavedChanges,
     setWorkflowNotFound,

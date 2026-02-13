@@ -7,7 +7,7 @@ import { HubHero } from "@/keeperhub/components/hub/hub-hero";
 import { HubResults } from "@/keeperhub/components/hub/hub-results";
 import { WorkflowSearchFilter } from "@/keeperhub/components/hub/workflow-search-filter";
 import { useDebounce } from "@/keeperhub/lib/hooks/use-debounce";
-import { api, type SavedWorkflow } from "@/lib/api-client";
+import { api, type PublicTag, type SavedWorkflow } from "@/lib/api-client";
 
 export default function HubPage() {
   // start custom KeeperHub code
@@ -17,9 +17,11 @@ export default function HubPage() {
   const [communityWorkflows, setCommunityWorkflows] = useState<SavedWorkflow[]>(
     []
   );
+  const [publicTags, setPublicTags] = useState<PublicTag[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTrigger, setSelectedTrigger] = useState<string | null>(null);
+  const [selectedTagSlugs, setSelectedTagSlugs] = useState<string[]>([]);
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   const triggers = useMemo(() => {
@@ -34,7 +36,9 @@ export default function HubPage() {
   }, [communityWorkflows]);
 
   const isSearchActive = Boolean(
-    debouncedSearchQuery.trim() || selectedTrigger
+    debouncedSearchQuery.trim() ||
+      selectedTrigger ||
+      selectedTagSlugs.length > 0
   );
 
   const searchResults = useMemo((): SavedWorkflow[] | null => {
@@ -53,6 +57,12 @@ export default function HubPage() {
       });
     }
 
+    if (selectedTagSlugs.length > 0) {
+      filtered = filtered.filter((w) =>
+        w.publicTags?.some((t) => selectedTagSlugs.includes(t.slug))
+      );
+    }
+
     if (query) {
       filtered = filtered.filter(
         (w) =>
@@ -66,18 +76,27 @@ export default function HubPage() {
     isSearchActive,
     communityWorkflows,
     selectedTrigger,
+    selectedTagSlugs,
     debouncedSearchQuery,
   ]);
+
+  const handleToggleTag = (slug: string): void => {
+    setSelectedTagSlugs((prev) =>
+      prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]
+    );
+  };
 
   useEffect(() => {
     const fetchWorkflows = async (): Promise<void> => {
       try {
-        const [featured, community] = await Promise.all([
+        const [featured, community, tags] = await Promise.all([
           api.workflow.getFeatured(),
           api.workflow.getPublic(),
+          api.publicTag.getAll().catch(() => [] as PublicTag[]),
         ]);
         setFeaturedWorkflows(featured);
         setCommunityWorkflows(community);
+        setPublicTags(tags);
       } catch (error) {
         console.error("Failed to fetch workflows:", error);
       } finally {
@@ -142,8 +161,11 @@ export default function HubPage() {
                   <div className="sticky top-28">
                     <WorkflowSearchFilter
                       onSearchChange={setSearchQuery}
+                      onTagToggle={handleToggleTag}
                       onTriggerChange={setSelectedTrigger}
+                      publicTags={publicTags}
                       searchQuery={searchQuery}
+                      selectedTagSlugs={selectedTagSlugs}
                       selectedTrigger={selectedTrigger}
                       triggers={triggers}
                     />
