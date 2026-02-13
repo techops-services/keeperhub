@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install dev build type-check lint fix deploy-to-local-kubernetes setup-local-kubernetes check-local-kubernetes status logs restart teardown db-create db-migrate db-studio build-scheduler-images deploy-scheduler scheduler-status scheduler-logs runner-logs teardown-scheduler test test-unit test-integration test-e2e test-e2e-hybrid hybrid-setup hybrid-up hybrid-deploy hybrid-deploy-only hybrid-status hybrid-down hybrid-reset hybrid-logs dev-setup dev-up dev-down dev-logs dev-migrate
+.PHONY: help install dev build type-check lint fix deploy-to-local-kubernetes setup-local-kubernetes check-local-kubernetes status logs restart teardown db-create db-migrate db-studio build-scheduler-images deploy-scheduler scheduler-status scheduler-logs runner-logs teardown-scheduler test test-unit test-integration test-e2e test-e2e-hybrid hybrid-setup hybrid-up hybrid-deploy hybrid-deploy-only hybrid-status hybrid-down hybrid-reset hybrid-logs hybrid-executor-logs dev-setup dev-up dev-down dev-logs dev-migrate
 
 # Development
 install:
@@ -78,12 +78,13 @@ db-studio:
 
 # Schedule Trigger Deployment
 build-scheduler-images:
-	@echo "Building scheduler and runner images..."
-	docker build --target scheduler -t keeperhub-scheduler:latest .
-	docker build --target workflow-runner -t keeperhub-runner:latest .
+	@echo "Building dispatcher image from submodule..."
+	docker build --target dispatcher -t keeperhub-dispatcher:latest ./keeperhub-scheduler
+	@echo "Building executor image from submodule..."
+	docker build --target executor -t keeperhub-executor:latest ./keeperhub-scheduler
 	@echo "Loading images into minikube..."
-	minikube image load keeperhub-scheduler:latest
-	minikube image load keeperhub-runner:latest
+	minikube image load keeperhub-dispatcher:latest
+	minikube image load keeperhub-executor:latest
 	@echo "Images ready!"
 
 deploy-scheduler: check-local-kubernetes
@@ -163,15 +164,19 @@ test-e2e-hybrid:
 # =============================================================================
 
 dev-up:
-	@echo "Starting dev profile (no K8s Jobs)..."
+	@echo "Starting dev profile..."
 	docker compose --profile dev up -d
 	@echo ""
 	@echo "Services started:"
 	@echo "  - db (PostgreSQL)"
 	@echo "  - localstack (SQS)"
+	@echo "  - redis (caching + event sync)"
 	@echo "  - app-dev (KeeperHub)"
-	@echo "  - dispatcher (runs every minute)"
-	@echo "  - executor (polls SQS, calls API directly)"
+	@echo "  - dispatcher (schedule polling)"
+	@echo "  - sc-event-worker (blockchain event dispatch)"
+	@echo "  - sc-event-tracker (blockchain event monitoring)"
+	@echo ""
+	@echo "Note: Scheduled workflow execution requires hybrid mode (make hybrid-deploy)"
 	@echo ""
 	@echo "App: http://localhost:3000"
 
@@ -198,22 +203,22 @@ dev-setup:
 	@echo "For subsequent starts, use: make dev-up"
 
 # =============================================================================
-# Hybrid Mode (Docker Compose + Minikube for K8s Jobs)
+# Hybrid Mode (Docker Compose + Minikube for schedule execution)
 # =============================================================================
 
 hybrid-setup:
-	# Full setup: prerequisites, /etc/hosts, Docker Compose, Minikube, scheduler
+	# Full setup: prerequisites, /etc/hosts, Docker Compose, Minikube, executor
 	chmod +x ./deploy/local/hybrid/setup.sh
 	./deploy/local/hybrid/setup.sh
 
 hybrid-up:
-	# Start Docker Compose services (everything except scheduler)
+	# Start Docker Compose services (everything except executor)
 	docker compose --profile minikube up -d
-	@echo "Docker Compose services started. Now deploy scheduler to Minikube:"
+	@echo "Docker Compose services started. Now deploy executor to Minikube:"
 	@echo "  make hybrid-deploy"
 
 hybrid-deploy:
-	# Start Docker Compose services (db, localstack, app)
+	# Start Docker Compose services and deploy executor to Minikube
 	@echo "Starting Docker Compose services..."
 	docker compose --profile minikube up -d
 	# Wait for database to be ready
@@ -232,14 +237,14 @@ hybrid-deploy:
 	done
 	# Run database migrations and seed chains
 	@echo "Setting up database schema and seeding chains..."
-	@DATABASE_URL="postgresql://postgres:postgres@localhost:5433/keeperhub" pnpm db:push || echo "Schema push completed (or already up to date)"
-	@DATABASE_URL="postgresql://postgres:postgres@localhost:5433/keeperhub" npx tsx scripts/seed-chains.ts || echo "Chains seeded (or already exist)"
-	# Deploy scheduler to Minikube (builds images if needed)
+	@DATABASE_URL="postgresql://postgres:postgres@localhost:5433/$${POSTGRES_DB:-keeperhub}" pnpm db:push || echo "Schema push completed (or already up to date)"
+	@DATABASE_URL="postgresql://postgres:postgres@localhost:5433/$${POSTGRES_DB:-keeperhub}" npx tsx scripts/seed-chains.ts || echo "Chains seeded (or already exist)"
+	# Deploy executor to Minikube (builds images if needed)
 	chmod +x ./deploy/local/hybrid/deploy.sh
 	./deploy/local/hybrid/deploy.sh --build
 
 hybrid-deploy-only:
-	# Deploy scheduler to Minikube (skip image build, skip db setup)
+	# Deploy executor to Minikube (skip image build, skip db setup)
 	chmod +x ./deploy/local/hybrid/deploy.sh
 	./deploy/local/hybrid/deploy.sh
 
@@ -273,10 +278,9 @@ hybrid-logs:
 	# Follow job-spawner logs
 	kubectl logs -n local -l app=job-spawner -f
 
-hybrid-runner-logs:
-	# Show recent workflow runner job logs
-	@echo "=== Recent Workflow Runner Job Logs ==="
-	@kubectl logs -n local -l app=workflow-runner --tail=100 2>/dev/null || echo "No runner logs available"
+hybrid-executor-logs:
+	# Show schedule executor logs (same as hybrid-logs)
+	kubectl logs -n local -l app=job-spawner --tail=100 2>/dev/null || echo "No executor logs available"
 
 # Help
 help:
@@ -309,8 +313,8 @@ help:
 	@echo "    hybrid-status              - Show hybrid deployment status"
 	@echo "    hybrid-down                - Teardown hybrid deployment"
 	@echo "    hybrid-reset               - Full reset and restart"
-	@echo "    hybrid-logs                - Follow job-spawner logs"
-	@echo "    hybrid-runner-logs         - Show workflow runner logs"
+	@echo "    hybrid-logs                - Follow executor logs"
+	@echo "    hybrid-executor-logs       - Show recent executor logs"
 	@echo ""
 	@echo "  Full Kubernetes (all in Minikube, ~8GB RAM):"
 	@echo "    setup-local-kubernetes     - Setup minikube with all infrastructure"
@@ -344,5 +348,5 @@ help:
 	@echo ""
 	@echo "Recommended workflow:"
 	@echo "  1. For UI/API dev (no workflow testing): make dev-up"
-	@echo "  2. For workflow testing with K8s Jobs:   make hybrid-setup"
+	@echo "  2. For scheduled workflow testing:        make hybrid-setup"
 	@echo "  3. For production-like testing:          make setup-local-kubernetes"

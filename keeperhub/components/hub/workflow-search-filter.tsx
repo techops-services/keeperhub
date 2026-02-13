@@ -2,6 +2,7 @@
 
 import { cva, type VariantProps } from "class-variance-authority";
 import { ChevronDown, Search, X } from "lucide-react";
+import type { PublicTag } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
 const searchWrapperVariants = cva(
@@ -28,60 +29,27 @@ const iconSizeMap = {
   xl: "size-6",
 } as const;
 
-const pillVariants = cva(
-  "inline-flex items-center rounded-full border font-medium transition-colors",
-  {
-    variants: {
-      size: {
-        sm: "px-2 py-0.5 text-xs",
-        default: "px-3 py-1 text-xs",
-        lg: "px-4 py-1.5 text-sm",
-        xl: "px-5 py-2 text-base",
-      },
-    },
-    defaultVariants: {
-      size: "default",
-    },
-  }
-);
-
 type WorkflowSearchFilterProps = VariantProps<typeof searchWrapperVariants> & {
-  categories: string[];
-  protocols: string[];
   triggers: string[];
   searchQuery: string;
-  selectedCategories: Set<string>;
-  selectedProtocols: Set<string>;
   selectedTrigger: string | null;
+  publicTags?: PublicTag[];
+  selectedTagSlugs?: string[];
   onSearchChange: (query: string) => void;
-  onCategoriesChange: (categories: Set<string>) => void;
-  onProtocolsChange: (protocols: Set<string>) => void;
   onTriggerChange: (trigger: string | null) => void;
+  onTagToggle?: (slug: string) => void;
 };
 
-function toggleInSet(set: Set<string>, value: string): Set<string> {
-  const next = new Set(set);
-  if (next.has(value)) {
-    next.delete(value);
-  } else {
-    next.add(value);
-  }
-  return next;
-}
-
 export function WorkflowSearchFilter({
-  categories,
-  protocols,
   triggers,
   searchQuery,
-  selectedCategories,
-  selectedProtocols,
   selectedTrigger,
+  publicTags = [],
+  selectedTagSlugs = [],
   size = "default",
   onSearchChange,
-  onCategoriesChange,
-  onProtocolsChange,
   onTriggerChange,
+  onTagToggle,
 }: WorkflowSearchFilterProps) {
   const sizeKey = size ?? "default";
   const iconSize = iconSizeMap[sizeKey];
@@ -108,60 +76,6 @@ export function WorkflowSearchFilter({
         )}
         <Search className={cn(iconSize, "text-muted-foreground")} />
       </div>
-
-      {protocols.length > 0 && (
-        <div>
-          <p className="mb-2 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-            Protocol
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {protocols.map((protocol) => (
-              <button
-                className={cn(
-                  pillVariants({ size }),
-                  selectedProtocols.has(protocol)
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-input bg-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                )}
-                key={protocol}
-                onClick={() =>
-                  onProtocolsChange(toggleInSet(selectedProtocols, protocol))
-                }
-                type="button"
-              >
-                {protocol}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {categories.length > 0 && (
-        <div>
-          <p className="mb-2 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-            Category
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {categories.map((category) => (
-              <button
-                className={cn(
-                  pillVariants({ size }),
-                  selectedCategories.has(category)
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-input bg-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                )}
-                key={category}
-                onClick={() =>
-                  onCategoriesChange(toggleInSet(selectedCategories, category))
-                }
-                type="button"
-              >
-                {category}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {triggers.length > 0 && (
         <div>
@@ -194,6 +108,35 @@ export function WorkflowSearchFilter({
                 "pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground"
               )}
             />
+          </div>
+        </div>
+      )}
+
+      {publicTags.length > 0 && onTagToggle && (
+        <div>
+          <p className="mb-2 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+            Tags
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {publicTags.map((tag) => {
+              const isSelected = selectedTagSlugs.includes(tag.slug);
+              return (
+                <button
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-xs transition-colors",
+                    "border focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+                    isSelected
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-muted text-foreground/70 hover:bg-muted/80"
+                  )}
+                  key={tag.slug}
+                  onClick={() => onTagToggle(tag.slug)}
+                  type="button"
+                >
+                  {tag.name}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

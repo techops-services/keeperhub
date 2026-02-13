@@ -15,6 +15,7 @@ import { TemplateBadgeInput } from "@/components/ui/template-badge-input";
 import { TemplateBadgeTextarea } from "@/components/ui/template-badge-textarea";
 // start custom keeperhub code //
 import { SaveAddressBookmark } from "@/keeperhub/components/address-book/save-address-bookmark";
+import { computeSelector } from "@/keeperhub/lib/abi-utils";
 import { parseAddressBookSelection } from "@/keeperhub/lib/address-book-selection";
 import { toChecksumAddress } from "@/keeperhub/lib/address-utils";
 // end keeperhub code //
@@ -204,10 +205,15 @@ function AbiFunctionSelectField({
               `${input.type} ${input.name}`
           )
           .join(", ");
+        // start custom keeperhub code //
+        const inputTypes = inputs.map((input: { type: string }) => input.type);
+        const selector = computeSelector(func.name, inputTypes);
+        // end keeperhub code //
         return {
           name: func.name,
           label: `${func.name}(${params})`,
           stateMutability: func.stateMutability || "nonpayable",
+          selector,
         };
       });
     } catch {
@@ -234,7 +240,14 @@ function AbiFunctionSelectField({
         {functions.map((func) => (
           <SelectItem key={func.label} value={func.name}>
             <div className="flex flex-col items-start">
-              <span>{func.label}</span>
+              {/* start custom keeperhub code // */}
+              <span>
+                {func.label}{" "}
+                <code className="text-muted-foreground text-xs">
+                  ({func.selector})
+                </code>
+              </span>
+              {/* end keeperhub code // */}
               <span className="text-muted-foreground text-xs">
                 {func.stateMutability}
               </span>

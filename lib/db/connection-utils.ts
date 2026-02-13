@@ -179,7 +179,10 @@ export function ensureExplicitSslMode(url: string): string {
     const parsed = new URL(url);
     const hostname = parsed.hostname;
     const isLocal =
-      hostname === "localhost" || hostname === "127.0.0.1" || hostname === "";
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "" ||
+      hostname.endsWith(".svc.cluster.local");
     if (isLocal) {
       return url;
     }

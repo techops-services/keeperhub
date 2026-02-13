@@ -1,13 +1,12 @@
 "use client";
 
-import { Check, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { WorkflowIcon } from "@/components/ui/workflow-icon";
@@ -16,7 +15,6 @@ import { getCustomLogo } from "@/lib/extension-registry";
 
 export function PersistentHeader() {
   const pathname = usePathname();
-  const router = useRouter();
 
   // Only show on non-workflow pages (workflow pages have their own toolbar)
   const isWorkflowPage = pathname === "/" || pathname.startsWith("/workflows/");
@@ -48,14 +46,6 @@ export function PersistentHeader() {
                 className="flex items-center justify-between"
               >
                 <Link href="/">New Workflow</Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="flex items-center justify-between"
-                onClick={() => router.push("/hub")}
-              >
-                <span>Hub</span>
-                {pathname === "/hub" && <Check className="size-4 shrink-0" />}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

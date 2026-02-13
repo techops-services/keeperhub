@@ -329,7 +329,13 @@ function DiamondContractAlert({
             Using combined ABI from all facets (Diamond Proxy).
           </p>
         )}
-        <DiamondFacetsList chains={chains} facets={facets} network={network} />
+        {useDiamondAbi && (
+          <DiamondFacetsList
+            chains={chains}
+            facets={facets}
+            network={network}
+          />
+        )}
         {warning && (
           <p className="mt-2 text-amber-700 text-sm dark:text-amber-300">
             {warning}
@@ -445,6 +451,7 @@ type AbiWithAutoFetchProps = FieldProps & {
   contractInteractionType?: "read" | "write";
   networkField?: string;
   config: Record<string, unknown>;
+  onUpdateConfig?: (key: string, value: unknown) => void;
 };
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: ABI field handles proxy, diamond, and read/write-as-proxy states with toggles
@@ -457,8 +464,11 @@ export function AbiWithAutoFetchField({
   contractInteractionType,
   networkField = "network",
   config,
+  onUpdateConfig,
 }: AbiWithAutoFetchProps) {
-  const [useManualAbi, setUseManualAbi] = useState(false);
+  const [useManualAbi, setUseManualAbi] = useState(
+    () => String(config.useManualAbi) === "true"
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isProxy, setIsProxy] = useState(false);
@@ -805,7 +815,13 @@ export function AbiWithAutoFetchField({
 
   const handleManualToggle = (checked: boolean) => {
     setUseManualAbi(checked);
+    onUpdateConfig?.("useManualAbi", String(checked));
     setError(null);
+    if (checked) {
+      onChange("");
+      resetProxyState();
+      lastFetchedRef.current = null;
+    }
   };
 
   return (
@@ -851,7 +867,7 @@ export function AbiWithAutoFetchField({
         </div>
       )}
 
-      {isDiamond && diamondFacets && (
+      {isDiamond && diamondFacets && !useManualAbi && (
         <DiamondContractAlert
           chains={chains}
           facets={diamondFacets}
@@ -888,7 +904,7 @@ export function AbiWithAutoFetchField({
         }}
         placeholder={
           useManualAbi
-            ? "Paste contract ABI JSON here"
+            ? "Paste your ABI here"
             : "Click 'Fetch ABI from Etherscan' or enable 'Use manual ABI' to enter manually"
         }
         rows={4}
