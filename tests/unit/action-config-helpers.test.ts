@@ -36,6 +36,9 @@ function traverseFieldPath(root: unknown, fieldPath: string): unknown {
   for (const part of fieldPath.split(".")) {
     if (data && typeof data === "object" && !Array.isArray(data)) {
       data = (data as Record<string, unknown>)[part];
+      if (data === undefined) {
+        return null;
+      }
     } else {
       return null;
     }
@@ -235,7 +238,7 @@ describe("action-config helpers", () => {
     });
 
     it("returns undefined for a missing key at the last level", () => {
-      expect(traverseFieldPath({ a: 1 }, "b")).toBeUndefined();
+      expect(traverseFieldPath({ a: 1 }, "b")).toBeNull();
     });
 
     it("returns null when an array is encountered along the path", () => {

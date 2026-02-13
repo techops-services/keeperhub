@@ -295,6 +295,9 @@ function traverseFieldPath(root: unknown, fieldPath: string): unknown {
   for (const part of fieldPath.split(".")) {
     if (data && typeof data === "object" && !Array.isArray(data)) {
       data = (data as Record<string, unknown>)[part];
+      if (data === undefined) {
+        return null;
+      }
     } else {
       return null;
     }
