@@ -8,8 +8,6 @@ import {
   addressBookEntry,
   addressBookEntryRelations,
   apiKeys,
-  categories,
-  categoriesRelations,
   chains,
   chainsRelations,
   explorerConfigs,
@@ -17,8 +15,6 @@ import {
   integrations,
   organizationApiKeys,
   pendingTransactions,
-  protocols,
-  protocolsRelations,
   // end keeperhub code //
   sessions,
   tags,
@@ -57,10 +53,6 @@ const schema = {
   addressBookEntryRelations,
   tags,
   tagsRelations,
-  categories,
-  categoriesRelations,
-  protocols,
-  protocolsRelations,
   // end keeperhub code //
   integrations,
   chains,

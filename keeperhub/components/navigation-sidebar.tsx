@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 const COLLAPSED_WIDTH = 60;
 const EXPANDED_WIDTH = 200;
 const SNAP_THRESHOLD = (COLLAPSED_WIDTH + EXPANDED_WIDTH) / 2;
+const SIDEBAR_STORAGE_KEY = "keeperhub-sidebar-expanded";
 
 type WorkflowEntry = {
   id: string;
@@ -306,6 +307,22 @@ export function NavigationSidebar(): React.ReactNode {
   const pathname = usePathname();
   const params = useParams();
   const [expanded, setExpanded] = useState(false);
+  const hasMounted = useRef(false);
+
+  useEffect(() => {
+    const stored = localStorage.getItem(SIDEBAR_STORAGE_KEY);
+    if (stored === "true") {
+      setExpanded(true);
+    }
+    hasMounted.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (hasMounted.current) {
+      localStorage.setItem(SIDEBAR_STORAGE_KEY, String(expanded));
+    }
+  }, [expanded]);
+
   const [dragWidth, setDragWidth] = useState<number | null>(null);
   const [flyoutOpen, setFlyoutOpen] = useState(false);
   const [workflows, setWorkflows] = useState<SavedWorkflow[]>([]);

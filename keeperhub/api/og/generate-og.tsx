@@ -4,7 +4,7 @@ import { ImageResponse } from "@vercel/og";
 import { eq } from "drizzle-orm";
 import type { ReactNode } from "react";
 import { db } from "@/lib/db";
-import { categories, protocols, workflows } from "@/lib/db/schema";
+import { workflows } from "@/lib/db/schema";
 
 // ---------------------------------------------------------------------------
 // Font loading (Anek Latin, bundled locally)
@@ -572,8 +572,6 @@ type OGRenderData = {
   description: string | null;
   triggerLabel: string | undefined;
   actionCount: number;
-  category: string | null;
-  protocol: string | null;
 };
 
 function prepareRenderData(workflowData: {
@@ -581,8 +579,6 @@ function prepareRenderData(workflowData: {
   description: string | null;
   nodes: unknown[];
   edges: unknown[];
-  category: string | null;
-  protocol: string | null;
 }): OGRenderData {
   const allNodes = (workflowData.nodes ?? []) as WorkflowNode[];
   const nodes = allNodes.filter((n) => n.data?.type !== "add" && n.position);
@@ -608,8 +604,6 @@ function prepareRenderData(workflowData: {
     description: workflowData.description,
     triggerLabel: triggerNode?.data.label,
     actionCount: nodes.filter((n) => n.data.type === "action").length,
-    category: workflowData.category,
-    protocol: workflowData.protocol,
   };
 }
 
@@ -768,12 +762,6 @@ function renderWorkflowOG(data: OGRenderData): Promise<ImageResponse> {
         <div style={{ display: "flex" }}>
           {data.actionCount} {data.actionCount === 1 ? "action" : "actions"}
         </div>
-        {data.category ? (
-          <div style={{ display: "flex" }}>{data.category}</div>
-        ) : null}
-        {data.protocol ? (
-          <div style={{ display: "flex" }}>{data.protocol}</div>
-        ) : null}
       </Footer>
     </OGBase>,
     3600
@@ -791,12 +779,8 @@ export async function generateWorkflowOGImage(
         nodes: workflows.nodes,
         edges: workflows.edges,
         visibility: workflows.visibility,
-        categoryName: categories.name,
-        protocolName: protocols.name,
       })
       .from(workflows)
-      .leftJoin(categories, eq(workflows.categoryId, categories.id))
-      .leftJoin(protocols, eq(workflows.protocolId, protocols.id))
       .where(eq(workflows.id, workflowId))
       .limit(1);
 
@@ -817,8 +801,6 @@ export async function generateWorkflowOGImage(
       nodes: workflow.nodes as any[],
       // biome-ignore lint/suspicious/noExplicitAny: JSONB column type from Drizzle schema
       edges: workflow.edges as any[],
-      category: workflow.categoryName ?? null,
-      protocol: workflow.protocolName ?? null,
     });
 
     return await renderWorkflowOG(data);

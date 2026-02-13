@@ -190,43 +190,6 @@ export const tags = pgTable(
   (table) => [index("idx_tags_org").on(table.organizationId)]
 );
 
-export const categories = pgTable(
-  "categories",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => generateId()),
-    name: text("name").notNull(),
-    organizationId: text("organization_id")
-      .notNull()
-      .references(() => organization.id, { onDelete: "cascade" }),
-    userId: text("user_id")
-      .notNull()
-      .references(() => users.id),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  },
-  (table) => [index("idx_categories_org").on(table.organizationId)]
-);
-
-export const protocols = pgTable(
-  "protocols",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => generateId()),
-    name: text("name").notNull(),
-    organizationId: text("organization_id")
-      .notNull()
-      .references(() => organization.id, { onDelete: "cascade" }),
-    userId: text("user_id")
-      .notNull()
-      .references(() => users.id),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  },
-  (table) => [index("idx_protocols_org").on(table.organizationId)]
-);
 // end keeperhub code //
 
 // Workflow visibility type
@@ -248,12 +211,6 @@ export const workflows = pgTable("workflows", {
   }),
   isAnonymous: boolean("is_anonymous").default(false).notNull(),
   featured: boolean("featured").default(false).notNull(),
-  categoryId: text("category_id").references(() => categories.id, {
-    onDelete: "set null",
-  }),
-  protocolId: text("protocol_id").references(() => protocols.id, {
-    onDelete: "set null",
-  }),
   featuredOrder: integer("featured_order").default(0),
   projectId: text("project_id").references(() => projects.id, {
     onDelete: "set null",
@@ -539,8 +496,6 @@ export const organizationRelations = relations(organization, ({ many }) => ({
   addressBookEntries: many(addressBookEntry),
   projects: many(projects),
   tags: many(tags),
-  categories: many(categories),
-  protocols: many(protocols),
 }));
 
 export const memberRelations = relations(member, ({ one }) => ({
@@ -609,27 +564,6 @@ export const tagsRelations = relations(tags, ({ one }) => ({
   }),
 }));
 
-export const categoriesRelations = relations(categories, ({ one }) => ({
-  organization: one(organization, {
-    fields: [categories.organizationId],
-    references: [organization.id],
-  }),
-  creator: one(users, {
-    fields: [categories.userId],
-    references: [users.id],
-  }),
-}));
-
-export const protocolsRelations = relations(protocols, ({ one }) => ({
-  organization: one(organization, {
-    fields: [protocols.organizationId],
-    references: [organization.id],
-  }),
-  creator: one(users, {
-    fields: [protocols.userId],
-    references: [users.id],
-  }),
-}));
 // end keeperhub code //
 
 export const chainsRelations = relations(chains, ({ one, many }) => ({
@@ -690,10 +624,6 @@ export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;
 export type Tag = typeof tags.$inferSelect;
 export type NewTag = typeof tags.$inferInsert;
-export type Category = typeof categories.$inferSelect;
-export type NewCategory = typeof categories.$inferInsert;
-export type Protocol = typeof protocols.$inferSelect;
-export type NewProtocol = typeof protocols.$inferInsert;
 // end keeperhub code //
 export type Chain = typeof chains.$inferSelect;
 export type NewChain = typeof chains.$inferInsert;

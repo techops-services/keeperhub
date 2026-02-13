@@ -25,12 +25,10 @@ import {
 } from "@/lib/integrations-store";
 import type { IntegrationType } from "@/lib/types/integration";
 import {
-  currentWorkflowCategoryIdAtom,
   currentWorkflowDescriptionAtom,
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
   currentWorkflowProjectIdAtom,
-  currentWorkflowProtocolIdAtom,
   currentWorkflowTagIdAtom,
   currentWorkflowVisibilityAtom,
   edgesAtom,
@@ -148,12 +146,6 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
   const setCurrentWorkflowName = useSetAtom(currentWorkflowNameAtom);
   const setCurrentWorkflowDescription = useSetAtom(
     currentWorkflowDescriptionAtom
-  );
-  const setCurrentWorkflowCategoryId = useSetAtom(
-    currentWorkflowCategoryIdAtom
-  );
-  const setCurrentWorkflowProtocolId = useSetAtom(
-    currentWorkflowProtocolIdAtom
   );
   const setCurrentWorkflowProjectId = useSetAtom(currentWorkflowProjectIdAtom);
   const setCurrentWorkflowTagId = useSetAtom(currentWorkflowTagIdAtom);
@@ -421,8 +413,6 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
       );
       setIsWorkflowOwner(workflow.isOwner !== false); // Default to true if not set
       setIsWorkflowEnabled(workflow.enabled ?? false); // keeperhub custom field //
-      setCurrentWorkflowCategoryId(workflow.categoryId ?? null);
-      setCurrentWorkflowProtocolId(workflow.protocolId ?? null);
       setCurrentWorkflowProjectId(workflow.projectId ?? null);
       setCurrentWorkflowTagId(workflow.tagId ?? null);
       setHasUnsavedChanges(false);
@@ -459,8 +449,6 @@ const WorkflowEditor = ({ params }: WorkflowPageProps) => {
     setCurrentWorkflowVisibility,
     setIsWorkflowOwner,
     setIsWorkflowEnabled, // keeperhub custom field //
-    setCurrentWorkflowCategoryId,
-    setCurrentWorkflowProtocolId,
     setCurrentWorkflowProjectId,
     setCurrentWorkflowTagId,
     setHasUnsavedChanges,

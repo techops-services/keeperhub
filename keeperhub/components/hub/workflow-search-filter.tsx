@@ -28,59 +28,20 @@ const iconSizeMap = {
   xl: "size-6",
 } as const;
 
-const pillVariants = cva(
-  "inline-flex items-center rounded-full border font-medium transition-colors",
-  {
-    variants: {
-      size: {
-        sm: "px-2 py-0.5 text-xs",
-        default: "px-3 py-1 text-xs",
-        lg: "px-4 py-1.5 text-sm",
-        xl: "px-5 py-2 text-base",
-      },
-    },
-    defaultVariants: {
-      size: "default",
-    },
-  }
-);
-
 type WorkflowSearchFilterProps = VariantProps<typeof searchWrapperVariants> & {
-  categories: string[];
-  protocols: string[];
   triggers: string[];
   searchQuery: string;
-  selectedCategories: Set<string>;
-  selectedProtocols: Set<string>;
   selectedTrigger: string | null;
   onSearchChange: (query: string) => void;
-  onCategoriesChange: (categories: Set<string>) => void;
-  onProtocolsChange: (protocols: Set<string>) => void;
   onTriggerChange: (trigger: string | null) => void;
 };
 
-function toggleInSet(set: Set<string>, value: string): Set<string> {
-  const next = new Set(set);
-  if (next.has(value)) {
-    next.delete(value);
-  } else {
-    next.add(value);
-  }
-  return next;
-}
-
 export function WorkflowSearchFilter({
-  categories,
-  protocols,
   triggers,
   searchQuery,
-  selectedCategories,
-  selectedProtocols,
   selectedTrigger,
   size = "default",
   onSearchChange,
-  onCategoriesChange,
-  onProtocolsChange,
   onTriggerChange,
 }: WorkflowSearchFilterProps) {
   const sizeKey = size ?? "default";
@@ -108,60 +69,6 @@ export function WorkflowSearchFilter({
         )}
         <Search className={cn(iconSize, "text-muted-foreground")} />
       </div>
-
-      {protocols.length > 0 && (
-        <div>
-          <p className="mb-2 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-            Protocol
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {protocols.map((protocol) => (
-              <button
-                className={cn(
-                  pillVariants({ size }),
-                  selectedProtocols.has(protocol)
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-input bg-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                )}
-                key={protocol}
-                onClick={() =>
-                  onProtocolsChange(toggleInSet(selectedProtocols, protocol))
-                }
-                type="button"
-              >
-                {protocol}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {categories.length > 0 && (
-        <div>
-          <p className="mb-2 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-            Category
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {categories.map((category) => (
-              <button
-                className={cn(
-                  pillVariants({ size }),
-                  selectedCategories.has(category)
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-input bg-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                )}
-                key={category}
-                onClick={() =>
-                  onCategoriesChange(toggleInSet(selectedCategories, category))
-                }
-                type="button"
-              >
-                {category}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {triggers.length > 0 && (
         <div>

@@ -18,8 +18,6 @@ export type WorkflowData = {
   visibility?: WorkflowVisibility;
   enabled?: boolean;
   // start custom keeperhub code //
-  categoryId?: string | null;
-  protocolId?: string | null;
   projectId?: string | null;
   tagId?: string | null;
   // end keeperhub code //
@@ -35,10 +33,6 @@ export type SavedWorkflow = WorkflowData & {
   isOwner?: boolean;
   // start custom KeeperHub code
   featured?: boolean;
-  categoryId?: string | null;
-  protocolId?: string | null;
-  categoryName?: string | null;
-  protocolName?: string | null;
   projectId?: string | null;
   tagId?: string | null;
   featuredOrder?: number;
@@ -758,15 +752,6 @@ export const aiGatewayApi = {
 };
 
 // start custom keeperhub code //
-export type TaxonomyEntry = {
-  id: string;
-  name: string;
-  workflowCount: number;
-  organizationId: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
 export type Tag = {
   id: string;
   name: string;
@@ -833,47 +818,6 @@ export const projectApi = {
     }),
 };
 
-export const categoryApi = {
-  getAll: () => apiCall<TaxonomyEntry[]>("/api/categories"),
-
-  create: (data: { name: string }) =>
-    apiCall<TaxonomyEntry>("/api/categories", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  update: (id: string, data: { name?: string }) =>
-    apiCall<TaxonomyEntry>(`/api/categories/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify(data),
-    }),
-
-  delete: (id: string) =>
-    apiCall<{ success: boolean }>(`/api/categories/${id}`, {
-      method: "DELETE",
-    }),
-};
-
-export const protocolApi = {
-  getAll: () => apiCall<TaxonomyEntry[]>("/api/protocols"),
-
-  create: (data: { name: string }) =>
-    apiCall<TaxonomyEntry>("/api/protocols", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  update: (id: string, data: { name?: string }) =>
-    apiCall<TaxonomyEntry>(`/api/protocols/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify(data),
-    }),
-
-  delete: (id: string) =>
-    apiCall<{ success: boolean }>(`/api/protocols/${id}`, {
-      method: "DELETE",
-    }),
-};
 // end keeperhub code //
 
 // Export all APIs as a single object
@@ -883,9 +827,7 @@ export const api = {
   integration: integrationApi,
   organization: organizationApi,
   // start custom keeperhub code //
-  category: categoryApi,
   project: projectApi,
-  protocol: protocolApi,
   tag: tagApi,
   // end keeperhub code //
   user: userApi,

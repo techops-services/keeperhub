@@ -182,8 +182,6 @@ function buildUpdateData(
     "edges",
     "visibility",
     "enabled", // keeperhub custom field //
-    "categoryId", // keeperhub custom field //
-    "protocolId", // keeperhub custom field //
     "projectId", // keeperhub custom field //
     "tagId", // keeperhub custom field //
   ];

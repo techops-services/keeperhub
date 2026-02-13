@@ -4,9 +4,7 @@ import {
   Bookmark,
   FolderOpen,
   Github,
-  Globe,
   Key,
-  Layers,
   LogOut,
   Plug,
   Settings,
@@ -36,10 +34,8 @@ import {
 // start custom keeperhub code //
 import { ManageOrgsModal } from "@/keeperhub/components/organization/manage-orgs-modal";
 import { AddressBookOverlay } from "@/keeperhub/components/overlays/address-book-overlay";
-import { CategoriesOverlay } from "@/keeperhub/components/overlays/categories-overlay";
 import { FeedbackOverlay } from "@/keeperhub/components/overlays/feedback-overlay";
 import { ProjectsOverlay } from "@/keeperhub/components/overlays/projects-overlay";
-import { ProtocolsOverlay } from "@/keeperhub/components/overlays/protocols-overlay";
 import { TagsOverlay } from "@/keeperhub/components/overlays/tags-overlay";
 import { WalletOverlay } from "@/keeperhub/components/overlays/wallet-overlay";
 import { useOrganization } from "@/keeperhub/lib/hooks/use-organization";
@@ -210,14 +206,6 @@ export const UserMenu = () => {
           <DropdownMenuItem onClick={() => openOverlay(TagsOverlay)}>
             <Tag className="size-4" />
             <span>Tags</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => openOverlay(CategoriesOverlay)}>
-            <Layers className="size-4" />
-            <span>Categories</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => openOverlay(ProtocolsOverlay)}>
-            <Globe className="size-4" />
-            <span>Protocols</span>
           </DropdownMenuItem>
           {/* end keeperhub code */}
           <DropdownMenuSeparator />

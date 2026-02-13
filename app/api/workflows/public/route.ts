@@ -1,7 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { categories, protocols, workflows } from "@/lib/db/schema";
+import { workflows } from "@/lib/db/schema";
 
 // start custom KeeperHub code
 export async function GET(request: Request): Promise<NextResponse> {
@@ -18,8 +18,6 @@ export async function GET(request: Request): Promise<NextResponse> {
         organizationId: workflows.organizationId,
         isAnonymous: workflows.isAnonymous,
         featured: workflows.featured,
-        categoryId: workflows.categoryId,
-        protocolId: workflows.protocolId,
         featuredOrder: workflows.featuredOrder,
         projectId: workflows.projectId,
         tagId: workflows.tagId,
@@ -29,12 +27,8 @@ export async function GET(request: Request): Promise<NextResponse> {
         enabled: workflows.enabled,
         createdAt: workflows.createdAt,
         updatedAt: workflows.updatedAt,
-        categoryName: categories.name,
-        protocolName: protocols.name,
       })
       .from(workflows)
-      .leftJoin(categories, eq(workflows.categoryId, categories.id))
-      .leftJoin(protocols, eq(workflows.protocolId, protocols.id))
       .where(
         and(
           eq(workflows.visibility, "public"),

@@ -29,7 +29,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ProjectSelect } from "@/keeperhub/components/projects/project-select";
 import { TagSelect } from "@/keeperhub/components/tags/tag-select";
-import { TaxonomySelect } from "@/keeperhub/components/taxonomy/taxonomy-select";
 import { api } from "@/lib/api-client";
 import { integrationsAtom } from "@/lib/integrations-store";
 import type { IntegrationType } from "@/lib/types/integration";
@@ -37,14 +36,11 @@ import { generateWorkflowCode } from "@/lib/workflow-codegen";
 import {
   clearNodeStatusesAtom,
   clearWorkflowAtom,
-  currentWorkflowCategoryIdAtom,
   currentWorkflowDescriptionAtom,
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
   currentWorkflowProjectIdAtom,
-  currentWorkflowProtocolIdAtom,
   currentWorkflowTagIdAtom,
-  currentWorkflowVisibilityAtom,
   deleteEdgeAtom,
   deleteNodeAtom,
   deleteSelectedItemsAtom,
@@ -171,20 +167,12 @@ export const PanelInner = () => {
   const [currentWorkflowDescription, setCurrentWorkflowDescription] = useAtom(
     currentWorkflowDescriptionAtom
   );
-  const [currentWorkflowCategoryId, setCurrentWorkflowCategoryId] = useAtom(
-    currentWorkflowCategoryIdAtom
-  );
-  const [currentWorkflowProtocolId, setCurrentWorkflowProtocolId] = useAtom(
-    currentWorkflowProtocolIdAtom
-  );
-  const currentWorkflowVisibility = useAtomValue(currentWorkflowVisibilityAtom);
   const [currentWorkflowProjectId, setCurrentWorkflowProjectId] = useAtom(
     currentWorkflowProjectIdAtom
   );
   const [currentWorkflowTagId, setCurrentWorkflowTagId] = useAtom(
     currentWorkflowTagIdAtom
   );
-  const isPublic = currentWorkflowVisibility === "public";
   const isOwner = useAtomValue(isWorkflowOwnerAtom);
   const workflowNotFound = useAtomValue(workflowNotFoundAtom);
   const updateNodeData = useSetAtom(updateNodeDataAtom);
@@ -616,38 +604,6 @@ export const PanelInner = () => {
   };
 
   // start custom keeperhub code //
-  const handleUpdateWorkflowCategoryId = async (
-    newCategoryId: string | null
-  ): Promise<void> => {
-    setCurrentWorkflowCategoryId(newCategoryId);
-    if (currentWorkflowId) {
-      try {
-        await api.workflow.update(currentWorkflowId, {
-          categoryId: newCategoryId,
-        });
-      } catch (error) {
-        console.error("Failed to update workflow category:", error);
-        toast.error("Failed to update workflow category");
-      }
-    }
-  };
-
-  const handleUpdateWorkflowProtocolId = async (
-    newProtocolId: string | null
-  ): Promise<void> => {
-    setCurrentWorkflowProtocolId(newProtocolId);
-    if (currentWorkflowId) {
-      try {
-        await api.workflow.update(currentWorkflowId, {
-          protocolId: newProtocolId,
-        });
-      } catch (error) {
-        console.error("Failed to update workflow protocol:", error);
-        toast.error("Failed to update workflow protocol");
-      }
-    }
-  };
-
   const handleUpdateWorkflowProject = async (
     newProjectId: string | null
   ): Promise<void> => {
@@ -865,42 +821,6 @@ export const PanelInner = () => {
                   value={currentWorkflowId || "Not saved"}
                 />
               </div>
-              {/* start custom keeperhub code */}
-              {isPublic && (
-                <div className="space-y-3 rounded-lg border border-border/50 bg-muted/30 p-3">
-                  <div className="space-y-1">
-                    <p className="font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                      Hub Listing
-                    </p>
-                    <p className="text-muted-foreground text-xs">
-                      Displayed when your workflow is public on the hub.
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="ml-1">Protocol</Label>
-                    <TaxonomySelect
-                      createFn={api.protocol.create}
-                      disabled={!isOwner}
-                      fetchFn={api.protocol.getAll}
-                      label="Protocol"
-                      onChange={handleUpdateWorkflowProtocolId}
-                      value={currentWorkflowProtocolId}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="ml-1">Category</Label>
-                    <TaxonomySelect
-                      createFn={api.category.create}
-                      disabled={!isOwner}
-                      fetchFn={api.category.getAll}
-                      label="Category"
-                      onChange={handleUpdateWorkflowCategoryId}
-                      value={currentWorkflowCategoryId}
-                    />
-                  </div>
-                </div>
-              )}
-              {/* end keeperhub code */}
               {!isOwner && (
                 <div className="rounded-lg border border-muted bg-muted/30 p-3">
                   <p className="text-muted-foreground text-sm">

@@ -19,34 +19,8 @@ export default function HubPage() {
   );
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(
-    new Set()
-  );
-  const [selectedProtocols, setSelectedProtocols] = useState<Set<string>>(
-    new Set()
-  );
   const [selectedTrigger, setSelectedTrigger] = useState<string | null>(null);
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
-
-  const categories = useMemo(() => {
-    const unique = new Set<string>();
-    for (const workflow of communityWorkflows) {
-      if (workflow.categoryName) {
-        unique.add(workflow.categoryName);
-      }
-    }
-    return Array.from(unique).sort();
-  }, [communityWorkflows]);
-
-  const protocols = useMemo(() => {
-    const unique = new Set<string>();
-    for (const workflow of communityWorkflows) {
-      if (workflow.protocolName) {
-        unique.add(workflow.protocolName);
-      }
-    }
-    return Array.from(unique).sort();
-  }, [communityWorkflows]);
 
   const triggers = useMemo(() => {
     const unique = new Set<string>();
@@ -60,10 +34,7 @@ export default function HubPage() {
   }, [communityWorkflows]);
 
   const isSearchActive = Boolean(
-    debouncedSearchQuery.trim() ||
-      selectedCategories.size > 0 ||
-      selectedProtocols.size > 0 ||
-      selectedTrigger
+    debouncedSearchQuery.trim() || selectedTrigger
   );
 
   const searchResults = useMemo((): SavedWorkflow[] | null => {
@@ -74,18 +45,6 @@ export default function HubPage() {
     const query = debouncedSearchQuery.trim().toLowerCase();
 
     let filtered = communityWorkflows;
-
-    if (selectedCategories.size > 0) {
-      filtered = filtered.filter(
-        (w) => w.categoryName && selectedCategories.has(w.categoryName)
-      );
-    }
-
-    if (selectedProtocols.size > 0) {
-      filtered = filtered.filter(
-        (w) => w.protocolName && selectedProtocols.has(w.protocolName)
-      );
-    }
 
     if (selectedTrigger) {
       filtered = filtered.filter((w) => {
@@ -106,8 +65,6 @@ export default function HubPage() {
   }, [
     isSearchActive,
     communityWorkflows,
-    selectedCategories,
-    selectedProtocols,
     selectedTrigger,
     debouncedSearchQuery,
   ]);
@@ -184,15 +141,9 @@ export default function HubPage() {
                 <div className="container mx-auto grid grid-cols-[1fr_3fr] items-start gap-8">
                   <div className="sticky top-28">
                     <WorkflowSearchFilter
-                      categories={categories}
-                      onCategoriesChange={setSelectedCategories}
-                      onProtocolsChange={setSelectedProtocols}
                       onSearchChange={setSearchQuery}
                       onTriggerChange={setSelectedTrigger}
-                      protocols={protocols}
                       searchQuery={searchQuery}
-                      selectedCategories={selectedCategories}
-                      selectedProtocols={selectedProtocols}
                       selectedTrigger={selectedTrigger}
                       triggers={triggers}
                     />
