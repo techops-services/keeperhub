@@ -284,7 +284,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: pnpm db:push
+    command: pnpm db:migrate
     profiles:
       - migrator
 
