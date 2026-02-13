@@ -25,6 +25,7 @@ import { findActionById } from "@/plugins";
 import { getTriggerOutputFields } from "@/keeperhub/lib/trigger-output-fields";
 // start custom keeperhub code //
 import { getReadContractOutputFields } from "@/keeperhub/lib/action-output-fields";
+import { resolveForEachSyntheticOutput } from "@/keeperhub/lib/for-each-utils";
 
 /** Map of nodeId -> execution log entry. Used for last-run fallback in template autocomplete. */
 type ExecutionLogsByNodeId = Record<string, ExecutionLogEntry>;
@@ -302,92 +303,6 @@ function sanitizeNodeId(nodeId: string): string {
   return nodeId.replace(/[^a-zA-Z0-9]/g, "_");
 }
 
-// start custom keeperhub code //
-const ARRAY_SOURCE_TEMPLATE_RE =
-  /^\{\{@([^:]+):([^.}]+)\.?([^}]*)\}\}$/;
-
-/**
- * For a For Each node, resolve the arraySource to build a synthetic output
- * containing the first array element as `currentItem`. This enables
- * getAvailableFields to enumerate nested object keys in autocomplete.
- */
-function resolveForEachSyntheticOutput(
-  node: WorkflowNode,
-  executionLogs: Record<string, ExecutionLogEntry>,
-  lastLogs: Record<string, ExecutionLogEntry>
-): Record<string, unknown> | null {
-  const arraySource = node.data.config?.arraySource as string | undefined;
-  if (!arraySource) {
-    return null;
-  }
-
-  const match = ARRAY_SOURCE_TEMPLATE_RE.exec(arraySource);
-  if (!match) {
-    return null;
-  }
-
-  const sourceNodeId = match[1];
-  const fieldPath = match[3] || "";
-
-  const sourceOutput =
-    executionLogs[sourceNodeId]?.output ?? lastLogs[sourceNodeId]?.output;
-  if (sourceOutput === undefined || sourceOutput === null) {
-    return null;
-  }
-
-  let data: unknown = sourceOutput;
-  if (fieldPath) {
-    for (const part of fieldPath.split(".")) {
-      if (data && typeof data === "object" && !Array.isArray(data)) {
-        data = (data as Record<string, unknown>)[part];
-      } else {
-        return null;
-      }
-    }
-  }
-
-  if (!Array.isArray(data) || data.length === 0) {
-    return null;
-  }
-
-  // Apply mapExpression to transform currentItem, matching executor behavior
-  let currentItem: unknown = data[0];
-  const mapExpression = node.data.config?.mapExpression as string | undefined;
-  if (
-    mapExpression &&
-    currentItem &&
-    typeof currentItem === "object"
-  ) {
-    const mapped = traverseDotPath(currentItem, mapExpression);
-    if (mapped !== null) {
-      currentItem = mapped;
-    }
-  }
-
-  return {
-    currentItem,
-    index: 0,
-    totalItems: data.length,
-  };
-}
-
-/**
- * Traverse a dot-path into a nested value, returning null on failure.
- */
-function traverseDotPath(root: unknown, path: string): unknown {
-  let data: unknown = root;
-  for (const part of path.split(".")) {
-    if (data && typeof data === "object" && !Array.isArray(data)) {
-      data = (data as Record<string, unknown>)[part];
-      if (data === undefined) {
-        return null;
-      }
-    } else {
-      return null;
-    }
-  }
-  return data;
-}
 // end keeperhub code //
 
 export function TemplateAutocomplete({
