@@ -313,6 +313,10 @@ export const workflowExecutionLogs = pgTable("workflow_execution_logs", {
   completedAt: timestamp("completed_at"),
   duration: text("duration"), // Duration in milliseconds
   timestamp: timestamp("timestamp").notNull().defaultNow(),
+  // start custom keeperhub code //
+  iterationIndex: integer("iteration_index"), // 0-based loop iteration (null for non-loop nodes)
+  forEachNodeId: text("for_each_node_id"), // parent For Each node ID (null for non-loop nodes)
+  // end keeperhub code //
 });
 
 // KeeperHub: Para Wallets, Organization API Keys, and Organization Tokens (imported from KeeperHub schema extensions)
