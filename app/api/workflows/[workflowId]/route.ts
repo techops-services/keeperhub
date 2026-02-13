@@ -6,26 +6,9 @@ import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { validateWorkflowIntegrations } from "@/lib/db/integrations";
-import { publicTags, workflowPublicTags, workflows } from "@/lib/db/schema";
+import { workflows } from "@/lib/db/schema";
 import { syncWorkflowSchedule } from "@/lib/schedule-service";
 
-// end keeperhub code //
-
-// start custom keeperhub code //
-async function fetchWorkflowPublicTags(
-  workflowId: string
-): Promise<Array<{ id: string; name: string; slug: string }>> {
-  const rows = await db
-    .select({
-      id: publicTags.id,
-      name: publicTags.name,
-      slug: publicTags.slug,
-    })
-    .from(workflowPublicTags)
-    .innerJoin(publicTags, eq(workflowPublicTags.publicTagId, publicTags.id))
-    .where(eq(workflowPublicTags.workflowId, workflowId));
-  return rows;
-}
 // end keeperhub code //
 
 // Helper to strip sensitive data from nodes for public viewing
@@ -152,8 +135,6 @@ export async function GET(
     }
 
     const hasFullAccess = isOwner || isSameOrg;
-
-    const workflowTags = await fetchWorkflowPublicTags(workflowId);
     // end keeperhub code //
 
     // For public workflows viewed by non-owners, sanitize sensitive data
@@ -164,7 +145,6 @@ export async function GET(
         : sanitizeNodesForPublicView(
             workflow.nodes as Record<string, unknown>[]
           ),
-      publicTags: workflowTags,
       createdAt: workflow.createdAt.toISOString(),
       updatedAt: workflow.updatedAt.toISOString(),
       // Note: `isOwner` controls edit permissions in the frontend.
@@ -202,8 +182,9 @@ function buildUpdateData(
     "edges",
     "visibility",
     "enabled", // keeperhub custom field //
+    "category", // keeperhub custom field //
+    "protocol", // keeperhub custom field //
     "projectId", // keeperhub custom field //
-    "tagId", // keeperhub custom field //
   ];
   for (const field of fields) {
     if (body[field] !== undefined) {
@@ -251,32 +232,6 @@ async function validateWorkflowAccess(
     hasAccess: isOwner || Boolean(isSameOrg),
   };
 }
-
-// start custom keeperhub code //
-async function handlePostUpdateSideEffects(
-  workflowId: string,
-  body: Record<string, unknown>
-): Promise<void> {
-  if (body.visibility === "private") {
-    await db
-      .delete(workflowPublicTags)
-      .where(eq(workflowPublicTags.workflowId, workflowId));
-  }
-
-  if (body.nodes !== undefined) {
-    const syncResult = await syncWorkflowSchedule(
-      workflowId,
-      body.nodes as Parameters<typeof syncWorkflowSchedule>[1]
-    );
-    if (!syncResult.synced) {
-      console.warn(
-        `[Workflow] Schedule sync failed for ${workflowId}:`,
-        syncResult.error
-      );
-    }
-  }
-}
-// end keeperhub code //
 
 export async function PATCH(
   request: Request,
@@ -346,9 +301,17 @@ export async function PATCH(
       );
     }
 
-    // start custom keeperhub code //
-    await handlePostUpdateSideEffects(workflowId, body);
-    // end keeperhub code //
+    // Sync schedule if nodes were updated
+    if (body.nodes !== undefined) {
+      const syncResult = await syncWorkflowSchedule(workflowId, body.nodes);
+      if (!syncResult.synced) {
+        console.warn(
+          `[Workflow] Schedule sync failed for ${workflowId}:`,
+          syncResult.error
+        );
+        // Don't fail the request, but log the warning
+      }
+    }
 
     return NextResponse.json({
       ...updatedWorkflow,

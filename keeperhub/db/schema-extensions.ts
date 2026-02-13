@@ -23,7 +23,7 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 // Note: Using relative paths instead of @/ aliases for drizzle-kit compatibility
-import { organization, users, workflows } from "../../lib/db/schema";
+import { organization, users } from "../../lib/db/schema";
 import { generateId } from "../../lib/utils/id";
 
 /**
@@ -240,50 +240,3 @@ export const pendingTransactions = pgTable(
 // Type exports for Pending Transactions table
 export type PendingTransaction = typeof pendingTransactions.$inferSelect;
 export type NewPendingTransaction = typeof pendingTransactions.$inferInsert;
-
-/**
- * Public Tags table
- *
- * Global pool of tags used for Hub discoverability. These are distinct from
- * organization-scoped tags -- public tags are shared across all orgs and
- * used for filtering on the Hub page.
- */
-export const publicTags = pgTable("public_tags", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => generateId()),
-  name: text("name").notNull().unique(),
-  slug: text("slug").notNull().unique(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-// Type exports for Public Tags table
-export type PublicTag = typeof publicTags.$inferSelect;
-export type NewPublicTag = typeof publicTags.$inferInsert;
-
-/**
- * Workflow Public Tags junction table (many-to-many)
- *
- * Links workflows to public tags for Hub discoverability.
- * Cascade deletes on both sides ensure cleanup when either entity is removed.
- */
-export const workflowPublicTags = pgTable(
-  "workflow_public_tags",
-  {
-    workflowId: text("workflow_id")
-      .notNull()
-      .references(() => workflows.id, { onDelete: "cascade" }),
-    publicTagId: text("public_tag_id")
-      .notNull()
-      .references(() => publicTags.id, { onDelete: "cascade" }),
-  },
-  (table) => [
-    primaryKey({ columns: [table.workflowId, table.publicTagId] }),
-    index("idx_workflow_public_tags_workflow").on(table.workflowId),
-    index("idx_workflow_public_tags_tag").on(table.publicTagId),
-  ]
-);
-
-// Type exports for Workflow Public Tags table
-export type WorkflowPublicTag = typeof workflowPublicTags.$inferSelect;
-export type NewWorkflowPublicTag = typeof workflowPublicTags.$inferInsert;

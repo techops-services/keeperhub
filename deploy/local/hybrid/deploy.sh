@@ -81,9 +81,13 @@ build_and_load_images() {
     # Use minikube's Docker daemon to build directly (faster than build + load)
     eval $(minikube docker-env)
 
-    # Build executor image from submodule (schedule-executor: polls SQS, calls API)
-    log_info "Building keeperhub-executor:latest in minikube..."
-    docker build --target executor -t keeperhub-executor:latest ./keeperhub-scheduler
+    # Build scheduler image (for dispatcher and job-spawner)
+    log_info "Building keeperhub-scheduler:latest in minikube..."
+    docker build --target scheduler -t keeperhub-scheduler:latest .
+
+    # Build workflow runner image (for K8s Jobs)
+    log_info "Building keeperhub-runner:latest in minikube..."
+    docker build --target workflow-runner -t keeperhub-runner:latest .
 
     # Reset to host Docker daemon
     eval $(minikube docker-env -u)
@@ -97,14 +101,8 @@ generate_manifest() {
     local ENCRYPTION_KEY="${INTEGRATION_ENCRYPTION_KEY:-$(openssl rand -hex 32 2>/dev/null || echo '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef')}"
     local ENCRYPTION_KEY_BASE64=$(echo -n "$ENCRYPTION_KEY" | base64 -w0)
 
-    # Source .env for consistency with docker-compose (picks up POSTGRES_DB, etc.)
-    if [ -f "$PROJECT_ROOT/.env" ]; then
-        set -a
-        . "$PROJECT_ROOT/.env"
-        set +a
-    fi
-
     # Support custom database name for worktrees (default: keeperhub)
+    # Uses POSTGRES_DB from .env for consistency with docker-compose
     local DB_NAME="${POSTGRES_DB:-keeperhub}"
 
     log_info "Using encryption key (first 8 chars): ${ENCRYPTION_KEY:0:8}..."
@@ -144,9 +142,11 @@ data:
   SQS_QUEUE_URL: "http://host.minikube.internal:4566/000000000000/keeperhub-workflow-queue"
   # Database - connects to Docker Compose PostgreSQL (port 5433 exposed on host)
   DATABASE_URL: "postgresql://postgres:postgres@host.minikube.internal:5433/__DB_NAME__"
-  # KeeperHub API - connects to Docker Compose app (port 3000 exposed on host)
-  KEEPERHUB_API_URL: "http://host.minikube.internal:3000"
-  KEEPERHUB_API_KEY: "local-scheduler-key-for-dev"
+  # Job spawner settings
+  RUNNER_IMAGE: "keeperhub-runner:latest"
+  K8S_NAMESPACE: "local"
+  JOB_TTL_SECONDS: "3600"
+  JOB_ACTIVE_DEADLINE: "300"
 ---
 # ServiceAccount for job-spawner to create K8s Jobs
 apiVersion: v1
@@ -155,16 +155,22 @@ metadata:
   name: job-spawner
   namespace: local
 ---
-# Role for schedule-executor service account
+# Role allowing job-spawner to manage Jobs
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: job-spawner-role
   namespace: local
 rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch", "delete"]
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
 ---
 # Bind role to service account
 apiVersion: rbac.authorization.k8s.io/v1
@@ -181,8 +187,54 @@ roleRef:
   name: job-spawner-role
   apiGroup: rbac.authorization.k8s.io
 ---
-# Schedule Executor Deployment
-# Long-running process that polls SQS and executes workflows via KeeperHub API
+# Schedule Dispatcher CronJob
+# Runs every minute to check for scheduled workflows and send to SQS
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: schedule-dispatcher
+  namespace: local
+  labels:
+    app: schedule-dispatcher
+    component: scheduler
+spec:
+  schedule: "* * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: schedule-dispatcher
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: dispatcher
+              image: keeperhub-scheduler:latest
+              imagePullPolicy: Never
+              workingDir: /app
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  echo "[Dispatcher] Starting at $(date)"
+                  tsx scripts/schedule-dispatcher.ts
+                  echo "[Dispatcher] Completed at $(date)"
+              envFrom:
+                - configMapRef:
+                    name: scheduler-env
+              resources:
+                requests:
+                  memory: "128Mi"
+                  cpu: "50m"
+                limits:
+                  memory: "256Mi"
+                  cpu: "200m"
+---
+# Job Spawner Deployment
+# Long-running process that polls SQS and creates K8s Jobs for workflow execution
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -204,8 +256,15 @@ spec:
       serviceAccountName: job-spawner
       containers:
         - name: spawner
-          image: keeperhub-executor:latest
+          image: keeperhub-scheduler:latest
           imagePullPolicy: Never
+          workingDir: /app
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "[JobSpawner] Starting..."
+              tsx scripts/job-spawner.ts
           envFrom:
             - configMapRef:
                 name: scheduler-env
@@ -221,7 +280,7 @@ spec:
               command:
                 - /bin/sh
                 - -c
-                - "pgrep -f 'schedule-executor' || exit 1"
+                - "pgrep -f 'job-spawner' || exit 1"
             initialDelaySeconds: 30
             periodSeconds: 30
             failureThreshold: 3
@@ -256,15 +315,20 @@ teardown() {
         rm -f "$SCRIPT_DIR/schedule-trigger-hybrid.yaml"
         log_info "Scheduler components removed"
     else
-        # Try to delete by name
+        # Try to delete by label/name
+        kubectl delete cronjob -n "$NAMESPACE" -l component=scheduler --ignore-not-found=true
         kubectl delete deployment -n "$NAMESPACE" -l component=scheduler --ignore-not-found=true
         kubectl delete configmap -n "$NAMESPACE" scheduler-env --ignore-not-found=true
         kubectl delete secret -n "$NAMESPACE" keeperhub-secrets --ignore-not-found=true
         kubectl delete serviceaccount -n "$NAMESPACE" job-spawner --ignore-not-found=true
         kubectl delete role -n "$NAMESPACE" job-spawner-role --ignore-not-found=true
         kubectl delete rolebinding -n "$NAMESPACE" job-spawner-binding --ignore-not-found=true
-        log_info "Executor components removed (by name)"
+        log_info "Scheduler components removed (by label)"
     fi
+
+    # Clean up any workflow jobs
+    log_info "Cleaning up workflow jobs..."
+    kubectl delete jobs -n "$NAMESPACE" -l app=workflow-runner --ignore-not-found=true
 }
 
 show_status() {
@@ -280,8 +344,20 @@ show_status() {
     docker compose --profile minikube ps 2>/dev/null || echo "  Not running"
     echo ""
 
-    echo "Schedule Executor (Deployment):"
+    echo "Schedule Dispatcher (CronJob):"
+    kubectl get cronjobs -n "$NAMESPACE" -l app=schedule-dispatcher 2>/dev/null || echo "  Not found"
+    echo ""
+
+    echo "Recent Dispatcher Jobs:"
+    kubectl get jobs -n "$NAMESPACE" -l app=schedule-dispatcher --sort-by=.metadata.creationTimestamp 2>/dev/null | tail -5 || echo "  No jobs"
+    echo ""
+
+    echo "Job Spawner:"
     kubectl get pods -n "$NAMESPACE" -l app=job-spawner 2>/dev/null || echo "  Not found"
+    echo ""
+
+    echo "Workflow Runner Jobs:"
+    kubectl get jobs -n "$NAMESPACE" -l app=workflow-runner --sort-by=.metadata.creationTimestamp 2>/dev/null | tail -10 || echo "  No jobs"
     echo ""
 }
 
@@ -319,9 +395,10 @@ log_info "=== Hybrid Mode Usage ==="
 echo ""
 echo "  App:          http://localhost:3000"
 echo ""
-echo "  Dispatcher (Docker Compose) polls for due schedules and sends to SQS."
-echo "  Executor (Minikube) polls SQS and executes workflows via KeeperHub API."
+echo "  Workflows are triggered via the UI or API."
+echo "  Scheduler polls for due schedules and sends to SQS."
+echo "  Job-spawner creates K8s Jobs for each workflow execution."
 echo ""
-echo "  View executor logs:"
-echo "    kubectl logs -n $NAMESPACE -l app=job-spawner -f"
+echo "  View workflow job logs:"
+echo "    kubectl logs -n $NAMESPACE -l app=workflow-runner"
 echo ""

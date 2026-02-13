@@ -2,4 +2,50 @@
 > ai-workflow-builder-template@0.1.0 check /Users/taitsengstock/Documents/GitHub/techops-workflow-builder-template
 > npx ultracite@latest check
 
-Checked 474 files in 239ms. No fixes applied.
+components/workflow/node-config-panel.tsx:614:20 lint/suspicious/noEmptyBlockStatements ━━━━━━━━━━━━
+
+  × Unexpected empty block.
+  
+    612 │       .getTaxonomy()
+    613 │       .then(setTaxonomyOptions)
+  > 614 │       .catch(() => {});
+        │                    ^^
+    615 │   }, []);
+    616 │ 
+  
+  i Empty blocks are usually the result of an incomplete refactoring. Remove the empty block or add a comment inside it if it is intentional.
+  
+
+keeperhub/api/workflows/taxonomy/route.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+    11 11 │           .from(workflows)
+    12 12 │           .where(
+    13    │ - ··········and(
+    14    │ - ············eq(workflows.visibility,·"public"),
+    15    │ - ············isNotNull(workflows.category)
+    16    │ - ··········)
+       13 │ + ··········and(eq(workflows.visibility,·"public"),·isNotNull(workflows.category))
+    17 14 │           )
+    18 15 │           .then((rows) =>
+    ····· │ 
+    25 22 │           .from(workflows)
+    26 23 │           .where(
+    27    │ - ··········and(
+    28    │ - ············eq(workflows.visibility,·"public"),
+    29    │ - ············isNotNull(workflows.protocol)
+    30    │ - ··········)
+       24 │ + ··········and(eq(workflows.visibility,·"public"),·isNotNull(workflows.protocol))
+    31 25 │           )
+    32 26 │           .then((rows) =>
+  
+
+Checked 429 files in 242ms. No fixes applied.
+Found 2 errors.
+check ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Some errors were emitted while running checks.
+  
+
+ ELIFECYCLE  Command failed with exit code 1.

@@ -15,11 +15,8 @@ import {
   integrations,
   organizationApiKeys,
   pendingTransactions,
-  publicTags,
   // end keeperhub code //
   sessions,
-  tags,
-  tagsRelations,
   userRpcPreferences,
   userRpcPreferencesRelations,
   users,
@@ -28,7 +25,6 @@ import {
   workflowExecutionLogs,
   workflowExecutions,
   workflowExecutionsRelations,
-  workflowPublicTags,
   workflowSchedules,
   workflowSchedulesRelations,
   workflows,
@@ -50,13 +46,9 @@ const schema = {
   // start custom keeperhub code //
   organizationApiKeys,
   pendingTransactions,
-  publicTags,
   walletLocks,
-  workflowPublicTags,
   addressBookEntry,
   addressBookEntryRelations,
-  tags,
-  tagsRelations,
   // end keeperhub code //
   integrations,
   chains,

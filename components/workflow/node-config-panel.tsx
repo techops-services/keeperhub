@@ -27,8 +27,8 @@ import { CodeEditor } from "@/components/ui/code-editor";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { ComboboxInput } from "@/keeperhub/components/hub/combobox-input";
 import { ProjectSelect } from "@/keeperhub/components/projects/project-select";
-import { TagSelect } from "@/keeperhub/components/tags/tag-select";
 import { api } from "@/lib/api-client";
 import { integrationsAtom } from "@/lib/integrations-store";
 import type { IntegrationType } from "@/lib/types/integration";
@@ -36,11 +36,12 @@ import { generateWorkflowCode } from "@/lib/workflow-codegen";
 import {
   clearNodeStatusesAtom,
   clearWorkflowAtom,
+  currentWorkflowCategoryAtom,
   currentWorkflowDescriptionAtom,
   currentWorkflowIdAtom,
   currentWorkflowNameAtom,
   currentWorkflowProjectIdAtom,
-  currentWorkflowTagIdAtom,
+  currentWorkflowProtocolAtom,
   deleteEdgeAtom,
   deleteNodeAtom,
   deleteSelectedItemsAtom,
@@ -167,12 +168,19 @@ export const PanelInner = () => {
   const [currentWorkflowDescription, setCurrentWorkflowDescription] = useAtom(
     currentWorkflowDescriptionAtom
   );
+  const [currentWorkflowCategory, setCurrentWorkflowCategory] = useAtom(
+    currentWorkflowCategoryAtom
+  );
+  const [currentWorkflowProtocol, setCurrentWorkflowProtocol] = useAtom(
+    currentWorkflowProtocolAtom
+  );
   const [currentWorkflowProjectId, setCurrentWorkflowProjectId] = useAtom(
     currentWorkflowProjectIdAtom
   );
-  const [currentWorkflowTagId, setCurrentWorkflowTagId] = useAtom(
-    currentWorkflowTagIdAtom
-  );
+  const [taxonomyOptions, setTaxonomyOptions] = useState<{
+    categories: string[];
+    protocols: string[];
+  }>({ categories: [], protocols: [] });
   const isOwner = useAtomValue(isWorkflowOwnerAtom);
   const workflowNotFound = useAtomValue(workflowNotFoundAtom);
   const updateNodeData = useSetAtom(updateNodeDataAtom);
@@ -304,12 +312,6 @@ export const PanelInner = () => {
   const autoSelectAbortControllersRef = useRef<Record<string, AbortController>>(
     {}
   );
-  // start custom keeperhub code //
-  // Tracks in-flight config so multiple synchronous onUpdateConfig calls
-  // within the same event (e.g. toggling manual ABI + clearing the field)
-  // don't overwrite each other due to stale selectedNode closure.
-  const pendingConfigRef = useRef<Record<string, unknown> | null>(null);
-  // end keeperhub code //
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
   const selectedEdge = edges.find((edge) => edge.id === selectedEdgeId);
 
@@ -539,22 +541,13 @@ export const PanelInner = () => {
 
   const handleUpdateConfig = (key: string, value: string) => {
     if (selectedNode) {
-      // start custom keeperhub code //
-      const baseConfig = pendingConfigRef.current ?? selectedNode.data.config;
-      let newConfig = { ...baseConfig, [key]: value };
-      // end keeperhub code //
+      let newConfig = { ...selectedNode.data.config, [key]: value };
 
       // When action type changes, clear the integrationId since it may not be valid for the new action
-      if (key === "actionType" && baseConfig?.integrationId) {
+      if (key === "actionType" && selectedNode.data.config?.integrationId) {
         newConfig = { ...newConfig, integrationId: undefined };
       }
 
-      // start custom keeperhub code //
-      pendingConfigRef.current = newConfig;
-      queueMicrotask(() => {
-        pendingConfigRef.current = null;
-      });
-      // end keeperhub code //
       updateNodeData({ id: selectedNode.id, data: { config: newConfig } });
 
       // When action type changes, auto-select integration if only one exists
@@ -619,6 +612,47 @@ export const PanelInner = () => {
   };
 
   // start custom keeperhub code //
+  useEffect(() => {
+    api.workflow
+      .getTaxonomy()
+      .then(setTaxonomyOptions)
+      .catch(() => {
+        // Silently ignore - taxonomy options are optional
+      });
+  }, []);
+
+  const handleUpdateWorkflowCategory = async (
+    newCategory: string
+  ): Promise<void> => {
+    setCurrentWorkflowCategory(newCategory);
+    if (currentWorkflowId) {
+      try {
+        await api.workflow.update(currentWorkflowId, {
+          category: newCategory || null,
+        });
+      } catch (error) {
+        console.error("Failed to update workflow category:", error);
+        toast.error("Failed to update workflow category");
+      }
+    }
+  };
+
+  const handleUpdateWorkflowProtocol = async (
+    newProtocol: string
+  ): Promise<void> => {
+    setCurrentWorkflowProtocol(newProtocol);
+    if (currentWorkflowId) {
+      try {
+        await api.workflow.update(currentWorkflowId, {
+          protocol: newProtocol || null,
+        });
+      } catch (error) {
+        console.error("Failed to update workflow protocol:", error);
+        toast.error("Failed to update workflow protocol");
+      }
+    }
+  };
+
   const handleUpdateWorkflowProject = async (
     newProjectId: string | null
   ): Promise<void> => {
@@ -631,22 +665,6 @@ export const PanelInner = () => {
       } catch (error) {
         console.error("Failed to update workflow project:", error);
         toast.error("Failed to update workflow project");
-      }
-    }
-  };
-
-  const handleUpdateWorkflowTag = async (
-    newTagId: string | null
-  ): Promise<void> => {
-    setCurrentWorkflowTagId(newTagId);
-    if (currentWorkflowId) {
-      try {
-        await api.workflow.update(currentWorkflowId, {
-          tagId: newTagId,
-        });
-      } catch (error) {
-        console.error("Failed to update workflow tag:", error);
-        toast.error("Failed to update workflow tag");
       }
     }
   };
@@ -810,22 +828,31 @@ export const PanelInner = () => {
               </div>
               {/* start custom keeperhub code */}
               <div className="space-y-2">
+                <Label className="ml-1">Protocol</Label>
+                <ComboboxInput
+                  disabled={!isOwner}
+                  onChange={handleUpdateWorkflowProtocol}
+                  options={taxonomyOptions.protocols}
+                  placeholder="Select or type protocol..."
+                  value={currentWorkflowProtocol}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="ml-1">Category</Label>
+                <ComboboxInput
+                  disabled={!isOwner}
+                  onChange={handleUpdateWorkflowCategory}
+                  options={taxonomyOptions.categories}
+                  placeholder="Select or type category..."
+                  value={currentWorkflowCategory}
+                />
+              </div>
+              <div className="space-y-2">
                 <Label className="ml-1">Project</Label>
                 <ProjectSelect
                   disabled={!isOwner}
                   onChange={handleUpdateWorkflowProject}
                   value={currentWorkflowProjectId}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="ml-1">Tag</Label>
-                <p className="ml-1 text-muted-foreground text-xs">
-                  Add a tag to organise your workflow within your project.
-                </p>
-                <TagSelect
-                  disabled={!isOwner}
-                  onChange={handleUpdateWorkflowTag}
-                  value={currentWorkflowTagId}
                 />
               </div>
               {/* end keeperhub code */}

@@ -4,6 +4,7 @@ import { Eye } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -88,37 +89,21 @@ export function WorkflowTemplateGrid({ workflows }: WorkflowTemplateGridProps) {
                 nodes={workflow.nodes}
                 width={280}
               />
-              {workflow.publicTags && workflow.publicTags.length > 0 && (
-                <div className="absolute top-3 right-3 flex flex-wrap justify-end gap-1">
-                  {workflow.publicTags.slice(0, 2).map((tag) => (
-                    <span
-                      className="rounded-full bg-[#09fd671a] px-3 py-1 font-medium text-[#09fd67] text-[10px]"
-                      key={tag.slug}
-                    >
-                      {tag.name}
-                    </span>
-                  ))}
-                  {workflow.publicTags.length > 2 && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="cursor-default rounded-full bg-[#09fd671a] px-2 py-1 font-medium text-[#09fd67] text-[10px]">
-                          +{workflow.publicTags.length - 2}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent
-                        className="flex flex-col gap-1"
-                        side="bottom"
-                      >
-                        {workflow.publicTags.map((tag) => (
-                          <span key={tag.slug}>{tag.name}</span>
-                        ))}
-                      </TooltipContent>
-                    </Tooltip>
-                  )}
-                </div>
+              {workflow.category && (
+                <Badge
+                  className="absolute top-3 right-3 rounded-full border-none bg-[#09fd671a] px-3 py-1 text-[#09fd67]"
+                  variant="outline"
+                >
+                  {workflow.category}
+                </Badge>
               )}
             </div>
             <CardHeader className="pb-4">
+              {workflow.protocol && (
+                <p className="font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                  {workflow.protocol}
+                </p>
+              )}
               <CardTitle className="line-clamp-2">{workflow.name}</CardTitle>
               {workflow.description && (
                 <CardDescription className="line-clamp-2">

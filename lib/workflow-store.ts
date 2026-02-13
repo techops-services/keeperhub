@@ -46,14 +46,12 @@ export const currentWorkflowIdAtom = atom<string | null>(null);
 export const currentWorkflowNameAtom = atom<string>("");
 // start custom keeperhub code //
 export const currentWorkflowDescriptionAtom = atom<string>("");
+export const currentWorkflowCategoryAtom = atom<string>("");
+export const currentWorkflowProtocolAtom = atom<string>("");
 export const currentWorkflowProjectIdAtom = atom<string | null>(null);
-export const currentWorkflowTagIdAtom = atom<string | null>(null);
 // end keeperhub code //
 export const currentWorkflowVisibilityAtom =
   atom<WorkflowVisibility>("private");
-export const currentWorkflowPublicTagsAtom = atom<
-  Array<{ id: string; name: string; slug: string }>
->([]);
 export const isWorkflowOwnerAtom = atom<boolean>(true); // Whether current user owns this workflow
 export const isWorkflowEnabled = atom<boolean>(false);
 
@@ -493,10 +491,10 @@ export const resetWorkflowStateForOrgSwitchAtom = atom(null, (_get, set) => {
   set(currentWorkflowIdAtom, null);
   set(currentWorkflowNameAtom, "");
   set(currentWorkflowDescriptionAtom, "");
+  set(currentWorkflowCategoryAtom, "");
+  set(currentWorkflowProtocolAtom, "");
   set(currentWorkflowProjectIdAtom, null);
-  set(currentWorkflowTagIdAtom, null);
   set(currentWorkflowVisibilityAtom, "private");
-  set(currentWorkflowPublicTagsAtom, []);
   set(isWorkflowOwnerAtom, true);
   set(isWorkflowEnabled, false);
   set(workflowNotFoundAtom, false);
