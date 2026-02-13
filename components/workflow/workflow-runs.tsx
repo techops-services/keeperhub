@@ -16,6 +16,12 @@ import Image from "next/image";
 import type { JSX } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toChecksumAddress } from "@/keeperhub/lib/address-utils";
+// start custom keeperhub code //
+import {
+  groupLogsByIteration,
+  type IterationGroup,
+} from "@/keeperhub/lib/iteration-grouping";
+// end keeperhub code //
 import { api } from "@/lib/api-client";
 import {
   OUTPUT_DISPLAY_CONFIGS,
@@ -574,83 +580,9 @@ function ExecutionProgress({ execution }: { execution: WorkflowExecution }) {
 }
 
 // start custom keeperhub code //
-
-// ---------------------------------------------------------------------------
-// For Each iteration grouping
-// ---------------------------------------------------------------------------
-
-type IterationGroup = {
-  iterationIndex: number;
-  logs: ExecutionLog[];
-};
-
-type GroupedLogEntry =
-  | { type: "standalone"; log: ExecutionLog }
-  | {
-      type: "for-each-group";
-      forEachLog: ExecutionLog;
-      iterations: IterationGroup[];
-    };
-
-/**
- * Group child logs by iteration index and sort them chronologically.
- */
-function buildIterationGroups(childLogs: ExecutionLog[]): IterationGroup[] {
-  const iterationMap = new Map<number, ExecutionLog[]>();
-  for (const child of childLogs) {
-    const idx = child.iterationIndex ?? 0;
-    const existing = iterationMap.get(idx) ?? [];
-    existing.push(child);
-    iterationMap.set(idx, existing);
-  }
-
-  return Array.from(iterationMap.entries())
-    .sort(([a], [b]) => a - b)
-    .map(([index, iterLogs]) => ({
-      iterationIndex: index,
-      logs: iterLogs.sort(
-        (a, b) =>
-          new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime()
-      ),
-    }));
-}
-
-/**
- * Transform a flat log array into grouped entries where For Each body
- * node logs are nested under their parent For Each node by iteration.
- */
-function groupLogsByIteration(logs: ExecutionLog[]): GroupedLogEntry[] {
-  const result: GroupedLogEntry[] = [];
-
-  // Collect logs that belong to a For Each loop body
-  const forEachChildLogs = new Map<string, ExecutionLog[]>();
-  for (const log of logs) {
-    if (log.forEachNodeId !== null && log.iterationIndex !== null) {
-      const existing = forEachChildLogs.get(log.forEachNodeId) ?? [];
-      existing.push(log);
-      forEachChildLogs.set(log.forEachNodeId, existing);
-    }
-  }
-
-  // Build grouped entries
-  for (const log of logs) {
-    // Skip loop body logs -- they'll be attached to their For Each parent
-    if (log.forEachNodeId !== null && log.iterationIndex !== null) {
-      continue;
-    }
-
-    // For Each parent with child logs: build iteration groups
-    if (log.nodeType === "For Each" && forEachChildLogs.has(log.nodeId)) {
-      const childLogs = forEachChildLogs.get(log.nodeId) ?? [];
-      const iterations = buildIterationGroups(childLogs);
-      result.push({ type: "for-each-group", forEachLog: log, iterations });
-    } else {
-      result.push({ type: "standalone", log });
-    }
-  }
-
-  return result;
-}
+// Types and functions (ExecutionLog, IterationGroup, GroupedLogEntry,
+// buildIterationGroups, groupLogsByIteration) imported from
+// @/keeperhub/lib/iteration-grouping
 
 /**
  * Render a For Each node with its iterations grouped and collapsible.
@@ -666,7 +598,7 @@ function ForEachLogGroup({
   isLast,
 }: {
   forEachLog: ExecutionLog;
-  iterations: IterationGroup[];
+  iterations: IterationGroup<ExecutionLog>[];
   expandedLogs: Set<string>;
   onToggleLog: (id: string) => void;
   getStatusIcon: (status: string) => JSX.Element;
