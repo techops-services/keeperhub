@@ -211,6 +211,30 @@ const getCommonFields = (node: WorkflowNode) => {
       return dynamicFields;
     }
   }
+
+  if (actionType === "For Each") {
+    return [
+      {
+        field: "currentItem",
+        description: "Current array element (inside loop body)",
+      },
+      { field: "index", description: "Current iteration index (0-based)" },
+      {
+        field: "totalItems",
+        description: "Total number of items in array",
+      },
+    ];
+  }
+
+  if (actionType === "Collect") {
+    return [
+      {
+        field: "results",
+        description: "Array of outputs from each iteration",
+      },
+      { field: "count", description: "Number of completed iterations" },
+    ];
+  }
   // end keeperhub code //
 
   // Check if the plugin defines output fields
@@ -277,6 +301,62 @@ const getCommonFields = (node: WorkflowNode) => {
 function sanitizeNodeId(nodeId: string): string {
   return nodeId.replace(/[^a-zA-Z0-9]/g, "_");
 }
+
+// start custom keeperhub code //
+const ARRAY_SOURCE_TEMPLATE_RE =
+  /^\{\{@([^:]+):([^.}]+)\.?([^}]*)\}\}$/;
+
+/**
+ * For a For Each node, resolve the arraySource to build a synthetic output
+ * containing the first array element as `currentItem`. This enables
+ * getAvailableFields to enumerate nested object keys in autocomplete.
+ */
+function resolveForEachSyntheticOutput(
+  node: WorkflowNode,
+  executionLogs: Record<string, ExecutionLogEntry>,
+  lastLogs: Record<string, ExecutionLogEntry>
+): Record<string, unknown> | null {
+  const arraySource = node.data.config?.arraySource as string | undefined;
+  if (!arraySource) {
+    return null;
+  }
+
+  const match = ARRAY_SOURCE_TEMPLATE_RE.exec(arraySource);
+  if (!match) {
+    return null;
+  }
+
+  const sourceNodeId = match[1];
+  const fieldPath = match[3] || "";
+
+  const sourceOutput =
+    executionLogs[sourceNodeId]?.output ?? lastLogs[sourceNodeId]?.output;
+  if (sourceOutput === undefined || sourceOutput === null) {
+    return null;
+  }
+
+  let data: unknown = sourceOutput;
+  if (fieldPath) {
+    for (const part of fieldPath.split(".")) {
+      if (data && typeof data === "object" && !Array.isArray(data)) {
+        data = (data as Record<string, unknown>)[part];
+      } else {
+        return null;
+      }
+    }
+  }
+
+  if (!Array.isArray(data) || data.length === 0) {
+    return null;
+  }
+
+  return {
+    currentItem: data[0],
+    index: 0,
+    totalItems: data.length,
+  };
+}
+// end keeperhub code //
 
 export function TemplateAutocomplete({
   isOpen,
@@ -436,6 +516,67 @@ export function TemplateAutocomplete({
       : hasLastRunOutput
         ? lastRunOutput
         : null;
+
+    // For Each nodes: override with synthetic output so autocomplete shows
+    // the actual currentItem shape (nested fields) instead of the step's
+    // generic metadata. Resolves the arraySource from upstream execution data.
+    const actionType = node.data.config?.actionType as string | undefined;
+    if (actionType === "For Each") {
+      const syntheticOutput = resolveForEachSyntheticOutput(
+        node,
+        executionLogs,
+        lastLogsForWorkflow
+      );
+
+      if (syntheticOutput) {
+        const sanitizedId = sanitizeNodeId(node.id);
+        const nodeOutputs: NodeOutputs = {
+          [sanitizedId]: { label: nodeName, data: syntheticOutput },
+        };
+        const runtimeFields = getAvailableFields(nodeOutputs);
+
+        options.push({
+          type: "node",
+          nodeId: node.id,
+          nodeName,
+          template: `{{@${node.id}:${nodeName}}}`,
+        });
+
+        for (const entry of runtimeFields) {
+          if (entry.fieldPath === "" && entry.field === "") {
+            continue;
+          }
+          const fieldPath = entry.fieldPath || entry.field;
+          options.push({
+            type: "field",
+            nodeId: node.id,
+            nodeName,
+            field: fieldPath,
+            description: undefined,
+            template: `{{@${node.id}:${nodeName}.${fieldPath}}}`,
+          });
+        }
+      } else {
+        const fields = getCommonFields(node);
+        options.push({
+          type: "node",
+          nodeId: node.id,
+          nodeName,
+          template: `{{@${node.id}:${nodeName}}}`,
+        });
+        for (const field of fields) {
+          options.push({
+            type: "field",
+            nodeId: node.id,
+            nodeName,
+            field: field.field,
+            description: field.description,
+            template: `{{@${node.id}:${nodeName}.${field.field}}}`,
+          });
+        }
+      }
+      continue;
+    }
 
     if (outputToUse !== null) {
       const sanitizedId = sanitizeNodeId(node.id);
