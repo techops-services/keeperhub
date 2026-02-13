@@ -397,50 +397,65 @@ function ForEachFields({
           Reference an array from a previous node. Use @ to select a field.
         </p>
       </div>
+      {/* start custom keeperhub code */}
       <div className="space-y-2">
-        <Label htmlFor="mapExpression">Map Expression (optional)</Label>
-        <Input
-          disabled={disabled}
-          id="mapExpression"
-          onChange={(e) => onUpdateConfig("mapExpression", e.target.value)}
-          placeholder="e.g., address or data.items[0].name"
-          value={(config?.mapExpression as string) || ""}
-        />
-        {/* start custom keeperhub code */}
-        {itemFields.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {itemFields.map((field) => (
-              <button
-                className="rounded border bg-muted/50 px-1.5 py-0.5 font-mono text-muted-foreground text-xs transition-colors hover:bg-muted hover:text-foreground"
-                disabled={disabled}
-                key={field}
-                onClick={() => onUpdateConfig("mapExpression", field)}
-                type="button"
-              >
-                {field}
-              </button>
-            ))}
-          </div>
+        <Label htmlFor="mapExpression">Extract Field (optional)</Label>
+        {itemFields.length > 0 ? (
+          <Select
+            disabled={disabled}
+            onValueChange={(value) =>
+              onUpdateConfig("mapExpression", value === "__full__" ? "" : value)
+            }
+            value={(config?.mapExpression as string) || "__full__"}
+          >
+            <SelectTrigger id="mapExpression">
+              <SelectValue placeholder="Full element" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__full__">
+                Full element (no mapping)
+              </SelectItem>
+              <SelectSeparator />
+              {itemFields.map((field) => (
+                <SelectItem key={field} value={field}>
+                  <span className="font-mono text-xs">{field}</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <Input
+            disabled={disabled}
+            id="mapExpression"
+            onChange={(e) => onUpdateConfig("mapExpression", e.target.value)}
+            placeholder="e.g., address or data.name"
+            value={(config?.mapExpression as string) || ""}
+          />
         )}
-        {/* end keeperhub code */}
         <p className="text-muted-foreground text-xs">
-          Dot-path to extract from each element. Leave empty to use the full
-          element.
+          {itemFields.length > 0
+            ? "Pick a field to extract from each element, or keep full element."
+            : "Run the workflow once to see available fields, or type a dot-path manually."}
         </p>
       </div>
+      {/* end keeperhub code */}
       <div className="space-y-2">
         <Label htmlFor="maxIterations">Max Items (optional)</Label>
         <Input
           disabled={disabled}
           id="maxIterations"
-          min={1}
-          onChange={(e) => onUpdateConfig("maxIterations", e.target.value)}
+          min={0}
+          onChange={(e) => {
+            const raw = e.target.value.replace(/[^0-9]/g, "");
+            onUpdateConfig("maxIterations", raw);
+          }}
           placeholder="All"
           type="number"
           value={(config?.maxIterations as string) || ""}
         />
         <p className="text-muted-foreground text-xs">
-          Leave empty to process all items
+          Leave empty or set to 0 to process all items. Negative values are not
+          allowed.
         </p>
       </div>
       <div className="rounded-lg border bg-muted/30 p-3">
