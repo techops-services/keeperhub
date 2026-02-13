@@ -18,11 +18,20 @@ export type WorkflowData = {
   visibility?: WorkflowVisibility;
   enabled?: boolean;
   // start custom keeperhub code //
-  category?: string | null;
-  protocol?: string | null;
   projectId?: string | null;
+  tagId?: string | null;
   // end keeperhub code //
 };
+
+// start custom keeperhub code //
+export type PublicTag = {
+  id: string;
+  name: string;
+  slug: string;
+  workflowCount?: number;
+  createdAt?: string;
+};
+// end keeperhub code //
 
 export type SavedWorkflow = WorkflowData & {
   id: string;
@@ -34,10 +43,10 @@ export type SavedWorkflow = WorkflowData & {
   isOwner?: boolean;
   // start custom KeeperHub code
   featured?: boolean;
-  category?: string | null;
-  protocol?: string | null;
   projectId?: string | null;
+  tagId?: string | null;
   featuredOrder?: number;
+  publicTags?: PublicTag[];
   // end custom KeeperHub code
 };
 
@@ -519,11 +528,6 @@ export const workflowApi = {
   // Get featured workflows
   getFeatured: () =>
     apiCall<SavedWorkflow[]>("/api/workflows/public?featured=true"),
-  // Get distinct categories and protocols
-  getTaxonomy: () =>
-    apiCall<{ categories: string[]; protocols: string[] }>(
-      "/api/workflows/taxonomy"
-    ),
   // end custom KeeperHub code
 
   // Get a specific workflow
@@ -560,6 +564,12 @@ export const workflowApi = {
     apiCall<SavedWorkflow>(`/api/workflows/${id}/claim`, {
       method: "POST",
       body: JSON.stringify({}),
+    }),
+
+  goLive: (id: string, data: { name: string; publicTagIds: string[] }) =>
+    apiCall<SavedWorkflow>(`/api/workflows/${id}/go-live`, {
+      method: "PUT",
+      body: JSON.stringify(data),
     }),
   // end keeperhub code //
 
@@ -759,6 +769,37 @@ export const aiGatewayApi = {
 };
 
 // start custom keeperhub code //
+export type Tag = {
+  id: string;
+  name: string;
+  color: string;
+  workflowCount: number;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const tagApi = {
+  getAll: () => apiCall<Tag[]>("/api/tags"),
+
+  create: (data: { name: string; color: string }) =>
+    apiCall<Tag>("/api/tags", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: { name?: string; color?: string }) =>
+    apiCall<Tag>(`/api/tags/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    apiCall<{ success: boolean }>(`/api/tags/${id}`, {
+      method: "DELETE",
+    }),
+};
+
 export type Project = {
   id: string;
   name: string;
@@ -768,6 +809,16 @@ export type Project = {
   organizationId: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export const publicTagApi = {
+  getAll: () => apiCall<PublicTag[]>("/api/public-tags"),
+
+  create: (data: { name: string }) =>
+    apiCall<PublicTag>("/api/public-tags", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 };
 
 export const projectApi = {
@@ -793,6 +844,7 @@ export const projectApi = {
       method: "DELETE",
     }),
 };
+
 // end keeperhub code //
 
 // Export all APIs as a single object
@@ -803,6 +855,8 @@ export const api = {
   organization: organizationApi,
   // start custom keeperhub code //
   project: projectApi,
+  publicTag: publicTagApi,
+  tag: tagApi,
   // end keeperhub code //
   user: userApi,
   workflow: workflowApi,
