@@ -1,5 +1,3 @@
-import "server-only";
-
 import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import {
@@ -8,7 +6,11 @@ import {
   decodeCalldata,
 } from "./decode-calldata-core";
 
-export type { DecodedParameter, DecodeCalldataResult, DecodeCalldataCoreInput } from "./decode-calldata-core";
+export type {
+  DecodeCalldataCoreInput,
+  DecodeCalldataResult,
+  DecodedParameter,
+} from "./decode-calldata-core";
 
 export type DecodeCalldataInput = StepInput & DecodeCalldataCoreInput;
 
