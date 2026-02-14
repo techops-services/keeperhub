@@ -1,14 +1,12 @@
 import "server-only";
 
-import { createAnthropic } from "@ai-sdk/anthropic";
-import { generateText } from "ai";
 import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import {
   type DecodeCalldataCoreInput,
   type DecodedParameter,
-  stepHandler as decodeCalldata,
-} from "./decode-calldata";
+  decodeCalldata,
+} from "./decode-calldata-core";
 
 // -- Module-level constants --
 
@@ -353,7 +351,6 @@ async function callLlmAssessment(
     return null;
   }
 
-  const provider = createAnthropic({ apiKey: ANTHROPIC_API_KEY });
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
 
@@ -365,15 +362,35 @@ async function callLlmAssessment(
       context
     );
 
-    const result = await generateText({
-      model: provider("claude-haiku-4-5-20251001"),
-      prompt,
-      maxOutputTokens: 200,
-      temperature: 0,
-      abortSignal: controller.signal,
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 200,
+        temperature: 0,
+        messages: [{ role: "user", content: prompt }],
+      }),
+      signal: controller.signal,
     });
 
-    return parseLlmResponse(result.text);
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = (await response.json()) as {
+      content?: Array<{ type: string; text?: string }>;
+    };
+    const text = data.content?.[0]?.text;
+    if (!text) {
+      return null;
+    }
+
+    return parseLlmResponse(text);
   } catch {
     return null;
   } finally {
