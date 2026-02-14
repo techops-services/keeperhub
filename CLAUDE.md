@@ -2,7 +2,7 @@
 
 ## AI Agents Code Policy
 
-- **No Emojis**: Do not use emojis in any code, documentation, or README files
+- **No Emojis**: NEVER use emojis in any code, documentation, README files, PR descriptions, commit messages, or any other text output. This rule applies to ALL generated content without exception.
 - **No File Structure**: Do not include file/folder structure diagrams in README files
 - **No Random Documentation**: Do not create markdown documentation files unless explicitly requested by the user. This includes integration guides, feature documentation, or any other .md files
 - **No co-authored with Claude in PR descriptions and git commits**
