@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { decrypt, encrypt } from "@/lib/db/integrations";
 import { accounts, integrations } from "@/lib/db/schema";
 import { generateId } from "@/lib/utils/id";
-import { logExternalServiceError, logInfrastructureError } from "@/keeperhub/lib/logging";
+import { ErrorCategory, logUserError, logSystemError } from "@/keeperhub/lib/logging";
 
 const API_KEY_PURPOSE = "ai-gateway";
 const API_KEY_NAME = "Workflow Builder Gateway Key";
@@ -67,7 +67,8 @@ async function createVercelApiKey(
   );
 
   if (!response.ok) {
-    logExternalServiceError(
+    logUserError(
+      ErrorCategory.EXTERNAL_SERVICE,
       "[ai-gateway] Failed to create API key:",
       new Error(await response.text()),
       {
@@ -209,7 +210,8 @@ export async function POST(request: Request) {
       managedIntegrationId: integrationId,
     });
   } catch (e) {
-    logExternalServiceError(
+    logUserError(
+      ErrorCategory.EXTERNAL_SERVICE,
       "[ai-gateway] Error creating API key:",
       e,
       {
@@ -269,7 +271,8 @@ export async function DELETE(request: Request) {
       const decrypted = decrypt(managedIntegration.config as string);
       config = JSON.parse(decrypted);
     } catch (e) {
-      logInfrastructureError(
+      logSystemError(
+        ErrorCategory.INFRASTRUCTURE,
         "[ai-gateway] Failed to decrypt config:",
         e,
         {
@@ -293,7 +296,8 @@ export async function DELETE(request: Request) {
           config.teamId
         );
       } catch (e) {
-        logExternalServiceError(
+        logUserError(
+          ErrorCategory.EXTERNAL_SERVICE,
           "[ai-gateway] Failed to delete API key from Vercel:",
           e,
           {

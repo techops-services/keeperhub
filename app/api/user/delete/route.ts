@@ -1,7 +1,7 @@
 // start custom keeperhub code //
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { logAuthError } from "@/keeperhub/lib/logging";
+import { ErrorCategory, logSystemError } from "@/keeperhub/lib/logging";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { sessions, users } from "@/lib/db/schema";
@@ -68,10 +68,15 @@ export async function POST(request: Request): Promise<NextResponse> {
       message: "Account deactivated successfully",
     });
   } catch (error) {
-    logAuthError("[User Delete] Failed to deactivate account:", error, {
-      endpoint: "/api/user/delete",
-      status_code: "500",
-    });
+    logSystemError(
+      ErrorCategory.AUTH,
+      "[User Delete] Failed to deactivate account:",
+      error,
+      {
+        endpoint: "/api/user/delete",
+        status_code: "500",
+      }
+    );
     return NextResponse.json(
       {
         error:

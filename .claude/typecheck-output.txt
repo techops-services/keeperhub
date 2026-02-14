@@ -1,4 +1,15 @@
 
-> ai-workflow-builder-template@0.1.0 type-check /Users/taitsengstock/Documents/GitHub/techops-workflow-builder-template
+> ai-workflow-builder-template@0.1.0 type-check /home/ot/maker/git/techops-services/keeperhub
 > tsc --noEmit
 
+.next/dev/types/validator.ts(89,39): error TS2307: Cannot find module '../../../app/workflows/page.js' or its corresponding type declarations.
+app/api/ai-gateway/consent/route.ts(8,25): error TS2305: Module '"@/keeperhub/lib/logging"' has no exported member 'logExternalServiceError'.
+app/api/workflows/create/route.ts(6,10): error TS2305: Module '"@/keeperhub/lib/logging"' has no exported member 'logDatabaseError'.
+app/api/workflows/current/route.ts(3,10): error TS2305: Module '"@/keeperhub/lib/logging"' has no exported member 'logDatabaseError'.
+app/api/workflows/route.ts(5,10): error TS2305: Module '"@/keeperhub/lib/logging"' has no exported member 'logDatabaseError'.
+keeperhub/lib/email.ts(8,3): error TS2305: Module '"@/keeperhub/lib/logging"' has no exported member 'logExternalServiceError'.
+keeperhub/plugins/discord/steps/send-message.ts(5,3): error TS2305: Module '"@/keeperhub/lib/logging"' has no exported member 'logConfigurationError'.
+keeperhub/plugins/telegram/steps/send-message.ts(5,3): error TS2305: Module '"@/keeperhub/lib/logging"' has no exported member 'logConfigurationError'.
+keeperhub/plugins/telegram/steps/send-message.ts(6,3): error TS2305: Module '"@/keeperhub/lib/logging"' has no exported member 'logNetworkError'.
+keeperhub/plugins/webhook/steps/send-webhook.ts(5,3): error TS2305: Module '"@/keeperhub/lib/logging"' has no exported member 'logConfigurationError'.
+ ELIFECYCLE  Command failed with exit code 2.

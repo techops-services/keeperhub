@@ -1,11 +1,6 @@
 import "server-only";
 
-import {
-  logConfigurationError,
-  logExternalServiceError,
-  logNetworkError,
-  logValidationError,
-} from "@/keeperhub/lib/logging";
+import { ErrorCategory, logUserError } from "@/keeperhub/lib/logging";
 import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 import { fetchCredentials } from "@/lib/credential-fetcher";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
@@ -79,7 +74,8 @@ async function sendMessage(
       const errorData = (await response
         .json()
         .catch(() => ({}))) as TelegramApiResponse;
-      logExternalServiceError(
+      logUserError(
+        ErrorCategory.EXTERNAL_SERVICE,
         "[Telegram] HTTP error response:",
         {
           status: response.status,
@@ -106,11 +102,16 @@ async function sendMessage(
     console.log("[Telegram] Response data:", data);
 
     if (!data.ok) {
-      logExternalServiceError("[Telegram] API error in response:", data, {
-        plugin_name: "telegram",
-        action_name: "send-message",
-        service: "telegram",
-      });
+      logUserError(
+        ErrorCategory.EXTERNAL_SERVICE,
+        "[Telegram] API error in response:",
+        data,
+        {
+          plugin_name: "telegram",
+          action_name: "send-message",
+          service: "telegram",
+        }
+      );
       return {
         success: false,
         error:
@@ -125,7 +126,7 @@ async function sendMessage(
       messageId: data.result?.message_id || 0,
     };
   } catch (error) {
-    logNetworkError("[Telegram] Fetch error:", error, {
+    logUserError(ErrorCategory.NETWORK_RPC, "[Telegram] Fetch error:", error, {
       plugin_name: "telegram",
       action_name: "send-message",
     });
@@ -148,7 +149,8 @@ async function stepHandler(
   const botToken = credentials.TELEGRAM_BOT_TOKEN;
 
   if (!botToken) {
-    logConfigurationError(
+    logUserError(
+      ErrorCategory.CONFIGURATION,
       "[Telegram] No bot token provided in integration",
       undefined,
       {
@@ -164,10 +166,15 @@ async function stepHandler(
   }
 
   if (!input.chatId) {
-    logValidationError("[Telegram] No chat ID provided", undefined, {
-      plugin_name: "telegram",
-      action_name: "send-message",
-    });
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Telegram] No chat ID provided",
+      undefined,
+      {
+        plugin_name: "telegram",
+        action_name: "send-message",
+      }
+    );
     return {
       success: false,
       error: "Chat ID is required. Please provide a valid chat ID.",
@@ -175,10 +182,15 @@ async function stepHandler(
   }
 
   if (!input.message) {
-    logValidationError("[Telegram] No message provided", undefined, {
-      plugin_name: "telegram",
-      action_name: "send-message",
-    });
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Telegram] No message provided",
+      undefined,
+      {
+        plugin_name: "telegram",
+        action_name: "send-message",
+      }
+    );
     return {
       success: false,
       error: "Message text is required.",
@@ -205,11 +217,16 @@ async function stepHandler(
   try {
     return await sendMessage(apiUrl, params, input.parseMode);
   } catch (error) {
-    logExternalServiceError("[Telegram] Error sending message:", error, {
-      plugin_name: "telegram",
-      action_name: "send-message",
-      service: "telegram",
-    });
+    logUserError(
+      ErrorCategory.EXTERNAL_SERVICE,
+      "[Telegram] Error sending message:",
+      error,
+      {
+        plugin_name: "telegram",
+        action_name: "send-message",
+        service: "telegram",
+      }
+    );
     return {
       success: false,
       error: `Failed to send Telegram message: ${error instanceof Error ? error.message : String(error)}`,

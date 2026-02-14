@@ -1,19 +1,24 @@
 /**
- * Unified Logging + Metrics Helpers
+ * Unified Logging + Metrics
  *
- * This module provides helper functions that automatically log AND emit Prometheus metrics
- * in a single call. This ensures consistency and prevents metrics from being forgotten.
+ * Provides two core functions that automatically log AND emit Prometheus metrics.
+ * This ensures consistency and prevents metrics from being forgotten.
  *
  * Usage:
- * - Use logUserError() for errors caused by user actions (validation, config, etc.)
- * - Use logSystemError() for errors caused by system failures (database, auth, etc.)
- * - Use convenience functions for common categories (logValidationError, logDatabaseError, etc.)
+ * - logUserError(category, message, error, labels) - for user-caused errors (validation, config, external services, RPC, transactions)
+ * - logSystemError(category, message, error, labels) - for system failures (database, auth, infrastructure, workflow engine)
  *
- * Every error/warning automatically:
+ * Every call automatically:
  * - Logs to console (warn for user errors, error for system errors)
  * - Emits a Prometheus metric with proper categorization
  * - Extracts context from message prefix (e.g., "[Discord]" → "Discord")
  * - Includes standard labels (error_category, error_context, is_user_error)
+ *
+ * @example
+ * logUserError(ErrorCategory.VALIDATION, "[Check Balance] Invalid address:", address, { plugin_name: "web3" });
+ * logUserError(ErrorCategory.EXTERNAL_SERVICE, "[Etherscan] API failed:", error, { service: "etherscan" });
+ * logSystemError(ErrorCategory.DATABASE, "[DB] Insert failed:", error, { table: "workflows" });
+ * logSystemError(ErrorCategory.INFRASTRUCTURE, "[Para] API key missing:", error, { component: "para-service" });
  */
 
 import {
@@ -166,172 +171,4 @@ export function logSystemError(
       [LabelKeys.IS_USER_ERROR]: "false",
     }
   );
-}
-
-/**
- * Convenience function: log validation error
- *
- * Use for: invalid addresses, malformed inputs, schema validation failures
- *
- * @example
- * logValidationError("[Check Balance] Invalid address:", address, {
- *   plugin_name: "web3",
- *   action_name: "check-balance"
- * });
- */
-export function logValidationError(
-  message: string,
-  details?: unknown,
-  labels?: Record<string, string>
-): void {
-  logUserError(ErrorCategory.VALIDATION, message, details, labels);
-}
-
-/**
- * Convenience function: log configuration error
- *
- * Use for: missing API keys, invalid settings, configuration mismatches
- *
- * @example
- * logConfigurationError("[Discord] Missing bot token in integration config", undefined, {
- *   integration_id: "abc123"
- * });
- */
-export function logConfigurationError(
-  message: string,
-  details?: unknown,
-  labels?: Record<string, string>
-): void {
-  logUserError(ErrorCategory.CONFIGURATION, message, details, labels);
-}
-
-/**
- * Convenience function: log external service error
- *
- * Use for: Etherscan API failures, Discord API errors, SendGrid failures
- *
- * @example
- * logExternalServiceError("[Etherscan] API request failed:", error, {
- *   service: "etherscan",
- *   endpoint: "/api/v1/contract"
- * });
- */
-export function logExternalServiceError(
-  message: string,
-  error?: unknown,
-  labels?: Record<string, string>
-): void {
-  logUserError(ErrorCategory.EXTERNAL_SERVICE, message, error, labels);
-}
-
-/**
- * Convenience function: log RPC/network error
- *
- * Use for: RPC connection failures, network timeouts, chain not available
- *
- * @example
- * logNetworkError("[RPC] Failed to connect to Ethereum node:", error, {
- *   chain_id: "1",
- *   rpc_url: "https://eth.llamarpc.com"
- * });
- */
-export function logNetworkError(
-  message: string,
-  error?: unknown,
-  labels?: Record<string, string>
-): void {
-  logUserError(ErrorCategory.NETWORK_RPC, message, error, labels);
-}
-
-/**
- * Convenience function: log transaction error
- *
- * Use for: transaction failures, gas estimation errors, nonce issues
- *
- * @example
- * logTransactionError("[Transaction] Failed to send transaction:", error, {
- *   chain_id: "1",
- *   tx_hash: "0x..."
- * });
- */
-export function logTransactionError(
-  message: string,
-  error?: unknown,
-  labels?: Record<string, string>
-): void {
-  logUserError(ErrorCategory.TRANSACTION, message, error, labels);
-}
-
-/**
- * Convenience function: log database error
- *
- * Use for: query failures, connection errors, constraint violations
- *
- * @example
- * logDatabaseError("[DB] Failed to insert workflow:", error, {
- *   table: "workflows",
- *   operation: "insert"
- * });
- */
-export function logDatabaseError(
-  message: string,
-  error: unknown,
-  labels?: Record<string, string>
-): void {
-  logSystemError(ErrorCategory.DATABASE, message, error, labels);
-}
-
-/**
- * Convenience function: log auth error
- *
- * Use for: session failures, token validation errors, permission denied
- *
- * @example
- * logAuthError("[Auth] Failed to verify session:", error, {
- *   endpoint: "/api/workflows"
- * });
- */
-export function logAuthError(
-  message: string,
-  error: unknown,
-  labels?: Record<string, string>
-): void {
-  logSystemError(ErrorCategory.AUTH, message, error, labels);
-}
-
-/**
- * Convenience function: log infrastructure error
- *
- * Use for: deployment failures, environment issues, resource exhaustion
- *
- * @example
- * logInfrastructureError("[Infrastructure] Failed to initialize metrics collector:", error, {
- *   component: "metrics"
- * });
- */
-export function logInfrastructureError(
-  message: string,
-  error: unknown,
-  labels?: Record<string, string>
-): void {
-  logSystemError(ErrorCategory.INFRASTRUCTURE, message, error, labels);
-}
-
-/**
- * Convenience function: log workflow engine error
- *
- * Use for: workflow execution failures, step resolution errors, workflow runtime issues
- *
- * @example
- * logWorkflowEngineError("[Workflow] Failed to execute step:", error, {
- *   workflow_id: "abc123",
- *   step_id: "xyz789"
- * });
- */
-export function logWorkflowEngineError(
-  message: string,
-  error: unknown,
-  labels?: Record<string, string>
-): void {
-  logSystemError(ErrorCategory.WORKFLOW_ENGINE, message, error, labels);
 }

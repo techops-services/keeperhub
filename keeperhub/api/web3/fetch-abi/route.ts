@@ -3,11 +3,7 @@ import { ethers } from "ethers";
 import { NextResponse } from "next/server";
 import { toChecksumAddress } from "@/keeperhub/lib/address-utils";
 import { apiError } from "@/keeperhub/lib/api-error";
-import {
-  logConfigurationError,
-  logExternalServiceError,
-  logValidationError,
-} from "@/keeperhub/lib/logging";
+import { ErrorCategory, logUserError } from "@/keeperhub/lib/logging";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { explorerConfigs } from "@/lib/db/schema";
@@ -64,7 +60,8 @@ function parseEtherscanError(
   const lowerMessage = errorMessage.toLowerCase();
 
   // Log the full response for debugging
-  logExternalServiceError(
+  logUserError(
+    ErrorCategory.EXTERNAL_SERVICE,
     "[Etherscan] API error response:",
     new Error(`${data.status}: ${data.message} - ${data.result}`),
     {
@@ -168,7 +165,8 @@ async function fetchAbiFromAddress(
   const response = await fetch(requestUrl);
 
   if (!response.ok) {
-    logExternalServiceError(
+    logUserError(
+      ErrorCategory.EXTERNAL_SERVICE,
       "[Etherscan] HTTP error response:",
       new Error(`HTTP ${response.status}: ${response.statusText}`),
       {
@@ -376,7 +374,8 @@ function processAbiString(
 
     return items;
   } catch (error) {
-    logExternalServiceError(
+    logUserError(
+      ErrorCategory.EXTERNAL_SERVICE,
       "[Diamond] Failed to parse facet ABI from Etherscan:",
       error instanceof Error ? error : new Error(String(error)),
       {
@@ -689,14 +688,20 @@ async function handleDiamondContract(
  */
 function validateAbiFetchInputs(contractAddress: string): void {
   if (!ETHERSCAN_API_KEY) {
-    logConfigurationError("[Etherscan] API key not configured", undefined, {
-      service: "etherscan",
-    });
+    logUserError(
+      ErrorCategory.CONFIGURATION,
+      "[Etherscan] API key not configured",
+      undefined,
+      {
+        service: "etherscan",
+      }
+    );
     throw new Error("Etherscan API key not configured");
   }
 
   if (!ethers.isAddress(contractAddress)) {
-    logValidationError(
+    logUserError(
+      ErrorCategory.VALIDATION,
       "[Etherscan] Invalid contract address:",
       contractAddress,
       {
@@ -830,7 +835,8 @@ function abiLooksLikeProxy(abi: string): boolean {
 
     return false;
   } catch (error) {
-    logExternalServiceError(
+    logUserError(
+      ErrorCategory.EXTERNAL_SERVICE,
       "[Proxy Detection] Failed to parse ABI for proxy pattern check:",
       error instanceof Error ? error : new Error(String(error)),
       {
@@ -1188,7 +1194,8 @@ async function handleEtherscanExplorer(
   );
 
   if (!sourceCodeResult.success) {
-    logExternalServiceError(
+    logUserError(
+      ErrorCategory.EXTERNAL_SERVICE,
       "[Etherscan] Failed to fetch source code:",
       new Error(sourceCodeResult.error || "Unknown error"),
       {

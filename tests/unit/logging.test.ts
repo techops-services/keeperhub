@@ -1,17 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ErrorCategory,
-  logAuthError,
-  logConfigurationError,
-  logDatabaseError,
-  logExternalServiceError,
-  logInfrastructureError,
-  logNetworkError,
   logSystemError,
-  logTransactionError,
   logUserError,
-  logValidationError,
-  logWorkflowEngineError,
 } from "@/keeperhub/lib/logging";
 import {
   LabelKeys,
@@ -256,12 +247,17 @@ describe("Unified Logging Helpers", () => {
     });
   });
 
-  describe("logValidationError", () => {
-    it("should use VALIDATION category and log as warning", () => {
-      logValidationError("[Check Balance] Invalid address:", "0xINVALID", {
-        plugin_name: "web3",
-        action_name: "check-balance",
-      });
+  describe("Convenience functions via core logUserError", () => {
+    it("should handle validation errors with string details", () => {
+      logUserError(
+        ErrorCategory.VALIDATION,
+        "[Check Balance] Invalid address:",
+        "0xINVALID",
+        {
+          plugin_name: "web3",
+          action_name: "check-balance",
+        }
+      );
 
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         "[Check Balance] Invalid address:",
@@ -282,11 +278,16 @@ describe("Unified Logging Helpers", () => {
     });
   });
 
-  describe("logConfigurationError", () => {
+  describe("Configuration errors via core logUserError", () => {
     it("should use CONFIGURATION category and log as warning", () => {
-      logConfigurationError("[Discord] Missing bot token", undefined, {
-        integration_id: "abc123",
-      });
+      logUserError(
+        ErrorCategory.CONFIGURATION,
+        "[Discord] Missing bot token",
+        undefined,
+        {
+          integration_id: "abc123",
+        }
+      );
 
       expect(consoleWarnSpy).toHaveBeenCalled();
       expect(mockCollector.recordError).toHaveBeenCalledWith(
@@ -300,12 +301,17 @@ describe("Unified Logging Helpers", () => {
     });
   });
 
-  describe("logExternalServiceError", () => {
+  describe("External service errors via core logUserError", () => {
     it("should use EXTERNAL_SERVICE category and log as warning", () => {
       const error = new Error("API timeout");
-      logExternalServiceError("[Etherscan] Request failed", error, {
-        service: "etherscan",
-      });
+      logUserError(
+        ErrorCategory.EXTERNAL_SERVICE,
+        "[Etherscan] Request failed",
+        error,
+        {
+          service: "etherscan",
+        }
+      );
 
       expect(consoleWarnSpy).toHaveBeenCalled();
       expect(mockCollector.recordError).toHaveBeenCalledWith(
@@ -319,11 +325,16 @@ describe("Unified Logging Helpers", () => {
     });
   });
 
-  describe("logNetworkError", () => {
+  describe("Network errors via core logUserError", () => {
     it("should use NETWORK_RPC category and log as warning", () => {
-      logNetworkError("[RPC] Connection timeout", undefined, {
-        chain_id: "1",
-      });
+      logUserError(
+        ErrorCategory.NETWORK_RPC,
+        "[RPC] Connection timeout",
+        undefined,
+        {
+          chain_id: "1",
+        }
+      );
 
       expect(consoleWarnSpy).toHaveBeenCalled();
       expect(mockCollector.recordError).toHaveBeenCalledWith(
@@ -337,12 +348,17 @@ describe("Unified Logging Helpers", () => {
     });
   });
 
-  describe("logTransactionError", () => {
+  describe("Transaction errors via core logUserError", () => {
     it("should use TRANSACTION category and log as warning", () => {
       const error = new Error("Gas estimation failed");
-      logTransactionError("[Transaction] Failed to send", error, {
-        tx_hash: "0x123",
-      });
+      logUserError(
+        ErrorCategory.TRANSACTION,
+        "[Transaction] Failed to send",
+        error,
+        {
+          tx_hash: "0x123",
+        }
+      );
 
       expect(consoleWarnSpy).toHaveBeenCalled();
       expect(mockCollector.recordError).toHaveBeenCalledWith(
@@ -356,10 +372,10 @@ describe("Unified Logging Helpers", () => {
     });
   });
 
-  describe("logDatabaseError", () => {
+  describe("Database errors via core logSystemError", () => {
     it("should use DATABASE category and log as error", () => {
       const error = new Error("Query failed");
-      logDatabaseError("[DB] Insert failed", error, {
+      logSystemError(ErrorCategory.DATABASE, "[DB] Insert failed", error, {
         table: "workflows",
       });
 
@@ -378,10 +394,10 @@ describe("Unified Logging Helpers", () => {
     });
   });
 
-  describe("logAuthError", () => {
+  describe("Auth errors via core logSystemError", () => {
     it("should use AUTH category and log as error", () => {
       const error = new Error("Session invalid");
-      logAuthError("[Auth] Verification failed", error, {
+      logSystemError(ErrorCategory.AUTH, "[Auth] Verification failed", error, {
         endpoint: "/api/workflows",
       });
 
@@ -397,12 +413,17 @@ describe("Unified Logging Helpers", () => {
     });
   });
 
-  describe("logInfrastructureError", () => {
+  describe("Infrastructure errors via core logSystemError", () => {
     it("should use INFRASTRUCTURE category and log as error", () => {
       const error = new Error("Deployment failed");
-      logInfrastructureError("[Infrastructure] Init failed", error, {
-        component: "metrics",
-      });
+      logSystemError(
+        ErrorCategory.INFRASTRUCTURE,
+        "[Infrastructure] Init failed",
+        error,
+        {
+          component: "metrics",
+        }
+      );
 
       expect(consoleErrorSpy).toHaveBeenCalled();
       expect(mockCollector.recordError).toHaveBeenCalledWith(
@@ -416,13 +437,18 @@ describe("Unified Logging Helpers", () => {
     });
   });
 
-  describe("logWorkflowEngineError", () => {
+  describe("Workflow engine errors via core logSystemError", () => {
     it("should use WORKFLOW_ENGINE category and log as error", () => {
       const error = new Error("Step execution failed");
-      logWorkflowEngineError("[Workflow] Step failed", error, {
-        workflow_id: "abc123",
-        step_id: "xyz789",
-      });
+      logSystemError(
+        ErrorCategory.WORKFLOW_ENGINE,
+        "[Workflow] Step failed",
+        error,
+        {
+          workflow_id: "abc123",
+          step_id: "xyz789",
+        }
+      );
 
       expect(consoleErrorSpy).toHaveBeenCalled();
       expect(mockCollector.recordError).toHaveBeenCalledWith(
@@ -440,7 +466,7 @@ describe("Unified Logging Helpers", () => {
 
   describe("Context extraction", () => {
     it("should extract simple context", () => {
-      logValidationError("[Discord] Error");
+      logUserError(ErrorCategory.VALIDATION, "[Discord] Error");
 
       expect(mockCollector.recordError).toHaveBeenCalledWith(
         expect.anything(),
@@ -452,7 +478,7 @@ describe("Unified Logging Helpers", () => {
     });
 
     it("should extract multi-word context", () => {
-      logValidationError("[Check Balance] Error");
+      logUserError(ErrorCategory.VALIDATION, "[Check Balance] Error");
 
       expect(mockCollector.recordError).toHaveBeenCalledWith(
         expect.anything(),
@@ -464,7 +490,7 @@ describe("Unified Logging Helpers", () => {
     });
 
     it("should extract context with special characters", () => {
-      logValidationError("[Web3/RPC] Error");
+      logUserError(ErrorCategory.VALIDATION, "[Web3/RPC] Error");
 
       expect(mockCollector.recordError).toHaveBeenCalledWith(
         expect.anything(),
@@ -476,7 +502,7 @@ describe("Unified Logging Helpers", () => {
     });
 
     it("should handle message without context prefix", () => {
-      logValidationError("Plain error message");
+      logUserError(ErrorCategory.VALIDATION, "Plain error message");
 
       expect(mockCollector.recordError).toHaveBeenCalledWith(
         expect.anything(),
@@ -490,7 +516,7 @@ describe("Unified Logging Helpers", () => {
 
   describe("Label merging", () => {
     it("should merge custom labels with standard labels", () => {
-      logValidationError("[Test] Error", undefined, {
+      logUserError(ErrorCategory.VALIDATION, "[Test] Error", undefined, {
         custom_label: "value",
         another_label: "value2",
       });
@@ -509,7 +535,7 @@ describe("Unified Logging Helpers", () => {
     });
 
     it("should handle empty labels object", () => {
-      logValidationError("[Test] Error", undefined, {});
+      logUserError(ErrorCategory.VALIDATION, "[Test] Error", undefined, {});
 
       expect(mockCollector.recordError).toHaveBeenCalledWith(
         expect.anything(),
