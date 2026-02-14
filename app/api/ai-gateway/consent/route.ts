@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { decrypt, encrypt } from "@/lib/db/integrations";
 import { accounts, integrations } from "@/lib/db/schema";
 import { generateId } from "@/lib/utils/id";
+import { logExternalServiceError, logInfrastructureError } from "@/keeperhub/lib/logging";
 
 const API_KEY_PURPOSE = "ai-gateway";
 const API_KEY_NAME = "Workflow Builder Gateway Key";
@@ -66,9 +67,14 @@ async function createVercelApiKey(
   );
 
   if (!response.ok) {
-    console.warn(
+    logExternalServiceError(
       "[ai-gateway] Failed to create API key:",
-      await response.text()
+      new Error(await response.text()),
+      {
+        endpoint: "/api/ai-gateway/consent",
+        service: "vercel",
+        status_code: response.status.toString(),
+      }
     );
     return null;
   }
@@ -203,7 +209,14 @@ export async function POST(request: Request) {
       managedIntegrationId: integrationId,
     });
   } catch (e) {
-    console.warn("[ai-gateway] Error creating API key:", e);
+    logExternalServiceError(
+      "[ai-gateway] Error creating API key:",
+      e,
+      {
+        endpoint: "/api/ai-gateway/consent",
+        service: "vercel",
+      }
+    );
     return Response.json(
       { error: "Failed to create API key" },
       { status: 500 }
@@ -256,7 +269,14 @@ export async function DELETE(request: Request) {
       const decrypted = decrypt(managedIntegration.config as string);
       config = JSON.parse(decrypted);
     } catch (e) {
-      console.warn("[ai-gateway] Failed to decrypt config:", e);
+      logInfrastructureError(
+        "[ai-gateway] Failed to decrypt config:",
+        e,
+        {
+          endpoint: "/api/ai-gateway/consent",
+          component: "encryption",
+        }
+      );
     }
   }
 
@@ -273,7 +293,14 @@ export async function DELETE(request: Request) {
           config.teamId
         );
       } catch (e) {
-        console.warn("[ai-gateway] Failed to delete API key from Vercel:", e);
+        logExternalServiceError(
+          "[ai-gateway] Failed to delete API key from Vercel:",
+          e,
+          {
+            endpoint: "/api/ai-gateway/consent",
+            service: "vercel",
+          }
+        );
       }
     }
   }

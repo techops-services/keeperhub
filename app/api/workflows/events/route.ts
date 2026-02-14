@@ -1,6 +1,7 @@
 // start custom keeperhub code //
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { logInfrastructureError } from "@/keeperhub/lib/logging";
 import { db } from "@/lib/db";
 import { type Chain, chains, workflows } from "@/lib/db/schema";
 import type { WorkflowNode } from "@/lib/workflow-store";
@@ -18,7 +19,17 @@ export async function GET(request: Request) {
     const expectedToken = process.env.EVENTS_SERVICE_API_KEY;
 
     if (!expectedToken) {
-      console.warn("[Workflows Events] EVENTS_SERVICE_API_KEY not configured");
+      console.error("[Workflows Events] EVENTS_SERVICE_API_KEY not configured");
+      logInfrastructureError(
+        "[Workflows Events] EVENTS_SERVICE_API_KEY not configured",
+        new Error(
+          "EVENTS_SERVICE_API_KEY environment variable is not configured"
+        ),
+        {
+          endpoint: "/api/workflows/events",
+          component: "events-service",
+        }
+      );
       return NextResponse.json(
         { error: "Internal endpoint not configured" },
         { status: 500 }

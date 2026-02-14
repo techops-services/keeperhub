@@ -3,6 +3,11 @@
  * Uses SendGrid API for transactional emails
  */
 
+import {
+  logExternalServiceError,
+  logInfrastructureError,
+} from "@/keeperhub/lib/logging";
+
 const SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send";
 
 type SendEmailOptions = {
@@ -34,7 +39,15 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
   const toAddress = normalizeEmail(options.to);
 
   if (!apiKey) {
-    console.warn("[Email] SENDGRID_API_KEY not configured");
+    console.error("[Email] SENDGRID_API_KEY not configured");
+    logInfrastructureError(
+      "[Email] SENDGRID_API_KEY not configured",
+      new Error("SENDGRID_API_KEY environment variable is not configured"),
+      {
+        component: "email-service",
+        service: "sendgrid",
+      }
+    );
     return false;
   }
 
@@ -74,13 +87,22 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.warn("[Email] SendGrid error:", response.status, errorText);
+      logExternalServiceError(
+        "[Email] SendGrid error:",
+        new Error(`${response.status}: ${errorText}`),
+        {
+          status_code: response.status.toString(),
+          service: "sendgrid",
+        }
+      );
       return false;
     }
 
     return true;
   } catch (error) {
-    console.warn("[Email] Failed to send:", error);
+    logExternalServiceError("[Email] Failed to send:", error, {
+      service: "sendgrid",
+    });
     return false;
   }
 }
@@ -192,7 +214,14 @@ KeeperHub - Blockchain Workflow Automation
   if (success) {
     console.log(`[Email] OTP sent to ${email} for ${type}`);
   } else {
-    console.warn(`[Email] Failed to send OTP to ${email}`);
+    logExternalServiceError(
+      `[Email] Failed to send OTP to ${email}`,
+      new Error("Failed to send verification OTP"),
+      {
+        service: "sendgrid",
+        email_type: type,
+      }
+    );
   }
 
   return success;
@@ -282,7 +311,14 @@ KeeperHub - Blockchain Workflow Automation
   if (success) {
     console.log(`[Email] OAuth password reset info sent to ${email}`);
   } else {
-    console.warn(`[Email] Failed to send OAuth info to ${email}`);
+    logExternalServiceError(
+      `[Email] Failed to send OAuth info to ${email}`,
+      new Error("Failed to send OAuth password reset email"),
+      {
+        service: "sendgrid",
+        provider: providerName,
+      }
+    );
   }
 
   return success;
@@ -364,7 +400,13 @@ KeeperHub - Blockchain Workflow Automation
   if (success) {
     console.log(`[Email] Invitation sent to ${inviteeEmail}`);
   } else {
-    console.warn(`[Email] Failed to send invitation to ${inviteeEmail}`);
+    logExternalServiceError(
+      `[Email] Failed to send invitation to ${inviteeEmail}`,
+      new Error("Failed to send invitation email"),
+      {
+        service: "sendgrid",
+      }
+    );
   }
 
   return success;
