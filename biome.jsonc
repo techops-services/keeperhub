@@ -17,7 +17,15 @@
       "!.work",
       "!.planning",
       "!.pnpm-store",
-      "!docs-site"
+      "!docs-site",
+      "!components/overlays",
+      "!scripts",
+      "!app/api/workflow",
+      "!app/api/workflows",
+      "!lib/workflow-executor.workflow.ts",
+      "!components/settings",
+      "!components/workflow",
+      "!lib/atoms"
     ]
   },
   "linter": {
