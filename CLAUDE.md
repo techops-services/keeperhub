@@ -9,6 +9,7 @@
 - **Do not git push or create Github PRs without user's confirmation**
 - **Do not leave code comments with summaries of user's prompt**
 - **Do not include task codes in branch/PR names**
+- **PR titles must follow conventional commit format**: `<type>: <description>` or `<type>(scope): <description>`. Allowed types: `feat`, `fix`, `hotfix`, `chore`, `docs`, `refactor`, `test`, `ci`, `build`, `perf`, `style`, `breaking`. This is enforced by the `pr-title-check` workflow on PRs targeting `staging`.
 
 ## Code Quality: Lint and Type Checking
 
