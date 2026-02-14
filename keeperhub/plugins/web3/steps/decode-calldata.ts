@@ -14,13 +14,13 @@ const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY ?? "";
 const FOURBYTE_API_URL = "https://www.4byte.directory/api/v1/signatures/";
 const HEX_PATTERN = /^0x[\da-fA-F]*$/;
 
-type DecodedParameter = {
+export type DecodedParameter = {
   name: string;
   type: string;
   value: string;
 };
 
-type DecodeCalldataResult =
+export type DecodeCalldataResult =
   | {
       success: true;
       selector: string;
@@ -312,7 +312,7 @@ async function try4byteStrategy(
  * 3. 4byte.directory signature database (fallback)
  * 4. Selector-only result (if all else fails)
  */
-async function stepHandler(
+export async function stepHandler(
   input: DecodeCalldataCoreInput
 ): Promise<DecodeCalldataResult> {
   const { calldata, contractAddress, network, abi } = input;
