@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 // start custom keeperhub code //
-import { logDatabaseError } from "@/keeperhub/lib/logging";
+import { ErrorCategory, logSystemError } from "@/keeperhub/lib/logging";
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 // end keeperhub code //
 import { auth } from "@/lib/auth";
@@ -59,7 +59,7 @@ export async function GET(
 
     return NextResponse.json(executions);
   } catch (error) {
-    logDatabaseError("Failed to get executions", error, {
+    logSystemError(ErrorCategory.DATABASE, "Failed to get executions", error, {
       endpoint: "/api/workflows/[workflowId]/executions",
       operation: "get",
     });
@@ -143,10 +143,15 @@ export async function DELETE(
       deletedCount: executionIds.length,
     });
   } catch (error) {
-    logDatabaseError("Failed to delete executions", error, {
-      endpoint: "/api/workflows/[workflowId]/executions",
-      operation: "delete",
-    });
+    logSystemError(
+      ErrorCategory.DATABASE,
+      "Failed to delete executions",
+      error,
+      {
+        endpoint: "/api/workflows/[workflowId]/executions",
+        operation: "delete",
+      }
+    );
     return NextResponse.json(
       {
         error:

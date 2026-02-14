@@ -3,7 +3,7 @@ import { nanoid } from "nanoid";
 import { NextResponse } from "next/server";
 // start custom keeperhub code //
 import { authenticateApiKey } from "@/keeperhub/lib/api-key-auth";
-import { logDatabaseError } from "@/keeperhub/lib/logging";
+import { ErrorCategory, logSystemError } from "@/keeperhub/lib/logging";
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -203,7 +203,7 @@ export async function POST(request: Request) {
       updatedAt: newWorkflow.updatedAt.toISOString(),
     });
   } catch (error) {
-    logDatabaseError("Failed to create workflow", error, {
+    logSystemError(ErrorCategory.DATABASE, "Failed to create workflow", error, {
       endpoint: "/api/workflows/create",
       operation: "create",
     });

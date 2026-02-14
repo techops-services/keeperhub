@@ -1,5 +1,82 @@
 
-> ai-workflow-builder-template@0.1.0 check /Users/taitsengstock/Documents/GitHub/techops-workflow-builder-template
-> npx ultracite@latest check
+> ai-workflow-builder-template@0.1.0 check /home/ot/maker/git/techops-services/keeperhub
+> ultracite check
 
-Checked 474 files in 239ms. No fixes applied.
+npm warn Unknown env config "verify-deps-before-run". This will stop working in the next major version of npm.
+npm warn Unknown env config "npm-globalconfig". This will stop working in the next major version of npm.
+npm warn Unknown env config "_jsr-registry". This will stop working in the next major version of npm.
+npm warn Unknown project config "public-hoist-pattern". This will stop working in the next major version of npm.
+app/api/workflows/create/route.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+      4   4 │   // start custom keeperhub code //
+      5   5 │   import { authenticateApiKey } from "@/keeperhub/lib/api-key-auth";
+      6     │ - import·{
+      7     │ - ··ErrorCategory,
+      8     │ - ··logSystemError,
+      9     │ - }·from·"@/keeperhub/lib/logging";
+          6 │ + import·{·ErrorCategory,·logSystemError·}·from·"@/keeperhub/lib/logging";
+     10   7 │   import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
+     11   8 │   import { auth } from "@/lib/auth";
+    ······· │ 
+    207 204 │       });
+    208 205 │     } catch (error) {
+    209     │ - ····logSystemError(
+    210     │ - ······ErrorCategory.DATABASE,
+    211     │ - ······"Failed·to·create·workflow",
+    212     │ - ······error,
+    213     │ - ······{
+    214     │ - ········endpoint:·"/api/workflows/create",
+    215     │ - ········operation:·"create",
+    216     │ - ······}
+    217     │ - ····);
+        206 │ + ····logSystemError(ErrorCategory.DATABASE,·"Failed·to·create·workflow",·error,·{
+        207 │ + ······endpoint:·"/api/workflows/create",
+        208 │ + ······operation:·"create",
+        209 │ + ····});
+    218 210 │       return NextResponse.json(
+    219 211 │         {
+  
+
+app/api/workflows/route.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+     3  3 │   // start custom keeperhub code //
+     4  4 │   import { authenticateApiKey } from "@/keeperhub/lib/api-key-auth";
+     5    │ - import·{
+     6    │ - ··ErrorCategory,
+     7    │ - ··logSystemError,
+     8    │ - }·from·"@/keeperhub/lib/logging";
+        5 │ + import·{·ErrorCategory,·logSystemError·}·from·"@/keeperhub/lib/logging";
+     9  6 │   import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
+    10  7 │   import { auth } from "@/lib/auth";
+    ····· │ 
+    72 69 │       return NextResponse.json(mappedWorkflows);
+    73 70 │     } catch (error) {
+    74    │ - ····logSystemError(
+    75    │ - ······ErrorCategory.DATABASE,
+    76    │ - ······"Failed·to·get·workflows",
+    77    │ - ······error,
+    78    │ - ······{
+    79    │ - ········endpoint:·"/api/workflows",
+    80    │ - ········operation:·"get",
+    81    │ - ······}
+    82    │ - ····);
+       71 │ + ····logSystemError(ErrorCategory.DATABASE,·"Failed·to·get·workflows",·error,·{
+       72 │ + ······endpoint:·"/api/workflows",
+       73 │ + ······operation:·"get",
+       74 │ + ····});
+    83 75 │       return NextResponse.json(
+    84 76 │         {
+  
+
+Checked 477 files in 279ms. No fixes applied.
+Found 2 errors.
+check ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Some errors were emitted while running checks.
+  
+
+ ELIFECYCLE  Command failed with exit code 1.

@@ -2,7 +2,7 @@
  * Utility functions for fetching wallet balances via RPC
  */
 
-import { logNetworkError } from "@/keeperhub/lib/logging";
+import { ErrorCategory, logUserError } from "@/keeperhub/lib/logging";
 import type {
   ChainBalance,
   ChainData,
@@ -123,10 +123,15 @@ export async function fetchNativeBalance(
       explorerUrl: buildExplorerAddressUrl(chain, address),
     };
   } catch (error) {
-    logNetworkError(`Failed to fetch balance for ${chain.name}:`, error, {
-      chain_id: chain.chainId.toString(),
-      chain_name: chain.name,
-    });
+    logUserError(
+      ErrorCategory.NETWORK_RPC,
+      `Failed to fetch balance for ${chain.name}:`,
+      error,
+      {
+        chain_id: chain.chainId.toString(),
+        chain_name: chain.name,
+      }
+    );
     return {
       chainId: chain.chainId,
       name: chain.name,
@@ -203,11 +208,16 @@ export async function fetchTokenBalance(
       loading: false,
     };
   } catch (error) {
-    logNetworkError(`Failed to fetch balance for ${token.symbol}:`, error, {
-      chain_id: token.chainId.toString(),
-      token_symbol: token.symbol,
-      token_address: token.tokenAddress,
-    });
+    logUserError(
+      ErrorCategory.NETWORK_RPC,
+      `Failed to fetch balance for ${token.symbol}:`,
+      error,
+      {
+        chain_id: token.chainId.toString(),
+        token_symbol: token.symbol,
+        token_address: token.tokenAddress,
+      }
+    );
     return {
       tokenId: token.id,
       chainId: token.chainId,
@@ -354,11 +364,16 @@ export function fetchSupportedTokenBalance(
         return makeRequest(attempt + 1);
       }
 
-      logNetworkError(`Failed to fetch balance for ${token.symbol}:`, error, {
-        chain_id: token.chainId.toString(),
-        token_symbol: token.symbol,
-        token_address: token.tokenAddress,
-      });
+      logUserError(
+        ErrorCategory.NETWORK_RPC,
+        `Failed to fetch balance for ${token.symbol}:`,
+        error,
+        {
+          chain_id: token.chainId.toString(),
+          token_symbol: token.symbol,
+          token_address: token.tokenAddress,
+        }
+      );
       return {
         chainId: token.chainId,
         tokenAddress: token.tokenAddress,

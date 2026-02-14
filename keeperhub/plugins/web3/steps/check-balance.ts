@@ -2,11 +2,7 @@ import "server-only";
 
 import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
-import {
-  logConfigurationError,
-  logNetworkError,
-  logValidationError,
-} from "@/keeperhub/lib/logging";
+import { ErrorCategory, logUserError } from "@/keeperhub/lib/logging";
 import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 import { db } from "@/lib/db";
 import { explorerConfigs, workflowExecutions } from "@/lib/db/schema";
@@ -76,10 +72,15 @@ async function stepHandler(
 
   // Validate address
   if (!ethers.isAddress(address)) {
-    logValidationError("[Check Balance] Invalid address:", address, {
-      plugin_name: "web3",
-      action_name: "check-balance",
-    });
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Check Balance] Invalid address:",
+      address,
+      {
+        plugin_name: "web3",
+        action_name: "check-balance",
+      }
+    );
     return {
       success: false,
       error: `Invalid Ethereum address: ${address}`,
@@ -92,10 +93,15 @@ async function stepHandler(
     chainId = getChainIdFromNetwork(network);
     console.log("[Check Balance] Resolved chain ID:", chainId);
   } catch (error) {
-    logConfigurationError("[Check Balance] Failed to resolve network:", error, {
-      plugin_name: "web3",
-      action_name: "check-balance",
-    });
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Check Balance] Failed to resolve network:",
+      error,
+      {
+        plugin_name: "web3",
+        action_name: "check-balance",
+      }
+    );
     return {
       success: false,
       error: getErrorMessage(error),
@@ -117,7 +123,8 @@ async function stepHandler(
       rpcConfig.source
     );
   } catch (error) {
-    logConfigurationError(
+    logUserError(
+      ErrorCategory.VALIDATION,
       "[Check Balance] Failed to resolve RPC config:",
       error,
       {
@@ -162,11 +169,16 @@ async function stepHandler(
       addressLink,
     };
   } catch (error) {
-    logNetworkError("[Check Balance] Failed to check balance:", error, {
-      plugin_name: "web3",
-      action_name: "check-balance",
-      chain_id: String(chainId),
-    });
+    logUserError(
+      ErrorCategory.NETWORK_RPC,
+      "[Check Balance] Failed to check balance:",
+      error,
+      {
+        plugin_name: "web3",
+        action_name: "check-balance",
+        chain_id: String(chainId),
+      }
+    );
     return {
       success: false,
       error: `Failed to check balance: ${getErrorMessage(error)}`,

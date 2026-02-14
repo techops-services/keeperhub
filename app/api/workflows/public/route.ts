@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { logDatabaseError } from "@/keeperhub/lib/logging";
+import { ErrorCategory, logSystemError } from "@/keeperhub/lib/logging";
 import { db } from "@/lib/db";
 import { publicTags, workflowPublicTags, workflows } from "@/lib/db/schema";
 
@@ -123,10 +123,15 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     return NextResponse.json(mappedWorkflows);
   } catch (error) {
-    logDatabaseError("Failed to get public workflows", error, {
-      endpoint: "/api/workflows/public",
-      operation: "get",
-    });
+    logSystemError(
+      ErrorCategory.DATABASE,
+      "Failed to get public workflows",
+      error,
+      {
+        endpoint: "/api/workflows/public",
+        operation: "get",
+      }
+    );
     return NextResponse.json(
       {
         error:

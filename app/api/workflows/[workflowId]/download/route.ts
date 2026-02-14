@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 // start custom keeperhub code //
-import { logDatabaseError } from "@/keeperhub/lib/logging";
+import { ErrorCategory, logSystemError } from "@/keeperhub/lib/logging";
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 // end keeperhub code //
 import { auth } from "@/lib/auth";
@@ -353,10 +353,15 @@ For more information, visit the [Workflow documentation](https://workflow.is).
       files: allFiles,
     });
   } catch (error) {
-    logDatabaseError("Failed to prepare workflow download", error, {
-      endpoint: "/api/workflows/[workflowId]/download",
-      operation: "get",
-    });
+    logSystemError(
+      ErrorCategory.DATABASE,
+      "Failed to prepare workflow download",
+      error,
+      {
+        endpoint: "/api/workflows/[workflowId]/download",
+        operation: "get",
+      }
+    );
     return NextResponse.json(
       {
         error:

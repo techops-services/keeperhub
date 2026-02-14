@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 // start custom keeperhub code //
 import { authenticateApiKey } from "@/keeperhub/lib/api-key-auth";
-import { logDatabaseError } from "@/keeperhub/lib/logging";
+import { ErrorCategory, logSystemError } from "@/keeperhub/lib/logging";
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -177,7 +177,7 @@ export async function GET(
 
     return NextResponse.json(responseData);
   } catch (error) {
-    logDatabaseError("Failed to get workflow", error, {
+    logSystemError(ErrorCategory.DATABASE, "Failed to get workflow", error, {
       endpoint: "/api/workflows/[workflowId]",
       operation: "get",
     });
@@ -361,7 +361,7 @@ export async function PATCH(
       isOwner: true,
     });
   } catch (error) {
-    logDatabaseError("Failed to update workflow", error, {
+    logSystemError(ErrorCategory.DATABASE, "Failed to update workflow", error, {
       endpoint: "/api/workflows/[workflowId]",
       operation: "update",
     });
@@ -426,7 +426,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    logDatabaseError("Failed to delete workflow", error, {
+    logSystemError(ErrorCategory.DATABASE, "Failed to delete workflow", error, {
       endpoint: "/api/workflows/[workflowId]",
       operation: "delete",
     });

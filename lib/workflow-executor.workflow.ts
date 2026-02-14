@@ -10,10 +10,9 @@ import {
   getBuiltinVariables,
 } from "@/keeperhub/lib/builtin-variables";
 import {
-  logDatabaseError,
-  logInfrastructureError,
-  logValidationError,
-  logWorkflowEngineError,
+  ErrorCategory,
+  logSystemError,
+  logUserError,
 } from "@/keeperhub/lib/logging";
 import {
   getMetricsCollector,
@@ -265,10 +264,14 @@ export function evaluateConditionExpression(
         throw error;
       }
       // Other errors (syntax errors, etc.) are user input errors - log as WARN not ERROR
-      logValidationError("[Condition] Failed to evaluate user expression:", {
-        expression: conditionExpression,
+      logUserError(
+        ErrorCategory.VALIDATION,
+        "[Condition] Failed to evaluate user expression:",
         error,
-      });
+        {
+          expression: conditionExpression,
+        }
+      );
       throw new Error(
         `Failed to evaluate condition expression: ${error instanceof Error ? error.message : String(error)}`
       );
@@ -835,7 +838,8 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
               mockData
             );
           } catch (error) {
-            logValidationError(
+            logUserError(
+              ErrorCategory.VALIDATION,
               "[Workflow Executor] Failed to parse webhook mock request:",
               error,
               {
@@ -1052,7 +1056,8 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
         }
       }
     } catch (error) {
-      logWorkflowEngineError(
+      logSystemError(
+        ErrorCategory.WORKFLOW_ENGINE,
         "[Workflow Executor] Error executing node:",
         error,
         {
@@ -1125,7 +1130,8 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
         });
         console.log("[Workflow Executor] Updated execution record");
       } catch (error) {
-        logDatabaseError(
+        logSystemError(
+          ErrorCategory.DATABASE,
           "[Workflow Executor] Failed to update execution record:",
           error,
           {
@@ -1142,7 +1148,8 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
       outputs,
     };
   } catch (error) {
-    logWorkflowEngineError(
+    logSystemError(
+      ErrorCategory.WORKFLOW_ENGINE,
       "[Workflow Executor] Fatal error during workflow execution:",
       error,
       {
@@ -1178,7 +1185,8 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
           },
         });
       } catch (logError) {
-        logInfrastructureError(
+        logSystemError(
+          ErrorCategory.INFRASTRUCTURE,
           "[Workflow Executor] Failed to log error:",
           logError,
           {

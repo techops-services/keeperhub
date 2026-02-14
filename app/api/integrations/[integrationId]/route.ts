@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 // start custom keeperhub code //
-import { logDatabaseError } from "@/keeperhub/lib/logging";
+import { ErrorCategory, logSystemError } from "@/keeperhub/lib/logging";
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 import { auth } from "@/lib/auth";
 import {
@@ -77,7 +77,7 @@ export async function GET(
 
     return NextResponse.json(response);
   } catch (error) {
-    logDatabaseError("Failed to get integration", error, {
+    logSystemError(ErrorCategory.DATABASE, "Failed to get integration", error, {
       endpoint: "/api/integrations/[integrationId]",
       operation: "get",
     });
@@ -162,10 +162,15 @@ export async function PUT(
 
     return NextResponse.json(response);
   } catch (error) {
-    logDatabaseError("Failed to update integration", error, {
-      endpoint: "/api/integrations/[integrationId]",
-      operation: "update",
-    });
+    logSystemError(
+      ErrorCategory.DATABASE,
+      "Failed to update integration",
+      error,
+      {
+        endpoint: "/api/integrations/[integrationId]",
+        operation: "update",
+      }
+    );
     return NextResponse.json(
       {
         error:
@@ -218,10 +223,15 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    logDatabaseError("Failed to delete integration", error, {
-      endpoint: "/api/integrations/[integrationId]",
-      operation: "delete",
-    });
+    logSystemError(
+      ErrorCategory.DATABASE,
+      "Failed to delete integration",
+      error,
+      {
+        endpoint: "/api/integrations/[integrationId]",
+        operation: "delete",
+      }
+    );
     return NextResponse.json(
       {
         error:

@@ -1,6 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { logDatabaseError } from "@/keeperhub/lib/logging";
+import { ErrorCategory, logSystemError } from "@/keeperhub/lib/logging";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { workflows } from "@/lib/db/schema";
@@ -44,10 +44,15 @@ export async function GET(request: Request) {
       edges: currentWorkflow.edges,
     });
   } catch (error) {
-    logDatabaseError("Failed to get current workflow", error, {
-      endpoint: "/api/workflows/current",
-      operation: "get",
-    });
+    logSystemError(
+      ErrorCategory.DATABASE,
+      "Failed to get current workflow",
+      error,
+      {
+        endpoint: "/api/workflows/current",
+        operation: "get",
+      }
+    );
     return NextResponse.json(
       {
         error:
@@ -132,10 +137,15 @@ export async function POST(request: Request) {
       edges: savedWorkflow.edges,
     });
   } catch (error) {
-    logDatabaseError("Failed to save current workflow", error, {
-      endpoint: "/api/workflows/current",
-      operation: "create",
-    });
+    logSystemError(
+      ErrorCategory.DATABASE,
+      "Failed to save current workflow",
+      error,
+      {
+        endpoint: "/api/workflows/current",
+        operation: "create",
+      }
+    );
     return NextResponse.json(
       {
         error:
