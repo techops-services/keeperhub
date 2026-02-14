@@ -1,5 +1,6 @@
 import { CronExpressionParser } from "cron-parser";
 import { eq } from "drizzle-orm";
+import { ErrorCategory, logSystemError } from "@/keeperhub/lib/logging";
 import { db } from "@/lib/db";
 import { workflowSchedules } from "@/lib/db/schema";
 import { generateId } from "@/lib/utils/id";
@@ -22,9 +23,14 @@ export function computeNextRunTime(
     });
     return interval.next().toDate();
   } catch (error) {
-    console.error(
+    logSystemError(
+      ErrorCategory.INFRASTRUCTURE,
       `[Schedule] Invalid cron expression: ${cronExpression}`,
-      error
+      error,
+      {
+        component: "schedule-service",
+        cron_expression: cronExpression,
+      }
     );
     return null;
   }

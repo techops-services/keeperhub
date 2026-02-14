@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logInfrastructureError } from "@/keeperhub/lib/logging";
 import { auth } from "@/lib/auth";
 
 const FEEDBACK_SERVICE_URL = process.env.FEEDBACK_SERVICE_URL || "";
@@ -8,7 +9,17 @@ export async function POST(request: Request) {
   try {
     // Validate configuration
     if (!FEEDBACK_SERVICE_URL) {
-      console.warn("[Feedback] FEEDBACK_SERVICE_URL not configured");
+      console.error("[Feedback] FEEDBACK_SERVICE_URL not configured");
+      logInfrastructureError(
+        "[Feedback] FEEDBACK_SERVICE_URL not configured",
+        new Error(
+          "FEEDBACK_SERVICE_URL environment variable is not configured"
+        ),
+        {
+          endpoint: "/api/feedback",
+          component: "feedback-service",
+        }
+      );
       return NextResponse.json(
         { error: "Feedback service not configured" },
         { status: 500 }
@@ -16,7 +27,15 @@ export async function POST(request: Request) {
     }
 
     if (!FEEDBACK_API_KEY) {
-      console.warn("[Feedback] FEEDBACK_API_KEY not configured");
+      console.error("[Feedback] FEEDBACK_API_KEY not configured");
+      logInfrastructureError(
+        "[Feedback] FEEDBACK_API_KEY not configured",
+        new Error("FEEDBACK_API_KEY environment variable is not configured"),
+        {
+          endpoint: "/api/feedback",
+          component: "feedback-service",
+        }
+      );
       return NextResponse.json(
         { error: "Feedback service not configured" },
         { status: 500 }
