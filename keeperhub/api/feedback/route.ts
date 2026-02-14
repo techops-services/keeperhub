@@ -9,7 +9,6 @@ export async function POST(request: Request) {
   try {
     // Validate configuration
     if (!FEEDBACK_SERVICE_URL) {
-      console.error("[Feedback] FEEDBACK_SERVICE_URL not configured");
       logSystemError(
         ErrorCategory.INFRASTRUCTURE,
         "[Feedback] FEEDBACK_SERVICE_URL not configured",
@@ -28,7 +27,6 @@ export async function POST(request: Request) {
     }
 
     if (!FEEDBACK_API_KEY) {
-      console.error("[Feedback] FEEDBACK_API_KEY not configured");
       logSystemError(
         ErrorCategory.INFRASTRUCTURE,
         "[Feedback] FEEDBACK_API_KEY not configured",

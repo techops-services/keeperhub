@@ -179,7 +179,6 @@ export async function GET(
   } catch (error) {
     logSystemError(ErrorCategory.DATABASE, "Failed to get workflow", error, {
       endpoint: "/api/workflows/[workflowId]",
-      operation: "get",
     });
     return NextResponse.json(
       {
@@ -363,7 +362,6 @@ export async function PATCH(
   } catch (error) {
     logSystemError(ErrorCategory.DATABASE, "Failed to update workflow", error, {
       endpoint: "/api/workflows/[workflowId]",
-      operation: "update",
     });
     return NextResponse.json(
       {
@@ -428,7 +426,6 @@ export async function DELETE(
   } catch (error) {
     logSystemError(ErrorCategory.DATABASE, "Failed to delete workflow", error, {
       endpoint: "/api/workflows/[workflowId]",
-      operation: "delete",
     });
     return NextResponse.json(
       {

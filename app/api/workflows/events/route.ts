@@ -19,7 +19,6 @@ export async function GET(request: Request) {
     const expectedToken = process.env.EVENTS_SERVICE_API_KEY;
 
     if (!expectedToken) {
-      console.error("[Workflows Events] EVENTS_SERVICE_API_KEY not configured");
       logSystemError(
         ErrorCategory.INFRASTRUCTURE,
         "[Workflows Events] EVENTS_SERVICE_API_KEY not configured",

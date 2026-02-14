@@ -60,7 +60,6 @@ export async function initializeParaSigner(
   const PARA_ENV = process.env.PARA_ENVIRONMENT || "beta";
 
   if (!PARA_API_KEY) {
-    console.error("[Para] PARA_API_KEY not configured");
     logSystemError(
       ErrorCategory.INFRASTRUCTURE,
       "[Para] PARA_API_KEY not configured",
