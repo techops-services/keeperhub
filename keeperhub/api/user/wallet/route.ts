@@ -118,7 +118,7 @@ async function checkExistingWallet(organizationId: string) {
 // Helper: Create wallet via Para SDK
 async function createParaWallet(email: string) {
   if (!PARA_API_KEY) {
-    console.warn("[Para] PARA_API_KEY not configured");
+    console.error("[Para] PARA_API_KEY not configured");
     throw new Error("Para API key not configured");
   }
 

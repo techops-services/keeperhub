@@ -90,7 +90,7 @@ async function stepHandler(
   } catch (error) {
     logUserError(
       ErrorCategory.VALIDATION,
-      "[Transfer Funds] Failed to get organization ID:",
+      "[Transfer Funds] Failed to get organization ID",
       error,
       {
         plugin_name: "web3",
@@ -118,7 +118,7 @@ async function stepHandler(
   } catch (error) {
     logUserError(
       ErrorCategory.VALIDATION,
-      "[Transfer Funds] Failed to get user ID:",
+      "[Transfer Funds] Failed to get user ID",
       error,
       {
         plugin_name: "web3",
@@ -153,7 +153,7 @@ async function stepHandler(
   } catch (error) {
     logUserError(
       ErrorCategory.VALIDATION,
-      "[Transfer Funds] Failed to resolve RPC config:",
+      "[Transfer Funds] Failed to resolve RPC config",
       error,
       {
         plugin_name: "web3",
@@ -318,7 +318,7 @@ async function stepHandler(
     } catch (error) {
       logUserError(
         ErrorCategory.TRANSACTION,
-        "[Transfer Funds] Transaction failed:",
+        "[Transfer Funds] Transaction failed",
         error,
         {
           plugin_name: "web3",

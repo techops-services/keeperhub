@@ -40,7 +40,6 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
   const toAddress = normalizeEmail(options.to);
 
   if (!apiKey) {
-    console.error("[Email] SENDGRID_API_KEY not configured");
     logSystemError(
       ErrorCategory.INFRASTRUCTURE,
       "[Email] SENDGRID_API_KEY not configured",
@@ -91,10 +90,9 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
       const errorText = await response.text();
       logUserError(
         ErrorCategory.EXTERNAL_SERVICE,
-        "[Email] SendGrid error:",
-        new Error(`${response.status}: ${errorText}`),
+        "[Email] SendGrid error",
+        new Error(errorText),
         {
-          status_code: response.status.toString(),
           service: "sendgrid",
         }
       );
@@ -105,7 +103,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
   } catch (error) {
     logUserError(
       ErrorCategory.EXTERNAL_SERVICE,
-      "[Email] Failed to send:",
+      "[Email] Failed to send",
       error,
       {
         service: "sendgrid",

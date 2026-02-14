@@ -167,7 +167,7 @@ async function stepHandler(
   } catch (error) {
     logUserError(
       ErrorCategory.VALIDATION,
-      "[Transfer Token] Failed to resolve network:",
+      "[Transfer Token] Failed to resolve network",
       error,
       {
         plugin_name: "web3",
@@ -223,7 +223,7 @@ async function stepHandler(
   } catch (error) {
     logUserError(
       ErrorCategory.VALIDATION,
-      "[Transfer Token] Failed to get organization ID:",
+      "[Transfer Token] Failed to get organization ID",
       error,
       {
         plugin_name: "web3",
@@ -252,7 +252,7 @@ async function stepHandler(
   } catch (error) {
     logUserError(
       ErrorCategory.VALIDATION,
-      "[Transfer Token] Failed to get user ID:",
+      "[Transfer Token] Failed to get user ID",
       error,
       {
         plugin_name: "web3",
@@ -284,7 +284,7 @@ async function stepHandler(
   } catch (error) {
     logUserError(
       ErrorCategory.VALIDATION,
-      "[Transfer Token] Failed to resolve RPC config:",
+      "[Transfer Token] Failed to resolve RPC config",
       error,
       {
         plugin_name: "web3",
@@ -491,7 +491,7 @@ async function stepHandler(
     } catch (error) {
       logUserError(
         ErrorCategory.TRANSACTION,
-        "[Transfer Token] Transaction failed:",
+        "[Transfer Token] Transaction failed",
         error,
         {
           plugin_name: "web3",

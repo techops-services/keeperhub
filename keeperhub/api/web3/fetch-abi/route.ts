@@ -167,10 +167,9 @@ async function fetchAbiFromAddress(
   if (!response.ok) {
     logUserError(
       ErrorCategory.EXTERNAL_SERVICE,
-      "[Etherscan] HTTP error response:",
+      "[Etherscan] HTTP error response",
       new Error(`HTTP ${response.status}: ${response.statusText}`),
       {
-        status_code: response.status.toString(),
         service: "etherscan",
       }
     );
@@ -376,7 +375,7 @@ function processAbiString(
   } catch (error) {
     logUserError(
       ErrorCategory.EXTERNAL_SERVICE,
-      "[Diamond] Failed to parse facet ABI from Etherscan:",
+      "[Diamond] Failed to parse facet ABI from Etherscan",
       error instanceof Error ? error : new Error(String(error)),
       {
         service: "etherscan",
@@ -837,7 +836,7 @@ function abiLooksLikeProxy(abi: string): boolean {
   } catch (error) {
     logUserError(
       ErrorCategory.EXTERNAL_SERVICE,
-      "[Proxy Detection] Failed to parse ABI for proxy pattern check:",
+      "[Proxy Detection] Failed to parse ABI for proxy pattern check",
       error instanceof Error ? error : new Error(String(error)),
       {
         component: "proxy-detection",
@@ -1196,7 +1195,7 @@ async function handleEtherscanExplorer(
   if (!sourceCodeResult.success) {
     logUserError(
       ErrorCategory.EXTERNAL_SERVICE,
-      "[Etherscan] Failed to fetch source code:",
+      "[Etherscan] Failed to fetch source code",
       new Error(sourceCodeResult.error || "Unknown error"),
       {
         service: "etherscan",

@@ -133,7 +133,7 @@ async function stepHandler(
   } catch (error) {
     logUserError(
       ErrorCategory.VALIDATION,
-      "[Write Contract] Failed to get organization ID:",
+      "[Write Contract] Failed to get organization ID",
       error,
       {
         plugin_name: "web3",
@@ -161,7 +161,7 @@ async function stepHandler(
   } catch (error) {
     logUserError(
       ErrorCategory.VALIDATION,
-      "[Write Contract] Failed to get user ID:",
+      "[Write Contract] Failed to get user ID",
       error,
       {
         plugin_name: "web3",
@@ -196,7 +196,7 @@ async function stepHandler(
   } catch (error) {
     logUserError(
       ErrorCategory.VALIDATION,
-      "[Write Contract] Failed to resolve RPC config:",
+      "[Write Contract] Failed to resolve RPC config",
       error,
       {
         plugin_name: "web3",
@@ -361,7 +361,7 @@ async function stepHandler(
     } catch (error) {
       logUserError(
         ErrorCategory.NETWORK_RPC,
-        "[Write Contract] Function call failed:",
+        "[Write Contract] Function call failed",
         error,
         {
           plugin_name: "web3",
