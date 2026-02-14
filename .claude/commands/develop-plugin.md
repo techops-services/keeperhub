@@ -375,7 +375,8 @@ RETRY BEHAVIOR:
   risk scoring, approval gates -- any step where a retry could mask a real threat
 
 CRITICAL RULES:
-1. Use fetch() not SDKs - reduces supply chain attack surface
+1. Use fetch() not SDKs - reduces supply chain attack surface and avoids Node.js-only
+   transitive deps that break the workflow bundler (see WORKFLOW BUNDLER below)
 2. All step files must start with `import "server-only";`
 3. Entry point must have `"use step";` directive
 4. Must export `_integrationType` constant matching plugin type
@@ -383,6 +384,45 @@ CRITICAL RULES:
 6. No emojis in code or comments
 7. All custom code in keeperhub/ directory
 8. Security-critical steps must set maxRetries = 0 (fail-safe, not fail-open)
+
+WORKFLOW BUNDLER CONSTRAINTS ("use step"):
+The "use step" directive tells the Workflow DevKit bundler to compile the function for a
+restricted runtime (similar to Cloudflare Workers). This has hard constraints:
+
+1. NEVER EXPORT FUNCTIONS from files containing "use step"
+   - Exporting a non-step function from a "use step" file causes the bundler to pull ALL
+     transitive dependencies into the workflow runtime bundle
+   - This breaks the build if any transitive dep uses Node.js modules (@solana/web3.js,
+     nanoid, etc.) or has incompatible package.json export conditions
+   - Type exports are fine (erased at compile time), only function/value exports break things
+   - The step function itself and `_integrationType` are the only valid exports
+
+2. SHARING LOGIC BETWEEN STEP FILES
+   If two steps need shared logic (e.g., assess-risk calls decode-calldata internally):
+   - Extract shared logic into a separate `*-core.ts` file WITHOUT "use step"
+   - Both step files import from the core file
+   - Example: `decode-calldata-core.ts` exports `decodeCalldata()`, imported by both
+     `decode-calldata.ts` and `assess-risk.ts`
+   - NEVER import a function from one step file into another step file
+
+3. NO NODE.JS-ONLY DEPENDENCIES in step files
+   - The Vercel AI SDK (`ai`, `@ai-sdk/*`) has Node.js transitive deps -- use fetch() instead
+   - Heavy libraries like ethers.js work IF used only internally (not re-exported)
+   - When in doubt, use direct fetch() calls to external APIs
+   - If a library works in Cloudflare Workers, it works in "use step" context
+
+4. CORRECT EXPORT PATTERN for step files:
+   ```typescript
+   // ONLY these exports are safe in a "use step" file:
+   export type { SomeType } from "./some-core";     // Type re-exports: OK
+   export type MyInput = StepInput & MyCoreInput;    // Type definitions: OK
+   export async function myStep(input) { ... }       // The step function: OK
+   export const _integrationType = "plugin-name";    // Integration type: OK
+
+   // NEVER export these from a "use step" file:
+   // export function helperFunction() { ... }       // BREAKS BUILD
+   // export const someUtil = ...                     // BREAKS BUILD (if non-trivial)
+   ```
 </architecture>
 
 <workflow_plugin_proposals>
