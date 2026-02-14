@@ -1,6 +1,7 @@
 // start custom keeperhub code //
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { ErrorCategory, logSystemError } from "@/keeperhub/lib/logging";
 import { hashPassword, verifyPassword } from "@/keeperhub/lib/password";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -100,7 +101,15 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Failed to change password:", error);
+    logSystemError(
+      ErrorCategory.AUTH,
+      "[User Password] Failed to change password:",
+      error,
+      {
+        endpoint: "/api/user/password",
+        status_code: "500",
+      }
+    );
     return NextResponse.json(
       {
         error:

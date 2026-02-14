@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 // start custom keeperhub code //
+import { ErrorCategory, logSystemError } from "@/keeperhub/lib/logging";
 import { createTimer } from "@/keeperhub/lib/metrics";
 import { recordStatusPollMetrics } from "@/keeperhub/lib/metrics/instrumentation/api";
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
@@ -137,10 +138,17 @@ export async function GET(
       errorContext,
     });
   } catch (error) {
-    console.error("Failed to get execution status:", error);
-
     // start custom keeperhub code //
     const { executionId } = await context.params;
+    logSystemError(
+      ErrorCategory.DATABASE,
+      "Failed to get execution status",
+      error,
+      {
+        endpoint: "/api/workflows/executions/[executionId]/status",
+        operation: "get",
+      }
+    );
     recordStatusPollMetrics({
       executionId,
       durationMs: timer(),

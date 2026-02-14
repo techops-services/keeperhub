@@ -1,5 +1,6 @@
 import "server-only";
 
+import { ErrorCategory, logUserError } from "@/keeperhub/lib/logging";
 import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 import { fetchCredentials } from "@/lib/credential-fetcher";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
@@ -39,7 +40,15 @@ async function stepHandler(
   const webhookUrl = credentials.webhookUrl;
 
   if (!webhookUrl) {
-    console.error("[Discord] No webhook URL provided in integration");
+    logUserError(
+      ErrorCategory.CONFIGURATION,
+      "[Discord] No webhook URL provided in integration",
+      undefined,
+      {
+        plugin_name: "discord",
+        action_name: "send-message",
+      }
+    );
     return {
       success: false,
       error:
@@ -49,7 +58,15 @@ async function stepHandler(
 
   // Validate webhook URL format
   if (!webhookUrl.includes("discord.com/api/webhooks/")) {
-    console.error("[Discord] Invalid webhook URL format");
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Discord] Invalid webhook URL format",
+      webhookUrl,
+      {
+        plugin_name: "discord",
+        action_name: "send-message",
+      }
+    );
     return {
       success: false,
       error: "Invalid Discord webhook URL format",
@@ -73,7 +90,16 @@ async function stepHandler(
       const errorData = (await response
         .json()
         .catch(() => ({}))) as DiscordWebhookResponse;
-      console.error("[Discord] API error:", errorData);
+      logUserError(
+        ErrorCategory.EXTERNAL_SERVICE,
+        "[Discord] API error:",
+        errorData,
+        {
+          plugin_name: "discord",
+          action_name: "send-message",
+          service: "discord",
+        }
+      );
       return {
         success: false,
         error:
@@ -95,7 +121,16 @@ async function stepHandler(
       messageId: result?.id || "sent",
     };
   } catch (error) {
-    console.error("[Discord] Error sending message:", error);
+    logUserError(
+      ErrorCategory.EXTERNAL_SERVICE,
+      "[Discord] Error sending message:",
+      error,
+      {
+        plugin_name: "discord",
+        action_name: "send-message",
+        service: "discord",
+      }
+    );
     return {
       success: false,
       error: `Failed to send Discord message: ${getErrorMessage(error)}`,

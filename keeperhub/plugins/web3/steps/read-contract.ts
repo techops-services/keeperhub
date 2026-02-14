@@ -2,6 +2,7 @@ import "server-only";
 
 import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
+import { ErrorCategory, logUserError } from "@/keeperhub/lib/logging";
 import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 import { db } from "@/lib/db";
 import { explorerConfigs, workflowExecutions } from "@/lib/db/schema";
@@ -72,7 +73,15 @@ async function stepHandler(
 
   // Validate contract address
   if (!ethers.isAddress(contractAddress)) {
-    console.error("[Read Contract] Invalid contract address:", contractAddress);
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Read Contract] Invalid contract address:",
+      contractAddress,
+      {
+        plugin_name: "web3",
+        action_name: "read-contract",
+      }
+    );
     return {
       success: false,
       error: `Invalid contract address: ${contractAddress}`,
@@ -85,7 +94,15 @@ async function stepHandler(
     parsedAbi = JSON.parse(abi);
     console.log("[Read Contract] ABI parsed successfully");
   } catch (error) {
-    console.error("[Read Contract] Failed to parse ABI:", error);
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Read Contract] Failed to parse ABI:",
+      error,
+      {
+        plugin_name: "web3",
+        action_name: "read-contract",
+      }
+    );
     return {
       success: false,
       error: `Invalid ABI JSON: ${getErrorMessage(error)}`,
@@ -94,7 +111,15 @@ async function stepHandler(
 
   // Validate ABI is an array
   if (!Array.isArray(parsedAbi)) {
-    console.error("[Read Contract] ABI is not an array");
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Read Contract] ABI is not an array",
+      parsedAbi,
+      {
+        plugin_name: "web3",
+        action_name: "read-contract",
+      }
+    );
     return {
       success: false,
       error: "ABI must be a JSON array",
@@ -108,7 +133,15 @@ async function stepHandler(
   );
 
   if (!functionAbi) {
-    console.error("[Read Contract] Function not found in ABI:", abiFunction);
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Read Contract] Function not found in ABI:",
+      abiFunction,
+      {
+        plugin_name: "web3",
+        action_name: "read-contract",
+      }
+    );
     return {
       success: false,
       error: `Function '${abiFunction}' not found in ABI`,
@@ -121,7 +154,15 @@ async function stepHandler(
     try {
       const parsedArgs = JSON.parse(functionArgs);
       if (!Array.isArray(parsedArgs)) {
-        console.error("[Read Contract] Function args is not an array");
+        logUserError(
+          ErrorCategory.VALIDATION,
+          "[Read Contract] Function args is not an array",
+          parsedArgs,
+          {
+            plugin_name: "web3",
+            action_name: "read-contract",
+          }
+        );
         return {
           success: false,
           error: "Function arguments must be a JSON array",
@@ -138,9 +179,14 @@ async function stepHandler(
       });
       console.log("[Read Contract] Function arguments parsed:", args);
     } catch (error) {
-      console.error(
+      logUserError(
+        ErrorCategory.VALIDATION,
         "[Read Contract] Failed to parse function arguments:",
-        error
+        error,
+        {
+          plugin_name: "web3",
+          action_name: "read-contract",
+        }
       );
       return {
         success: false,
@@ -155,7 +201,15 @@ async function stepHandler(
     chainId = getChainIdFromNetwork(network);
     console.log("[Read Contract] Resolved chain ID:", chainId);
   } catch (error) {
-    console.error("[Read Contract] Failed to resolve network:", error);
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Read Contract] Failed to resolve network:",
+      error,
+      {
+        plugin_name: "web3",
+        action_name: "read-contract",
+      }
+    );
     return {
       success: false,
       error: getErrorMessage(error),
@@ -177,7 +231,16 @@ async function stepHandler(
       rpcConfig.source
     );
   } catch (error) {
-    console.error("[Read Contract] Failed to resolve RPC config:", error);
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Read Contract] Failed to resolve RPC config:",
+      error,
+      {
+        plugin_name: "web3",
+        action_name: "read-contract",
+        chain_id: String(chainId),
+      }
+    );
     return {
       success: false,
       error: getErrorMessage(error),
@@ -265,7 +328,16 @@ async function stepHandler(
       addressLink,
     };
   } catch (error) {
-    console.error("[Read Contract] Function call failed:", error);
+    logUserError(
+      ErrorCategory.NETWORK_RPC,
+      "[Read Contract] Function call failed:",
+      error,
+      {
+        plugin_name: "web3",
+        action_name: "read-contract",
+        chain_id: String(chainId),
+      }
+    );
     return {
       success: false,
       error: `Contract call failed: ${getErrorMessage(error)}`,

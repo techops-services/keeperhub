@@ -4,6 +4,7 @@ import { Environment, Para as ParaServer } from "@getpara/server-sdk";
 import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
 import { decryptUserShare } from "@/keeperhub/lib/encryption";
+import { ErrorCategory, logSystemError } from "@/keeperhub/lib/logging";
 import { db } from "@/lib/db";
 import { paraWallets } from "@/lib/db/schema";
 
@@ -59,6 +60,15 @@ export async function initializeParaSigner(
   const PARA_ENV = process.env.PARA_ENVIRONMENT || "beta";
 
   if (!PARA_API_KEY) {
+    logSystemError(
+      ErrorCategory.INFRASTRUCTURE,
+      "[Para] PARA_API_KEY not configured",
+      new Error("PARA_API_KEY environment variable is not configured"),
+      {
+        component: "para-service",
+        service: "para",
+      }
+    );
     throw new Error("PARA_API_KEY not configured");
   }
 

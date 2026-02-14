@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 // start custom keeperhub code //
+import { ErrorCategory, logSystemError } from "@/keeperhub/lib/logging";
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 import { auth } from "@/lib/auth";
 import {
@@ -76,7 +77,10 @@ export async function GET(
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error("Failed to get integration:", error);
+    logSystemError(ErrorCategory.DATABASE, "Failed to get integration", error, {
+      endpoint: "/api/integrations/[integrationId]",
+      operation: "get",
+    });
     return NextResponse.json(
       {
         error:
@@ -158,7 +162,15 @@ export async function PUT(
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error("Failed to update integration:", error);
+    logSystemError(
+      ErrorCategory.DATABASE,
+      "Failed to update integration",
+      error,
+      {
+        endpoint: "/api/integrations/[integrationId]",
+        operation: "update",
+      }
+    );
     return NextResponse.json(
       {
         error:
@@ -211,7 +223,15 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Failed to delete integration:", error);
+    logSystemError(
+      ErrorCategory.DATABASE,
+      "Failed to delete integration",
+      error,
+      {
+        endpoint: "/api/integrations/[integrationId]",
+        operation: "delete",
+      }
+    );
     return NextResponse.json(
       {
         error:

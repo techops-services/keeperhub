@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 // start custom keeperhub code //
+import { ErrorCategory, logSystemError } from "@/keeperhub/lib/logging";
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 import { auth } from "@/lib/auth";
 import { createIntegration, getIntegrations } from "@/lib/db/integrations";
@@ -78,7 +79,15 @@ export async function GET(request: Request) {
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error("Failed to get integrations:", error);
+    logSystemError(
+      ErrorCategory.DATABASE,
+      "Failed to get integrations",
+      error,
+      {
+        endpoint: "/api/integrations",
+        operation: "get",
+      }
+    );
     return NextResponse.json(
       {
         error: "Failed to get integrations",
@@ -137,7 +146,15 @@ export async function POST(request: Request) {
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error("Failed to create integration:", error);
+    logSystemError(
+      ErrorCategory.DATABASE,
+      "Failed to create integration",
+      error,
+      {
+        endpoint: "/api/integrations",
+        operation: "create",
+      }
+    );
     return NextResponse.json(
       {
         error: "Failed to create integration",

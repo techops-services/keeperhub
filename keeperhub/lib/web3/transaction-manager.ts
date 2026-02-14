@@ -11,6 +11,7 @@
  */
 
 import { ethers } from "ethers";
+import { ErrorCategory, logUserError } from "@/keeperhub/lib/logging";
 import { initializeParaSigner } from "@/keeperhub/lib/para/wallet-helpers";
 import {
   type TriggerType as GasTriggerType,
@@ -127,7 +128,15 @@ export async function executeTransaction(
       nonce,
     };
   } catch (error) {
-    console.error("[TransactionManager] Transaction failed:", error);
+    logUserError(
+      ErrorCategory.TRANSACTION,
+      "[TransactionManager] Transaction failed:",
+      error,
+      {
+        chain_id: context.chainId.toString(),
+        nonce: nonce.toString(),
+      }
+    );
 
     return {
       success: false,
@@ -215,7 +224,16 @@ export async function executeContractTransaction(
       nonce,
     };
   } catch (error) {
-    console.error("[TransactionManager] Contract transaction failed:", error);
+    logUserError(
+      ErrorCategory.TRANSACTION,
+      "[TransactionManager] Contract transaction failed:",
+      error,
+      {
+        chain_id: context.chainId.toString(),
+        nonce: nonce.toString(),
+        method,
+      }
+    );
 
     return {
       success: false,

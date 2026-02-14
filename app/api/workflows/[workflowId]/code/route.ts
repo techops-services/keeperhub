@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 // start custom keeperhub code //
+import { ErrorCategory, logSystemError } from "@/keeperhub/lib/logging";
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 // end keeperhub code //
 import { auth } from "@/lib/auth";
@@ -62,7 +63,15 @@ export async function GET(
       workflowName: workflow.name,
     });
   } catch (error) {
-    console.error("Failed to get workflow code:", error);
+    logSystemError(
+      ErrorCategory.DATABASE,
+      "Failed to get workflow code",
+      error,
+      {
+        endpoint: "/api/workflows/[workflowId]/code",
+        operation: "get",
+      }
+    );
     return NextResponse.json(
       {
         error:

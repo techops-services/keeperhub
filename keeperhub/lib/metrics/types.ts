@@ -107,6 +107,19 @@ export const MetricNames = {
   PLUGIN_ACTION_ERRORS: "plugin.action.errors",
   API_ERRORS_TOTAL: "api.errors.total",
 
+  // User-caused error metrics
+  USER_VALIDATION_ERRORS: "errors.user.validation.total",
+  USER_CONFIGURATION_ERRORS: "errors.user.configuration.total",
+  EXTERNAL_SERVICE_ERRORS: "errors.external.service.total",
+  NETWORK_RPC_ERRORS: "errors.network.rpc.total",
+  TRANSACTION_BLOCKCHAIN_ERRORS: "errors.transaction.blockchain.total",
+
+  // System-caused error metrics
+  SYSTEM_DATABASE_ERRORS: "errors.system.database.total",
+  SYSTEM_AUTH_ERRORS: "errors.system.auth.total",
+  SYSTEM_INFRASTRUCTURE_ERRORS: "errors.system.infrastructure.total",
+  SYSTEM_WORKFLOW_ENGINE_ERRORS: "errors.system.workflow_engine.total",
+
   // Saturation metrics
   DB_POOL_UTILIZATION: "db.pool.utilization",
   DB_QUERY_SLOW_COUNT: "db.query.slow_count",
@@ -129,6 +142,9 @@ export const LabelKeys = {
   ERROR_TYPE: "error_type",
   ENDPOINT: "endpoint",
   SERVICE: "service",
+  ERROR_CATEGORY: "error_category",
+  ERROR_CONTEXT: "error_context",
+  IS_USER_ERROR: "is_user_error",
 } as const;
 
 /**

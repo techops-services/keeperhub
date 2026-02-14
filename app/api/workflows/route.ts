@@ -2,6 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 // start custom keeperhub code //
 import { authenticateApiKey } from "@/keeperhub/lib/api-key-auth";
+import { ErrorCategory, logSystemError } from "@/keeperhub/lib/logging";
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -67,7 +68,10 @@ export async function GET(request: Request) {
 
     return NextResponse.json(mappedWorkflows);
   } catch (error) {
-    console.error("Failed to get workflows:", error);
+    logSystemError(ErrorCategory.DATABASE, "Failed to get workflows", error, {
+      endpoint: "/api/workflows",
+      operation: "get",
+    });
     return NextResponse.json(
       {
         error:
