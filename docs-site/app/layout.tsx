@@ -66,6 +66,7 @@ export default async function RootLayout({
       </Head>
       <body>
         <Layout
+          darkMode={false}
           docsRepositoryBase={themeConfig.docsRepositoryBase}
           editLink={themeConfig.editLink?.content}
           footer={<Footer>{themeConfig.footer?.content}</Footer>}

@@ -490,19 +490,15 @@ html.dark a[class*="nav-link"]:hover {
 }
 
 /* ----------------------------------------------------------------
-   Dark mode: Theme toggle and icon buttons
+   Hide theme switcher (dark-only site)
    ---------------------------------------------------------------- */
-html.dark button[aria-label*="theme"],
-html.dark button[aria-label*="dark"],
-html.dark button[aria-label*="light"] {
-  color: var(--kh-text-muted);
-}
-
-html.dark button[aria-label*="theme"]:hover,
-html.dark button[aria-label*="dark"]:hover,
-html.dark button[aria-label*="light"]:hover {
-  color: var(--kh-text);
-  background-color: rgba(255, 255, 255, 0.05);
+[data-theme-switch],
+button[aria-label*="theme"],
+button[aria-label*="Theme"],
+.nextra-sidebar-footer [class*="theme"],
+select:has(option[value="light"]),
+div:has(> select:has(option[value="light"])) {
+  display: none !important;
 }
 
 /* ----------------------------------------------------------------
