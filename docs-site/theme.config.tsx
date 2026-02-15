@@ -67,7 +67,7 @@ const config = {
     prev: true,
     next: true,
   },
-  darkMode: true,
+  darkMode: false,
   primaryHue: 152,
   primarySaturation: 90,
 };

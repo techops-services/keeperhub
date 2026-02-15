@@ -60,7 +60,7 @@ export default async function RootLayout({
   const pageMap = filterPageMap(rawPageMap);
 
   return (
-    <html dir="ltr" lang="en" className={anekLatin.variable} suppressHydrationWarning>
+    <html dir="ltr" lang="en" className={`dark ${anekLatin.variable}`} suppressHydrationWarning>
       <Head>
         <meta content="width=device-width, initial-scale=1.0" name="viewport" />
       </Head>
