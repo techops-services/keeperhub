@@ -9,8 +9,8 @@
     "build": "tsx scripts/migrate-prod.ts && pnpm discover-plugins && next build",
     "start": "next start",
     "type-check": "tsc --noEmit",
-    "check": "npx ultracite@latest check",
-    "fix": "npx ultracite@latest fix",
+    "check": "ultracite check",
+    "fix": "ultracite fix",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push --force",
@@ -104,6 +104,7 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.3.4",
     "@inquirer/prompts": "^8.0.1",
     "@noble/hashes": "^2.0.1",
     "@playwright/test": "^1.57.0",
@@ -124,5 +125,6 @@
     "typescript": "^5",
     "ultracite": "6.3.0",
     "vitest": "^4.0.15"
-  }
+  },
+  "packageManager": "pnpm@10.27.0+sha512.72d699da16b1179c14ba9e64dc71c9a40988cbdc65c264cb0e489db7de917f20dcf4d64d8723625f2969ba52d4b7e2a1170682d9ac2a5dcaeaab732b7e16f04a"
 }

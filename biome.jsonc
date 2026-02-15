@@ -13,7 +13,11 @@
       "!lib/ai-gateway",
       "!components/workflow/config/action-grid.tsx",
       "!lib/rpc/index.ts",
-      "!drizzle"
+      "!drizzle",
+      "!.work",
+      "!.planning",
+      "!.pnpm-store",
+      "!docs-site"
     ]
   },
   "linter": {
@@ -29,7 +33,9 @@
       "nursery": {
         // These are experimental rules that add friction without clear benefit
         "useMaxParams": "off",
-        "noIncrementDecrement": "off"
+        "noIncrementDecrement": "off",
+        "useSortedClasses": "off",
+        "noUselessUndefined": "off"
       }
     }
   }
