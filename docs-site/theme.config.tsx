@@ -6,13 +6,19 @@ const config = {
       style={{
         display: "flex",
         alignItems: "center",
-        gap: "8px",
-        fontWeight: 700,
-        fontSize: "1.1rem",
+        gap: "10px",
       }}
     >
       <KeeperHubLogo />
-      KeeperHub Docs
+      <span
+        style={{
+          color: "#7a9ca8",
+          fontWeight: 400,
+          fontSize: "13px",
+        }}
+      >
+        Docs
+      </span>
     </span>
   ),
   project: {
@@ -22,7 +28,9 @@ const config = {
     "https://github.com/techops-services/keeperhub/edit/main/docs",
   footer: {
     content: (
-      <span>{new Date().getFullYear()} KeeperHub. All rights reserved.</span>
+      <span style={{ color: "#7a9ca8", fontSize: "13px" }}>
+        {new Date().getFullYear()} KeeperHub. All rights reserved.
+      </span>
     ),
   },
   head: (
@@ -60,8 +68,8 @@ const config = {
     next: true,
   },
   darkMode: true,
-  primaryHue: 142, // Green hue to match KeeperHub branding
-  primarySaturation: 70,
+  primaryHue: 152,
+  primarySaturation: 90,
 };
 
 export default config;
