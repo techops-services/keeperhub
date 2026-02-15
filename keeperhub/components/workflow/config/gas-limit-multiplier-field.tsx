@@ -217,19 +217,31 @@ export function GasLimitMultiplierField({
     onChange(serializeConfig({ mode, value: newValue }));
   };
 
-  // Calculated gas limit display (multiplier mode)
-  const calculatedGasLimit = useMemo(() => {
-    if (mode !== "multiplier" || estimate.status !== "success") {
-      return;
-    }
-    const multiplier = inputValue
-      ? Number.parseFloat(inputValue)
-      : defaultMultiplier;
-    if (Number.isNaN(multiplier)) {
+  // Final max gas for both modes
+  const finalMaxGas = useMemo(() => {
+    if (estimate.status !== "success") {
       return;
     }
     const estimated = Number(estimate.estimatedGas);
-    return Math.ceil(estimated * multiplier);
+
+    if (mode === "multiplier") {
+      const multiplier = inputValue
+        ? Number.parseFloat(inputValue)
+        : defaultMultiplier;
+      if (Number.isNaN(multiplier)) {
+        return;
+      }
+      return Math.ceil(estimated * multiplier);
+    }
+
+    if (mode === "maxGasLimit" && inputValue) {
+      const limit = Number(inputValue);
+      if (!Number.isNaN(limit) && limit >= estimated) {
+        return limit;
+      }
+    }
+
+    return;
   }, [mode, estimate, inputValue, defaultMultiplier]);
 
   // Warnings for max gas limit mode
@@ -315,54 +327,57 @@ export function GasLimitMultiplierField({
         />
       )}
 
-      {/* Gas estimate display */}
+      {/* Gas estimate and evaluation below fields */}
       <div className="space-y-1">
         {estimate.status === "loading" && (
-          <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
+          <div className="flex items-center gap-1.5 text-foreground text-sm">
             <Spinner className="size-3" />
             Estimating gas...
           </div>
         )}
         {estimate.status === "success" && (
-          <p className="text-muted-foreground text-xs">
-            Estimated gas: {formatGasNumber(estimate.estimatedGas)}
-          </p>
+          <div className="space-y-0.5">
+            <p className="font-medium text-foreground text-sm">
+              Gas Estimate: {formatGasNumber(estimate.estimatedGas)}
+            </p>
+            {finalMaxGas !== undefined && (
+              <p className="font-medium text-foreground text-sm">
+                Final Max Gas:{" "}
+                {mode === "multiplier" ? (
+                  <>
+                    {formatGasNumber(estimate.estimatedGas)} x{" "}
+                    {inputValue || defaultMultiplier}x ={" "}
+                    {finalMaxGas.toLocaleString()}
+                  </>
+                ) : (
+                  <>{finalMaxGas.toLocaleString()}</>
+                )}
+              </p>
+            )}
+          </div>
         )}
         {estimate.status === "error" && (
-          <p className="text-muted-foreground text-xs">{estimate.message}</p>
+          <p className="text-muted-foreground text-sm">{estimate.message}</p>
         )}
         {estimate.status === "idle" &&
           canEstimate === false &&
           chainId &&
           actionSlug && (
-            <p className="text-muted-foreground/70 text-xs">
+            <p className="text-muted-foreground text-xs">
               {hasTemplateRefs(config)
                 ? "Cannot estimate with template references"
                 : "Configure required fields to see gas estimate"}
             </p>
           )}
 
-        {/* Calculated result (multiplier mode) */}
-        {mode === "multiplier" &&
-          calculatedGasLimit !== undefined &&
-          estimate.status === "success" && (
-            <p className="text-muted-foreground text-xs">
-              {formatGasNumber(estimate.estimatedGas)} x{" "}
-              {inputValue || defaultMultiplier}x ={" "}
-              {calculatedGasLimit.toLocaleString()} gas limit
-            </p>
-          )}
-
-        {/* Helper text (multiplier mode) */}
         {mode === "multiplier" && (
-          <p className="text-muted-foreground/70 text-xs">
+          <p className="text-muted-foreground text-xs">
             {inputValue
               ? `Custom: ${inputValue}x (chain default: ${defaultMultiplier}x)`
               : `Using chain default: ${defaultMultiplier}x`}
           </p>
         )}
 
-        {/* Warnings (max gas limit mode) */}
         {maxGasWarning && (
           <div
             className={`flex items-start gap-1.5 text-xs ${
