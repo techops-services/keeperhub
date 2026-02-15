@@ -48,6 +48,37 @@ function serializeConfig(config: GasLimitConfig): string {
   return JSON.stringify(config);
 }
 
+function computeFinalMaxGas(
+  estimate: GasEstimateState,
+  mode: string,
+  inputValue: string,
+  defaultMultiplier: number
+): number | undefined {
+  if (estimate.status !== "success") {
+    return;
+  }
+  const estimated = Number(estimate.estimatedGas);
+
+  if (mode === "multiplier") {
+    const multiplier = inputValue
+      ? Number.parseFloat(inputValue)
+      : defaultMultiplier;
+    if (Number.isNaN(multiplier)) {
+      return;
+    }
+    return Math.ceil(estimated * multiplier);
+  }
+
+  if (mode === "maxGasLimit" && inputValue) {
+    const limit = Number(inputValue);
+    if (!Number.isNaN(limit) && limit >= estimated) {
+      return limit;
+    }
+  }
+
+  return;
+}
+
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: React component with conditional rendering for multiple UI states
 export function GasLimitMultiplierField({
   field,
@@ -218,31 +249,10 @@ export function GasLimitMultiplierField({
   };
 
   // Final max gas for both modes
-  const finalMaxGas = useMemo(() => {
-    if (estimate.status !== "success") {
-      return;
-    }
-    const estimated = Number(estimate.estimatedGas);
-
-    if (mode === "multiplier") {
-      const multiplier = inputValue
-        ? Number.parseFloat(inputValue)
-        : defaultMultiplier;
-      if (Number.isNaN(multiplier)) {
-        return;
-      }
-      return Math.ceil(estimated * multiplier);
-    }
-
-    if (mode === "maxGasLimit" && inputValue) {
-      const limit = Number(inputValue);
-      if (!Number.isNaN(limit) && limit >= estimated) {
-        return limit;
-      }
-    }
-
-    return;
-  }, [mode, estimate, inputValue, defaultMultiplier]);
+  const finalMaxGas = useMemo(
+    () => computeFinalMaxGas(estimate, mode, inputValue, defaultMultiplier),
+    [mode, estimate, inputValue, defaultMultiplier]
+  );
 
   // Warnings for max gas limit mode
   const maxGasWarning = useMemo(() => {
@@ -350,7 +360,7 @@ export function GasLimitMultiplierField({
                     {finalMaxGas.toLocaleString()}
                   </>
                 ) : (
-                  <>{finalMaxGas.toLocaleString()}</>
+                  finalMaxGas.toLocaleString()
                 )}
               </p>
             )}
