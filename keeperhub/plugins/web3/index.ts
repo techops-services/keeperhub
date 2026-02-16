@@ -347,7 +347,7 @@ const web3Plugin: IntegrationPlugin = {
       label: "Decode Calldata",
       description:
         "Decode raw transaction calldata into human-readable function calls with parameter names and values",
-      category: "Security",
+      category: "Web3",
       stepFunction: "decodeCalldataStep",
       stepImportPath: "decode-calldata",
       outputFields: [
