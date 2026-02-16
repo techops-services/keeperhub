@@ -4,6 +4,7 @@
  * Shared by:
  *   - components/workflow/config/action-config.tsx (map expression dropdown)
  *   - components/ui/template-autocomplete.tsx (synthetic output for autocomplete)
+ *   - lib/workflow-executor.workflow.ts (array source resolution)
  *   - tests/unit/action-config-helpers.test.ts
  *   - tests/unit/template-autocomplete-foreach.test.ts
  */
@@ -60,16 +61,16 @@ export function extractObjectPaths(
 }
 
 /**
- * Resolve an array source template to the first element of the referenced
- * array. Returns null when the template is invalid, the source node has no
- * output, the resolved value is not an array, the array is empty, or the
- * first element is not a plain object.
+ * Resolve an array source template to the raw array value.
+ * Shared by resolveArraySourceElement and resolveForEachSyntheticOutput.
+ * Returns null when the template is invalid, the source node has no output,
+ * or the resolved value is not a non-empty array.
  */
-export function resolveArraySourceElement(
+function resolveArrayFromTemplate(
   arraySource: string,
   executionLogs: Record<string, { output?: unknown }>,
   lastLogs: Record<string, { output?: unknown }>
-): Record<string, unknown> | null {
+): unknown[] | null {
   const match = ARRAY_SOURCE_RE.exec(arraySource);
   if (!match) {
     return null;
@@ -88,6 +89,25 @@ export function resolveArraySourceElement(
     ? traverseDotPath(sourceOutput, fieldPath)
     : sourceOutput;
   if (!Array.isArray(data) || data.length === 0) {
+    return null;
+  }
+
+  return data;
+}
+
+/**
+ * Resolve an array source template to the first element of the referenced
+ * array. Returns null when the template is invalid, the source node has no
+ * output, the resolved value is not an array, the array is empty, or the
+ * first element is not a plain object.
+ */
+export function resolveArraySourceElement(
+  arraySource: string,
+  executionLogs: Record<string, { output?: unknown }>,
+  lastLogs: Record<string, { output?: unknown }>
+): Record<string, unknown> | null {
+  const data = resolveArrayFromTemplate(arraySource, executionLogs, lastLogs);
+  if (!data) {
     return null;
   }
 
@@ -123,25 +143,8 @@ export function resolveForEachSyntheticOutput(
     return null;
   }
 
-  const match = ARRAY_SOURCE_RE.exec(arraySource);
-  if (!match) {
-    return null;
-  }
-
-  const sourceNodeId = match[1];
-  const fieldPath = match[3] || "";
-
-  const sourceOutput =
-    executionLogs[sourceNodeId]?.output ?? lastLogs[sourceNodeId]?.output;
-  if (sourceOutput === undefined || sourceOutput === null) {
-    return null;
-  }
-
-  const data = fieldPath
-    ? traverseDotPath(sourceOutput, fieldPath)
-    : sourceOutput;
-
-  if (!Array.isArray(data) || data.length === 0) {
+  const data = resolveArrayFromTemplate(arraySource, executionLogs, lastLogs);
+  if (!data) {
     return null;
   }
 

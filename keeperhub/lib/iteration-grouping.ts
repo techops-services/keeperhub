@@ -9,6 +9,9 @@
  * upstream ExecutionLog) without this module redefining it.
  */
 
+/** Discriminant value for For Each group entries in grouped log output. */
+export const FOR_EACH_GROUP_TYPE = "for-each-group" as const;
+
 /** Minimal fields the grouping functions require from a log entry. */
 export type IterationLogFields = {
   nodeId: string;
@@ -26,7 +29,7 @@ export type IterationGroup<T extends IterationLogFields> = {
 export type GroupedLogEntry<T extends IterationLogFields> =
   | { type: "standalone"; log: T }
   | {
-      type: "for-each-group";
+      type: typeof FOR_EACH_GROUP_TYPE;
       forEachLog: T;
       iterations: IterationGroup<T>[];
     };
@@ -86,7 +89,7 @@ export function groupLogsByIteration<T extends IterationLogFields>(
     if (log.nodeType === "For Each" && forEachChildLogs.has(log.nodeId)) {
       const childLogs = forEachChildLogs.get(log.nodeId) ?? [];
       const iterations = buildIterationGroups(childLogs);
-      result.push({ type: "for-each-group", forEachLog: log, iterations });
+      result.push({ type: FOR_EACH_GROUP_TYPE, forEachLog: log, iterations });
     } else {
       result.push({ type: "standalone", log });
     }
