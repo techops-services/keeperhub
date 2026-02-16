@@ -51,15 +51,15 @@ function findPkgDir(name: string, fromDir: string): string | undefined {
   } catch {
     // not resolvable from this location
   }
-  return undefined;
+  return;
 }
 
-interface PackageJson {
+type PackageJson = {
   name?: string;
   dependencies?: Record<string, string>;
   optionalDependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
-}
+};
 
 /**
  * Recursively walk dependencies starting from `pkg`, resolving each
@@ -112,9 +112,7 @@ const directDeps = new Set(
 
 const transitiveDeps = packages.filter((p) => !directDeps.has(p));
 
-console.log(
-  `Found ${packages.length} packages in ${ROOT_PKG} dependency tree`
-);
+console.log(`Found ${packages.length} packages in ${ROOT_PKG} dependency tree`);
 const transitiveCount =
   directDeps.size > 0 ? transitiveDeps.length : packages.length;
 console.log(`  ${transitiveCount} transitive (need .npmrc hoisting)`);

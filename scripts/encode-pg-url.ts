@@ -16,8 +16,7 @@
  *   export WORKFLOW_POSTGRES_URL=$(tsx scripts/encode-pg-url.ts)
  */
 
-const url =
-  process.env.WORKFLOW_POSTGRES_URL ?? process.env.DATABASE_URL ?? "";
+const url = process.env.WORKFLOW_POSTGRES_URL ?? process.env.DATABASE_URL ?? "";
 
 if (!url) {
   process.exit(0);

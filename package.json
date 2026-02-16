@@ -18,6 +18,7 @@
     "db:seed": "tsx scripts/seed/seed-chains.ts && tsx scripts/seed/seed-tokens.ts",
     "db:seed-chains": "tsx scripts/seed/seed-chains.ts",
     "db:seed-test-wallet": "tsx scripts/seed/seed-test-wallet.ts",
+    "db:fund-test-wallet": "tsx scripts/miscellaneous/fund-test-wallet.ts",
     "db:seed-tokens": "tsx scripts/seed/seed-tokens.ts",
     "db:setup": "pnpm db:migrate && pnpm db:setup-workflow && pnpm db:seed",
     "db:setup-workflow": "tsx scripts/setup-workflow-db.ts",

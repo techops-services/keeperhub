@@ -64,7 +64,7 @@ export function createManualTriggerNode(): WorkflowNode {
  */
 export function createActionNode(
   id = "action-1",
-  actionType = "http"
+  actionType = "HTTP Request"
 ): WorkflowNode {
   return {
     id,
@@ -75,8 +75,10 @@ export function createActionNode(
       label: "HTTP Request",
       config: {
         actionType,
-        url: "https://api.example.com/webhook",
-        method: "POST",
+        endpoint: "https://httpbin.org/post",
+        httpMethod: "POST",
+        httpHeaders: "{}",
+        httpBody: "{}",
       },
     },
   };

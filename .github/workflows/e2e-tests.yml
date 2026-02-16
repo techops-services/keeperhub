@@ -53,6 +53,7 @@ jobs:
     needs: should-run
     if: needs.should-run.outputs.run-e2e == 'true'
     runs-on: ubuntu-latest
+    environment: staging
 
     services:
       postgres:
@@ -125,15 +126,26 @@ jobs:
             sleep 2
           done
 
-      - name: Run database migrations
-        run: pnpm db:push
+      - name: Setup database
+        run: |
+          pnpm db:push
+          pnpm db:setup-workflow
+          pnpm db:seed
+          pnpm db:seed-test-wallet
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/keeperhub_test
+          PARA_API_KEY: ${{ secrets.PARA_API_KEY }}
+          PARA_ENVIRONMENT: beta
+          WALLET_ENCRYPTION_KEY: ${{ secrets.WALLET_ENCRYPTION_KEY }}
 
       - name: Run E2E Vitest tests
-        run: pnpm test:e2e:schedule && pnpm test:e2e:runner
+        run: pnpm test:e2e:vitest
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/keeperhub_test
+          PARA_API_KEY: ${{ secrets.PARA_API_KEY }}
+          PARA_ENVIRONMENT: beta
+          WALLET_ENCRYPTION_KEY: ${{ secrets.WALLET_ENCRYPTION_KEY }}
+          WORKFLOW_TARGET_WORLD: "@workflow/world-postgres"
           AWS_ENDPOINT_URL: http://localhost:4566
           AWS_ACCESS_KEY_ID: test
           AWS_SECRET_ACCESS_KEY: test

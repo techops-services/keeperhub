@@ -29,7 +29,7 @@ import {
 
 // Unmock db to use real database for e2e tests
 vi.unmock("@/lib/db");
-vi.unmock("server-only");
+vi.mock("server-only", () => ({}));
 
 import {
   pendingTransactions,
@@ -638,42 +638,81 @@ describe.skipIf(shouldSkip)("Transaction Flow with Real RPC", () => {
 /**
  * Real Transaction Tests on Sepolia
  *
- * These tests send actual transactions on Sepolia testnet.
- * Requires PRIVATE_KEY environment variable with funded Sepolia ETH.
+ * These tests send actual transactions on Sepolia testnet using
+ * the persistent test org's Para wallet (provisioned by pnpm db:seed-test-wallet).
  *
  * To run:
  * pnpm test:e2e tests/e2e/transaction-flow.test.ts
  */
-const hasPrivateKey = !!process.env.PRIVATE_KEY;
-const skipRealTx = shouldSkip || !hasPrivateKey;
+const TEST_ORG_SLUG = "e2e-test-org";
+const skipRealTx = shouldSkip || !process.env.PARA_API_KEY;
 
 describe.skipIf(skipRealTx)("Real Transaction Tests (Sepolia)", () => {
   let client: ReturnType<typeof postgres>;
   let db: ReturnType<typeof drizzle>;
   let sepoliaProvider: ethers.JsonRpcProvider;
-  let wallet: ethers.Wallet;
+  let wallet: ethers.AbstractSigner;
   let walletAddress: string;
   let testExecutionId: string;
 
   beforeAll(async () => {
     // Connect to database
     const connectionString =
-      process.env.DATABASE_URL ||
-      "postgresql://postgres:postgres@localhost:5433/KEEP-1240";
+      process.env.DATABASE_URL ??
+      "postgresql://postgres:postgres@localhost:5433/keeperhub";
 
     client = postgres(connectionString, { max: 5 });
     db = drizzle(client);
 
-    // Initialize provider and wallet
-    sepoliaProvider = new ethers.JsonRpcProvider(SEPOLIA_RPC);
-    const privateKey = process.env.PRIVATE_KEY;
-    if (!privateKey) {
-      throw new Error("PRIVATE_KEY environment variable is required");
-    }
-    wallet = new ethers.Wallet(privateKey, sepoliaProvider);
-    walletAddress = await wallet.getAddress();
+    // Look up persistent test org
+    const { organization, paraWallets } = await import("@/lib/db/schema");
+    const [testOrg] = await db
+      .select()
+      .from(organization)
+      .where(eq(organization.slug, TEST_ORG_SLUG))
+      .limit(1);
 
-    console.log(`Test wallet: ${walletAddress}`);
+    if (!testOrg) {
+      throw new Error(
+        `Test org "${TEST_ORG_SLUG}" not found. Run pnpm db:seed-test-wallet first.`
+      );
+    }
+
+    const [paraWallet] = await db
+      .select()
+      .from(paraWallets)
+      .where(eq(paraWallets.organizationId, testOrg.id))
+      .limit(1);
+
+    if (!paraWallet) {
+      throw new Error(
+        "No Para wallet for test org. Run pnpm db:seed-test-wallet first."
+      );
+    }
+
+    walletAddress = paraWallet.walletAddress;
+
+    // Initialize Para signer
+    const { ParaEthersSigner } = await import("@getpara/ethers-v6-integration");
+    const { Environment, Para: ParaServer } = await import(
+      "@getpara/server-sdk"
+    );
+    const { decryptUserShare } = await import("@/keeperhub/lib/encryption");
+
+    const paraClient = new ParaServer(
+      process.env.PARA_ENVIRONMENT === "prod"
+        ? Environment.PROD
+        : Environment.BETA,
+      process.env.PARA_API_KEY ?? ""
+    );
+
+    const decryptedShare = decryptUserShare(paraWallet.userShare);
+    await paraClient.setUserShare(decryptedShare);
+
+    sepoliaProvider = new ethers.JsonRpcProvider(SEPOLIA_RPC);
+    wallet = new ParaEthersSigner(paraClient, sepoliaProvider);
+
+    console.log(`Test wallet (Para): ${walletAddress}`);
 
     // Check balance
     const balance = await sepoliaProvider.getBalance(walletAddress);
@@ -681,10 +720,10 @@ describe.skipIf(skipRealTx)("Real Transaction Tests (Sepolia)", () => {
 
     if (balance < ethers.parseEther("0.001")) {
       console.warn(
-        "Low balance! Get Sepolia ETH from https://sepoliafaucet.com"
+        "Low balance! Fund the persistent test wallet with pnpm db:fund-test-wallet"
       );
     }
-  });
+  }, 60_000);
 
   afterAll(async () => {
     // Cleanup test data

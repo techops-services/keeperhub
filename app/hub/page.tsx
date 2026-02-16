@@ -142,7 +142,7 @@ export default function HubPage() {
           <>
             <HubHero />
 
-            <div className="relative right-1/2 left-1/2 -mr-[50vw] -ml-[50vw] w-screen bg-sidebar">
+            <div className="-mr-[50vw] -ml-[50vw] relative right-1/2 left-1/2 w-screen bg-sidebar">
               <div className="bg-white/[0.03] py-12">
                 <div className="container mx-auto px-4">
                   <FeaturedCarousel workflows={featuredWorkflows} />
@@ -150,7 +150,7 @@ export default function HubPage() {
               </div>
             </div>
 
-            <div className="relative right-1/2 left-1/2 -mr-[50vw] -ml-[50vw] w-screen">
+            <div className="-mr-[50vw] -ml-[50vw] relative right-1/2 left-1/2 w-screen">
               <div className="bg-sidebar px-4 pt-8 pb-12">
                 <div className="container mx-auto">
                   <h2 className="mb-8 font-bold text-2xl">

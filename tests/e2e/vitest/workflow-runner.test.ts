@@ -19,6 +19,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { apiKeys, users, workflowExecutions, workflows } from "@/lib/db/schema";
+import { PERSISTENT_TEST_USER_EMAIL } from "../../utils/db";
 
 // Regex pattern for API key prefix validation (top-level for performance)
 const API_KEY_PREFIX_PATTERN = /^wfb_test_/;
@@ -37,6 +38,7 @@ describe.skipIf(shouldSkip)("Workflow Runner E2E", () => {
   let testUserId: string;
   let testWorkflowId: string;
   let testApiKeyRaw: string;
+  let testApiKeyId: string;
 
   beforeAll(async () => {
     // Connect to test database
@@ -47,14 +49,19 @@ describe.skipIf(shouldSkip)("Workflow Runner E2E", () => {
     client = postgres(connectionString, { max: 1 });
     db = drizzle(client);
 
-    // Create a test user
-    testUserId = `test_runner_${Date.now()}`;
-    await db.insert(users).values({
-      id: testUserId,
-      email: `test-runner-${Date.now()}@example.com`,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    // Look up persistent test user
+    const existingUser = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, PERSISTENT_TEST_USER_EMAIL))
+      .limit(1);
+
+    if (existingUser.length === 0) {
+      throw new Error(
+        "Persistent test user not found. Run pnpm db:seed-test-wallet first."
+      );
+    }
+    testUserId = existingUser[0].id;
 
     // Create test workflow with webhook trigger
     testWorkflowId = generateId();
@@ -85,9 +92,10 @@ describe.skipIf(shouldSkip)("Workflow Runner E2E", () => {
       .update(testApiKeyRaw)
       .digest("hex");
     const keyPrefix = testApiKeyRaw.substring(0, 12);
+    testApiKeyId = generateId();
 
     await db.insert(apiKeys).values({
-      id: generateId(),
+      id: testApiKeyId,
       userId: testUserId,
       name: "E2E Runner Test Key",
       keyHash,
@@ -96,16 +104,15 @@ describe.skipIf(shouldSkip)("Workflow Runner E2E", () => {
   });
 
   afterAll(async () => {
-    // Cleanup test data
+    // Clean up test-specific data (keep persistent user)
     if (testWorkflowId) {
       await db
         .delete(workflowExecutions)
         .where(eq(workflowExecutions.workflowId, testWorkflowId));
       await db.delete(workflows).where(eq(workflows.id, testWorkflowId));
     }
-    if (testUserId) {
-      await db.delete(apiKeys).where(eq(apiKeys.userId, testUserId));
-      await db.delete(users).where(eq(users.id, testUserId));
+    if (testApiKeyId) {
+      await db.delete(apiKeys).where(eq(apiKeys.id, testApiKeyId));
     }
     await client.end();
   });

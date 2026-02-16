@@ -22,11 +22,21 @@ export type SolanaFailoverStateChangeCallback = (
 ) => void;
 
 export const noopSolanaMetricsCollector: SolanaRpcMetricsCollector = {
-  recordPrimaryAttempt: () => undefined,
-  recordPrimaryFailure: () => undefined,
-  recordFallbackAttempt: () => undefined,
-  recordFallbackFailure: () => undefined,
-  recordFailoverEvent: () => undefined,
+  recordPrimaryAttempt: () => {
+    /* noop */
+  },
+  recordPrimaryFailure: () => {
+    /* noop */
+  },
+  recordFallbackAttempt: () => {
+    /* noop */
+  },
+  recordFallbackFailure: () => {
+    /* noop */
+  },
+  recordFailoverEvent: () => {
+    /* noop */
+  },
 };
 
 export const consoleSolanaMetricsCollector: SolanaRpcMetricsCollector = {

@@ -15,6 +15,7 @@ export default defineConfig({
       "tests/e2e/playwright",
       ".pnpm-store",
       ".worktrees",
+      "**/.worktrees/**",
     ],
     coverage: {
       provider: "v8",
@@ -24,6 +25,7 @@ export default defineConfig({
     },
     setupFiles: ["./tests/setup.ts"],
     testTimeout: 10_000,
+    fileParallelism: false,
   },
   resolve: {
     alias: {

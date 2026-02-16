@@ -185,7 +185,7 @@ export function AddConnectionOverlay({
 
       <div className="space-y-3">
         <div className="relative">
-          <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="-translate-y-1/2 absolute top-1/2 left-3 size-4 text-muted-foreground" />
           <Input
             autoFocus={!isMobile}
             className="pl-9"

@@ -26,7 +26,9 @@
       "!lib/workflow-executor.workflow.ts",
       "!components/settings",
       "!components/workflow",
-      "!lib/atoms"
+      "!lib/atoms",
+      "!keeperhub-events",
+      "!keeperhub-scheduler"
     ]
   },
   "linter": {

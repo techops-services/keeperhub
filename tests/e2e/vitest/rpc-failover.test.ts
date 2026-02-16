@@ -53,7 +53,7 @@ describe.skipIf(shouldSkip)("RPC Failover E2E", () => {
 
     if (existingUser.length === 0) {
       throw new Error(
-        `Persistent test user not found. Run pnpm db:seed-test-wallet first.`
+        "Persistent test user not found. Run pnpm db:seed-test-wallet first."
       );
     }
     testUserId = existingUser[0].id;

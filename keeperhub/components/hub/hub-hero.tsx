@@ -14,7 +14,7 @@ export function HubHero() {
       </div>
 
       <div className="relative hidden lg:block">
-        <div className="absolute top-1/2 left-1/2 -z-10 h-[150%] w-[150%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,#243548_0%,transparent_70%)]" />
+        <div className="-z-10 -translate-x-1/2 -translate-y-1/2 absolute top-1/2 left-1/2 h-[150%] w-[150%] rounded-full bg-[radial-gradient(circle,#243548_0%,transparent_70%)]" />
         <Image
           alt=""
           height={400}

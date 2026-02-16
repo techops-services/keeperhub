@@ -245,7 +245,7 @@ function DesktopOverlayContainer() {
             <motion.div
               animate="visible"
               className={cn(
-                "fixed top-1/2 left-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 px-4",
+                "-translate-x-1/2 -translate-y-1/2 fixed top-1/2 left-1/2 z-50 w-full px-4",
                 sizeClasses[currentItem?.options.size || "lg"]
               )}
               exit="exit"

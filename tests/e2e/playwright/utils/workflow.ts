@@ -187,12 +187,17 @@ export async function saveWorkflow(page: Page): Promise<void> {
   await expect(saveButton).toBeVisible({ timeout: 5000 });
   await saveButton.click();
 
-  // Wait for save to complete (network settles or toast appears)
-  await page.waitForLoadState("networkidle");
-
-  // Optionally check for toast (but don't fail if not present)
+  // Wait for save to complete - look for toast or URL change
+  // Don't use networkidle as it hangs when there's polling
   const toast = page.locator("[data-sonner-toast]").first();
-  await toast.isVisible({ timeout: 3000 }).catch(() => false);
+  await expect(toast)
+    .toBeVisible({ timeout: 10_000 })
+    .catch(() => {
+      // Toast may not appear, that's OK - just wait a bit
+    });
+
+  // Give time for any redirects/state updates
+  await page.waitForTimeout(500);
 }
 
 /**

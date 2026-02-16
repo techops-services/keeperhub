@@ -1,134 +1,167 @@
 import { expect, test } from "@playwright/test";
 import {
-  addActionNode,
-  configureWebhookTrigger,
-  createWorkflow,
-  getWebhookUrl,
-  saveWorkflow,
+  createApiKey,
+  createTestWorkflow,
+  deleteApiKey,
+  deleteTestWorkflow,
+  getWorkflowWebhookUrl,
   signUpAndVerify,
-  waitForCanvas,
+  waitForWorkflowExecution,
 } from "../utils";
-
-// Top-level regex for URL validation
-const URL_REGEX = /^https?:\/\//;
 
 // Run tests serially to maintain user session state
 test.describe.configure({ mode: "serial" });
 
 test.describe("Happy Path: Webhook Workflow", () => {
+  // Track resources to clean up after tests
+  const createdWorkflows: string[] = [];
+  const createdApiKeys: string[] = [];
+
   test.beforeEach(async ({ context }) => {
     await context.clearCookies();
   });
 
-  test("create webhook workflow and get webhook URL", async ({ page }) => {
+  test.afterAll(async () => {
+    // Cleanup workflows
+    for (const workflowId of createdWorkflows) {
+      try {
+        await deleteTestWorkflow(workflowId);
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+    // Cleanup API keys
+    for (const apiKey of createdApiKeys) {
+      try {
+        await deleteApiKey(apiKey);
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+  });
+
+  test("trigger webhook and verify execution completes successfully", async ({
+    page,
+    request,
+    baseURL,
+  }) => {
     // Step 1: Sign up and verify
-    await signUpAndVerify(page);
+    const { email } = await signUpAndVerify(page);
 
-    // Step 2: Create a new workflow
-    const workflowId = await createWorkflow(page, "Webhook Test Workflow");
-    expect(workflowId).toBeTruthy();
+    // Step 2: Create API key for webhook authentication
+    const apiKey = await createApiKey(email);
+    createdApiKeys.push(apiKey);
 
-    // Step 3: Configure trigger as webhook type
-    await configureWebhookTrigger(page);
+    // Step 3: Create workflow directly in database with connected nodes
+    const workflow = await createTestWorkflow(email, {
+      name: "Webhook Execution Test",
+      triggerType: "webhook",
+      enabled: true,
+    });
+    createdWorkflows.push(workflow.id);
 
-    // Step 4: Add Send Webhook action
-    await addActionNode(page, "Send Webhook");
+    // Step 4: Get webhook URL
+    const webhookUrl = getWorkflowWebhookUrl(workflow.id, baseURL);
 
-    // Step 5: Verify action node exists
-    const actionNode = page.locator(".react-flow__node-action");
-    await expect(actionNode).toBeVisible({ timeout: 5000 });
+    // Verify URL format
+    expect(webhookUrl).toContain("/api/workflows/");
+    expect(webhookUrl).toContain("/webhook");
 
-    // Step 6: Save the workflow
-    await saveWorkflow(page);
-
-    // Step 7: Get webhook URL from trigger
-    const webhookUrl = await getWebhookUrl(page);
-    expect(webhookUrl).toMatch(URL_REGEX);
-    expect(webhookUrl).toContain(workflowId);
-  });
-
-  test("trigger webhook and verify execution", async ({ page, request }) => {
-    // Sign up and verify
-    await signUpAndVerify(page);
-
-    // Create workflow
-    const workflowId = await createWorkflow(page, "Webhook Trigger Test");
-
-    // Configure trigger as webhook type
-    await configureWebhookTrigger(page);
-
-    // Add action
-    await addActionNode(page, "Send Webhook");
-
-    // Save workflow
-    await saveWorkflow(page);
-
-    // Get webhook URL from trigger
-    const webhookUrl = await getWebhookUrl(page);
-
-    // Trigger webhook via API
+    // Step 5: Trigger webhook via API with API key
     const response = await request.post(webhookUrl, {
-      data: { test: true },
-      headers: { "Content-Type": "application/json" },
+      data: { test: true, timestamp: Date.now() },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
     });
 
-    expect(response.status()).toBeLessThan(500);
+    // Log response for debugging
+    if (!response.ok()) {
+      const body = await response.text();
+      console.log(`Webhook response: ${response.status()} - ${body}`);
+    }
+    expect(response.ok()).toBe(true);
 
-    // Navigate to execution history
-    await page.goto(`/workflow/${workflowId}/history`, {
-      waitUntil: "domcontentloaded",
-    });
-
-    // Wait for execution to appear
-    const executionRow = page.locator('[data-testid="execution-row"]').first();
-    await expect(executionRow).toBeVisible({ timeout: 30_000 });
+    // Step 6: Wait for execution to complete via database polling
+    const execution = await waitForWorkflowExecution(workflow.id, 60_000);
+    expect(execution).not.toBeNull();
+    if (execution?.status === "error") {
+      console.log(`Workflow execution error: ${execution.error}`);
+    }
+    expect(execution?.status).toBe("success");
   });
 
-  test("webhook URL is unique per workflow", async ({ page }) => {
+  test("webhook URL is unique per workflow", async ({ page, baseURL }) => {
     // Sign up and verify
-    await signUpAndVerify(page);
+    const { email } = await signUpAndVerify(page);
 
-    // Create first workflow with webhook trigger
-    await createWorkflow(page, "Webhook Workflow 1");
-    await configureWebhookTrigger(page);
-    await addActionNode(page, "Send Webhook");
-    await saveWorkflow(page);
-    const webhookUrl1 = await getWebhookUrl(page);
+    // Create first workflow
+    const workflow1 = await createTestWorkflow(email, {
+      name: "Webhook Workflow 1",
+      triggerType: "webhook",
+    });
+    createdWorkflows.push(workflow1.id);
 
-    // Create second workflow with webhook trigger
-    await createWorkflow(page, "Webhook Workflow 2");
-    await configureWebhookTrigger(page);
-    await addActionNode(page, "Send Webhook");
-    await saveWorkflow(page);
-    const webhookUrl2 = await getWebhookUrl(page);
+    // Create second workflow
+    const workflow2 = await createTestWorkflow(email, {
+      name: "Webhook Workflow 2",
+      triggerType: "webhook",
+    });
+    createdWorkflows.push(workflow2.id);
+
+    // Get webhook URLs
+    const webhookUrl1 = getWorkflowWebhookUrl(workflow1.id, baseURL);
+    const webhookUrl2 = getWorkflowWebhookUrl(workflow2.id, baseURL);
 
     // Verify URLs are different
     expect(webhookUrl1).not.toBe(webhookUrl2);
+
+    // Verify both contain the correct workflow IDs
+    expect(webhookUrl1).toContain(workflow1.id);
+    expect(webhookUrl2).toContain(workflow2.id);
   });
 
-  test("webhook URL persists after page reload", async ({ page }) => {
+  test("webhook can be triggered multiple times", async ({
+    page,
+    request,
+    baseURL,
+  }) => {
     // Sign up and verify
-    await signUpAndVerify(page);
+    const { email } = await signUpAndVerify(page);
 
-    // Create workflow with webhook trigger
-    await createWorkflow(page, "Webhook Persistence Test");
-    await configureWebhookTrigger(page);
+    // Create API key
+    const apiKey = await createApiKey(email);
+    createdApiKeys.push(apiKey);
 
-    // Add action and save
-    await addActionNode(page, "Send Webhook");
-    await saveWorkflow(page);
+    // Create workflow
+    const workflow = await createTestWorkflow(email, {
+      name: "Multi-trigger Test",
+      triggerType: "webhook",
+      enabled: true,
+    });
+    createdWorkflows.push(workflow.id);
 
-    // Get webhook URL from trigger
-    const webhookUrlBefore = await getWebhookUrl(page);
+    const webhookUrl = getWorkflowWebhookUrl(workflow.id, baseURL);
 
-    // Reload page
-    await page.reload();
-    await waitForCanvas(page);
+    // Trigger webhook 3 times
+    for (let i = 0; i < 3; i++) {
+      const response = await request.post(webhookUrl, {
+        data: { run: i + 1 },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+      });
+      expect(response.ok()).toBe(true);
 
-    // Get webhook URL again
-    const webhookUrlAfter = await getWebhookUrl(page);
+      // Wait a bit between triggers
+      await page.waitForTimeout(500);
+    }
 
-    // Verify URL is the same
-    expect(webhookUrlAfter).toBe(webhookUrlBefore);
+    // All triggers should succeed - check the last execution
+    const execution = await waitForWorkflowExecution(workflow.id, 60_000);
+    expect(execution).not.toBeNull();
+    expect(execution?.status).toBe("success");
   });
 });

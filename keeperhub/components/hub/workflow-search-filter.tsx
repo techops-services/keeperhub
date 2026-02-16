@@ -105,7 +105,7 @@ export function WorkflowSearchFilter({
             <ChevronDown
               className={cn(
                 iconSize,
-                "pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground"
+                "-translate-y-1/2 pointer-events-none absolute top-1/2 right-3 text-muted-foreground"
               )}
             />
           </div>

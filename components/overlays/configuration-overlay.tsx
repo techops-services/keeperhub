@@ -765,7 +765,7 @@ export function ConfigurationOverlay({ overlayId }: ConfigurationOverlayProps) {
         {/* Preload Code tab - always render but hide when not active */}
         {showCodeTab && (
           <div
-            className={`flex flex-col ${activeTab === "code" ? "" : "invisible absolute -z-10"}`}
+            className={`flex flex-col ${activeTab === "code" ? "" : "-z-10 invisible absolute"}`}
           >
             <div className="flex shrink-0 items-center justify-between border-b bg-muted/30 px-3 py-2">
               <div className="flex items-center gap-2">

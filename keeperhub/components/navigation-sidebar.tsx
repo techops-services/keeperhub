@@ -380,7 +380,9 @@ export function NavigationSidebar(): React.ReactNode {
       }
     }
 
-    fetchData().catch(() => undefined);
+    fetchData().catch(() => {
+      /* intentional noop */
+    });
     return () => {
       cancelled = true;
     };
@@ -659,7 +661,7 @@ export function NavigationSidebar(): React.ReactNode {
           <div className="absolute inset-y-0 right-0 w-px bg-border transition-colors group-hover:w-1 group-hover:bg-blue-500 group-active:w-1 group-active:bg-blue-600" />
           {dragWidth === null && (
             <button
-              className="absolute top-1/2 right-0 flex size-6 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border bg-background opacity-0 shadow-sm transition-opacity hover:bg-muted group-hover:opacity-100"
+              className="-translate-y-1/2 absolute top-1/2 right-0 flex size-6 translate-x-1/2 items-center justify-center rounded-full border bg-background opacity-0 shadow-sm transition-opacity hover:bg-muted group-hover:opacity-100"
               onClick={(e) => {
                 e.stopPropagation();
                 setExpanded((prev) => !prev);

@@ -17,8 +17,8 @@ import { expand } from "dotenv-expand";
 
 expand(dotenv.config());
 
-import { hashPassword } from "better-auth/crypto";
 import { Environment, Para as ParaServer } from "@getpara/server-sdk";
+import { hashPassword } from "better-auth/crypto";
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -37,6 +37,152 @@ const TEST_ORG_SLUG = "e2e-test-org";
 const TEST_USER_EMAIL = "e2e-test@keeperhub.test";
 const TEST_PASSWORD = "TestPassword123!";
 
+type Db = ReturnType<typeof drizzle>;
+
+async function ensureUser(db: Db): Promise<string> {
+  const existing = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, TEST_USER_EMAIL))
+    .limit(1);
+
+  if (existing.length > 0) {
+    console.log(`Test user already exists (id: ${existing[0].id})`);
+    return existing[0].id;
+  }
+
+  const userId = generateId();
+  await db.insert(users).values({
+    id: userId,
+    name: "E2E Test User",
+    email: TEST_USER_EMAIL,
+    emailVerified: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  console.log(`Created test user (id: ${userId})`);
+  return userId;
+}
+
+async function ensureCredentialAccount(db: Db, userId: string): Promise<void> {
+  const existing = await db
+    .select()
+    .from(accounts)
+    .where(
+      and(eq(accounts.userId, userId), eq(accounts.providerId, "credential"))
+    )
+    .limit(1);
+
+  if (existing.length > 0) {
+    console.log("Credential account already exists");
+    return;
+  }
+
+  const hashedPassword = await hashPassword(TEST_PASSWORD);
+  await db.insert(accounts).values({
+    id: generateId(),
+    accountId: userId,
+    providerId: "credential",
+    userId,
+    password: hashedPassword,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  console.log(`Created credential account (password: ${TEST_PASSWORD})`);
+}
+
+async function ensureOrganization(db: Db, userId: string): Promise<string> {
+  const existing = await db
+    .select()
+    .from(organization)
+    .where(eq(organization.slug, TEST_ORG_SLUG))
+    .limit(1);
+
+  if (existing.length > 0) {
+    console.log(`Test org already exists (id: ${existing[0].id})`);
+    return existing[0].id;
+  }
+
+  const orgId = generateId();
+  await db.insert(organization).values({
+    id: orgId,
+    name: "E2E Test Organization",
+    slug: TEST_ORG_SLUG,
+    createdAt: new Date(),
+  });
+  console.log(`Created test org (id: ${orgId})`);
+
+  const memberId = generateId();
+  await db.insert(member).values({
+    id: memberId,
+    organizationId: orgId,
+    userId,
+    role: "owner",
+    createdAt: new Date(),
+  });
+  console.log(`Created member record (id: ${memberId})`);
+  return orgId;
+}
+
+async function ensureParaWallet(
+  db: Db,
+  userId: string,
+  orgId: string
+): Promise<void> {
+  const existing = await db
+    .select()
+    .from(paraWallets)
+    .where(eq(paraWallets.organizationId, orgId))
+    .limit(1);
+
+  if (existing.length > 0) {
+    console.log(`Wallet already exists: ${existing[0].walletAddress}`);
+    return;
+  }
+
+  const PARA_API_KEY = process.env.PARA_API_KEY;
+  const PARA_ENV = process.env.PARA_ENVIRONMENT || "beta";
+
+  if (!PARA_API_KEY) {
+    throw new Error("PARA_API_KEY is required");
+  }
+  if (!process.env.WALLET_ENCRYPTION_KEY) {
+    throw new Error("WALLET_ENCRYPTION_KEY is required");
+  }
+
+  console.log("Creating Para pregenerated wallet...");
+  const environment = PARA_ENV === "prod" ? Environment.PROD : Environment.BETA;
+  const paraClient = new ParaServer(environment, PARA_API_KEY);
+
+  const wallet = await paraClient.createPregenWallet({
+    type: "EVM",
+    pregenId: { email: TEST_USER_EMAIL },
+  });
+
+  const userShare = await paraClient.getUserShare();
+
+  if (!userShare) {
+    throw new Error("Failed to get user share from Para");
+  }
+  if (!(wallet.id && wallet.address)) {
+    throw new Error("Invalid wallet data from Para");
+  }
+
+  const encryptedShare = encryptUserShare(userShare);
+
+  await db.insert(paraWallets).values({
+    id: generateId(),
+    userId,
+    organizationId: orgId,
+    email: TEST_USER_EMAIL,
+    walletId: wallet.id,
+    walletAddress: wallet.address,
+    userShare: encryptedShare,
+  });
+
+  console.log(`Created wallet: ${wallet.address}`);
+}
+
 async function seedTestWallet(): Promise<void> {
   const connectionString = getDatabaseUrl();
   console.log("Connecting to database...");
@@ -45,148 +191,11 @@ async function seedTestWallet(): Promise<void> {
   const db = drizzle(client);
 
   try {
-    // --- User ---
-    let userId: string;
-    const existingUser = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, TEST_USER_EMAIL))
-      .limit(1);
+    const userId = await ensureUser(db);
+    await ensureCredentialAccount(db, userId);
+    const orgId = await ensureOrganization(db, userId);
+    await ensureParaWallet(db, userId, orgId);
 
-    if (existingUser.length > 0) {
-      userId = existingUser[0].id;
-      console.log(`Test user already exists (id: ${userId})`);
-    } else {
-      userId = generateId();
-      await db.insert(users).values({
-        id: userId,
-        name: "E2E Test User",
-        email: TEST_USER_EMAIL,
-        emailVerified: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-      console.log(`Created test user (id: ${userId})`);
-    }
-
-    // --- Credential account (for Playwright login) ---
-    const existingAccount = await db
-      .select()
-      .from(accounts)
-      .where(
-        and(
-          eq(accounts.userId, userId),
-          eq(accounts.providerId, "credential")
-        )
-      )
-      .limit(1);
-
-    if (existingAccount.length > 0) {
-      console.log("Credential account already exists");
-    } else {
-      const hashedPassword = await hashPassword(TEST_PASSWORD);
-      await db.insert(accounts).values({
-        id: generateId(),
-        accountId: userId,
-        providerId: "credential",
-        userId,
-        password: hashedPassword,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-      console.log(`Created credential account (password: ${TEST_PASSWORD})`);
-    }
-
-    // --- Organization ---
-    let orgId: string;
-    const existingOrg = await db
-      .select()
-      .from(organization)
-      .where(eq(organization.slug, TEST_ORG_SLUG))
-      .limit(1);
-
-    if (existingOrg.length > 0) {
-      orgId = existingOrg[0].id;
-      console.log(`Test org already exists (id: ${orgId})`);
-    } else {
-      orgId = generateId();
-      await db.insert(organization).values({
-        id: orgId,
-        name: "E2E Test Organization",
-        slug: TEST_ORG_SLUG,
-        createdAt: new Date(),
-      });
-      console.log(`Created test org (id: ${orgId})`);
-
-      // Create member record
-      const memberId = generateId();
-      await db.insert(member).values({
-        id: memberId,
-        organizationId: orgId,
-        userId,
-        role: "owner",
-        createdAt: new Date(),
-      });
-      console.log(`Created member record (id: ${memberId})`);
-    }
-
-    // --- Para wallet ---
-    const existingWallet = await db
-      .select()
-      .from(paraWallets)
-      .where(eq(paraWallets.organizationId, orgId))
-      .limit(1);
-
-    if (existingWallet.length > 0) {
-      console.log(`Wallet already exists: ${existingWallet[0].walletAddress}`);
-    } else {
-      // Validate Para config
-      const PARA_API_KEY = process.env.PARA_API_KEY;
-      const PARA_ENV = process.env.PARA_ENVIRONMENT || "beta";
-
-      if (!PARA_API_KEY) {
-        throw new Error("PARA_API_KEY is required");
-      }
-      if (!process.env.WALLET_ENCRYPTION_KEY) {
-        throw new Error("WALLET_ENCRYPTION_KEY is required");
-      }
-
-      console.log("Creating Para pregenerated wallet...");
-      const environment =
-        PARA_ENV === "prod" ? Environment.PROD : Environment.BETA;
-      const paraClient = new ParaServer(environment, PARA_API_KEY);
-
-      const wallet = await paraClient.createPregenWallet({
-        type: "EVM",
-        pregenId: { email: TEST_USER_EMAIL },
-      });
-
-      const userShare = await paraClient.getUserShare();
-
-      if (!userShare) {
-        throw new Error("Failed to get user share from Para");
-      }
-      if (!(wallet.id && wallet.address)) {
-        throw new Error("Invalid wallet data from Para");
-      }
-
-      // Encrypt user share and store wallet
-      const encryptedShare = encryptUserShare(userShare);
-
-      await db.insert(paraWallets).values({
-        id: generateId(),
-        userId,
-        organizationId: orgId,
-        email: TEST_USER_EMAIL,
-        walletId: wallet.id,
-        walletAddress: wallet.address,
-        userShare: encryptedShare,
-      });
-
-      console.log(`Created wallet: ${wallet.address}`);
-    }
-
-    // --- Summary ---
     const wallet = await db
       .select()
       .from(paraWallets)

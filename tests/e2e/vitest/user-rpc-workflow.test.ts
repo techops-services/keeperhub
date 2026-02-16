@@ -103,7 +103,7 @@ describe.skipIf(SKIP_INFRA_TESTS)(
 
       if (existingUser.length === 0) {
         throw new Error(
-          `Persistent test user not found. Run pnpm db:seed-test-wallet first.`
+          "Persistent test user not found. Run pnpm db:seed-test-wallet first."
         );
       }
       TEST_USER_ID = existingUser[0].id;
@@ -167,7 +167,7 @@ describe.skipIf(SKIP_INFRA_TESTS)(
           import.meta.dirname,
           "../../../scripts/runtime/workflow-runner-bootstrap.ts"
         );
-        const child = spawn("tsx", [scriptPath], {
+        const child = spawn("npx", ["tsx", scriptPath], {
           env,
           cwd: join(import.meta.dirname, "../../.."),
         });

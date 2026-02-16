@@ -178,7 +178,7 @@ export function AddStepButton({
   return (
     <>
       <button
-        className="add-step-button group nopan nodrag absolute -translate-y-1/2"
+        className="add-step-button group nopan nodrag -translate-y-1/2 absolute"
         onClick={handleClick}
         style={{
           left: `calc(100% + ${distance}px)`,
