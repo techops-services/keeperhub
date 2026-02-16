@@ -221,14 +221,6 @@ const errorTriggers: ErrorTrigger[] = [
 ];
 
 export async function POST(request: Request): Promise<NextResponse> {
-  // Security: Only enable in non-production environments
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json(
-      { error: "Test endpoints disabled in production" },
-      { status: 403 }
-    );
-  }
-
   const { searchParams } = new URL(request.url);
   const categoryFilter = searchParams.get("category");
   const countParam = searchParams.get("count");
@@ -282,7 +274,6 @@ export async function GET(): Promise<NextResponse> {
     method: "POST",
     description:
       "Triggers all error categories for metrics testing and Grafana dashboard development",
-    security: "Only enabled in non-production environments",
     usage: {
       "Trigger all errors once": "POST /api/test/trigger-errors",
       "Trigger specific category": "POST /api/test/trigger-errors?category=validation",
