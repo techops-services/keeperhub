@@ -294,24 +294,24 @@ export function GasLimitMultiplierField({
   return (
     <div className="space-y-2">
       {/* Mode toggle */}
-      <div className="flex gap-1 rounded-md border bg-muted/30 p-0.5">
+      <div className="flex gap-1 rounded-md border bg-muted/40 p-0.5">
         <Button
-          className={`h-7 flex-1 text-xs ${mode === "multiplier" ? "bg-background shadow-sm" : ""}`}
+          className={`h-7 flex-1 text-xs ${mode === "multiplier" ? "bg-background font-medium shadow-sm" : "text-muted-foreground"}`}
           disabled={disabled}
           onClick={() => handleModeChange("multiplier")}
           size="sm"
           type="button"
-          variant={mode === "multiplier" ? "secondary" : "ghost"}
+          variant="ghost"
         >
           Gas Estimate Multiplier
         </Button>
         <Button
-          className={`h-7 flex-1 text-xs ${mode === "maxGasLimit" ? "bg-background shadow-sm" : ""}`}
+          className={`h-7 flex-1 text-xs ${mode === "maxGasLimit" ? "bg-background font-medium shadow-sm" : "text-muted-foreground"}`}
           disabled={disabled}
           onClick={() => handleModeChange("maxGasLimit")}
           size="sm"
           type="button"
-          variant={mode === "maxGasLimit" ? "secondary" : "ghost"}
+          variant="ghost"
         >
           Absolute Gas Limit
         </Button>
@@ -358,7 +358,7 @@ export function GasLimitMultiplierField({
             </p>
             {finalMaxGas !== undefined && (
               <p className="font-medium text-foreground text-sm">
-                Final Max Gas:{" "}
+                Final Gas Limit:{" "}
                 {mode === "multiplier" ? (
                   <>
                     {formatGasNumber(estimate.estimatedGas)} x{" "}
@@ -388,7 +388,7 @@ export function GasLimitMultiplierField({
 
         {isCustomMultiplier && (
           <p className="text-muted-foreground text-xs">
-            Custom multiplier: {inputValue}x
+            Custom: {inputValue}x
           </p>
         )}
 
