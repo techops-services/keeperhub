@@ -329,6 +329,7 @@ jobs:
           base_branch: staging
           branch_prefix: docs-sync-
           branch_name_template: 'docs-sync-${{ steps.tag.outputs.release_tag }}-{{timestamp}}'
+          show_full_output: true
           prompt: |
             REPO: ${{ github.repository }}
             RELEASE TAG: ${{ steps.tag.outputs.release_tag }}
