@@ -39,6 +39,7 @@
     "lib/next-boilerplate/**/*.ts",
     "lib/next-boilerplate/**/*.tsx",
     "tmp/**/*",
-    "docs-site/**/*"
+    "docs-site/**/*",
+    "keeperhub-scheduler/**/*"
   ]
 }

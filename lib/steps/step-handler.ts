@@ -22,6 +22,9 @@ export type StepContext = {
   nodeId: string;
   nodeName: string;
   nodeType: string;
+  // start custom keeperhub code //
+  triggerType?: string;
+  // end keeperhub code //
 };
 
 /**

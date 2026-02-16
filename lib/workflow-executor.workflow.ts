@@ -711,6 +711,27 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
     "trigger nodes"
   );
 
+  // start custom keeperhub code //
+  // Detect trigger type for step context (gas strategy uses this for multiplier selection)
+  const workflowTriggerType: string = (() => {
+    const triggerNode = nodes.find((n) => n.data.type === "trigger");
+    if (!triggerNode) {
+      return "manual";
+    }
+    const tt = triggerNode.data.config?.triggerType as string | undefined;
+    if (tt === "Webhook") {
+      return "webhook";
+    }
+    if (tt === "Scheduled" || tt === "Schedule") {
+      return "scheduled";
+    }
+    if (tt === "Event") {
+      return "event";
+    }
+    return "manual";
+  })();
+  // end keeperhub code //
+
   // Helper to get a meaningful node name
   function getNodeName(node: WorkflowNode): string {
     if (node.data.label) {
@@ -906,6 +927,9 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
           nodeId: node.id,
           nodeName: getNodeName(node),
           nodeType: actionType,
+          // start custom keeperhub code //
+          triggerType: workflowTriggerType,
+          // end keeperhub code //
         };
 
         // Execute the action step with stepHandler (logging is handled inside)

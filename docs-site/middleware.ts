@@ -11,6 +11,7 @@ const VALID_ROUTES = new Set([
   "keeper-runs",
   "keepers",
   "notifications",
+  "plugins",
   "practices",
   "users-teams-orgs",
   "wallet-management",

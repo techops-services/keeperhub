@@ -8,6 +8,8 @@
 - **No co-authored with Claude in PR descriptions and git commits**
 - **Do not git push or create Github PRs without user's confirmation**
 - **Do not leave code comments with summaries of user's prompt**
+- **Do not include task codes in branch/PR names**
+- **PR titles must follow conventional commit format**: `<type>: <description>` or `<type>(scope): <description>`. Allowed types: `feat`, `fix`, `hotfix`, `chore`, `docs`, `refactor`, `test`, `ci`, `build`, `perf`, `style`, `breaking`. This is enforced by the `pr-title-check` workflow on PRs targeting `staging`.
 
 ## Code Quality: Lint and Type Checking
 
@@ -48,6 +50,7 @@ When lint/type-check commands run, their output is saved to gitignored files:
 - `.claude/typecheck-output.txt` - Output from `pnpm type-check`
 
 **Workflow for fixing errors:**
+
 1. Run `pnpm check` or `pnpm type-check` once
 2. Read `.claude/lint-output.txt` or `.claude/typecheck-output.txt` for errors
 3. Fix the errors in code
@@ -60,11 +63,13 @@ When lint/type-check commands run, their output is saved to gitignored files:
 This project has Claude Code hooks configured in `.claude/settings.json`:
 
 **Pre-Edit Lint Context** (`.claude/hooks/pre-edit-lint-context.sh`):
+
 - Fires before Edit/Write on .ts/.tsx/.js/.jsx files
 - Injects key Ultracite/Biome lint rules into context
 - **Rationale**: Higher upfront token cost, but saves overall context by writing correct code the first time instead of the expensive cycle of: write code → run lint → see errors → fix partially → re-run lint → repeat
 
 **Pre-Commit Checks** (`.claude/hooks/pre-commit-checks.sh`):
+
 - Detects `git commit` commands
 - Runs `pnpm check` (lint) and `pnpm type-check` (TypeScript)
 - Saves output to `.claude/*.txt` files for reading without re-running
@@ -85,6 +90,7 @@ This project has Claude Code hooks configured in `.claude/settings.json`:
 - "It's faster to ignore than fix"
 
 When you must use an ignore comment:
+
 1. Use the most specific ignore possible (target the exact rule, not all rules)
 2. Add a brief comment explaining why the ignore is necessary
 3. Example:
@@ -189,6 +195,7 @@ pnpm test:e2e               # E2E tests
 ## MCP Schemas Endpoint
 
 **Files**:
+
 - `keeperhub/api/mcp/schemas/route.ts` - Implementation
 - `app/api/mcp/schemas/route.ts` - Thin wrapper (re-exports from keeperhub)
 
@@ -204,12 +211,12 @@ This endpoint serves workflow schemas to the KeeperHub MCP server. It's the sour
 
 These are defined directly in the file because they rarely change and aren't in a registry:
 
-| Section | When to Update |
-|---------|----------------|
-| `SYSTEM_ACTIONS` | Adding new system action (Condition, HTTP Request, Database Query) |
-| `TRIGGERS` | Adding new trigger type (Manual, Schedule, Webhook, Event) |
-| `TEMPLATE_SYNTAX` | If template syntax `{{@nodeId:Label.field}}` changes |
-| `tips` array | When adding guidance for AI workflow generation |
+| Section           | When to Update                                                     |
+| ----------------- | ------------------------------------------------------------------ |
+| `SYSTEM_ACTIONS`  | Adding new system action (Condition, HTTP Request, Database Query) |
+| `TRIGGERS`        | Adding new trigger type (Manual, Schedule, Webhook, Event)         |
+| `TEMPLATE_SYNTAX` | If template syntax `{{@nodeId:Label.field}}` changes               |
+| `tips` array      | When adding guidance for AI workflow generation                    |
 
 ### How to Update
 
