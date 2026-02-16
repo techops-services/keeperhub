@@ -55,7 +55,9 @@ export function TokenSelectField({
   const [validationError, setValidationError] = useState<string | null>(null);
 
   // Parse current value
-  const currentValue = parseTokenValue(config[field.key] as string | undefined);
+  const currentValue = parseTokenValue(
+    config[field.key] as string | Record<string, unknown> | undefined,
+  );
   const networkValue = config[networkField] as string | undefined;
 
   // Reset token selection when network changes
@@ -555,27 +557,34 @@ function extractCustomToken(parsed: unknown): CustomToken | undefined {
 }
 
 /**
- * Parse token value from JSON string
- * Supports both new (single token) and legacy (array) formats
+ * Parse token value from JSON string or object
+ * Supports: object (API/MCP), JSON string (UI), bare address string (legacy)
  */
-function parseTokenValue(value: string | undefined): TokenFieldValue {
+function parseTokenValue(
+  value: string | Record<string, unknown> | undefined,
+): TokenFieldValue {
   if (!value) {
     return {
       mode: "supported",
     };
   }
 
+  // Object values from API/MCP-created workflows
+  if (typeof value === "object") {
+    return {
+      mode: extractMode(value),
+      supportedTokenId: extractSupportedTokenId(value),
+      customToken: extractCustomToken(value),
+    };
+  }
+
   try {
     const parsed = JSON.parse(value);
 
-    const supportedTokenId = extractSupportedTokenId(parsed);
-    const customToken = extractCustomToken(parsed);
-    const mode = extractMode(parsed);
-
     return {
-      mode,
-      supportedTokenId,
-      customToken,
+      mode: extractMode(parsed),
+      supportedTokenId: extractSupportedTokenId(parsed),
+      customToken: extractCustomToken(parsed),
     };
   } catch {
     // Legacy support: if value is just a string (old format), treat as custom
