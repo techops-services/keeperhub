@@ -753,19 +753,19 @@ function ForEachLogGroup({
               </div>
             );
           })}
-
-          {collectLog && (
-            <ExecutionLogEntry
-              getStatusDotClass={getStatusDotClass}
-              getStatusIcon={getStatusIcon}
-              isExpanded={expandedLogs.has(collectLog.id)}
-              isFirst={false}
-              isLast={isLast}
-              log={collectLog}
-              onToggle={() => onToggleLog(collectLog.id)}
-            />
-          )}
         </div>
+      )}
+
+      {collectLog && (
+        <ExecutionLogEntry
+          getStatusDotClass={getStatusDotClass}
+          getStatusIcon={getStatusIcon}
+          isExpanded={expandedLogs.has(collectLog.id)}
+          isFirst={false}
+          isLast={isLast}
+          log={collectLog}
+          onToggle={() => onToggleLog(collectLog.id)}
+        />
       )}
     </div>
   );
