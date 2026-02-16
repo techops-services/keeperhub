@@ -14,6 +14,7 @@ Interact with EVM-compatible blockchain networks. Read-only actions work without
 | Get Native Token Balance | Web3 | No | Check ETH/MATIC/etc. balance of any address |
 | Get ERC20 Token Balance | Web3 | No | Check token balance of any address |
 | Read Contract | Web3 | No | Call view/pure functions on smart contracts |
+| Get Transaction | Web3 | No | Fetch full transaction details by hash |
 | Write Contract | Web3 | Wallet | Execute state-changing contract functions |
 | Transfer Native Token | Web3 | Wallet | Send ETH/MATIC/etc. to a recipient |
 | Transfer ERC20 Token | Web3 | Wallet | Send ERC20 tokens to a recipient |
@@ -71,6 +72,28 @@ Schedule (every 5 min)
   -> Read Contract: Aave getLiquidationThreshold()
   -> Condition: health factor < 1.5
   -> Discord: "Liquidation risk alert"
+```
+
+---
+
+## Get Transaction
+
+Fetch full transaction details by hash via `eth_getTransactionByHash`. Returns sender, recipient, value, calldata, nonce, gas, and block explorer links.
+
+**Inputs:** Network, Transaction Hash
+
+**Outputs:** `success`, `hash`, `from`, `to`, `value` (ETH), `input` (calldata), `nonce`, `gasLimit`, `blockNumber`, `transactionLink`, `fromLink`, `toLink`, `error`
+
+**When to use:** Enrich event-triggered workflows with full transaction context, inspect pending transactions, feed transaction data into Decode Calldata or Assess Risk steps.
+
+**Example workflow:**
+```
+Event (new transaction on monitored contract)
+  -> Get Transaction: {{Trigger.transactionHash}}
+  -> Decode Calldata: {{GetTransaction.input}}
+  -> Assess Transaction Risk: calldata={{GetTransaction.input}}, value={{GetTransaction.value}}
+  -> Condition: riskScore >= 51
+  -> Discord: "HIGH RISK TX from {{GetTransaction.from}}: {{AssessRisk.reasoning}}"
 ```
 
 ---
@@ -135,7 +158,7 @@ Webhook (receives pending tx)
 
 ## Assess Transaction Risk
 
-AI-powered risk assessment that combines built-in DeFi security rules with Claude AI analysis. Produces a risk score (0-100) and detailed risk factors.
+AI-powered risk assessment that combines built-in DeFi security rules with OpenAI analysis. Produces a risk score (0-100) and detailed risk factors.
 
 **Inputs:** Transaction Calldata, Contract Address (optional), Transaction Value in ETH (optional), Chain (optional), Sender Address (optional)
 
@@ -150,7 +173,7 @@ AI-powered risk assessment that combines built-in DeFi security rules with Claud
    - **Value risks** -- Large ETH transfers (>10 ETH)
    - **Interaction risks** -- Zero address targets, unknown selectors, generic execution patterns
 3. Critical rule match short-circuits without AI call
-4. Otherwise, enhances assessment with Claude Haiku (3s timeout)
+4. Otherwise, enhances assessment with GPT-4o Mini (3s timeout)
 5. Combines rule-based and AI findings, taking the higher risk level
 
 **Fail-closed policy:** If the AI call fails or times out, the risk level is elevated (not lowered). This is a security-critical action (`maxRetries = 0`).

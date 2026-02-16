@@ -343,6 +343,88 @@ const web3Plugin: IntegrationPlugin = {
       ],
     },
     {
+      slug: "get-transaction",
+      label: "Get Transaction",
+      description:
+        "Fetch full transaction details by hash, including sender, recipient, value, and calldata",
+      category: "Web3",
+      stepFunction: "getTransactionStep",
+      stepImportPath: "get-transaction",
+      outputFields: [
+        {
+          field: "success",
+          description: "Whether the transaction was found",
+        },
+        {
+          field: "hash",
+          description: "The transaction hash",
+        },
+        {
+          field: "from",
+          description: "Sender address",
+        },
+        {
+          field: "to",
+          description: "Recipient address (null for contract creation)",
+        },
+        {
+          field: "value",
+          description: "Value sent in ETH (human-readable)",
+        },
+        {
+          field: "input",
+          description: "Transaction input data (calldata)",
+        },
+        {
+          field: "nonce",
+          description: "Transaction nonce",
+        },
+        {
+          field: "gasLimit",
+          description: "Gas limit for the transaction",
+        },
+        {
+          field: "blockNumber",
+          description: "Block number (null if pending)",
+        },
+        {
+          field: "transactionLink",
+          description: "Explorer link to the transaction",
+        },
+        {
+          field: "fromLink",
+          description: "Explorer link to the sender address",
+        },
+        {
+          field: "toLink",
+          description: "Explorer link to the recipient address",
+        },
+        {
+          field: "error",
+          description: "Error message if the lookup failed",
+        },
+      ],
+      configFields: [
+        {
+          key: "network",
+          label: "Network",
+          type: "chain-select",
+          chainTypeFilter: "evm",
+          placeholder: "Select network",
+          required: true,
+        },
+        {
+          key: "transactionHash",
+          label: "Transaction Hash",
+          type: "template-input",
+          placeholder: "0x... or {{NodeName.transactionHash}}",
+          example:
+            "0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060",
+          required: true,
+        },
+      ],
+    },
+    {
       slug: "decode-calldata",
       label: "Decode Calldata",
       description:
@@ -421,6 +503,84 @@ const web3Plugin: IntegrationPlugin = {
               rows: 4,
             },
           ],
+        },
+      ],
+    },
+    {
+      slug: "assess-risk",
+      label: "Assess Transaction Risk",
+      description:
+        "AI-powered risk assessment that analyzes transaction calldata, value, and context to produce a risk score with detailed factors",
+      category: "Web3",
+      stepFunction: "assessRiskStep",
+      stepImportPath: "assess-risk",
+      outputFields: [
+        {
+          field: "success",
+          description: "Whether the assessment completed",
+        },
+        {
+          field: "riskLevel",
+          description: "Risk level: low, medium, high, or critical",
+        },
+        {
+          field: "riskScore",
+          description: "Numeric risk score from 0 (safe) to 100 (critical)",
+        },
+        {
+          field: "factors",
+          description: "Array of identified risk factors",
+        },
+        {
+          field: "decodedFunction",
+          description: "The decoded function signature, or null if unknown",
+        },
+        {
+          field: "reasoning",
+          description: "AI-generated explanation of the risk assessment",
+        },
+        {
+          field: "error",
+          description:
+            "Error message if assessment failed (riskLevel will be critical)",
+        },
+      ],
+      configFields: [
+        {
+          key: "calldata",
+          label: "Transaction Calldata",
+          type: "template-input",
+          placeholder: "0x... or {{NodeName.calldata}}",
+          example:
+            "0xa9059cbb0000000000000000000000001234567890abcdef1234567890abcdef12345678ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          required: true,
+        },
+        {
+          key: "contractAddress",
+          label: "Contract Address",
+          type: "template-input",
+          placeholder: "0x... or {{NodeName.contractAddress}}",
+          example: "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+        },
+        {
+          key: "value",
+          label: "Transaction Value",
+          type: "template-input",
+          placeholder: "0 or {{NodeName.value}}",
+          example: "0",
+        },
+        {
+          key: "chain",
+          label: "Network",
+          type: "chain-select",
+          chainTypeFilter: "evm",
+          placeholder: "Select network",
+        },
+        {
+          key: "senderAddress",
+          label: "Sender Address",
+          type: "template-input",
+          placeholder: "0x... or {{NodeName.sender}}",
         },
       ],
     },
