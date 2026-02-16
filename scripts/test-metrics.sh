@@ -13,7 +13,7 @@
 set -e
 
 # Default values
-BASE_URL="${1:-http://localhost:3000}"
+BASE_URL="http://localhost:3000"
 CATEGORY=""
 COUNT=1
 INTERVAL=0
@@ -58,9 +58,14 @@ while [[ $# -gt 0 ]]; do
       echo "  $0 --category external_service --count 20 --interval 1  # 20 times with 1s delay"
       exit 0
       ;;
-    *)
+    http://*|https://*)
       BASE_URL="$1"
       shift
+      ;;
+    *)
+      echo "Error: Unknown option or invalid URL: $1"
+      echo "Use -h or --help for usage information"
+      exit 1
       ;;
   esac
 done
