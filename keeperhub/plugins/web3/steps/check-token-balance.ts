@@ -58,7 +58,7 @@ type CheckTokenBalanceResult =
 export type CheckTokenBalanceCoreInput = {
   network: string;
   address: string;
-  tokenConfig: string; // JSON string of TokenConfig
+  tokenConfig: string | Record<string, unknown>;
   // Legacy support
   tokenAddress?: string;
 };
@@ -187,17 +187,22 @@ function parseTokenConfig(input: CheckTokenBalanceInput): TokenFieldValue {
     };
   }
 
+  // Object values from API/MCP-created workflows
+  if (typeof input.tokenConfig === "object") {
+    return {
+      mode: extractMode(input.tokenConfig),
+      supportedTokenId: extractSupportedTokenId(input.tokenConfig),
+      customToken: extractCustomToken(input.tokenConfig),
+    };
+  }
+
   try {
     const parsed = JSON.parse(input.tokenConfig);
 
-    const supportedTokenId = extractSupportedTokenId(parsed);
-    const customToken = extractCustomToken(parsed);
-    const mode = extractMode(parsed);
-
     return {
-      mode,
-      supportedTokenId,
-      customToken,
+      mode: extractMode(parsed),
+      supportedTokenId: extractSupportedTokenId(parsed),
+      customToken: extractCustomToken(parsed),
     };
   } catch {
     // If parsing fails and it looks like an address, treat as custom
