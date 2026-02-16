@@ -440,6 +440,71 @@ const apiErrors = getOrCreateCounter(
   ["endpoint", "status_code", "error_type"]
 );
 
+// User-caused error counters (from unified logging system)
+const userValidationErrors = getOrCreateCounter(
+  apiRegistry,
+  "keeperhub_errors_user_validation_total",
+  "User validation errors",
+  ["error_category", "error_context", "is_user_error", "error_type"]
+);
+
+const userConfigurationErrors = getOrCreateCounter(
+  apiRegistry,
+  "keeperhub_errors_user_configuration_total",
+  "User configuration errors",
+  ["error_category", "error_context", "is_user_error", "error_type"]
+);
+
+const externalServiceErrors = getOrCreateCounter(
+  apiRegistry,
+  "keeperhub_errors_external_service_total",
+  "External service errors",
+  ["error_category", "error_context", "is_user_error", "error_type", "service"]
+);
+
+const networkRpcErrors = getOrCreateCounter(
+  apiRegistry,
+  "keeperhub_errors_network_rpc_total",
+  "Network and RPC errors",
+  ["error_category", "error_context", "is_user_error", "error_type", "chain_id"]
+);
+
+const transactionBlockchainErrors = getOrCreateCounter(
+  apiRegistry,
+  "keeperhub_errors_transaction_blockchain_total",
+  "Transaction and blockchain errors",
+  ["error_category", "error_context", "is_user_error", "error_type", "chain_id"]
+);
+
+// System-caused error counters (from unified logging system)
+const systemDatabaseErrors = getOrCreateCounter(
+  apiRegistry,
+  "keeperhub_errors_system_database_total",
+  "System database errors",
+  ["error_category", "error_context", "is_user_error", "error_type", "table"]
+);
+
+const systemAuthErrors = getOrCreateCounter(
+  apiRegistry,
+  "keeperhub_errors_system_auth_total",
+  "System authentication errors",
+  ["error_category", "error_context", "is_user_error", "error_type", "endpoint"]
+);
+
+const systemInfrastructureErrors = getOrCreateCounter(
+  apiRegistry,
+  "keeperhub_errors_system_infrastructure_total",
+  "System infrastructure errors",
+  ["error_category", "error_context", "is_user_error", "error_type", "component"]
+);
+
+const systemWorkflowEngineErrors = getOrCreateCounter(
+  apiRegistry,
+  "keeperhub_errors_system_workflow_engine_total",
+  "System workflow engine errors",
+  ["error_category", "error_context", "is_user_error", "error_type", "workflow_id"]
+);
+
 const slowQueries = getOrCreateCounter(
   apiRegistry,
   "keeperhub_db_query_slow_total",
@@ -514,6 +579,17 @@ const counterMap: Record<string, Counter> = {
 const errorCounterMap: Record<string, Counter> = {
   "plugin.action.errors": pluginErrors,
   "api.errors.total": apiErrors,
+  // User-caused errors
+  "errors.user.validation.total": userValidationErrors,
+  "errors.user.configuration.total": userConfigurationErrors,
+  "errors.external.service.total": externalServiceErrors,
+  "errors.network.rpc.total": networkRpcErrors,
+  "errors.transaction.blockchain.total": transactionBlockchainErrors,
+  // System-caused errors
+  "errors.system.database.total": systemDatabaseErrors,
+  "errors.system.auth.total": systemAuthErrors,
+  "errors.system.infrastructure.total": systemInfrastructureErrors,
+  "errors.system.workflow_engine.total": systemWorkflowEngineErrors,
 };
 
 const gaugeMap: Record<string, Gauge> = {
