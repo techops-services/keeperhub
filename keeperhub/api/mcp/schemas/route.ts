@@ -92,6 +92,10 @@ const SYSTEM_ACTIONS = {
         "number - Safety limit on iterations (default: processes entire array)",
       mapExpression:
         'string - Dot-path to extract from each element, e.g., "address" or "data.name". When set, the iteration output is transformed before being collected.',
+      concurrency:
+        '"sequential" | "parallel" | "custom" - Execution mode for iterations (default: "sequential"). "parallel" runs all at once, "custom" uses concurrencyLimit.',
+      concurrencyLimit:
+        'number - Max concurrent iterations when concurrency is "custom" (min: 2)',
     },
     outputFields: {
       currentItem:

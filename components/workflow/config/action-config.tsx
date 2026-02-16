@@ -387,6 +387,48 @@ function ForEachFields({
           allowed.
         </p>
       </div>
+      {/* start custom keeperhub code */}
+      <div className="space-y-2">
+        <Label htmlFor="concurrency">Concurrency</Label>
+        <Select
+          disabled={disabled}
+          onValueChange={(value) => {
+            onUpdateConfig("concurrency", value);
+            if (value !== "custom") {
+              onUpdateConfig("concurrencyLimit", "");
+            }
+          }}
+          value={(config?.concurrency as string) || "sequential"}
+        >
+          <SelectTrigger id="concurrency">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="sequential">Sequential (one at a time)</SelectItem>
+            <SelectItem value="parallel">Parallel (all at once)</SelectItem>
+            <SelectItem value="custom">Custom limit</SelectItem>
+          </SelectContent>
+        </Select>
+        {(config?.concurrency as string) === "custom" && (
+          <Input
+            disabled={disabled}
+            id="concurrencyLimit"
+            min={2}
+            onChange={(e) => {
+              const raw = e.target.value.replace(/[^0-9]/g, "");
+              onUpdateConfig("concurrencyLimit", raw);
+            }}
+            placeholder="e.g., 5"
+            type="number"
+            value={(config?.concurrencyLimit as string) || ""}
+          />
+        )}
+        <p className="text-muted-foreground text-xs">
+          Sequential runs one iteration at a time. Parallel runs all at once.
+          Custom limit runs up to N iterations concurrently.
+        </p>
+      </div>
+      {/* end keeperhub code */}
       <div className="rounded-lg border bg-muted/30 p-3">
         <p className="text-muted-foreground text-sm">
           Connect action nodes after this For Each to define the loop body.

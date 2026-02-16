@@ -1310,17 +1310,59 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
       return iterationOutput;
     }
 
-    // 4. Run iterations sequentially
+    // start custom keeperhub code //
+    // 4. Run iterations with configurable concurrency
+    const concurrencyMode =
+      (processedConfig.concurrency as string) || "sequential";
+    const concurrencyLimit = Number(processedConfig.concurrencyLimit) || 0;
     const iterationResults: unknown[] = [];
 
-    for (const [i, item] of itemsToProcess.entries()) {
-      try {
-        iterationResults.push(await executeIteration(item, i));
-      } catch (error) {
-        const errorMessage = await getErrorMessageAsync(error);
-        iterationResults.push({ success: false, error: errorMessage });
+    if (concurrencyMode === "parallel") {
+      const settled = await Promise.allSettled(
+        itemsToProcess.map((item, i) => executeIteration(item, i))
+      );
+      for (const entry of settled) {
+        if (entry.status === "fulfilled") {
+          iterationResults.push(entry.value);
+        } else {
+          const errorMessage = await getErrorMessageAsync(entry.reason);
+          iterationResults.push({ success: false, error: errorMessage });
+        }
+      }
+    } else if (concurrencyMode === "custom" && concurrencyLimit > 1) {
+      // Worker pool: N workers pull from a shared index counter
+      iterationResults.length = itemsToProcess.length;
+      let nextIndex = 0;
+      const runWorker = async (): Promise<void> => {
+        while (nextIndex < itemsToProcess.length) {
+          const i = nextIndex++;
+          try {
+            iterationResults[i] = await executeIteration(
+              itemsToProcess[i],
+              i
+            );
+          } catch (error) {
+            const errorMessage = await getErrorMessageAsync(error);
+            iterationResults[i] = { success: false, error: errorMessage };
+          }
+        }
+      };
+      const workerCount = Math.min(concurrencyLimit, itemsToProcess.length);
+      await Promise.all(
+        Array.from({ length: workerCount }, () => runWorker())
+      );
+    } else {
+      // Sequential (default)
+      for (const [i, item] of itemsToProcess.entries()) {
+        try {
+          iterationResults.push(await executeIteration(item, i));
+        } catch (error) {
+          const errorMessage = await getErrorMessageAsync(error);
+          iterationResults.push({ success: false, error: errorMessage });
+        }
       }
     }
+    // end keeperhub code //
 
     // 5. Mark body nodes as visited in the parent scope
     for (const bodyNodeId of bodyNodeIds) {
