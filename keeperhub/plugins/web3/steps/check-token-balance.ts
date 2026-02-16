@@ -252,6 +252,34 @@ async function getTokenAddress(
 }
 
 /**
+ * Fetch a string metadata field from a token contract, handling non-standard
+ * tokens (e.g. MKR, DAI v1) that return bytes32 instead of string.
+ */
+async function fetchStringOrBytes32(
+  provider: ethers.JsonRpcProvider,
+  tokenAddress: string,
+  method: "symbol" | "name"
+): Promise<string> {
+  const iface = new ethers.Interface([
+    `function ${method}() view returns (string)`,
+  ]);
+  const data = iface.encodeFunctionData(method);
+  const result = await provider.call({ to: tokenAddress, data });
+
+  try {
+    const decoded = iface.decodeFunctionResult(method, result);
+    return decoded[0] as string;
+  } catch {
+    // Non-standard token returning bytes32 (e.g. MKR, DAI v1)
+    try {
+      return ethers.decodeBytes32String(result);
+    } catch {
+      return method === "symbol" ? "???" : "Unknown";
+    }
+  }
+}
+
+/**
  * Fetch balance for a single token
  */
 async function fetchTokenBalance(
@@ -264,8 +292,8 @@ async function fetchTokenBalance(
   const [balanceRaw, decimals, symbol, name] = await Promise.all([
     contract.balanceOf(walletAddress) as Promise<bigint>,
     contract.decimals() as Promise<bigint>,
-    contract.symbol() as Promise<string>,
-    contract.name() as Promise<string>,
+    fetchStringOrBytes32(provider, tokenAddress, "symbol"),
+    fetchStringOrBytes32(provider, tokenAddress, "name"),
   ]);
 
   const decimalsNum = Number(decimals);
