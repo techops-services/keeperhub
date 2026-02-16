@@ -619,6 +619,102 @@ const web3Plugin: IntegrationPlugin = {
       ],
     },
     {
+      slug: "query-events",
+      label: "Query Contract Events",
+      description:
+        "Query historical smart contract events across a block range with automatic batching",
+      category: "Web3",
+      stepFunction: "queryEventsStep",
+      stepImportPath: "query-events",
+      outputFields: [
+        {
+          field: "success",
+          description: "Whether the query succeeded",
+        },
+        {
+          field: "events",
+          description:
+            "Array of decoded event objects with blockNumber, transactionHash, logIndex, and args",
+        },
+        {
+          field: "fromBlock",
+          description: "Actual start block used",
+        },
+        {
+          field: "toBlock",
+          description: "Actual end block used (resolved from latest)",
+        },
+        {
+          field: "eventCount",
+          description: "Number of events returned",
+        },
+        {
+          field: "error",
+          description: "Error message if the query failed",
+        },
+      ],
+      configFields: [
+        {
+          key: "network",
+          label: "Network",
+          type: "chain-select",
+          chainTypeFilter: "evm",
+          placeholder: "Select network",
+          required: true,
+        },
+        {
+          key: "contractAddress",
+          label: "Contract Address",
+          type: "template-input",
+          placeholder: "0x... or {{NodeName.contractAddress}}",
+          example: "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+          required: true,
+        },
+        {
+          key: "abi",
+          label: "Contract ABI",
+          type: "abi-with-auto-fetch",
+          contractAddressField: "contractAddress",
+          contractInteractionType: "read",
+          networkField: "network",
+          rows: 6,
+          required: true,
+        },
+        {
+          key: "eventName",
+          label: "Event Name",
+          type: "abi-event-select",
+          abiField: "abi",
+          placeholder: "Select an event",
+          required: true,
+        },
+        {
+          key: "blockCount",
+          label: "Block Count",
+          type: "template-input",
+          placeholder: "Number of blocks to look back (default: 6500, ~1 day)",
+        },
+        {
+          key: "fromBlock",
+          label: "From Block",
+          type: "template-input",
+          placeholder: "Specific start block (overrides Block Count if set)",
+        },
+        {
+          key: "toBlock",
+          label: "To Block",
+          type: "template-input",
+          placeholder: "Block number or 'latest' (default: latest)",
+        },
+        {
+          key: "batchSize",
+          label: "Batch Size",
+          type: "template-input",
+          placeholder: "Blocks per query batch (default: 2000)",
+        },
+      ],
+    },
+    {
       slug: "write-contract",
       label: "Write Contract",
       description: "Write data to a smart contract (state-changing functions)",
