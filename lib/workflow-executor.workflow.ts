@@ -27,6 +27,7 @@ import {
   detectTriggerType,
   recordWorkflowComplete,
 } from "@/keeperhub/lib/metrics/instrumentation/workflow";
+import { ARRAY_SOURCE_RE } from "@/keeperhub/lib/for-each-utils";
 import {
   preValidateConditionExpression,
   validateConditionExpression,
@@ -741,9 +742,10 @@ export function identifyLoopBody(
   // Seed queue with direct children of the For Each node
   const initialTargets = edgesBySource.get(forEachNodeId) ?? [];
   for (const targetId of initialTargets) {
-    const targets = bodyEdgesBySource.get(forEachNodeId) ?? [];
-    targets.push(targetId);
-    bodyEdgesBySource.set(forEachNodeId, [...targets]);
+    if (!bodyEdgesBySource.has(forEachNodeId)) {
+      bodyEdgesBySource.set(forEachNodeId, []);
+    }
+    bodyEdgesBySource.get(forEachNodeId)!.push(targetId);
   }
 
   const queue: Array<{ nodeId: string; depth: number }> = initialTargets.map(
@@ -788,17 +790,16 @@ export function identifyLoopBody(
     const nextDepth = computeNextDepth(isForEach, isCollect, depth);
     const nextIds = edgesBySource.get(nodeId) ?? [];
     for (const nextId of nextIds) {
-      const targets = bodyEdgesBySource.get(nodeId) ?? [];
-      targets.push(nextId);
-      bodyEdgesBySource.set(nodeId, [...targets]);
+      if (!bodyEdgesBySource.has(nodeId)) {
+        bodyEdgesBySource.set(nodeId, []);
+      }
+      bodyEdgesBySource.get(nodeId)!.push(nextId);
       queue.push({ nodeId: nextId, depth: nextDepth });
     }
   }
 
   return { bodyNodeIds, collectNodeId, bodyEdgesBySource };
 }
-
-const ARRAY_SOURCE_TEMPLATE_PATTERN = /^\{\{@([^:]+):([^}]+)\}\}$/;
 
 /**
  * Resolve a template string to its raw array value.
@@ -815,7 +816,7 @@ export function resolveArraySource(
     );
   }
 
-  const match = source.trim().match(ARRAY_SOURCE_TEMPLATE_PATTERN);
+  const match = source.trim().match(ARRAY_SOURCE_RE);
 
   if (!match) {
     // Try to parse as a JSON array literal
@@ -833,7 +834,8 @@ export function resolveArraySource(
     );
   }
 
-  const [, nodeId, rest] = match;
+  const [, nodeId, label, fieldPath] = match;
+  const rest = fieldPath ? `${label}.${fieldPath}` : label;
   const raw = resolveTemplateToRawValue(nodeId, rest, outputs);
 
   if (raw === null || raw === undefined) {
@@ -946,6 +948,53 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
   }
 
   // start custom keeperhub code //
+
+  /**
+   * Process a node's config by resolving templates and handling special fields
+   * (condition, dbQuery). Shared by executeNode and executeBodyNode.
+   */
+  function processActionConfig(
+    config: Record<string, unknown>,
+    actionType: string,
+    currentOutputs: NodeOutputs
+  ): Record<string, unknown> {
+    const configWithoutSpecial = { ...config };
+    const originalCondition = config.condition;
+    configWithoutSpecial.condition = undefined;
+    const originalDbQuery = config.dbQuery;
+    if (actionType === "Database Query") {
+      configWithoutSpecial.dbQuery = undefined;
+    }
+
+    const processedConfig = processTemplates(
+      configWithoutSpecial,
+      currentOutputs
+    );
+
+    if (originalCondition !== undefined) {
+      processedConfig.condition = originalCondition;
+    }
+
+    if (
+      actionType === "Database Query" &&
+      typeof originalDbQuery === "string"
+    ) {
+      const { parameterizedQuery, paramValues } = extractTemplateParameters(
+        originalDbQuery,
+        currentOutputs
+      );
+      processedConfig.dbQuery = parameterizedQuery;
+      processedConfig._dbParams = paramValues;
+    } else if (
+      actionType === "Database Query" &&
+      originalDbQuery !== undefined
+    ) {
+      processedConfig.dbQuery = originalDbQuery;
+    }
+
+    return processedConfig;
+  }
+
   // -------------------------------------------------------------------
   // For Each: body-node executor (scoped outputs, body-only edges)
   // -------------------------------------------------------------------
@@ -986,19 +1035,17 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
         data: null,
       };
       const nextNodes = bodyEdgesBySource.get(nodeId) ?? [];
-      await Promise.all(
-        nextNodes.map((next) =>
-          executeBodyNode(
-            next,
-            bodyVisited,
-            scopedOutputs,
-            bodyResults,
-            bodyEdgesBySource,
-            collectNodeId,
-            iterationMeta
-          )
-        )
-      );
+      for (const next of nextNodes) {
+        await executeBodyNode(
+          next,
+          bodyVisited,
+          scopedOutputs,
+          bodyResults,
+          bodyEdgesBySource,
+          collectNodeId,
+          iterationMeta
+        );
+      }
       return;
     }
 
@@ -1021,39 +1068,11 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
         return;
       }
 
-      // Process templates using scoped outputs
-      const configWithoutSpecial = { ...config };
-      const originalCondition = config.condition;
-      configWithoutSpecial.condition = undefined;
-      const originalDbQuery = config.dbQuery;
-      if (actionType === "Database Query") {
-        configWithoutSpecial.dbQuery = undefined;
-      }
-
-      const processedConfig = processTemplates(
-        configWithoutSpecial,
+      const processedConfig = processActionConfig(
+        config,
+        actionType,
         scopedOutputs
       );
-
-      if (originalCondition !== undefined) {
-        processedConfig.condition = originalCondition;
-      }
-      if (
-        actionType === "Database Query" &&
-        typeof originalDbQuery === "string"
-      ) {
-        const { parameterizedQuery, paramValues } = extractTemplateParameters(
-          originalDbQuery,
-          scopedOutputs
-        );
-        processedConfig.dbQuery = parameterizedQuery;
-        processedConfig._dbParams = paramValues;
-      } else if (
-        actionType === "Database Query" &&
-        originalDbQuery !== undefined
-      ) {
-        processedConfig.dbQuery = originalDbQuery;
-      }
 
       const stepContext: StepContext = {
         executionId,
@@ -1109,19 +1128,17 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
           currentEdgesBySource: bodyEdgesBySource,
           continueAfterCollect: async (collectId) => {
             const nextNodes = bodyEdgesBySource.get(collectId) ?? [];
-            await Promise.all(
-              nextNodes.map((next) =>
-                executeBodyNode(
-                  next,
-                  bodyVisited,
-                  scopedOutputs,
-                  bodyResults,
-                  bodyEdgesBySource,
-                  collectNodeId,
-                  iterationMeta
-                )
-              )
-            );
+            for (const next of nextNodes) {
+              await executeBodyNode(
+                next,
+                bodyVisited,
+                scopedOutputs,
+                bodyResults,
+                bodyEdgesBySource,
+                collectNodeId,
+                iterationMeta
+              );
+            }
           },
         });
       } else if (actionType === "Condition") {
@@ -1134,19 +1151,17 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
 
       // Continue to downstream body nodes
       const nextNodes = bodyEdgesBySource.get(nodeId) ?? [];
-      await Promise.all(
-        nextNodes.map((next) =>
-          executeBodyNode(
-            next,
-            bodyVisited,
-            scopedOutputs,
-            bodyResults,
-            bodyEdgesBySource,
-            collectNodeId,
-            iterationMeta
-          )
-        )
-      );
+      for (const next of nextNodes) {
+        await executeBodyNode(
+          next,
+          bodyVisited,
+          scopedOutputs,
+          bodyResults,
+          bodyEdgesBySource,
+          collectNodeId,
+          iterationMeta
+        );
+      }
     } catch (error) {
       const errorMessage = await getErrorMessageAsync(error);
       bodyResults[nodeId] = { success: false, error: errorMessage };
@@ -1233,19 +1248,17 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
       const firstBodyNodes = bodyEdgesBySource.get(forEachNodeId) ?? [];
       const iterationMeta = { iterationIndex: index, forEachNodeId };
 
-      await Promise.all(
-        firstBodyNodes.map((bodyNodeId) =>
-          executeBodyNode(
-            bodyNodeId,
-            bodyVisited,
-            scopedOutputs,
-            bodyResults,
-            bodyEdgesBySource,
-            collectNodeId,
-            iterationMeta
-          )
-        )
-      );
+      for (const bodyNodeId of firstBodyNodes) {
+        await executeBodyNode(
+          bodyNodeId,
+          bodyVisited,
+          scopedOutputs,
+          bodyResults,
+          bodyEdgesBySource,
+          collectNodeId,
+          iterationMeta
+        );
+      }
 
       // If any body node failed, surface the error in the iteration result
       const bodyFailure = Object.entries(bodyResults).find(
@@ -1495,42 +1508,8 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
           return;
         }
 
-        // Process templates in config, but keep condition and dbQuery unprocessed for special handling
-        const configWithoutSpecial = { ...config };
-        const originalCondition = config.condition;
-        configWithoutSpecial.condition = undefined;
         // start custom keeperhub code //
-        const originalDbQuery = config.dbQuery;
-        if (actionType === "Database Query") {
-          configWithoutSpecial.dbQuery = undefined;
-        }
-        // end keeperhub code //
-
-        const processedConfig = processTemplates(configWithoutSpecial, outputs);
-
-        // Add back the original condition (unprocessed)
-        if (originalCondition !== undefined) {
-          processedConfig.condition = originalCondition;
-        }
-
-        // start custom keeperhub code //
-        // For Database Query, use parameterized queries instead of raw interpolation
-        if (
-          actionType === "Database Query" &&
-          typeof originalDbQuery === "string"
-        ) {
-          const { parameterizedQuery, paramValues } = extractTemplateParameters(
-            originalDbQuery,
-            outputs
-          );
-          processedConfig.dbQuery = parameterizedQuery;
-          processedConfig._dbParams = paramValues;
-        } else if (
-          actionType === "Database Query" &&
-          originalDbQuery !== undefined
-        ) {
-          processedConfig.dbQuery = originalDbQuery;
-        }
+        const processedConfig = processActionConfig(config, actionType, outputs);
         // end keeperhub code //
 
         // Build step context for logging (stepHandler will handle the logging)
