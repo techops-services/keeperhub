@@ -10,9 +10,10 @@
 
 import { spawn } from "node:child_process";
 import { copyFileSync, existsSync, unlinkSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const scriptDir = import.meta.dirname;
+const scriptDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(scriptDir, "..", "..");
 
 // Create a shim for server-only in node_modules to avoid the error
