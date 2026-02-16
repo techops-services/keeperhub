@@ -117,7 +117,6 @@ describe.skipIf(shouldSkip)("API Key Authentication", () => {
         name: "Other E2E Org",
         slug: `e2e-other-org-${Date.now()}`,
         createdAt: new Date(),
-        updatedAt: new Date(),
       });
 
       // Create test API key for the persistent org
@@ -188,27 +187,35 @@ describe.skipIf(shouldSkip)("API Key Authentication", () => {
         await db
           .delete(workflowsTable)
           .where(eq(workflowsTable.id, id))
-          .catch(() => {});
+          .catch(() => {
+            /* noop */
+          });
       }
       // Clean up created API keys
       for (const id of createdApiKeyIds) {
         await db
           .delete(organizationApiKeys)
           .where(eq(organizationApiKeys.id, id))
-          .catch(() => {});
+          .catch(() => {
+            /* noop */
+          });
       }
       // Clean up the other org and user
       if (otherOrgId) {
         await db
           .delete(organization)
           .where(eq(organization.id, otherOrgId))
-          .catch(() => {});
+          .catch(() => {
+            /* noop */
+          });
       }
       if (otherUserId) {
         await db
           .delete(users)
           .where(eq(users.id, otherUserId))
-          .catch(() => {});
+          .catch(() => {
+            /* noop */
+          });
       }
     } catch {
       // Ignore cleanup errors
@@ -462,7 +469,9 @@ describe.skipIf(shouldSkip)("API Key Authentication", () => {
       });
       // 500 means AI key is not configured — skip rather than fail
       if (response.status === 500) {
-        console.warn("AI generate test skipped: AI gateway returned 500 (API key not configured)");
+        console.warn(
+          "AI generate test skipped: AI gateway returned 500 (API key not configured)"
+        );
         return;
       }
       expect(response.status).toBe(200);
