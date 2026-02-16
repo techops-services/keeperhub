@@ -268,7 +268,7 @@ function ConditionFields({
 /**
  * Extract dot-paths from the first element of the array referenced by arraySource.
  */
-function useArrayItemFields(arraySource: string | undefined): string[] {
+export function useArrayItemFields(arraySource: string | undefined): string[] {
   const executionLogs = useAtomValue(executionLogsAtom);
   const lastExecutionLogs = useAtomValue(lastExecutionLogsAtom);
 
@@ -292,6 +292,9 @@ function useArrayItemFields(arraySource: string | undefined): string[] {
   }, [arraySource, executionLogs, lastExecutionLogs]);
 }
 // end keeperhub code //
+
+/** Sentinel value for the "Full element (no mapping)" select option. */
+const FULL_ELEMENT_VALUE = "__full__";
 
 // For Each fields component
 function ForEachFields({
@@ -330,15 +333,15 @@ function ForEachFields({
           <Select
             disabled={disabled}
             onValueChange={(value) =>
-              onUpdateConfig("mapExpression", value === "__full__" ? "" : value)
+              onUpdateConfig("mapExpression", value === FULL_ELEMENT_VALUE ? "" : value)
             }
-            value={(config?.mapExpression as string) || "__full__"}
+            value={(config?.mapExpression as string) || FULL_ELEMENT_VALUE}
           >
             <SelectTrigger id="mapExpression">
               <SelectValue placeholder="Full element" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__full__">
+              <SelectItem value={FULL_ELEMENT_VALUE}>
                 Full element (no mapping)
               </SelectItem>
               <SelectSeparator />
@@ -524,6 +527,7 @@ function useCategoryData() {
       : SYSTEM_ACTIONS.filter((a) => a.id !== "Collect");
     // end keeperhub code //
 
+    // Build category map including System with both id and label
     const allCategories: Record<
       string,
       Array<{ id: string; label: string }>

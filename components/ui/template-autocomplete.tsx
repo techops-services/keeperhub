@@ -298,6 +298,7 @@ const getCommonFields = (node: WorkflowNode) => {
   return [{ field: "data", description: "Output data" }];
 };
 
+// start custom keeperhub code //
 // Sanitize nodeId the same way as workflow executor for consistent lookup
 function sanitizeNodeId(nodeId: string): string {
   return nodeId.replace(/[^a-zA-Z0-9]/g, "_");

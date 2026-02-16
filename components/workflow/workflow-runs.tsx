@@ -18,6 +18,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toChecksumAddress } from "@/keeperhub/lib/address-utils";
 // start custom keeperhub code //
 import {
+  FOR_EACH_GROUP_TYPE,
   groupLogsByIteration,
   type IterationGroup,
 } from "@/keeperhub/lib/iteration-grouping";
@@ -584,6 +585,61 @@ function ExecutionProgress({ execution }: { execution: WorkflowExecution }) {
 // buildIterationGroups, groupLogsByIteration) imported from
 // @/keeperhub/lib/iteration-grouping
 
+/** Sum the duration (ms) of all logs in an iteration. */
+function computeIterationDuration(
+  logs: Array<{ duration: string | null }>
+): number {
+  let total = 0;
+  for (const log of logs) {
+    if (log.duration) {
+      total += Number.parseInt(log.duration, 10);
+    }
+  }
+  return total;
+}
+
+/** Expand/collapse button for a single iteration with duration and error indicator. */
+function IterationHeader({
+  iterationIndex,
+  isExpanded,
+  hasError,
+  durationMs,
+  onToggle,
+}: {
+  iterationIndex: number;
+  isExpanded: boolean;
+  hasError: boolean;
+  durationMs: number;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      className="group flex w-full items-center gap-2 rounded-lg py-1.5 text-left transition-colors hover:bg-muted/50"
+      onClick={onToggle}
+      type="button"
+    >
+      {isExpanded ? (
+        <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+      ) : (
+        <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+      )}
+      <span className="font-medium text-muted-foreground text-xs">
+        Iteration {iterationIndex + 1}
+      </span>
+      {hasError && (
+        <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+      )}
+      {durationMs > 0 && (
+        <span className="ml-auto shrink-0 font-mono text-muted-foreground text-xs tabular-nums">
+          {durationMs < 1000
+            ? `${durationMs}ms`
+            : `${(durationMs / 1000).toFixed(2)}s`}
+        </span>
+      )}
+    </button>
+  );
+}
+
 /**
  * Render a For Each node with its iterations grouped and collapsible.
  */
@@ -640,41 +696,16 @@ function ForEachLogGroup({
             const isIterExpanded = expandedIterations.has(
               iteration.iterationIndex
             );
-            const iterHasError = iteration.logs.some(
-              (l) => l.status === "error"
-            );
-            const iterDuration = iteration.logs.reduce(
-              (sum, l) =>
-                sum + (l.duration ? Number.parseInt(l.duration, 10) : 0),
-              0
-            );
 
             return (
               <div key={iteration.iterationIndex}>
-                <button
-                  className="group flex w-full items-center gap-2 rounded-lg py-1.5 text-left transition-colors hover:bg-muted/50"
-                  onClick={() => toggleIteration(iteration.iterationIndex)}
-                  type="button"
-                >
-                  {isIterExpanded ? (
-                    <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
-                  ) : (
-                    <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
-                  )}
-                  <span className="font-medium text-muted-foreground text-xs">
-                    Iteration {iteration.iterationIndex + 1}
-                  </span>
-                  {iterHasError && (
-                    <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                  )}
-                  {iterDuration > 0 && (
-                    <span className="ml-auto shrink-0 font-mono text-muted-foreground text-xs tabular-nums">
-                      {iterDuration < 1000
-                        ? `${iterDuration}ms`
-                        : `${(iterDuration / 1000).toFixed(2)}s`}
-                    </span>
-                  )}
-                </button>
+                <IterationHeader
+                  durationMs={computeIterationDuration(iteration.logs)}
+                  hasError={iteration.logs.some((l) => l.status === "error")}
+                  isExpanded={isIterExpanded}
+                  iterationIndex={iteration.iterationIndex}
+                  onToggle={() => toggleIteration(iteration.iterationIndex)}
+                />
 
                 {isIterExpanded && (
                   <div className="ml-4">
@@ -1214,7 +1245,7 @@ export function WorkflowRuns({
                     {/* start custom keeperhub code */}
                     {groupLogsByIteration(executionLogs).map(
                       (entry, entryIndex, entries) => {
-                        if (entry.type === "for-each-group") {
+                        if (entry.type === FOR_EACH_GROUP_TYPE) {
                           return (
                             <ForEachLogGroup
                               expandedLogs={expandedLogs}
