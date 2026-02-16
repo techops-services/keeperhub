@@ -69,7 +69,6 @@ export function Web3WalletSection({
     checkWallet();
   }, [isAnonymous, sessionUserId]);
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Sequential wallet creation with error handling
   async function handleCreateWallet() {
     // start keeperhub - validate email before creating
     if (!userEmail) {

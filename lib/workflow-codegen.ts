@@ -29,7 +29,6 @@ const CONST_ASSIGNMENT_PATTERN = /^(\s*)(const\s+\w+\s*=\s*)(.*)$/;
 /**
  * Generate TypeScript code from workflow JSON with "use workflow" directive
  */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: large function with many nested helpers, refactoring is out of scope
 export function generateWorkflowCode(
   nodes: WorkflowNode[],
   edges: WorkflowEdge[],

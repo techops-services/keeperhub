@@ -1107,7 +1107,6 @@ export function WalletOverlay({ overlayId }: WalletOverlayProps) {
     await loadWallet();
   };
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Logic is straightforward, two loops with validation
   const buildWithdrawableAssets = useCallback((): WithdrawableAsset[] => {
     const assets: WithdrawableAsset[] = [];
 

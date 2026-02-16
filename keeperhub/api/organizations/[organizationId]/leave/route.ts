@@ -56,7 +56,6 @@ export async function POST(
       );
     }
 
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: linear validation steps within transaction
     const result = await db.transaction(async (tx): Promise<LeaveResult> => {
       const [currentMember] = await tx
         .select({ id: member.id, role: member.role })

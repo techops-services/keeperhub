@@ -43,7 +43,6 @@ export type WriteContractInput = StepInput & WriteContractCoreInput;
 /**
  * Core write contract logic
  */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Contract interaction requires extensive validation
 async function stepHandler(
   input: WriteContractInput
 ): Promise<WriteContractResult> {

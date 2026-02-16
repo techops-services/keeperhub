@@ -111,7 +111,6 @@ function extractSupportedTokenId(parsed: unknown): string | undefined {
  * Extract custom token from parsed config
  * Handles both new (single) and legacy (array/string) formats
  */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Handles multiple legacy formats for backwards compatibility
 function extractCustomToken(parsed: unknown): CustomToken | undefined {
   if (typeof parsed !== "object" || parsed === null) {
     return;

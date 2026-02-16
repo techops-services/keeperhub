@@ -156,7 +156,6 @@ async function parseTokenAddress(
 /**
  * Core transfer token logic
  */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Step handler with comprehensive validation and error handling
 async function stepHandler(
   input: TransferTokenInput
 ): Promise<TransferTokenResult> {

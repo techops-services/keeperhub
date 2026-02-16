@@ -10,7 +10,6 @@ import {
 
 import { cn } from "@/lib/utils";
 
-// biome-ignore lint/nursery/noReactForwardRef: Component is installed by default
 const Switch = forwardRef<
   ElementRef<typeof SwitchPrimitive.Root>,
   ComponentPropsWithoutRef<typeof SwitchPrimitive.Root>
