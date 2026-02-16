@@ -271,6 +271,7 @@ function ConditionFields({
 export function useArrayItemFields(arraySource: string | undefined): string[] {
   const executionLogs = useAtomValue(executionLogsAtom);
   const lastExecutionLogs = useAtomValue(lastExecutionLogsAtom);
+  const nodes = useAtomValue(nodesAtom);
 
   return useMemo(() => {
     if (!arraySource) {
@@ -280,7 +281,8 @@ export function useArrayItemFields(arraySource: string | undefined): string[] {
     const first = resolveArraySourceElement(
       arraySource,
       executionLogs,
-      lastExecutionLogs.logs
+      lastExecutionLogs.logs,
+      nodes
     );
     if (!first) {
       return [];
@@ -289,7 +291,7 @@ export function useArrayItemFields(arraySource: string | undefined): string[] {
     const paths: string[] = [];
     extractObjectPaths(first, "", 0, paths);
     return paths;
-  }, [arraySource, executionLogs, lastExecutionLogs]);
+  }, [arraySource, executionLogs, lastExecutionLogs, nodes]);
 }
 // end keeperhub code //
 

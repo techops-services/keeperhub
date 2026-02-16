@@ -473,7 +473,8 @@ export function TemplateAutocomplete({
       const syntheticOutput = resolveForEachSyntheticOutput(
         node,
         executionLogs,
-        lastLogsForWorkflow
+        lastLogsForWorkflow,
+        upstreamNodes
       );
 
       if (syntheticOutput) {

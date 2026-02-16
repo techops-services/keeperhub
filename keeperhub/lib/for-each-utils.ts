@@ -61,15 +61,50 @@ export function extractObjectPaths(
 }
 
 /**
+ * When the source node of a template is a For Each, resolve its synthetic
+ * output (with currentItem) instead of the raw execution log metadata.
+ */
+function tryChainResolveForEach(
+  sourceNodeId: string,
+  executionLogs: Record<string, { output?: unknown }>,
+  lastLogs: Record<string, { output?: unknown }>,
+  allNodes: ForEachNode[],
+  visited: Set<string>
+): Record<string, unknown> | null {
+  const sourceNode = allNodes.find(
+    (n) =>
+      n.id === sourceNodeId &&
+      (n.data.config?.actionType as string | undefined) === "For Each"
+  );
+  if (!sourceNode || visited.has(sourceNodeId)) {
+    return null;
+  }
+  return resolveForEachSyntheticOutput(
+    sourceNode,
+    executionLogs,
+    lastLogs,
+    allNodes,
+    visited
+  );
+}
+
+/**
  * Resolve an array source template to the raw array value.
  * Shared by resolveArraySourceElement and resolveForEachSyntheticOutput.
  * Returns null when the template is invalid, the source node has no output,
  * or the resolved value is not a non-empty array.
+ *
+ * When `allNodes` is provided and the source node is a For Each, the
+ * resolution chain-resolves via the parent's synthetic output so that
+ * nested For Each references (e.g., `{{@parent:Parent.currentItem.items}}`)
+ * work correctly in autocomplete.
  */
 function resolveArrayFromTemplate(
   arraySource: string,
   executionLogs: Record<string, { output?: unknown }>,
-  lastLogs: Record<string, { output?: unknown }>
+  lastLogs: Record<string, { output?: unknown }>,
+  allNodes?: ForEachNode[],
+  visited?: Set<string>
 ): unknown[] | null {
   const match = ARRAY_SOURCE_RE.exec(arraySource);
   if (!match) {
@@ -79,8 +114,21 @@ function resolveArrayFromTemplate(
   const sourceNodeId = match[1];
   const fieldPath = match[3] || "";
 
-  const sourceOutput =
+  // Chain-resolve: if the source node is a For Each, use its synthetic output
+  // instead of the raw execution log (which contains step metadata, not currentItem).
+  const logOutput: unknown =
     executionLogs[sourceNodeId]?.output ?? lastLogs[sourceNodeId]?.output;
+  const chainResolved = allNodes
+    ? tryChainResolveForEach(
+        sourceNodeId,
+        executionLogs,
+        lastLogs,
+        allNodes,
+        visited ?? new Set<string>()
+      )
+    : null;
+  const sourceOutput = chainResolved ?? logOutput;
+
   if (sourceOutput === undefined || sourceOutput === null) {
     return null;
   }
@@ -104,9 +152,15 @@ function resolveArrayFromTemplate(
 export function resolveArraySourceElement(
   arraySource: string,
   executionLogs: Record<string, { output?: unknown }>,
-  lastLogs: Record<string, { output?: unknown }>
+  lastLogs: Record<string, { output?: unknown }>,
+  allNodes?: ForEachNode[]
 ): Record<string, unknown> | null {
-  const data = resolveArrayFromTemplate(arraySource, executionLogs, lastLogs);
+  const data = resolveArrayFromTemplate(
+    arraySource,
+    executionLogs,
+    lastLogs,
+    allNodes
+  );
   if (!data) {
     return null;
   }
@@ -132,18 +186,33 @@ type ForEachNode = {
  * For a For Each node, resolve the arraySource to build a synthetic output
  * containing the first array element as `currentItem`. This enables
  * getAvailableFields to enumerate nested object keys in autocomplete.
+ *
+ * When `allNodes` is provided, nested For Each references are chain-resolved
+ * so that `{{@parent:Parent.currentItem.items}}` works correctly.
  */
 export function resolveForEachSyntheticOutput(
   node: ForEachNode,
   executionLogs: Record<string, ExecutionLogEntry>,
-  lastLogs: Record<string, ExecutionLogEntry>
+  lastLogs: Record<string, ExecutionLogEntry>,
+  allNodes?: ForEachNode[],
+  visited?: Set<string>
 ): Record<string, unknown> | null {
   const arraySource = node.data.config?.arraySource as string | undefined;
   if (!arraySource) {
     return null;
   }
 
-  const data = resolveArrayFromTemplate(arraySource, executionLogs, lastLogs);
+  // Track visited nodes to prevent infinite recursion on circular references
+  const currentVisited = visited ?? new Set<string>();
+  currentVisited.add(node.id);
+
+  const data = resolveArrayFromTemplate(
+    arraySource,
+    executionLogs,
+    lastLogs,
+    allNodes,
+    currentVisited
+  );
   if (!data) {
     return null;
   }

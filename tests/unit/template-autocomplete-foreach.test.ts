@@ -476,3 +476,213 @@ describe("resolveForEachSyntheticOutput", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Nested For Each chain resolution
+// ---------------------------------------------------------------------------
+
+describe("resolveForEachSyntheticOutput - nested chain resolution", () => {
+  it("resolves inner For Each referencing parent's currentItem field", () => {
+    const outer = makeNode("fe-outer", "For Each", {
+      actionType: "For Each",
+      arraySource: "{{@trigger:Trigger.groups}}",
+    });
+    const inner = makeNode("fe-inner", "For Each", {
+      actionType: "For Each",
+      arraySource: "{{@fe-outer:Outer.currentItem.members}}",
+    });
+    const executionLogs = {
+      trigger: {
+        output: {
+          groups: [
+            { members: [{ name: "Alice" }, { name: "Bob" }] },
+            { members: [{ name: "Charlie" }] },
+          ],
+        },
+      },
+    };
+    const allNodes = [outer, inner];
+    const result = resolveForEachSyntheticOutput(
+      inner,
+      executionLogs,
+      {},
+      allNodes
+    );
+    expect(result).toEqual({
+      currentItem: { name: "Alice" },
+      index: 0,
+      totalItems: 2,
+    });
+  });
+
+  it("applies parent's mapExpression before resolving inner array", () => {
+    const outer = makeNode("fe-outer", "For Each", {
+      actionType: "For Each",
+      arraySource: "{{@trigger:Trigger.data}}",
+      mapExpression: "nested",
+    });
+    const inner = makeNode("fe-inner", "For Each", {
+      actionType: "For Each",
+      arraySource: "{{@fe-outer:Outer.currentItem.items}}",
+    });
+    const executionLogs = {
+      trigger: {
+        output: {
+          data: [
+            { nested: { items: [{ id: 1 }, { id: 2 }] } },
+            { nested: { items: [{ id: 3 }] } },
+          ],
+        },
+      },
+    };
+    const allNodes = [outer, inner];
+    const result = resolveForEachSyntheticOutput(
+      inner,
+      executionLogs,
+      {},
+      allNodes
+    );
+    // Parent's mapExpression extracts "nested", so currentItem = { items: [...] }
+    // Inner resolves currentItem.items from that
+    expect(result).toEqual({
+      currentItem: { id: 1 },
+      index: 0,
+      totalItems: 2,
+    });
+  });
+
+  it("resolves 3 levels of nested For Each", () => {
+    const level1 = makeNode("fe-1", "For Each", {
+      actionType: "For Each",
+      arraySource: "{{@src:Source.departments}}",
+    });
+    const level2 = makeNode("fe-2", "For Each", {
+      actionType: "For Each",
+      arraySource: "{{@fe-1:Level1.currentItem.teams}}",
+    });
+    const level3 = makeNode("fe-3", "For Each", {
+      actionType: "For Each",
+      arraySource: "{{@fe-2:Level2.currentItem.members}}",
+    });
+    const executionLogs = {
+      src: {
+        output: {
+          departments: [
+            {
+              teams: [
+                { members: [{ name: "Alice" }, { name: "Bob" }] },
+                { members: [{ name: "Charlie" }] },
+              ],
+            },
+          ],
+        },
+      },
+    };
+    const allNodes = [level1, level2, level3];
+    const result = resolveForEachSyntheticOutput(
+      level3,
+      executionLogs,
+      {},
+      allNodes
+    );
+    expect(result).toEqual({
+      currentItem: { name: "Alice" },
+      index: 0,
+      totalItems: 2,
+    });
+  });
+
+  it("prevents infinite recursion on circular references", () => {
+    const nodeA = makeNode("fe-a", "For Each", {
+      actionType: "For Each",
+      arraySource: "{{@fe-b:B.currentItem.items}}",
+    });
+    const nodeB = makeNode("fe-b", "For Each", {
+      actionType: "For Each",
+      arraySource: "{{@fe-a:A.currentItem.items}}",
+    });
+    const allNodes = [nodeA, nodeB];
+    // Should return null instead of infinite looping
+    const result = resolveForEachSyntheticOutput(nodeA, {}, {}, allNodes);
+    expect(result).toBeNull();
+  });
+
+  it("falls back gracefully when parent has no arraySource", () => {
+    const outer = makeNode("fe-outer", "For Each", {
+      actionType: "For Each",
+    });
+    const inner = makeNode("fe-inner", "For Each", {
+      actionType: "For Each",
+      arraySource: "{{@fe-outer:Outer.currentItem.items}}",
+    });
+    const allNodes = [outer, inner];
+    const result = resolveForEachSyntheticOutput(inner, {}, {}, allNodes);
+    expect(result).toBeNull();
+  });
+
+  it("falls back to execution logs when source is not a For Each", () => {
+    const httpNode = makeNode("http-1", "HTTP Request", {
+      actionType: "HTTP Request",
+    });
+    const inner = makeNode("fe-inner", "For Each", {
+      actionType: "For Each",
+      arraySource: "{{@http-1:HTTP Request.items}}",
+    });
+    const executionLogs = {
+      "http-1": { output: { items: [{ a: 1 }, { a: 2 }] } },
+    };
+    const allNodes = [httpNode, inner];
+    const result = resolveForEachSyntheticOutput(
+      inner,
+      executionLogs,
+      {},
+      allNodes
+    );
+    expect(result).toEqual({
+      currentItem: { a: 1 },
+      index: 0,
+      totalItems: 2,
+    });
+  });
+
+  it("works without allNodes (backward compatible)", () => {
+    const node = makeNode("n1", "For Each", {
+      arraySource: "{{@src:Source.items}}",
+    });
+    const executionLogs = {
+      src: { output: { items: [{ id: 1 }] } },
+    };
+    // No allNodes passed -- existing behavior preserved
+    const result = resolveForEachSyntheticOutput(node, executionLogs, {});
+    expect(result).toEqual({
+      currentItem: { id: 1 },
+      index: 0,
+      totalItems: 1,
+    });
+  });
+
+  it("resolves inner For Each from lastLogs when parent uses lastLogs", () => {
+    const outer = makeNode("fe-outer", "For Each", {
+      actionType: "For Each",
+      arraySource: "{{@trigger:Trigger.items}}",
+    });
+    const inner = makeNode("fe-inner", "For Each", {
+      actionType: "For Each",
+      arraySource: "{{@fe-outer:Outer.currentItem.children}}",
+    });
+    const lastLogs = {
+      trigger: {
+        output: {
+          items: [{ children: ["x", "y"] }, { children: ["z"] }],
+        },
+      },
+    };
+    const allNodes = [outer, inner];
+    const result = resolveForEachSyntheticOutput(inner, {}, lastLogs, allNodes);
+    expect(result).toEqual({
+      currentItem: "x",
+      index: 0,
+      totalItems: 2,
+    });
+  });
+});
