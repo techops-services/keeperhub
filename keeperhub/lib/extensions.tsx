@@ -15,6 +15,7 @@ import { Web3WalletSection } from "@/keeperhub/components/settings/web3-wallet-s
 import { AbiEventSelectField } from "@/keeperhub/components/workflow/config/abi-event-select-field";
 import { AbiWithAutoFetchField } from "@/keeperhub/components/workflow/config/abi-with-auto-fetch-field";
 import { ChainSelectField } from "@/keeperhub/components/workflow/config/chain-select-field";
+import { GasLimitMultiplierField } from "@/keeperhub/components/workflow/config/gas-limit-multiplier-field";
 import { TokenSelectField } from "@/keeperhub/components/workflow/config/token-select-field";
 import {
   registerBranding,
@@ -138,6 +139,33 @@ registerFieldRenderer(
         </Label>
         <AbiEventSelectField
           abiValue={abiValue}
+          disabled={disabled}
+          field={field}
+          onChange={(val: unknown) => onUpdateConfig(field.key, val)}
+          value={value}
+        />
+      </div>
+    );
+  }
+);
+
+/**
+ * Gas Limit Multiplier Field
+ * Number input with dynamic chain default display and helper text
+ */
+registerFieldRenderer(
+  "gas-limit-multiplier",
+  ({ field, config, onUpdateConfig, disabled }) => {
+    const value =
+      (config[field.key] as string | undefined) || field.defaultValue || "";
+
+    return (
+      <div className="space-y-2" key={field.key}>
+        <Label className="ml-1" htmlFor={field.key}>
+          {field.label}
+        </Label>
+        <GasLimitMultiplierField
+          config={config}
           disabled={disabled}
           field={field}
           onChange={(val: unknown) => onUpdateConfig(field.key, val)}

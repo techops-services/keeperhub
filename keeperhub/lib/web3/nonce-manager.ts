@@ -26,6 +26,7 @@ import {
   walletLocks,
 } from "@/keeperhub/db/schema-extensions";
 import { db } from "@/lib/db";
+import { getDatabaseUrl } from "@/lib/db/connection-utils";
 
 export type NonceSession = {
   walletAddress: string;
@@ -57,8 +58,7 @@ const DEFAULT_OPTIONS: Required<NonceManagerOptions> = {
   lockRetryDelayMs: 100,
 };
 
-const getConnectionString = () =>
-  process.env.DATABASE_URL || "postgres://localhost:5432/workflow";
+const getConnectionString = () => getDatabaseUrl();
 
 export class NonceManager {
   private readonly lockTimeoutMs: number;
