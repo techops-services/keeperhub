@@ -243,8 +243,16 @@ export const addNodeAtom = atom(null, (get, set, node: WorkflowNode) => {
   set(historyAtom, [...history, { nodes: currentNodes, edges: currentEdges }]);
   set(futureAtom, []);
 
-  // Deselect all existing nodes and add new node as selected
-  const updatedNodes = currentNodes.map((n) => ({ ...n, selected: false }));
+  // start custom keeperhub code //
+  // Deselect all existing nodes and add new node as selected.
+  // Only spread nodes whose selected state actually changes to preserve
+  // object references -- React Flow re-measures handle bounds when node
+  // objects change, which temporarily unregisters named handles (e.g.
+  // For Each "loop"/"done") and breaks concurrent edge creation.
+  const updatedNodes = currentNodes.map((n) =>
+    n.selected ? { ...n, selected: false } : n
+  );
+  // end keeperhub code //
   const newNode = { ...node, selected: true };
   const newNodes = [...updatedNodes, newNode];
   set(nodesAtom, newNodes);

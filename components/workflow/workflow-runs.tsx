@@ -19,7 +19,9 @@ import { toChecksumAddress } from "@/keeperhub/lib/address-utils";
 // start custom keeperhub code //
 import {
   FOR_EACH_GROUP_TYPE,
+  buildChildLogsLookup,
   groupLogsByIteration,
+  type ChildLogsLookup,
   type IterationGroup,
 } from "@/keeperhub/lib/iteration-grouping";
 // end keeperhub code //
@@ -646,6 +648,8 @@ function IterationHeader({
 function ForEachLogGroup({
   forEachLog,
   iterations,
+  collectLog,
+  lookup,
   expandedLogs,
   onToggleLog,
   getStatusIcon,
@@ -655,6 +659,8 @@ function ForEachLogGroup({
 }: {
   forEachLog: ExecutionLog;
   iterations: IterationGroup<ExecutionLog>[];
+  collectLog: ExecutionLog | null;
+  lookup: ChildLogsLookup<ExecutionLog>;
   expandedLogs: Set<string>;
   onToggleLog: (id: string) => void;
   getStatusIcon: (status: string) => JSX.Element;
@@ -709,11 +715,12 @@ function ForEachLogGroup({
 
                 {isIterExpanded && (
                   <div className="ml-4">
-                    {groupLogsByIteration(iteration.logs).map(
+                    {groupLogsByIteration(iteration.logs, lookup).map(
                       (subEntry, subIdx, subEntries) => {
                         if (subEntry.type === FOR_EACH_GROUP_TYPE) {
                           return (
                             <ForEachLogGroup
+                              collectLog={subEntry.collectLog}
                               expandedLogs={expandedLogs}
                               forEachLog={subEntry.forEachLog}
                               getStatusDotClass={getStatusDotClass}
@@ -722,6 +729,7 @@ function ForEachLogGroup({
                               isLast={subIdx === subEntries.length - 1}
                               iterations={subEntry.iterations}
                               key={subEntry.forEachLog.id}
+                              lookup={lookup}
                               onToggleLog={onToggleLog}
                             />
                           );
@@ -745,6 +753,18 @@ function ForEachLogGroup({
               </div>
             );
           })}
+
+          {collectLog && (
+            <ExecutionLogEntry
+              getStatusDotClass={getStatusDotClass}
+              getStatusIcon={getStatusIcon}
+              isExpanded={expandedLogs.has(collectLog.id)}
+              isFirst={false}
+              isLast={isLast}
+              log={collectLog}
+              onToggle={() => onToggleLog(collectLog.id)}
+            />
+          )}
         </div>
       )}
     </div>
@@ -1262,37 +1282,43 @@ export function WorkflowRuns({
                 ) : (
                   <div className="p-4">
                     {/* start custom keeperhub code */}
-                    {groupLogsByIteration(executionLogs).map(
-                      (entry, entryIndex, entries) => {
-                        if (entry.type === FOR_EACH_GROUP_TYPE) {
+                    {(() => {
+                      const lookup = buildChildLogsLookup(executionLogs);
+                      const grouped = groupLogsByIteration(executionLogs, lookup);
+                      return grouped.map(
+                        (entry, entryIndex, entries) => {
+                          if (entry.type === FOR_EACH_GROUP_TYPE) {
+                            return (
+                              <ForEachLogGroup
+                                collectLog={entry.collectLog}
+                                expandedLogs={expandedLogs}
+                                forEachLog={entry.forEachLog}
+                                getStatusDotClass={getStatusDotClass}
+                                getStatusIcon={getStatusIcon}
+                                isFirst={entryIndex === 0}
+                                isLast={entryIndex === entries.length - 1}
+                                iterations={entry.iterations}
+                                key={entry.forEachLog.id}
+                                lookup={lookup}
+                                onToggleLog={toggleLog}
+                              />
+                            );
+                          }
                           return (
-                            <ForEachLogGroup
-                              expandedLogs={expandedLogs}
-                              forEachLog={entry.forEachLog}
+                            <ExecutionLogEntry
                               getStatusDotClass={getStatusDotClass}
                               getStatusIcon={getStatusIcon}
+                              isExpanded={expandedLogs.has(entry.log.id)}
                               isFirst={entryIndex === 0}
                               isLast={entryIndex === entries.length - 1}
-                              iterations={entry.iterations}
-                              key={entry.forEachLog.id}
-                              onToggleLog={toggleLog}
+                              key={entry.log.id}
+                              log={entry.log}
+                              onToggle={() => toggleLog(entry.log.id)}
                             />
                           );
                         }
-                        return (
-                          <ExecutionLogEntry
-                            getStatusDotClass={getStatusDotClass}
-                            getStatusIcon={getStatusIcon}
-                            isExpanded={expandedLogs.has(entry.log.id)}
-                            isFirst={entryIndex === 0}
-                            isLast={entryIndex === entries.length - 1}
-                            key={entry.log.id}
-                            log={entry.log}
-                            onToggle={() => toggleLog(entry.log.id)}
-                          />
-                        );
-                      }
-                    )}
+                      );
+                    })()}
                     {/* end keeperhub code */}
                   </div>
                 )}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildChildLogsLookup,
   buildIterationGroups,
   groupLogsByIteration,
   type IterationLogFields,
@@ -198,6 +199,7 @@ describe("groupLogsByIteration", () => {
     expect(entry.type).toBe("for-each-group");
     if (entry.type === "for-each-group") {
       expect(entry.forEachLog).toBe(forEachLog);
+      expect(entry.collectLog).toBeNull();
       expect(entry.iterations).toHaveLength(2);
       expect(entry.iterations[0].iterationIndex).toBe(0);
       expect(entry.iterations[0].logs).toEqual([bodyLog0]);
@@ -510,5 +512,281 @@ describe("groupLogsByIteration", () => {
     if (result[0].type === "standalone") {
       expect(result[0].log).toBe(actionLog);
     }
+  });
+
+  it("attaches Collect log to its For Each group and skips it from standalone", () => {
+    const forEachLog = makeLog({
+      nodeId: "fe-1",
+      nodeType: "For Each",
+    });
+    const bodyLog = makeLog({
+      nodeId: "body-1",
+      forEachNodeId: "fe-1",
+      iterationIndex: 0,
+    });
+    const collectLog = makeLog({
+      nodeId: "collect-1",
+      nodeType: "Collect",
+      forEachNodeId: "fe-1",
+      iterationIndex: null,
+    });
+
+    const result = groupLogsByIteration([forEachLog, bodyLog, collectLog]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].type).toBe("for-each-group");
+    if (result[0].type === "for-each-group") {
+      expect(result[0].collectLog).toBe(collectLog);
+      expect(result[0].iterations).toHaveLength(1);
+    }
+  });
+
+  it("nested For Each finds inner children when lookup is provided", () => {
+    const outerFe = makeLog({
+      nodeId: "fe-outer",
+      nodeType: "For Each",
+    });
+    const innerFe = makeLog({
+      nodeId: "fe-inner",
+      nodeType: "For Each",
+      forEachNodeId: "fe-outer",
+      iterationIndex: 0,
+      startedAt: new Date("2025-01-01T00:00:01Z"),
+    });
+    const innerBody0 = makeLog({
+      nodeId: "http-1",
+      forEachNodeId: "fe-inner",
+      iterationIndex: 0,
+      startedAt: new Date("2025-01-01T00:00:02Z"),
+    });
+    const innerBody1 = makeLog({
+      nodeId: "http-1",
+      forEachNodeId: "fe-inner",
+      iterationIndex: 1,
+      startedAt: new Date("2025-01-01T00:00:03Z"),
+    });
+    const innerCollect = makeLog({
+      nodeId: "collect-inner",
+      nodeType: "Collect",
+      forEachNodeId: "fe-inner",
+      iterationIndex: null,
+    });
+    const outerCollect = makeLog({
+      nodeId: "collect-outer",
+      nodeType: "Collect",
+      forEachNodeId: "fe-outer",
+      iterationIndex: null,
+    });
+
+    const allLogs = [
+      outerFe,
+      innerFe,
+      innerBody0,
+      innerBody1,
+      innerCollect,
+      outerCollect,
+    ];
+    const lookup = buildChildLogsLookup(allLogs);
+
+    // Top level: outer For Each group with collectLog
+    const topResult = groupLogsByIteration(allLogs, lookup);
+    expect(topResult).toHaveLength(1);
+    expect(topResult[0].type).toBe("for-each-group");
+    if (topResult[0].type === "for-each-group") {
+      expect(topResult[0].forEachLog).toBe(outerFe);
+      expect(topResult[0].collectLog).toBe(outerCollect);
+      expect(topResult[0].iterations).toHaveLength(1);
+
+      // Recursive: inner For Each inside outer iteration 0
+      const outerIterLogs = topResult[0].iterations[0].logs;
+      expect(outerIterLogs).toEqual([innerFe]);
+
+      const innerResult = groupLogsByIteration(outerIterLogs, lookup);
+      expect(innerResult).toHaveLength(1);
+      expect(innerResult[0].type).toBe("for-each-group");
+      if (innerResult[0].type === "for-each-group") {
+        expect(innerResult[0].forEachLog).toBe(innerFe);
+        expect(innerResult[0].collectLog).toBe(innerCollect);
+        expect(innerResult[0].iterations).toHaveLength(2);
+        expect(innerResult[0].iterations[0].logs).toEqual([innerBody0]);
+        expect(innerResult[0].iterations[1].logs).toEqual([innerBody1]);
+      }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildChildLogsLookup
+// ---------------------------------------------------------------------------
+
+describe("buildChildLogsLookup", () => {
+  it("builds child and collect maps from a flat log array", () => {
+    const forEachLog = makeLog({
+      nodeId: "fe-1",
+      nodeType: "For Each",
+    });
+    const bodyLog = makeLog({
+      nodeId: "body-1",
+      forEachNodeId: "fe-1",
+      iterationIndex: 0,
+    });
+    const collectLog = makeLog({
+      nodeId: "collect-1",
+      nodeType: "Collect",
+      forEachNodeId: "fe-1",
+      iterationIndex: null,
+    });
+    const standalone = makeLog({ nodeType: "action" });
+
+    const lookup = buildChildLogsLookup([
+      forEachLog,
+      bodyLog,
+      collectLog,
+      standalone,
+    ]);
+
+    expect(lookup.childLogs.get("fe-1")).toEqual([bodyLog]);
+    expect(lookup.collectLogs.get("fe-1")).toEqual([collectLog]);
+    expect(lookup.childLogs.size).toBe(1);
+    expect(lookup.collectLogs.size).toBe(1);
+    expect(lookup.invocations.get("fe-1")).toEqual([forEachLog]);
+  });
+
+  it("partitions multi-invocation child logs by time window", () => {
+    const outerFe = makeLog({
+      nodeId: "fe-outer",
+      nodeType: "For Each",
+      startedAt: new Date("2025-01-01T00:00:00Z"),
+    });
+    // Inner For Each invocation 1 (outer iteration 0)
+    const innerFe1 = makeLog({
+      nodeId: "fe-inner",
+      nodeType: "For Each",
+      forEachNodeId: "fe-outer",
+      iterationIndex: 0,
+      startedAt: new Date("2025-01-01T00:01:00Z"),
+    });
+    const innerBody1a = makeLog({
+      nodeId: "http-1",
+      forEachNodeId: "fe-inner",
+      iterationIndex: 0,
+      startedAt: new Date("2025-01-01T00:01:01Z"),
+    });
+    const innerBody1b = makeLog({
+      nodeId: "http-1",
+      forEachNodeId: "fe-inner",
+      iterationIndex: 1,
+      startedAt: new Date("2025-01-01T00:01:02Z"),
+    });
+    const innerCollect1 = makeLog({
+      nodeId: "collect-inner",
+      nodeType: "Collect",
+      forEachNodeId: "fe-inner",
+      iterationIndex: null,
+      startedAt: new Date("2025-01-01T00:01:03Z"),
+    });
+    // Inner For Each invocation 2 (outer iteration 1)
+    const innerFe2 = makeLog({
+      nodeId: "fe-inner",
+      nodeType: "For Each",
+      forEachNodeId: "fe-outer",
+      iterationIndex: 1,
+      startedAt: new Date("2025-01-01T00:02:00Z"),
+    });
+    const innerBody2a = makeLog({
+      nodeId: "http-1",
+      forEachNodeId: "fe-inner",
+      iterationIndex: 0,
+      startedAt: new Date("2025-01-01T00:02:01Z"),
+    });
+    const innerBody2b = makeLog({
+      nodeId: "http-1",
+      forEachNodeId: "fe-inner",
+      iterationIndex: 1,
+      startedAt: new Date("2025-01-01T00:02:02Z"),
+    });
+    const innerBody2c = makeLog({
+      nodeId: "http-1",
+      forEachNodeId: "fe-inner",
+      iterationIndex: 2,
+      startedAt: new Date("2025-01-01T00:02:03Z"),
+    });
+    const innerCollect2 = makeLog({
+      nodeId: "collect-inner",
+      nodeType: "Collect",
+      forEachNodeId: "fe-inner",
+      iterationIndex: null,
+      startedAt: new Date("2025-01-01T00:02:04Z"),
+    });
+    const outerCollect = makeLog({
+      nodeId: "collect-outer",
+      nodeType: "Collect",
+      forEachNodeId: "fe-outer",
+      iterationIndex: null,
+      startedAt: new Date("2025-01-01T00:03:00Z"),
+    });
+
+    const allLogs = [
+      outerFe,
+      innerFe1,
+      innerBody1a,
+      innerBody1b,
+      innerCollect1,
+      innerFe2,
+      innerBody2a,
+      innerBody2b,
+      innerBody2c,
+      innerCollect2,
+      outerCollect,
+    ];
+    const lookup = buildChildLogsLookup(allLogs);
+
+    // Top level: outer For Each with 2 iterations
+    const topResult = groupLogsByIteration(allLogs, lookup);
+    expect(topResult).toHaveLength(1);
+    if (topResult[0].type !== "for-each-group") {
+      throw new Error("Expected for-each-group");
+    }
+    expect(topResult[0].collectLog).toBe(outerCollect);
+    expect(topResult[0].iterations).toHaveLength(2);
+
+    // Outer iteration 0: contains innerFe1
+    const outerIter0 = topResult[0].iterations[0].logs;
+    expect(outerIter0).toEqual([innerFe1]);
+    const innerResult1 = groupLogsByIteration(outerIter0, lookup);
+    expect(innerResult1).toHaveLength(1);
+    if (innerResult1[0].type !== "for-each-group") {
+      throw new Error("Expected for-each-group");
+    }
+    // Invocation 1: 2 inner iterations
+    expect(innerResult1[0].iterations).toHaveLength(2);
+    expect(innerResult1[0].iterations[0].logs).toEqual([innerBody1a]);
+    expect(innerResult1[0].iterations[1].logs).toEqual([innerBody1b]);
+    expect(innerResult1[0].collectLog).toBe(innerCollect1);
+
+    // Outer iteration 1: contains innerFe2
+    const outerIter1 = topResult[0].iterations[1].logs;
+    expect(outerIter1).toEqual([innerFe2]);
+    const innerResult2 = groupLogsByIteration(outerIter1, lookup);
+    expect(innerResult2).toHaveLength(1);
+    if (innerResult2[0].type !== "for-each-group") {
+      throw new Error("Expected for-each-group");
+    }
+    // Invocation 2: 3 inner iterations
+    expect(innerResult2[0].iterations).toHaveLength(3);
+    expect(innerResult2[0].iterations[0].logs).toEqual([innerBody2a]);
+    expect(innerResult2[0].iterations[1].logs).toEqual([innerBody2b]);
+    expect(innerResult2[0].iterations[2].logs).toEqual([innerBody2c]);
+    expect(innerResult2[0].collectLog).toBe(innerCollect2);
+  });
+
+  it("returns empty maps for logs with no For Each relationships", () => {
+    const logA = makeLog({ nodeType: "action" });
+    const logB = makeLog({ nodeType: "action" });
+
+    const lookup = buildChildLogsLookup([logA, logB]);
+
+    expect(lookup.childLogs.size).toBe(0);
+    expect(lookup.collectLogs.size).toBe(0);
   });
 });

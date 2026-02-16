@@ -6,6 +6,7 @@ import {
   useEdges,
   useInternalNode,
   useNodes,
+  useUpdateNodeInternals,
 } from "@xyflow/react";
 import { useSetAtom } from "jotai";
 import { Plus } from "lucide-react";
@@ -50,6 +51,7 @@ export function AddStepButton({
   const edges = useEdges();
   const nodes = useNodes();
   const sourceNode = useInternalNode(sourceNodeId);
+  const updateNodeInternals = useUpdateNodeInternals();
   const addNode = useSetAtom(addNodeAtom);
   const setEdges = useSetAtom(edgesAtom);
   const setNodes = useSetAtom(nodesAtom);
@@ -142,13 +144,17 @@ export function AddStepButton({
 
       setTimeout(() => {
         setNodes((currentNodes) =>
-          currentNodes.map((n) => ({
-            ...n,
-            selected: n.id === newNodeId,
-          }))
+          currentNodes.map((n) =>
+            n.selected !== (n.id === newNodeId)
+              ? { ...n, selected: n.id === newNodeId }
+              : n
+          )
         );
       }, 50);
 
+      // Force React Flow to recalculate handle positions on the source node
+      // before adding the edge. Without this, named handles ("loop"/"done")
+      // may be missing from the internal store after the node array changes.
       const newEdge: WorkflowEdge = {
         id: nanoid(),
         source: sourceNodeId,
@@ -156,9 +162,12 @@ export function AddStepButton({
         type: "animated",
         ...(sourceHandleId ? { sourceHandle: sourceHandleId } : {}),
       };
-      setEdges((currentEdges) => [...currentEdges, newEdge]);
-      setHasUnsavedChanges(true);
-      triggerAutosave({ immediate: true });
+      requestAnimationFrame(() => {
+        updateNodeInternals(sourceNodeId);
+        setEdges((currentEdges) => [...currentEdges, newEdge]);
+        setHasUnsavedChanges(true);
+        triggerAutosave({ immediate: true });
+      });
     },
     [
       sourceNode,
@@ -166,6 +175,7 @@ export function AddStepButton({
       sourceHandleId,
       outgoingEdges,
       nodes,
+      updateNodeInternals,
       addNode,
       setEdges,
       setNodes,
@@ -181,7 +191,8 @@ export function AddStepButton({
   }
 
   const hasNoTargets = outgoingEdges.length === 0;
-  const topBase = offsetTopPercent !== undefined ? `${offsetTopPercent}%` : "50%";
+  const topBase =
+    offsetTopPercent !== undefined ? `${offsetTopPercent}%` : "50%";
 
   // Generate a curved bezier path from the handle to the button
   const [connectorPath] = getSimpleBezierPath({

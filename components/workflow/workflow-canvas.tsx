@@ -8,6 +8,7 @@ import {
   type OnConnect,
   type OnConnectStartParams,
   useReactFlow,
+  useUpdateNodeInternals,
   type Connection as XYFlowConnection,
   type Edge as XYFlowEdge,
 } from "@xyflow/react";
@@ -106,6 +107,7 @@ export function WorkflowCanvas() {
   const setActiveTab = useSetAtom(propertiesPanelActiveTabAtom);
   const { screenToFlowPosition, fitView, getViewport, setViewport } =
     useReactFlow();
+  const updateNodeInternals = useUpdateNodeInternals();
 
   const connectingNodeId = useRef<string | null>(null);
   const justCreatedNodeFromConnection = useRef(false);
@@ -237,6 +239,7 @@ export function WorkflowCanvas() {
   // start custom keeperhub code //
   // Auto-assign sourceHandle on For Each edges that lack one.
   // Runs once when edges load and whenever nodes change type.
+  // Uses functional setEdges to avoid overwriting concurrent edge additions.
   useEffect(() => {
     const forEachNodeIds = new Set(
       nodes
@@ -248,25 +251,26 @@ export function WorkflowCanvas() {
       return;
     }
 
-    let changed = false;
-    const updated = edges.map((edge) => {
-      if (!forEachNodeIds.has(edge.source)) {
-        return edge;
-      }
-      if (edge.sourceHandle === "done" || edge.sourceHandle === "loop") {
-        return edge;
-      }
-      const targetNode = nodes.find((n) => n.id === edge.target);
-      const handle =
-        targetNode && getActionType(targetNode) === "Collect" ? "done" : "loop";
-      changed = true;
-      return { ...edge, sourceHandle: handle };
+    setEdges((currentEdges) => {
+      let changed = false;
+      const updated = currentEdges.map((edge) => {
+        if (!forEachNodeIds.has(edge.source)) {
+          return edge;
+        }
+        if (edge.sourceHandle === "done" || edge.sourceHandle === "loop") {
+          return edge;
+        }
+        const targetNode = nodes.find((n) => n.id === edge.target);
+        const handle =
+          targetNode && getActionType(targetNode) === "Collect"
+            ? "done"
+            : "loop";
+        changed = true;
+        return { ...edge, sourceHandle: handle };
+      });
+      return changed ? updated : currentEdges;
     });
-
-    if (changed) {
-      setEdges(updated);
-    }
-  }, [nodes, edges, setEdges]);
+  }, [nodes, setEdges]);
   // end keeperhub code //
 
   const isValidConnection = useCallback(
@@ -334,12 +338,12 @@ export function WorkflowCanvas() {
         sourceHandle,
         type: "animated",
       };
-      setEdges([...edges, newEdge]);
+      setEdges((currentEdges) => [...currentEdges, newEdge]);
       setHasUnsavedChanges(true);
       // Trigger immediate autosave when nodes are connected
       triggerAutosave({ immediate: true });
     },
-    [edges, nodes, setEdges, setHasUnsavedChanges, triggerAutosave]
+    [nodes, setEdges, setHasUnsavedChanges, triggerAutosave]
   );
 
   const onNodeClick: NodeMouseHandler = useCallback(
@@ -464,15 +468,20 @@ export function WorkflowCanvas() {
         // Need to do this after a delay because panOnDrag will clear selection
         setTimeout(() => {
           setNodes((currentNodes) =>
-            currentNodes.map((n) => ({
-              ...n,
-              selected: n.id === newNode.id,
-            }))
+            currentNodes.map((n) =>
+              n.selected !== (n.id === newNode.id)
+                ? { ...n, selected: n.id === newNode.id }
+                : n
+            )
           );
         }, 50);
 
         // start custom keeperhub code //
-        // Create connection from the source node to the new node
+        // Create connection from the source node to the new node.
+        // Defer edge creation: addNode deselects the source node (new object
+        // reference), which makes React Flow re-measure its handles via
+        // ResizeObserver. Creating the edge in the same render fails because
+        // named handles ("loop"/"done") are temporarily unregistered.
         const newEdge = {
           id: nanoid(),
           source: connectingNodeId.current,
@@ -482,11 +491,20 @@ export function WorkflowCanvas() {
             ? { sourceHandle: connectingHandleId.current }
             : {}),
         };
+        // Force React Flow to recalculate handle positions on the source
+        // node before adding the edge. Without this, named handles
+        // ("loop"/"done") may be missing from the internal store after
+        // the node array changes (see reactflow.dev/error#008).
+        const sourceId = connectingNodeId.current;
+        requestAnimationFrame(() => {
+          if (sourceId) {
+            updateNodeInternals(sourceId);
+          }
+          setEdges((currentEdges) => [...currentEdges, newEdge]);
+          setHasUnsavedChanges(true);
+          triggerAutosave({ immediate: true });
+        });
         // end keeperhub code //
-        setEdges([...edges, newEdge]);
-        setHasUnsavedChanges(true);
-        // Trigger immediate autosave for the new edge
-        triggerAutosave({ immediate: true });
 
         // Set flag to prevent immediate deselection
         justCreatedNodeFromConnection.current = true;
@@ -504,8 +522,8 @@ export function WorkflowCanvas() {
       getClientPosition,
       calculateMenuPosition,
       screenToFlowPosition,
+      updateNodeInternals,
       addNode,
-      edges,
       setEdges,
       setNodes,
       setSelectedNode,
