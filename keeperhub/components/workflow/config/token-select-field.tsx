@@ -56,7 +56,7 @@ export function TokenSelectField({
 
   // Parse current value
   const currentValue = parseTokenValue(
-    config[field.key] as string | Record<string, unknown> | undefined,
+    config[field.key] as string | Record<string, unknown> | undefined
   );
   const networkValue = config[networkField] as string | undefined;
 
@@ -561,7 +561,7 @@ function extractCustomToken(parsed: unknown): CustomToken | undefined {
  * Supports: object (API/MCP), JSON string (UI), bare address string (legacy)
  */
 function parseTokenValue(
-  value: string | Record<string, unknown> | undefined,
+  value: string | Record<string, unknown> | undefined
 ): TokenFieldValue {
   if (!value) {
     return {

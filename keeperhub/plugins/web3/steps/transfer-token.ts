@@ -66,13 +66,23 @@ async function parseTokenAddress(
   }
 
   // Object values from API/MCP-created workflows -- normalize to parsed form
-  const parsed = typeof input.tokenConfig === "object"
-    ? input.tokenConfig
-    : (() => { try { return JSON.parse(input.tokenConfig as string); } catch { return null; } })();
+  const parsed =
+    typeof input.tokenConfig === "object"
+      ? input.tokenConfig
+      : (() => {
+          try {
+            return JSON.parse(input.tokenConfig as string);
+          } catch {
+            return null;
+          }
+        })();
 
   if (!parsed) {
     // JSON parse failed -- check if it's a bare address string
-    if (typeof input.tokenConfig === "string" && input.tokenConfig.startsWith("0x")) {
+    if (
+      typeof input.tokenConfig === "string" &&
+      input.tokenConfig.startsWith("0x")
+    ) {
       return input.tokenConfig;
     }
     return null;
