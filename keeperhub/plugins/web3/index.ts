@@ -343,6 +343,88 @@ const web3Plugin: IntegrationPlugin = {
       ],
     },
     {
+      slug: "get-transaction",
+      label: "Get Transaction",
+      description:
+        "Fetch full transaction details by hash, including sender, recipient, value, and calldata",
+      category: "Web3",
+      stepFunction: "getTransactionStep",
+      stepImportPath: "get-transaction",
+      outputFields: [
+        {
+          field: "success",
+          description: "Whether the transaction was found",
+        },
+        {
+          field: "hash",
+          description: "The transaction hash",
+        },
+        {
+          field: "from",
+          description: "Sender address",
+        },
+        {
+          field: "to",
+          description: "Recipient address (null for contract creation)",
+        },
+        {
+          field: "value",
+          description: "Value sent in ETH (human-readable)",
+        },
+        {
+          field: "input",
+          description: "Transaction input data (calldata)",
+        },
+        {
+          field: "nonce",
+          description: "Transaction nonce",
+        },
+        {
+          field: "gasLimit",
+          description: "Gas limit for the transaction",
+        },
+        {
+          field: "blockNumber",
+          description: "Block number (null if pending)",
+        },
+        {
+          field: "transactionLink",
+          description: "Explorer link to the transaction",
+        },
+        {
+          field: "fromLink",
+          description: "Explorer link to the sender address",
+        },
+        {
+          field: "toLink",
+          description: "Explorer link to the recipient address",
+        },
+        {
+          field: "error",
+          description: "Error message if the lookup failed",
+        },
+      ],
+      configFields: [
+        {
+          key: "network",
+          label: "Network",
+          type: "chain-select",
+          chainTypeFilter: "evm",
+          placeholder: "Select network",
+          required: true,
+        },
+        {
+          key: "transactionHash",
+          label: "Transaction Hash",
+          type: "template-input",
+          placeholder: "0x... or {{NodeName.transactionHash}}",
+          example:
+            "0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060",
+          required: true,
+        },
+      ],
+    },
+    {
       slug: "decode-calldata",
       label: "Decode Calldata",
       description:
@@ -429,7 +511,7 @@ const web3Plugin: IntegrationPlugin = {
       label: "Assess Transaction Risk",
       description:
         "AI-powered risk assessment that analyzes transaction calldata, value, and context to produce a risk score with detailed factors",
-      category: "Security",
+      category: "Web3",
       stepFunction: "assessRiskStep",
       stepImportPath: "assess-risk",
       outputFields: [
@@ -482,17 +564,17 @@ const web3Plugin: IntegrationPlugin = {
         },
         {
           key: "value",
-          label: "Transaction Value (ETH)",
+          label: "Transaction Value",
           type: "template-input",
           placeholder: "0 or {{NodeName.value}}",
           example: "0",
         },
         {
           key: "chain",
-          label: "Chain",
+          label: "Network",
           type: "chain-select",
           chainTypeFilter: "evm",
-          placeholder: "Select chain",
+          placeholder: "Select network",
         },
         {
           key: "senderAddress",

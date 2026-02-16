@@ -10,7 +10,6 @@ import {
 
 // -- Module-level constants --
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY ?? "";
 const LLM_TIMEOUT_MS = 3000;
 
 const MAX_UINT256_DECIMAL =
@@ -347,7 +346,8 @@ async function callLlmAssessment(
   ruleFactors: RiskFactor[],
   context: AssessRiskCoreInput
 ): Promise<LlmAssessment | null> {
-  if (!ANTHROPIC_API_KEY) {
+  const apiKey = process.env.OPENAI_API_KEY ?? "";
+  if (!apiKey) {
     return null;
   }
 
@@ -362,15 +362,14 @@ async function callLlmAssessment(
       context
     );
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
+        model: "gpt-4o-mini",
         max_tokens: 200,
         temperature: 0,
         messages: [{ role: "user", content: prompt }],
@@ -383,9 +382,9 @@ async function callLlmAssessment(
     }
 
     const data = (await response.json()) as {
-      content?: Array<{ type: string; text?: string }>;
+      choices?: Array<{ message?: { content?: string } }>;
     };
-    const text = data.content?.[0]?.text;
+    const text = data.choices?.[0]?.message?.content;
     if (!text) {
       return null;
     }
@@ -411,11 +410,11 @@ function buildRulesOnlyResult(
     riskScore: ruleAssessment.riskScore,
     factors: [
       ...ruleFactors.map((f) => f.description),
-      "AI analysis unavailable (ANTHROPIC_API_KEY not configured)",
+      "AI analysis unavailable (OPENAI_API_KEY not configured)",
     ],
     decodedFunction,
     reasoning:
-      "Assessment based on built-in security rules only. Configure ANTHROPIC_API_KEY for AI-enhanced analysis.",
+      "Assessment based on built-in security rules only. Configure OPENAI_API_KEY for AI-enhanced analysis.",
   };
 }
 
@@ -520,7 +519,7 @@ async function stepHandler(
     };
   }
 
-  if (!ANTHROPIC_API_KEY) {
+  if (!process.env.OPENAI_API_KEY) {
     return buildRulesOnlyResult(ruleFactors, ruleAssessment, decodedFunction);
   }
 
@@ -530,7 +529,7 @@ async function stepHandler(
 /**
  * Assess Transaction Risk Step
  * AI-powered risk assessment combining built-in DeFi knowledge base
- * with Claude Haiku analysis. Fail-closed: errors elevate risk level.
+ * with GPT-4o Mini analysis. Fail-closed: errors elevate risk level.
  */
 export async function assessRiskStep(
   input: AssessRiskInput
