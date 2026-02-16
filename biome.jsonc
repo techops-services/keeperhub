@@ -44,6 +44,9 @@
         "noIncrementDecrement": "off",
         "useSortedClasses": "off",
         "noUselessUndefined": "off"
+      },
+      "style": {
+        "useConsistentTypeDefinitions": "off"
       }
     }
   }

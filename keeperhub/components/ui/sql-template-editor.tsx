@@ -1,6 +1,6 @@
 "use client";
 
-import type { OnMount } from "@monaco-editor/react";
+import type { Monaco, OnMount } from "@monaco-editor/react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { AlertTriangle } from "lucide-react";
 import {
@@ -606,7 +606,10 @@ export function SqlTemplateEditor({
         "sql",
         {
           triggerCharacters: ["@"],
-          provideCompletionItems: (model, position) => {
+          provideCompletionItems: (
+            model: ReturnType<Monaco["editor"]["createModel"]>,
+            position: { lineNumber: number; column: number }
+          ) => {
             // Only provide suggestions for our editor instance (the
             // provider is registered at the language level, not per-editor)
             if (model !== editorRef.current?.getModel()) {

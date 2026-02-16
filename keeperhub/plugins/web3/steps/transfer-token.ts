@@ -38,7 +38,7 @@ type TransferTokenResult =
 
 export type TransferTokenCoreInput = {
   network: string;
-  tokenConfig: string; // JSON string of TokenConfig
+  tokenConfig: string | Record<string, unknown>;
   recipientAddress: string;
   amount: string;
   // Legacy support
@@ -65,79 +65,92 @@ async function parseTokenAddress(
     return null;
   }
 
-  try {
-    const parsed = JSON.parse(input.tokenConfig);
+  // Object values from API/MCP-created workflows -- normalize to parsed form
+  const parsed =
+    typeof input.tokenConfig === "object"
+      ? input.tokenConfig
+      : (() => {
+          try {
+            return JSON.parse(input.tokenConfig as string);
+          } catch {
+            return null;
+          }
+        })();
 
-    // New format: single supported token ID
-    if (parsed.supportedTokenId) {
-      const tokens = await db
-        .select({ tokenAddress: supportedTokens.tokenAddress })
-        .from(supportedTokens)
-        .where(
-          and(
-            eq(supportedTokens.chainId, chainId),
-            eq(supportedTokens.id, parsed.supportedTokenId)
-          )
-        )
-        .limit(1);
-      if (tokens[0]?.tokenAddress) {
-        return tokens[0].tokenAddress;
-      }
-    }
-
-    // Legacy format: array of supported token IDs - use first
+  if (!parsed) {
+    // JSON parse failed -- check if it's a bare address string
     if (
-      Array.isArray(parsed.supportedTokenIds) &&
-      parsed.supportedTokenIds.length > 0
+      typeof input.tokenConfig === "string" &&
+      input.tokenConfig.startsWith("0x")
     ) {
-      const tokens = await db
-        .select({ tokenAddress: supportedTokens.tokenAddress })
-        .from(supportedTokens)
-        .where(
-          and(
-            eq(supportedTokens.chainId, chainId),
-            inArray(supportedTokens.id, parsed.supportedTokenIds)
-          )
-        )
-        .limit(1);
-      if (tokens[0]?.tokenAddress) {
-        return tokens[0].tokenAddress;
-      }
-    }
-
-    // New format: single custom token
-    if (parsed.customToken?.address) {
-      return parsed.customToken.address;
-    }
-
-    // Legacy format: array of custom tokens - use first
-    if (Array.isArray(parsed.customTokens) && parsed.customTokens.length > 0) {
-      return parsed.customTokens[0].address;
-    }
-
-    // Legacy: check old formats
-    if (
-      Array.isArray(parsed.customTokenAddresses) &&
-      parsed.customTokenAddresses.length > 0
-    ) {
-      const addr = parsed.customTokenAddresses.find(
-        (a: string) => a && a.trim() !== ""
-      );
-      if (addr) {
-        return addr;
-      }
-    } else if (parsed.customTokenAddress) {
-      return parsed.customTokenAddress;
-    }
-
-    return null;
-  } catch {
-    // If parsing fails and it looks like an address, use it directly
-    if (input.tokenConfig.startsWith("0x")) {
       return input.tokenConfig;
     }
     return null;
   }
+
+  // New format: single supported token ID
+  if (parsed.supportedTokenId) {
+    const tokens = await db
+      .select({ tokenAddress: supportedTokens.tokenAddress })
+      .from(supportedTokens)
+      .where(
+        and(
+          eq(supportedTokens.chainId, chainId),
+          eq(supportedTokens.id, parsed.supportedTokenId)
+        )
+      )
+      .limit(1);
+    if (tokens[0]?.tokenAddress) {
+      return tokens[0].tokenAddress;
+    }
+  }
+
+  // Legacy format: array of supported token IDs - use first
+  if (
+    Array.isArray(parsed.supportedTokenIds) &&
+    parsed.supportedTokenIds.length > 0
+  ) {
+    const tokens = await db
+      .select({ tokenAddress: supportedTokens.tokenAddress })
+      .from(supportedTokens)
+      .where(
+        and(
+          eq(supportedTokens.chainId, chainId),
+          inArray(supportedTokens.id, parsed.supportedTokenIds)
+        )
+      )
+      .limit(1);
+    if (tokens[0]?.tokenAddress) {
+      return tokens[0].tokenAddress;
+    }
+  }
+
+  // New format: single custom token
+  if (parsed.customToken?.address) {
+    return parsed.customToken.address;
+  }
+
+  // Legacy format: array of custom tokens - use first
+  if (Array.isArray(parsed.customTokens) && parsed.customTokens.length > 0) {
+    return parsed.customTokens[0].address;
+  }
+
+  // Legacy: check old formats
+  if (
+    Array.isArray(parsed.customTokenAddresses) &&
+    parsed.customTokenAddresses.length > 0
+  ) {
+    const addr = parsed.customTokenAddresses.find(
+      (a: string) => a && a.trim() !== ""
+    );
+    if (addr) {
+      return addr;
+    }
+  } else if (parsed.customTokenAddress) {
+    return parsed.customTokenAddress;
+  }
+
+  return null;
 }
 
 /**
