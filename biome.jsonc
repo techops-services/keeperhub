@@ -40,8 +40,10 @@
       },
       "nursery": {
         // These are experimental rules that add friction without clear benefit
+        "useMaxParams": "off",
         "noIncrementDecrement": "off",
-        "useSortedClasses": "off"
+        "useSortedClasses": "off",
+        "noUselessUndefined": "off"
       },
       "style": {
         "useConsistentTypeDefinitions": "off"

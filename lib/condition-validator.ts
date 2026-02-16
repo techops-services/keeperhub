@@ -709,6 +709,7 @@ function validateOperatorBoundaries(tokens: Token[]): ValidationResult {
 /**
  * Validates consecutive operators
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Multiple operator validation cases needed
 function validateConsecutiveOperators(tokens: Token[]): ValidationResult {
   for (let j = 0; j < tokens.length - 1; j++) {
     const current = tokens[j];
@@ -750,6 +751,7 @@ function validateConsecutiveOperators(tokens: Token[]): ValidationResult {
  * Validates binary operator has operands on both sides
  * Note: `-` can be unary (negative numbers) or binary (subtraction)
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Handles both unary and binary operators
 function validateBinaryOperator(
   token: Token,
   index: number,

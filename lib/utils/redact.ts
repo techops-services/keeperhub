@@ -102,6 +102,7 @@ function maskValue(value: string): string {
  * Recursively redact sensitive data from an object
  */
 // biome-ignore lint/suspicious/noExplicitAny: Redaction works on arbitrary data structures
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Function handles multiple data types and recursive structures
 function redactObject(obj: any, depth = 0): any {
   // Prevent infinite recursion
   if (depth > 10) {

@@ -40,6 +40,7 @@ export type SendEmailInput = StepInput &
 /**
  * Core logic - portable between app and export
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Email sending requires validation of many fields
 async function stepHandler(
   input: SendEmailCoreInput,
   credentials: SendGridCredentials,

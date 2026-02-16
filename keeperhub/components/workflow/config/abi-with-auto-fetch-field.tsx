@@ -454,6 +454,7 @@ type AbiWithAutoFetchProps = FieldProps & {
   onUpdateConfig?: (key: string, value: unknown) => void;
 };
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: ABI field handles proxy, diamond, and read/write-as-proxy states with toggles
 export function AbiWithAutoFetchField({
   field,
   value,

@@ -160,6 +160,7 @@ async function databaseQuery(
       count: Array.isArray(result) ? result.length : 0,
     };
   } catch (error) {
+    console.error("[Database Query] Raw connection error:", error);
     return {
       success: false,
       error: `Database query failed: ${getDatabaseErrorMessage(error)}`,
