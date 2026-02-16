@@ -684,20 +684,33 @@ function ForEachLogGroup({
     });
   }, []);
 
+  const hasContent = iterations.length > 0 || collectLog !== null;
+
   return (
-    <div>
+    <div className="relative">
+      {/* Continuous timeline line from For Each dot through expanded
+          iterations down to Collect (or the group bottom). Without this,
+          the line breaks because expanded content sits between two
+          ExecutionLogEntry siblings whose internal lines don't span
+          across intervening DOM nodes. */}
+      {hasContent && (!isLast || collectLog !== null) && (
+        <div
+          className="absolute w-px bg-border"
+          style={{ left: "9px", top: "calc(0.5rem + 1.25rem)", bottom: 0 }}
+        />
+      )}
       <ExecutionLogEntry
         getStatusDotClass={getStatusDotClass}
         getStatusIcon={getStatusIcon}
         isExpanded={expandedLogs.has(forEachLog.id)}
         isFirst={isFirst}
-        isLast={isLast && iterations.length === 0}
+        isLast={isLast && !hasContent}
         log={forEachLog}
         onToggle={() => onToggleLog(forEachLog.id)}
       />
 
       {expandedLogs.has(forEachLog.id) && (
-        <div className="ml-6 border-border border-l pl-2">
+        <div className="ml-6 pl-2">
           {iterations.map((iteration) => {
             const isIterExpanded = expandedIterations.has(
               iteration.iterationIndex
@@ -714,7 +727,7 @@ function ForEachLogGroup({
                 />
 
                 {isIterExpanded && (
-                  <div className="ml-4">
+                  <div className="ml-4 border-border border-l pl-2">
                     {groupLogsByIteration(iteration.logs, lookup).map(
                       (subEntry, subIdx, subEntries) => {
                         if (subEntry.type === FOR_EACH_GROUP_TYPE) {
