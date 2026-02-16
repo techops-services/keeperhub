@@ -108,11 +108,23 @@ POST /api/integrations/{integrationId}/test
 
 Tests the integration credentials and connectivity.
 
+### Request Body (Optional)
+
+```json
+{
+  "configOverrides": {
+    "webhookUrl": "https://test-webhook-url..."
+  }
+}
+```
+
+The `configOverrides` field allows testing with temporary configuration values without modifying the saved integration.
+
 ### Response
 
 ```json
 {
-  "success": true,
+  "status": "success",
   "message": "Integration test successful"
 }
 ```

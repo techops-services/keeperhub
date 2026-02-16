@@ -24,9 +24,16 @@ Send transactional emails through SendGrid. Useful for formal notifications, rep
 
 Send an email with customizable subject and body.
 
-**Inputs:** To (email address), From (verified sender), Subject, Body (supports `{{NodeName.field}}` variables)
+**Inputs:**
+- To (email address) - Required
+- From (verified sender) - Optional (uses default sender if not specified)
+- Subject - Required
+- Body (supports `{{NodeName.field}}` variables) - Required
+- CC (email address) - Optional
+- BCC (email address) - Optional
+- Reply-To (email address) - Optional
 
-**Outputs:** `success`, `error`
+**Outputs:** `success`, `id` (on success), `error`
 
 **When to use:** Daily/weekly DeFi position reports, formal security incident notifications, compliance audit trails, stakeholder updates.
 
