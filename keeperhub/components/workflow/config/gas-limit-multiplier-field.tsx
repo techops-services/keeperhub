@@ -107,7 +107,11 @@ export function GasLimitMultiplierField({
   // Parse the current value to determine mode
   const parsed = useMemo(() => parseGasLimitConfig(value), [value]);
   const mode = parsed?.mode ?? "multiplier";
-  const inputValue = parsed?.value ?? "";
+  const rawInputValue = parsed?.value ?? "";
+  const inputValue =
+    mode === "multiplier" && rawInputValue === "" ? "2.00" : rawInputValue;
+  const isCustomMultiplier =
+    mode === "multiplier" && inputValue !== "" && inputValue !== "2.00";
 
   const [estimate, setEstimate] = useState<GasEstimateState>({
     status: "idle",
@@ -290,26 +294,26 @@ export function GasLimitMultiplierField({
   return (
     <div className="space-y-2">
       {/* Mode toggle */}
-      <div className="flex gap-1 rounded-md border p-0.5">
+      <div className="flex gap-1 rounded-md border bg-muted/30 p-0.5">
         <Button
-          className="h-7 flex-1 text-xs"
+          className={`h-7 flex-1 text-xs ${mode === "multiplier" ? "bg-background shadow-sm" : ""}`}
           disabled={disabled}
           onClick={() => handleModeChange("multiplier")}
           size="sm"
           type="button"
           variant={mode === "multiplier" ? "secondary" : "ghost"}
         >
-          Multiplier
+          Gas Estimate Multiplier
         </Button>
         <Button
-          className="h-7 flex-1 text-xs"
+          className={`h-7 flex-1 text-xs ${mode === "maxGasLimit" ? "bg-background shadow-sm" : ""}`}
           disabled={disabled}
           onClick={() => handleModeChange("maxGasLimit")}
           size="sm"
           type="button"
           variant={mode === "maxGasLimit" ? "secondary" : "ghost"}
         >
-          Max Gas Limit
+          Absolute Gas Limit
         </Button>
       </div>
 
@@ -321,7 +325,7 @@ export function GasLimitMultiplierField({
           max={field.max ?? 10}
           min={field.min ?? 1}
           onChange={(e) => handleValueChange(e.target.value)}
-          placeholder={`Auto (${defaultMultiplier}x for ${displayName})`}
+          placeholder="2.00"
           step={field.step ?? 0.01}
           type="number"
           value={inputValue}
@@ -358,7 +362,7 @@ export function GasLimitMultiplierField({
                 {mode === "multiplier" ? (
                   <>
                     {formatGasNumber(estimate.estimatedGas)} x{" "}
-                    {inputValue || defaultMultiplier} ={" "}
+                    {inputValue} ={" "}
                     {finalMaxGas.toLocaleString()}
                   </>
                 ) : (
@@ -382,11 +386,9 @@ export function GasLimitMultiplierField({
             </p>
           )}
 
-        {mode === "multiplier" && (
+        {isCustomMultiplier && (
           <p className="text-muted-foreground text-xs">
-            {inputValue
-              ? `Custom: ${inputValue}x (chain default: ${defaultMultiplier}x)`
-              : `Using chain default: ${defaultMultiplier}x`}
+            Custom multiplier: {inputValue}x
           </p>
         )}
 
