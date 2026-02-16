@@ -1348,6 +1348,7 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
             nodeId: collectNodeId,
             nodeName: collectLabel,
             nodeType: "Collect",
+            forEachNodeId,
           } satisfies StepContext,
         });
       }

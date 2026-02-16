@@ -18,6 +18,7 @@ import {
   hasUnsavedChangesAtom,
   nodesAtom,
   propertiesPanelActiveTabAtom,
+  type WorkflowEdge,
   type WorkflowNode,
 } from "@/lib/workflow-store";
 
@@ -37,10 +38,14 @@ const MAX_OFFSET = 25;
 
 type AddStepButtonProps = {
   sourceNodeId: string;
+  sourceHandleId?: string;
+  offsetTopPercent?: number;
 };
 
 export function AddStepButton({
   sourceNodeId,
+  sourceHandleId,
+  offsetTopPercent,
 }: AddStepButtonProps): React.ReactNode {
   const edges = useEdges();
   const nodes = useNodes();
@@ -53,8 +58,13 @@ export function AddStepButton({
   const triggerAutosave = useSetAtom(autosaveAtom);
 
   const outgoingEdges = useMemo(
-    () => edges.filter((e) => e.source === sourceNodeId),
-    [edges, sourceNodeId]
+    () =>
+      edges.filter(
+        (e) =>
+          e.source === sourceNodeId &&
+          (sourceHandleId === undefined || e.sourceHandle === sourceHandleId)
+      ),
+    [edges, sourceNodeId, sourceHandleId]
   );
 
   // Calculate vertical offset so the button clears all outgoing edge paths
@@ -112,15 +122,16 @@ export function AddStepButton({
       }
 
       const newNodeId = nanoid();
+      const isAutoCollect = sourceHandleId === "done";
       const newNode: WorkflowNode = {
         id: newNodeId,
         type: "action",
         position: { x: sourceX, y: newY },
         data: {
-          label: "",
+          label: isAutoCollect ? "Collect" : "",
           description: "",
           type: "action",
-          config: {},
+          config: isAutoCollect ? { actionType: "Collect" } : {},
           status: "idle",
         },
         selected: true,
@@ -138,11 +149,12 @@ export function AddStepButton({
         );
       }, 50);
 
-      const newEdge = {
+      const newEdge: WorkflowEdge = {
         id: nanoid(),
         source: sourceNodeId,
         target: newNodeId,
         type: "animated",
+        ...(sourceHandleId ? { sourceHandle: sourceHandleId } : {}),
       };
       setEdges((currentEdges) => [...currentEdges, newEdge]);
       setHasUnsavedChanges(true);
@@ -151,6 +163,7 @@ export function AddStepButton({
     [
       sourceNode,
       sourceNodeId,
+      sourceHandleId,
       outgoingEdges,
       nodes,
       addNode,
@@ -162,15 +175,20 @@ export function AddStepButton({
     ]
   );
 
-  const isLeaf = outgoingEdges.length === 0;
-  const distance = isLeaf ? BUTTON_DISTANCE : BUTTON_DISTANCE;
+  // Hide the "+" button on the "done" handle once a Collect is already connected
+  if (sourceHandleId === "done" && outgoingEdges.length > 0) {
+    return null;
+  }
+
+  const hasNoTargets = outgoingEdges.length === 0;
+  const topBase = offsetTopPercent !== undefined ? `${offsetTopPercent}%` : "50%";
 
   // Generate a curved bezier path from the handle to the button
   const [connectorPath] = getSimpleBezierPath({
     sourceX: 0,
     sourceY: 0,
     sourcePosition: Position.Right,
-    targetX: distance,
+    targetX: BUTTON_DISTANCE,
     targetY: buttonOffsetY,
     targetPosition: Position.Left,
   });
@@ -181,10 +199,10 @@ export function AddStepButton({
         className="add-step-button group nopan nodrag absolute -translate-y-1/2"
         onClick={handleClick}
         style={{
-          left: `calc(100% + ${distance}px)`,
-          top: `calc(50% + ${buttonOffsetY}px)`,
+          left: `calc(100% + ${BUTTON_DISTANCE}px)`,
+          top: `calc(${topBase} + ${buttonOffsetY}px)`,
         }}
-        title={isLeaf ? "Add step" : "Add branch"}
+        title={hasNoTargets ? "Add step" : "Add branch"}
         type="button"
       >
         <span className="flex size-7 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground transition-all duration-150 group-hover:scale-110 group-hover:border-primary group-hover:bg-primary/10 group-hover:text-primary">
@@ -197,7 +215,7 @@ export function AddStepButton({
         role="presentation"
         style={{
           left: "100%",
-          top: "50%",
+          top: topBase,
           overflow: "visible",
           width: 1,
           height: 1,

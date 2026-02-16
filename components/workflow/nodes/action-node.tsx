@@ -20,6 +20,7 @@ import {
   Node,
   NodeDescription,
   NodeTitle,
+  type SourceHandleConfig,
 } from "@/components/ai-elements/node";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -71,6 +72,13 @@ const getModelDisplayName = (modelId: string): string => {
   };
   return modelNames[modelId] || modelId;
 };
+
+// start custom keeperhub code //
+const FOR_EACH_SOURCE_HANDLES: SourceHandleConfig[] = [
+  { id: "done", label: "done", topPercent: 30 },
+  { id: "loop", label: "loop", topPercent: 70 },
+];
+// end keeperhub code //
 
 // System action labels (non-plugin actions)
 const SYSTEM_ACTION_LABELS: Record<string, string> = {
@@ -355,6 +363,13 @@ export const ActionNode = memo(({ data, selected, id }: ActionNodeProps) => {
   const aiModel = getAiModel();
   const isDisabled = data.enabled === false;
 
+  // start custom keeperhub code //
+  const isForEach = actionType === "For Each";
+  const handles = isForEach
+    ? { target: true, source: false, sourceHandles: FOR_EACH_SOURCE_HANDLES }
+    : { target: true, source: true };
+  // end keeperhub code //
+
   return (
     <Node
       className={cn(
@@ -363,7 +378,7 @@ export const ActionNode = memo(({ data, selected, id }: ActionNodeProps) => {
         isDisabled && "opacity-50"
       )}
       data-testid={`action-node-${id}`}
-      handles={{ target: true, source: true }}
+      handles={handles}
       nodeId={id}
       status={status}
     >

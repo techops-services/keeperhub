@@ -646,6 +646,7 @@ function IterationHeader({
 function ForEachLogGroup({
   forEachLog,
   iterations,
+  collectLog,
   expandedLogs,
   onToggleLog,
   getStatusIcon,
@@ -655,6 +656,7 @@ function ForEachLogGroup({
 }: {
   forEachLog: ExecutionLog;
   iterations: IterationGroup<ExecutionLog>[];
+  collectLog: ExecutionLog | null;
   expandedLogs: Set<string>;
   onToggleLog: (id: string) => void;
   getStatusIcon: (status: string) => JSX.Element;
@@ -685,12 +687,12 @@ function ForEachLogGroup({
         getStatusIcon={getStatusIcon}
         isExpanded={expandedLogs.has(forEachLog.id)}
         isFirst={isFirst}
-        isLast={isLast && iterations.length === 0}
+        isLast={isLast && iterations.length === 0 && collectLog === null}
         log={forEachLog}
         onToggle={() => onToggleLog(forEachLog.id)}
       />
 
-      {iterations.length > 0 && expandedLogs.has(forEachLog.id) && (
+      {expandedLogs.has(forEachLog.id) && (
         <div className="ml-6 border-border border-l pl-2">
           {iterations.map((iteration) => {
             const isIterExpanded = expandedIterations.has(
@@ -709,42 +711,36 @@ function ForEachLogGroup({
 
                 {isIterExpanded && (
                   <div className="ml-4">
-                    {groupLogsByIteration(iteration.logs).map(
-                      (subEntry, subIdx, subEntries) => {
-                        if (subEntry.type === FOR_EACH_GROUP_TYPE) {
-                          return (
-                            <ForEachLogGroup
-                              expandedLogs={expandedLogs}
-                              forEachLog={subEntry.forEachLog}
-                              getStatusDotClass={getStatusDotClass}
-                              getStatusIcon={getStatusIcon}
-                              isFirst={subIdx === 0}
-                              isLast={subIdx === subEntries.length - 1}
-                              iterations={subEntry.iterations}
-                              key={subEntry.forEachLog.id}
-                              onToggleLog={onToggleLog}
-                            />
-                          );
-                        }
-                        return (
-                          <ExecutionLogEntry
-                            getStatusDotClass={getStatusDotClass}
-                            getStatusIcon={getStatusIcon}
-                            isExpanded={expandedLogs.has(subEntry.log.id)}
-                            isFirst={subIdx === 0}
-                            isLast={subIdx === subEntries.length - 1}
-                            key={subEntry.log.id}
-                            log={subEntry.log}
-                            onToggle={() => onToggleLog(subEntry.log.id)}
-                          />
-                        );
-                      }
-                    )}
+                    {iteration.logs.map((iterLog, logIdx) => (
+                      <ExecutionLogEntry
+                        getStatusDotClass={getStatusDotClass}
+                        getStatusIcon={getStatusIcon}
+                        isExpanded={expandedLogs.has(iterLog.id)}
+                        isFirst={logIdx === 0}
+                        isLast={logIdx === iteration.logs.length - 1}
+                        key={iterLog.id}
+                        log={iterLog}
+                        onToggle={() => onToggleLog(iterLog.id)}
+                      />
+                    ))}
                   </div>
                 )}
               </div>
             );
           })}
+
+          {collectLog && (
+            <ExecutionLogEntry
+              getStatusDotClass={getStatusDotClass}
+              getStatusIcon={getStatusIcon}
+              isExpanded={expandedLogs.has(collectLog.id)}
+              isFirst={iterations.length === 0}
+              isLast={isLast}
+              key={collectLog.id}
+              log={collectLog}
+              onToggle={() => onToggleLog(collectLog.id)}
+            />
+          )}
         </div>
       )}
     </div>
@@ -1267,6 +1263,7 @@ export function WorkflowRuns({
                         if (entry.type === FOR_EACH_GROUP_TYPE) {
                           return (
                             <ForEachLogGroup
+                              collectLog={entry.collectLog}
                               expandedLogs={expandedLogs}
                               forEachLog={entry.forEachLog}
                               getStatusDotClass={getStatusDotClass}

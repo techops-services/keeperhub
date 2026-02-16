@@ -76,6 +76,15 @@ const edgeTypes = {
   temporary: Edge.Temporary,
 };
 
+// start custom keeperhub code //
+/** Extract actionType from a workflow node's data. */
+function getActionType(node: { data?: unknown }): string | undefined {
+  const config = (node.data as Record<string, unknown> | undefined)
+    ?.config as Record<string, unknown> | undefined;
+  return config?.actionType as string | undefined;
+}
+// end keeperhub code //
+
 export function WorkflowCanvas() {
   const [nodes, setNodes] = useAtom(nodesAtom);
   const [edges, setEdges] = useAtom(edgesAtom);
@@ -225,6 +234,41 @@ export function WorkflowCanvas() {
     []
   );
 
+  // start custom keeperhub code //
+  // Auto-assign sourceHandle on For Each edges that lack one.
+  // Runs once when edges load and whenever nodes change type.
+  useEffect(() => {
+    const forEachNodeIds = new Set(
+      nodes
+        .filter((n) => getActionType(n) === "For Each")
+        .map((n) => n.id)
+    );
+
+    if (forEachNodeIds.size === 0) {
+      return;
+    }
+
+    let changed = false;
+    const updated = edges.map((edge) => {
+      if (!forEachNodeIds.has(edge.source)) {
+        return edge;
+      }
+      if (edge.sourceHandle === "done" || edge.sourceHandle === "loop") {
+        return edge;
+      }
+      const targetNode = nodes.find((n) => n.id === edge.target);
+      const handle =
+        targetNode && getActionType(targetNode) === "Collect" ? "done" : "loop";
+      changed = true;
+      return { ...edge, sourceHandle: handle };
+    });
+
+    if (changed) {
+      setEdges(updated);
+    }
+  }, [nodes, edges, setEdges]);
+  // end keeperhub code //
+
   const isValidConnection = useCallback(
     (connection: XYFlowConnection | XYFlowEdge) => {
       // Ensure we have both source and target
@@ -237,19 +281,57 @@ export function WorkflowCanvas() {
         return false;
       }
 
-      // Ensure connection is from source handle to target handle
-      // sourceHandle should be defined if connecting from a specific handle
-      // targetHandle should be defined if connecting to a specific handle
+      // start custom keeperhub code //
+      const sourceHandle = "sourceHandle" in connection
+        ? (connection.sourceHandle as string | undefined)
+        : undefined;
+
+      const targetNode = nodes.find((n) => n.id === connection.target);
+      const targetIsCollect =
+        targetNode !== undefined && getActionType(targetNode) === "Collect";
+
+      // Collect nodes can only be targets of a For Each "done" handle
+      if (targetIsCollect && sourceHandle !== "done") {
+        return false;
+      }
+
+      // For Each "done" handle only connects to Collect nodes
+      if (sourceHandle === "done" && !targetIsCollect) {
+        return false;
+      }
+
+      // For Each "loop" handle cannot connect to Collect nodes
+      if (sourceHandle === "loop" && targetIsCollect) {
+        return false;
+      }
+      // end keeperhub code //
+
       return true;
     },
-    []
+    [nodes]
   );
 
   const onConnect: OnConnect = useCallback(
     (connection: XYFlowConnection) => {
+      // start custom keeperhub code //
+      // Auto-assign sourceHandle for For Each connections when not already set
+      let { sourceHandle } = connection;
+      if (!sourceHandle) {
+        const sourceNode = nodes.find((n) => n.id === connection.source);
+        if (sourceNode && getActionType(sourceNode) === "For Each") {
+          const targetNode = nodes.find((n) => n.id === connection.target);
+          sourceHandle =
+            targetNode && getActionType(targetNode) === "Collect"
+              ? "done"
+              : "loop";
+        }
+      }
+      // end keeperhub code //
+
       const newEdge = {
         id: nanoid(),
         ...connection,
+        sourceHandle,
         type: "animated",
       };
       setEdges([...edges, newEdge]);
@@ -257,7 +339,7 @@ export function WorkflowCanvas() {
       // Trigger immediate autosave when nodes are connected
       triggerAutosave({ immediate: true });
     },
-    [edges, setEdges, setHasUnsavedChanges, triggerAutosave]
+    [edges, nodes, setEdges, setHasUnsavedChanges, triggerAutosave]
   );
 
   const onNodeClick: NodeMouseHandler = useCallback(
@@ -267,9 +349,16 @@ export function WorkflowCanvas() {
     [setSelectedNode]
   );
 
+  // start custom keeperhub code //
+  const connectingHandleId = useRef<string | null>(null);
+  // end keeperhub code //
+
   const onConnectStart = useCallback(
     (_event: MouseEvent | TouchEvent, params: OnConnectStartParams) => {
       connectingNodeId.current = params.nodeId;
+      // start custom keeperhub code //
+      connectingHandleId.current = params.handleId ?? null;
+      // end keeperhub code //
     },
     []
   );
@@ -382,13 +471,18 @@ export function WorkflowCanvas() {
           );
         }, 50);
 
+        // start custom keeperhub code //
         // Create connection from the source node to the new node
         const newEdge = {
           id: nanoid(),
           source: connectingNodeId.current,
           target: newNode.id,
-          type: "animated",
+          type: "animated" as const,
+          ...(connectingHandleId.current
+            ? { sourceHandle: connectingHandleId.current }
+            : {}),
         };
+        // end keeperhub code //
         setEdges([...edges, newEdge]);
         setHasUnsavedChanges(true);
         // Trigger immediate autosave for the new edge
@@ -402,6 +496,9 @@ export function WorkflowCanvas() {
       }
 
       connectingNodeId.current = null;
+      // start custom keeperhub code //
+      connectingHandleId.current = null;
+      // end keeperhub code //
     },
     [
       getClientPosition,
