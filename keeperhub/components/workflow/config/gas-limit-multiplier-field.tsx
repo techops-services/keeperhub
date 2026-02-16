@@ -240,10 +240,17 @@ export function GasLimitMultiplierField({
   };
 
   const handleValueChange = (newValue: string) => {
-    if (mode === "multiplier" && newValue === "") {
-      // Empty multiplier = use chain default, store empty string for backward compat
-      onChange("");
-      return;
+    if (mode === "multiplier") {
+      if (newValue === "") {
+        // Empty multiplier = use chain default, store empty string for backward compat
+        onChange("");
+        return;
+      }
+      const parsed = Number.parseFloat(newValue);
+      if (!Number.isNaN(parsed) && parsed < 1) {
+        onChange(serializeConfig({ mode, value: "1" }));
+        return;
+      }
     }
     onChange(serializeConfig({ mode, value: newValue }));
   };
@@ -254,28 +261,23 @@ export function GasLimitMultiplierField({
     [mode, estimate, inputValue, defaultMultiplier]
   );
 
-  // Warnings for max gas limit mode
-  const maxGasWarning = useMemo(() => {
-    if (
-      mode !== "maxGasLimit" ||
-      estimate.status !== "success" ||
-      !inputValue
-    ) {
+  // Warnings for both modes when final gas is below or close to estimate
+  const gasWarning = useMemo(() => {
+    if (estimate.status !== "success" || finalMaxGas === undefined) {
       return;
     }
-    const limit = Number(inputValue);
     const estimated = Number(estimate.estimatedGas);
-    if (Number.isNaN(limit) || Number.isNaN(estimated) || estimated === 0) {
+    if (Number.isNaN(estimated) || estimated === 0) {
       return;
     }
-    if (limit < estimated) {
+    if (finalMaxGas < estimated) {
       return {
         level: "error" as const,
         message:
           "Gas limit is below the estimate \u2014 transaction will likely fail",
       };
     }
-    if (limit < estimated * 1.2) {
+    if (finalMaxGas < estimated * 1.2) {
       return {
         level: "warning" as const,
         message:
@@ -283,7 +285,7 @@ export function GasLimitMultiplierField({
       };
     }
     return;
-  }, [mode, estimate, inputValue]);
+  }, [estimate, finalMaxGas]);
 
   return (
     <div className="space-y-2">
@@ -356,7 +358,7 @@ export function GasLimitMultiplierField({
                 {mode === "multiplier" ? (
                   <>
                     {formatGasNumber(estimate.estimatedGas)} x{" "}
-                    {inputValue || defaultMultiplier}x ={" "}
+                    {inputValue || defaultMultiplier} ={" "}
                     {finalMaxGas.toLocaleString()}
                   </>
                 ) : (
@@ -388,16 +390,16 @@ export function GasLimitMultiplierField({
           </p>
         )}
 
-        {maxGasWarning && (
+        {gasWarning && (
           <div
             className={`flex items-start gap-1.5 text-xs ${
-              maxGasWarning.level === "error"
+              gasWarning.level === "error"
                 ? "text-destructive"
                 : "text-yellow-600 dark:text-yellow-500"
             }`}
           >
             <AlertTriangle className="mt-0.5 size-3 shrink-0" />
-            {maxGasWarning.message}
+            {gasWarning.message}
           </div>
         )}
       </div>
