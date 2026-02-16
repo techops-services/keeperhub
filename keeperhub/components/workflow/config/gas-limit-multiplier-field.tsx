@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import {
   type GasLimitConfig,
-  getChainDisplayName,
   getChainGasDefaults,
   parseGasLimitConfig,
 } from "@/keeperhub/lib/web3/gas-defaults";
@@ -96,18 +95,12 @@ export function GasLimitMultiplierField({
     chainId && !Number.isNaN(chainId)
       ? getChainGasDefaults(chainId)
       : undefined;
-  const chainName =
-    chainId && !Number.isNaN(chainId)
-      ? getChainDisplayName(chainId)
-      : undefined;
-
   const defaultMultiplier = defaults?.multiplier ?? 2.0;
-  const displayName = chainName ?? "selected chain";
 
   // Parse the current value to determine mode
-  const parsed = useMemo(() => parseGasLimitConfig(value), [value]);
-  const mode = parsed?.mode ?? "multiplier";
-  const rawInputValue = parsed?.value ?? "";
+  const parsedConfig = useMemo(() => parseGasLimitConfig(value), [value]);
+  const mode = parsedConfig?.mode ?? "multiplier";
+  const rawInputValue = parsedConfig?.value ?? "";
   const inputValue =
     mode === "multiplier" && rawInputValue === "" ? "2.00" : rawInputValue;
   const isCustomMultiplier =
@@ -361,8 +354,7 @@ export function GasLimitMultiplierField({
                 Final Gas Limit:{" "}
                 {mode === "multiplier" ? (
                   <>
-                    {formatGasNumber(estimate.estimatedGas)} x{" "}
-                    {inputValue} ={" "}
+                    {formatGasNumber(estimate.estimatedGas)} x {inputValue} ={" "}
                     {finalMaxGas.toLocaleString()}
                   </>
                 ) : (
@@ -387,9 +379,7 @@ export function GasLimitMultiplierField({
           )}
 
         {isCustomMultiplier && (
-          <p className="text-muted-foreground text-xs">
-            Custom: {inputValue}x
-          </p>
+          <p className="text-muted-foreground text-xs">Custom: {inputValue}x</p>
         )}
 
         {gasWarning && (
