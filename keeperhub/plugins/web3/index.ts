@@ -343,6 +343,88 @@ const web3Plugin: IntegrationPlugin = {
       ],
     },
     {
+      slug: "decode-calldata",
+      label: "Decode Calldata",
+      description:
+        "Decode raw transaction calldata into human-readable function calls with parameter names and values",
+      category: "Web3",
+      stepFunction: "decodeCalldataStep",
+      stepImportPath: "decode-calldata",
+      outputFields: [
+        {
+          field: "success",
+          description: "Whether decoding succeeded",
+        },
+        {
+          field: "selector",
+          description: "4-byte function selector (e.g., 0xa9059cbb)",
+        },
+        {
+          field: "functionName",
+          description:
+            "Decoded function name (e.g., transfer), or null if unknown",
+        },
+        {
+          field: "functionSignature",
+          description:
+            "Full function signature (e.g., transfer(address,uint256)), or null if unknown",
+        },
+        {
+          field: "parameters",
+          description: "Array of decoded parameters with name, type, and value",
+        },
+        {
+          field: "decodingSource",
+          description:
+            "How the function was identified: explorer, 4byte, manual-abi, selector-only, or none",
+        },
+        {
+          field: "error",
+          description: "Error message if decoding failed",
+        },
+      ],
+      configFields: [
+        {
+          key: "calldata",
+          label: "Calldata",
+          type: "template-input",
+          placeholder: "0x... or {{NodeName.calldata}}",
+          example:
+            "0xa9059cbb0000000000000000000000001234567890abcdef1234567890abcdef12345678000000000000000000000000000000000000000000000000000000003b9aca00",
+          required: true,
+        },
+        {
+          key: "contractAddress",
+          label: "Contract Address",
+          type: "template-input",
+          placeholder:
+            "0x... or {{NodeName.contractAddress}} (optional, for ABI lookup)",
+          example: "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+        },
+        {
+          key: "network",
+          label: "Network",
+          type: "chain-select",
+          chainTypeFilter: "evm",
+          placeholder: "Select network (required if contract address provided)",
+        },
+        {
+          type: "group",
+          label: "Advanced",
+          defaultExpanded: false,
+          fields: [
+            {
+              key: "abi",
+              label: "ABI Override",
+              type: "template-textarea",
+              placeholder: "Paste ABI JSON to use instead of auto-fetching",
+              rows: 4,
+            },
+          ],
+        },
+      ],
+    },
+    {
       slug: "write-contract",
       label: "Write Contract",
       description: "Write data to a smart contract (state-changing functions)",

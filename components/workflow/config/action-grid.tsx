@@ -230,12 +230,16 @@ export function ActionGrid({
       groups[category].push(action);
     }
 
-    // Sort categories: System first, then alphabetically
+    // start custom keeperhub code //
+    // Sort categories: Web3 first, System second, then alphabetically
     const sortedCategories = Object.keys(groups).sort((a, b) => {
+      if (a === "Web3") return -1;
+      if (b === "Web3") return 1;
       if (a === "System") return -1;
       if (b === "System") return 1;
       return a.localeCompare(b);
     });
+    // end keeperhub code //
 
     return sortedCategories.map((category) => ({
       category,
