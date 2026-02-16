@@ -53,6 +53,8 @@ export type GasStrategyConfig = {
 
 type ChainGasConfig = GasStrategyConfig;
 
+const MAX_GAS_LIMIT_MULTIPLIER_OVERRIDE = 10;
+
 const DEFAULT_CONFIG: GasStrategyConfig = {
   gasLimitMultiplier: 2.0,
   gasLimitMultiplierConservative: 2.5,
@@ -237,7 +239,9 @@ export class AdaptiveGasStrategy {
     provider: ethers.Provider,
     triggerType: TriggerType,
     estimatedGas: bigint,
-    chainId: number
+    chainId: number,
+    gasLimitMultiplierOverride?: number,
+    gasLimitOverride?: bigint
   ): Promise<GasConfig> {
     // Apply chain-specific overrides (from DB with hardcoded fallback)
     const chainConfig = await this.getChainConfig(chainId);
@@ -246,7 +250,9 @@ export class AdaptiveGasStrategy {
     const gasLimit = this.calculateGasLimit(
       estimatedGas,
       triggerType,
-      chainConfig
+      chainConfig,
+      gasLimitMultiplierOverride,
+      gasLimitOverride
     );
 
     // Get fee configuration based on strategy
@@ -266,11 +272,30 @@ export class AdaptiveGasStrategy {
   private calculateGasLimit(
     estimatedGas: bigint,
     triggerType: TriggerType,
-    chainConfig: ChainGasConfig
+    chainConfig: ChainGasConfig,
+    gasLimitMultiplierOverride?: number,
+    gasLimitOverride?: bigint
   ): bigint {
-    const multiplier = this.isTimeSensitive(triggerType)
-      ? chainConfig.gasLimitMultiplierConservative
-      : chainConfig.gasLimitMultiplier;
+    // If an absolute gas limit is provided, use it directly (no multiplication)
+    if (gasLimitOverride !== undefined && gasLimitOverride > BigInt(0)) {
+      console.log(
+        `[GasStrategy] Using absolute gas limit override: ${gasLimitOverride.toString()}`
+      );
+      return gasLimitOverride;
+    }
+
+    let multiplier: number;
+    if (gasLimitMultiplierOverride && gasLimitMultiplierOverride > 0) {
+      multiplier = Math.min(
+        gasLimitMultiplierOverride,
+        MAX_GAS_LIMIT_MULTIPLIER_OVERRIDE
+      );
+      console.log(`[GasStrategy] Using override multiplier: ${multiplier}x`);
+    } else if (this.isTimeSensitive(triggerType)) {
+      multiplier = chainConfig.gasLimitMultiplierConservative;
+    } else {
+      multiplier = chainConfig.gasLimitMultiplier;
+    }
 
     // Apply multiplier (using integer math with basis points)
     const multiplierBps = BigInt(Math.floor(multiplier * 10_000));
