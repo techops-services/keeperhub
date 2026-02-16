@@ -17,7 +17,7 @@ import { afterEach, describe, expect, it } from "vitest";
 const PROJECT_ROOT = path.resolve(import.meta.dirname, "../..");
 const WORKFLOW_RUNNER_PATH = path.join(
   PROJECT_ROOT,
-  "scripts/workflow-runner.ts"
+  "scripts/runtime/workflow-runner.ts"
 );
 const TEST_HARNESS_PATH = path.join(
   PROJECT_ROOT,

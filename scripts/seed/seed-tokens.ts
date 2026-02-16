@@ -10,7 +10,7 @@
  *   2. Individual env vars (CHAIN_ETH_MAINNET_PRIMARY_RPC, etc.)
  *   3. Public RPC defaults (no API keys required)
  *
- * Run with: pnpm tsx scripts/seed-tokens.ts
+ * Run with: pnpm tsx scripts/seed/seed-tokens.ts
  */
 
 import "dotenv/config";
@@ -18,10 +18,10 @@ import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { ethers } from "ethers";
 import postgres from "postgres";
-import { supportedTokens } from "../keeperhub/db/schema-extensions";
-import { ERC20_ABI } from "../lib/contracts";
-import { getDatabaseUrl } from "../lib/db/connection-utils";
-import { getRpcUrlByChainId } from "../lib/rpc/rpc-config";
+import { supportedTokens } from "../../keeperhub/db/schema-extensions";
+import { ERC20_ABI } from "../../lib/contracts";
+import { getDatabaseUrl } from "../../lib/db/connection-utils";
+import { getRpcUrlByChainId } from "../../lib/rpc/rpc-config";
 
 // Token logo URLs (using popular token list sources)
 const LOGOS = {

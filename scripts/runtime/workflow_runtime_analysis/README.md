@@ -213,7 +213,7 @@ scripts/workflow_runtime_analysis/
 ├── analyze-steps.ts                    # Static AST analysis
 ├── profile-step.ts                     # V8 step profiling
 ├── workflow-runner-profiled.ts         # Workflow execution profiling
-├── workflow-runner-profiled-bootstrap.cjs  # Bootstrap (patches server-only)
+├── workflow-runner-profiled-bootstrap.ts   # Bootstrap (patches server-only)
 └── calibrate-wasm-fuel.ts              # WASM fuel calibration
 ```
 

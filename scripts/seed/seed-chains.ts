@@ -6,27 +6,27 @@
  *   2. Individual env vars (CHAIN_ETH_MAINNET_PRIMARY_RPC, etc.)
  *   3. Public RPC defaults (no API keys required)
  *
- * Run with: pnpm tsx scripts/seed-chains.ts
+ * Run with: pnpm tsx scripts/seed/seed-chains.ts
  */
 
 import "dotenv/config";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { getDatabaseUrl } from "../lib/db/connection-utils";
+import { getDatabaseUrl } from "../../lib/db/connection-utils";
 import {
   chains,
   explorerConfigs,
   type NewChain,
   type NewExplorerConfig,
-} from "../lib/db/schema";
+} from "../../lib/db/schema";
 import {
   CHAIN_CONFIG,
   getConfigValue,
   getRpcUrlByChainId,
   getWssUrl,
   parseRpcConfigWithDetails,
-} from "../lib/rpc/rpc-config";
+} from "../../lib/rpc/rpc-config";
 
 // Parse JSON config from environment (if available) - used for WSS URLs and config values
 const rpcConfig = (() => {

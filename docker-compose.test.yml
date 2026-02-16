@@ -108,7 +108,7 @@ services:
       app:
         condition: service_healthy
     # Run dispatcher every 10 seconds for faster testing
-    command: sh -c "npm install -g pnpm && while true; do npx tsx scripts/schedule-dispatcher.ts; sleep 10; done"
+    command: sh -c "npm install -g pnpm && while true; do npx tsx scripts/scheduler/schedule-dispatcher.ts; sleep 10; done"
 
   # Schedule Executor (long-running)
   executor:
@@ -124,7 +124,7 @@ services:
     depends_on:
       app:
         condition: service_healthy
-    command: sh -c "npm install -g pnpm && npx tsx scripts/schedule-executor.ts"
+    command: sh -c "npm install -g pnpm && npx tsx scripts/scheduler/schedule-executor.ts"
 
   # Test runner
   test-runner:

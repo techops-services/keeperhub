@@ -4,10 +4,10 @@
  * This ESM script registers a hook to return empty module for 'server-only'
  * before loading the main workflow-runner script.
  *
- * Usage: node --import ./scripts/workflow-runner-bootstrap.mjs scripts/workflow-runner.ts
+ * Usage: node --import ./scripts/runtime/workflow-runner-bootstrap.mjs scripts/runtime/workflow-runner.ts
  *
  * Or with tsx:
- *   NODE_OPTIONS="--import ./scripts/workflow-runner-bootstrap.mjs" npx tsx scripts/workflow-runner.ts
+ *   NODE_OPTIONS="--import ./scripts/runtime/workflow-runner-bootstrap.mjs" npx tsx scripts/runtime/workflow-runner.ts
  */
 
 import { register } from "node:module";

@@ -5,7 +5,7 @@
  * Runs continuously as a long-polling listener.
  *
  * Usage:
- *   npx tsx scripts/schedule-executor.ts
+ *   npx tsx scripts/scheduler/schedule-executor.ts
  *
  * Environment variables:
  *   DATABASE_URL - PostgreSQL connection string
@@ -24,13 +24,13 @@ import { CronExpressionParser } from "cron-parser";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { getDatabaseUrl } from "../lib/db/connection-utils";
+import { getDatabaseUrl } from "../../lib/db/connection-utils";
 import {
   workflowExecutions,
   workflowSchedules,
   workflows,
-} from "../lib/db/schema";
-import { generateId } from "../lib/utils/id";
+} from "../../lib/db/schema";
+import { generateId } from "../../lib/utils/id";
 
 // Database connection
 const connectionString = getDatabaseUrl();

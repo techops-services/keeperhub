@@ -238,7 +238,7 @@ hybrid-deploy:
 	# Run database migrations and seed chains
 	@echo "Setting up database schema and seeding chains..."
 	@DATABASE_URL="postgresql://postgres:postgres@localhost:5433/$${POSTGRES_DB:-keeperhub}" pnpm db:push || echo "Schema push completed (or already up to date)"
-	@DATABASE_URL="postgresql://postgres:postgres@localhost:5433/$${POSTGRES_DB:-keeperhub}" npx tsx scripts/seed-chains.ts || echo "Chains seeded (or already exist)"
+	@DATABASE_URL="postgresql://postgres:postgres@localhost:5433/$${POSTGRES_DB:-keeperhub}" npx tsx scripts/seed/seed-chains.ts || echo "Chains seeded (or already exist)"
 	# Deploy executor to Minikube (builds images if needed)
 	chmod +x ./deploy/local/hybrid/deploy.sh
 	./deploy/local/hybrid/deploy.sh --build

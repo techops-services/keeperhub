@@ -6,10 +6,10 @@
  * updates the database, and exits.
  *
  * Usage (via bootstrap script that patches 'server-only'):
- *   node scripts/workflow-runner-bootstrap.cjs
+ *   tsx scripts/runtime/workflow-runner-bootstrap.ts
  *
  * Usage (in Docker container where 'server-only' is already shimmed):
- *   tsx scripts/workflow-runner.ts
+ *   tsx scripts/runtime/workflow-runner.ts
  *
  * Environment variables (required):
  *   WORKFLOW_ID - ID of the workflow to execute
@@ -26,16 +26,16 @@ import { CronExpressionParser } from "cron-parser";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { validateWorkflowIntegrations } from "../lib/db/integrations";
+import { validateWorkflowIntegrations } from "../../lib/db/integrations";
 import {
   workflowExecutions,
   workflowSchedules,
   workflows,
-} from "../lib/db/schema";
-import { executeWorkflow } from "../lib/workflow-executor.workflow";
-import { calculateTotalSteps } from "../lib/workflow-progress";
-import { SHUTDOWN_TIMEOUT_MS } from "../lib/workflow-runner/constants";
-import type { WorkflowEdge, WorkflowNode } from "../lib/workflow-store";
+} from "../../lib/db/schema";
+import { executeWorkflow } from "../../lib/workflow-executor.workflow";
+import { calculateTotalSteps } from "../../lib/workflow-progress";
+import { SHUTDOWN_TIMEOUT_MS } from "../../lib/workflow-runner/constants";
+import type { WorkflowEdge, WorkflowNode } from "../../lib/workflow-store";
 
 // Validate required environment variables
 function validateEnv(): {

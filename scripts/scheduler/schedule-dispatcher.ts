@@ -5,7 +5,7 @@
  * Run this every minute via cron or `watch -n 60`.
  *
  * Usage:
- *   npx tsx scripts/schedule-dispatcher.ts
+ *   npx tsx scripts/scheduler/schedule-dispatcher.ts
  *
  * Environment variables:
  *   DATABASE_URL - PostgreSQL connection string
@@ -18,8 +18,8 @@ import { CronExpressionParser } from "cron-parser";
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { getDatabaseUrl } from "../lib/db/connection-utils";
-import { workflowSchedules, workflows } from "../lib/db/schema";
+import { getDatabaseUrl } from "../../lib/db/connection-utils";
+import { workflowSchedules, workflows } from "../../lib/db/schema";
 
 // Database connection
 const connectionString = getDatabaseUrl();

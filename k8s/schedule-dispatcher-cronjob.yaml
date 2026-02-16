@@ -25,7 +25,7 @@ spec:
                   cd /app
                   npm install -g pnpm
                   pnpm install --frozen-lockfile
-                  npx tsx scripts/schedule-dispatcher.ts
+                  npx tsx scripts/scheduler/schedule-dispatcher.ts
               env:
                 - name: DATABASE_URL
                   valueFrom:

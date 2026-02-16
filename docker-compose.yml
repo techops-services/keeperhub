@@ -199,7 +199,7 @@ services:
     command: |
       sh -c 'while true; do
         echo "[Dispatcher] Running at $$(date)"
-        tsx scripts/schedule-dispatcher.ts
+        tsx scripts/scheduler/schedule-dispatcher.ts
         echo "[Dispatcher] Sleeping 60s..."
         sleep 60
       done'
@@ -337,7 +337,7 @@ services:
 
   # JS Sandbox for WASM fuel calibration
   # Uses Spidermonkey compiled to WASM for deterministic instruction counting
-  # See: scripts/workflow_runtime_analysis/calibrate-wasm-fuel.ts
+  # See: scripts/runtime/workflow_runtime_analysis/calibrate-wasm-fuel.ts
   js-sandbox:
     image: forbeslindesay/secure-js-sandbox:latest
     container_name: keeperhub-js-sandbox

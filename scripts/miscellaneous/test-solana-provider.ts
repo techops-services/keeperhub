@@ -11,12 +11,12 @@
 
 import "dotenv/config";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { getSolanaProviderFromUrls } from "../lib/rpc/provider-factory";
+import { getSolanaProviderFromUrls } from "../../lib/rpc/provider-factory";
 import {
   createRpcUrlResolver,
   PUBLIC_RPCS,
   parseRpcConfig,
-} from "../lib/rpc/rpc-config";
+} from "../../lib/rpc/rpc-config";
 
 // Parse JSON config from environment (if available)
 const rpcConfig = parseRpcConfig(process.env.CHAIN_RPC_CONFIG);

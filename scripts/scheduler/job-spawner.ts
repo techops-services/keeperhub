@@ -5,7 +5,7 @@
  * Replaces the previous executor that called the KeeperHub API directly.
  *
  * Usage:
- *   tsx scripts/job-spawner.ts
+ *   tsx scripts/scheduler/job-spawner.ts
  *
  * Environment variables:
  *   DATABASE_URL - PostgreSQL connection string
@@ -31,8 +31,8 @@ import {
   workflowExecutions,
   workflowSchedules,
   workflows,
-} from "../lib/db/schema";
-import { generateId } from "../lib/utils/id";
+} from "../../lib/db/schema";
+import { generateId } from "../../lib/utils/id";
 
 // Configuration
 const CONFIG = {

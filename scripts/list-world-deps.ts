@@ -1,14 +1,14 @@
-#!/usr/bin/env node
+#!/usr/bin/env tsx
 
 /**
- * list-world-deps.mjs
+ * list-world-deps.ts
  *
  * Walks the full transitive dependency tree of @workflow/world-postgres
  * and prints the package lists needed for:
  *   - .npmrc          (public-hoist-pattern entries)
  *   - next.config.ts  (serverExternalPackages + outputFileTracingIncludes)
  *
- * Usage: node scripts/list-world-deps.mjs
+ * Usage: tsx scripts/list-world-deps.ts
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -17,29 +17,31 @@ import { dirname, join } from "node:path";
 
 const ROOT_PKG = "@workflow/world-postgres";
 const builtins = new Set(builtinModules.flatMap((m) => [m, `node:${m}`]));
-const seen = new Set();
+const seen = new Set<string>();
 
 /**
  * Find a package's directory by resolving from a given base directory.
- * Works with pnpm's strict node_modules layout — each package can only
+ * Works with pnpm's strict node_modules layout -- each package can only
  * resolve its own declared dependencies.
  */
-function findPkgDir(name, fromDir) {
-  const require = createRequire(join(fromDir, "_resolve.js"));
+function findPkgDir(name: string, fromDir: string): string | undefined {
+  const req = createRequire(join(fromDir, "_resolve.js"));
   // Try direct package.json resolution first
   try {
-    return dirname(require.resolve(join(name, "package.json")));
+    return dirname(req.resolve(join(name, "package.json")));
   } catch {
-    // package.json may not be in the exports map — resolve the main
+    // package.json may not be in the exports map -- resolve the main
     // entry and walk up to find the package root
   }
   try {
-    const main = require.resolve(name);
+    const main = req.resolve(name);
     let dir = dirname(main);
     while (dir !== dirname(dir)) {
       const pj = join(dir, "package.json");
       if (existsSync(pj)) {
-        const data = JSON.parse(readFileSync(pj, "utf8"));
+        const data = JSON.parse(readFileSync(pj, "utf8")) as {
+          name?: string;
+        };
         if (data.name === name) {
           return dir;
         }
@@ -49,7 +51,14 @@ function findPkgDir(name, fromDir) {
   } catch {
     // not resolvable from this location
   }
-  return;
+  return undefined;
+}
+
+interface PackageJson {
+  name?: string;
+  dependencies?: Record<string, string>;
+  optionalDependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
 }
 
 /**
@@ -57,7 +66,7 @@ function findPkgDir(name, fromDir) {
  * dependency from within its parent's directory so pnpm's isolation
  * is respected.
  */
-function walk(pkg, fromDir) {
+function walk(pkg: string, fromDir: string): void {
   if (seen.has(pkg) || builtins.has(pkg)) {
     return;
   }
@@ -70,7 +79,7 @@ function walk(pkg, fromDir) {
   }
 
   const pjPath = join(pkgDir, "package.json");
-  const pj = JSON.parse(readFileSync(pjPath, "utf8"));
+  const pj = JSON.parse(readFileSync(pjPath, "utf8")) as PackageJson;
 
   // Walk hard dependencies and optional dependencies
   const deps = Object.keys({
@@ -93,7 +102,7 @@ const packages = [...seen].sort();
 // Read package.json to find direct deps (these don't need .npmrc hoisting)
 const appPj = JSON.parse(
   readFileSync(join(projectRoot, "package.json"), "utf8")
-);
+) as PackageJson;
 const directDeps = new Set(
   Object.keys({
     ...appPj.dependencies,
@@ -103,7 +112,9 @@ const directDeps = new Set(
 
 const transitiveDeps = packages.filter((p) => !directDeps.has(p));
 
-console.log(`Found ${packages.length} packages in ${ROOT_PKG} dependency tree`);
+console.log(
+  `Found ${packages.length} packages in ${ROOT_PKG} dependency tree`
+);
 const transitiveCount =
   directDeps.size > 0 ? transitiveDeps.length : packages.length;
 console.log(`  ${transitiveCount} transitive (need .npmrc hoisting)`);
@@ -112,7 +123,7 @@ console.log(
 );
 
 // .npmrc output
-console.log("# ── .npmrc public-hoist-pattern entries ──");
+console.log("# -- .npmrc public-hoist-pattern entries --");
 console.log(
   "# Only transitive deps need hoisting (direct deps are already at top level)"
 );
@@ -121,7 +132,7 @@ for (const pkg of transitiveDeps) {
 }
 
 // serverExternalPackages output
-console.log("\n# ── next.config.ts serverExternalPackages ──");
+console.log("\n# -- next.config.ts serverExternalPackages --");
 console.log("serverExternalPackages: [");
 for (const pkg of packages) {
   console.log(`  "${pkg}",`);
@@ -129,7 +140,7 @@ for (const pkg of packages) {
 console.log("]");
 
 // outputFileTracingIncludes output
-console.log("\n# ── next.config.ts outputFileTracingIncludes ──");
+console.log("\n# -- next.config.ts outputFileTracingIncludes --");
 console.log('outputFileTracingIncludes: {\n  "/*": [');
 for (const pkg of packages) {
   console.log(`    "./node_modules/${pkg}/**/*",`);

@@ -58,7 +58,7 @@ deployment:
       args:
         - |
           echo "Setting up workflow postgres tables..."
-          export WORKFLOW_POSTGRES_URL=$(node scripts/encode-pg-url.mjs)
+          export WORKFLOW_POSTGRES_URL=$(tsx scripts/encode-pg-url.ts)
           pnpm exec workflow-postgres-setup
           echo "Running database migrations..."
           pnpm db:migrate

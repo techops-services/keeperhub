@@ -5,8 +5,8 @@
 
 import { randomBytes, type ScryptOptions, scrypt } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { db } from "../lib/db";
-import { accounts, users } from "../lib/db/schema";
+import { db } from "../../lib/db";
+import { accounts, users } from "../../lib/db/schema";
 
 function scryptAsync(
   password: string,

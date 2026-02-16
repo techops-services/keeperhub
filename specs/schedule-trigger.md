@@ -59,25 +59,25 @@ All services in Minikube - suitable for production-like testing (~8GB RAM).
 
 ## Components
 
-1. **Schedule Dispatcher** (`scripts/schedule-dispatcher.ts`)
+1. **Schedule Dispatcher** (`scripts/scheduler/schedule-dispatcher.ts`)
    - Runs as a Kubernetes CronJob (hybrid/k8s) or Docker loop (dev)
    - Queries `workflow_schedules` table for schedules due to run
    - Sends messages to SQS queue for each triggered schedule
    - Updates `next_run_at` and `last_run_at` timestamps
 
-2. **Schedule Executor** (`scripts/schedule-executor.ts`) - Dev Mode Only
+2. **Schedule Executor** (`scripts/scheduler/schedule-executor.ts`) - Dev Mode Only
    - Runs as a Docker container in dev profile
    - Polls SQS queue for workflow trigger messages
    - Calls KeeperHub API to execute workflows directly
    - Handles retries and error logging
 
-3. **Job Spawner** (`scripts/job-spawner.ts`) - Hybrid/K8s Mode
+3. **Job Spawner** (`scripts/scheduler/job-spawner.ts`) - Hybrid/K8s Mode
    - Runs as a Kubernetes Deployment
    - Polls SQS queue for workflow trigger messages
    - Creates K8s Jobs for each workflow execution
    - Provides isolated execution environment
 
-4. **Workflow Runner** (`scripts/workflow-runner.ts`) - Hybrid/K8s Mode
+4. **Workflow Runner** (`scripts/runtime/workflow-runner.ts`) - Hybrid/K8s Mode
    - Runs inside K8s Jobs (one per workflow execution)
    - Executes workflow steps in isolation
    - Updates execution status in database
@@ -453,10 +453,10 @@ For production, use the full K8s mode or hybrid mode with:
 | File | Purpose |
 |------|---------|
 | **Scripts** ||
-| `scripts/schedule-dispatcher.ts` | Dispatcher script (queries DB, sends to SQS) |
-| `scripts/schedule-executor.ts` | Executor script - dev mode (polls SQS, calls API) |
-| `scripts/job-spawner.ts` | Job spawner - hybrid/k8s mode (polls SQS, creates K8s Jobs) |
-| `scripts/workflow-runner.ts` | Workflow runner - runs inside K8s Jobs |
+| `scripts/scheduler/schedule-dispatcher.ts` | Dispatcher script (queries DB, sends to SQS) |
+| `scripts/scheduler/schedule-executor.ts` | Executor script - dev mode (polls SQS, calls API) |
+| `scripts/scheduler/job-spawner.ts` | Job spawner - hybrid/k8s mode (polls SQS, creates K8s Jobs) |
+| `scripts/runtime/workflow-runner.ts` | Workflow runner - runs inside K8s Jobs |
 | **Services** ||
 | `lib/schedule-service.ts` | Schedule management service |
 | `lib/db/schema/workflow-schedules.ts` | Database schema |

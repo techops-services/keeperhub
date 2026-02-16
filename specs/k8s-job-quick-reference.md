@@ -60,8 +60,8 @@ resources:
 
 | File | Purpose |
 |------|---------|
-| `scripts/job-spawner.ts` | Polls SQS, creates K8s Jobs |
-| `scripts/workflow-runner.ts` | Executes workflow in Job pod |
+| `scripts/scheduler/job-spawner.ts` | Polls SQS, creates K8s Jobs |
+| `scripts/runtime/workflow-runner.ts` | Executes workflow in Job pod |
 | `deploy/local/workflow-runner-job.yaml` | Job template |
 
 ## Commands

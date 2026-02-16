@@ -51,7 +51,7 @@ scott.cameron@ethereum.org [edit]
 
 ### Data Source
 
-Block explorer URLs are already seeded in the database via `scripts/seed-chains.ts`:
+Block explorer URLs are already seeded in the database via `scripts/seed/seed-chains.ts`:
 
 | Chain         | Explorer URL               |
 | ------------- | -------------------------- |

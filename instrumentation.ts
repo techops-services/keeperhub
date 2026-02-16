@@ -10,7 +10,7 @@
  * postgres.js parses connection strings via new URL() which requires encoding.
  * CNPG-generated passwords often contain +/= (base64) that break URL parsing.
  *
- * Parsing strategy (keep in sync with scripts/encode-pg-url.mjs):
+ * Parsing strategy (keep in sync with scripts/encode-pg-url.ts):
  * 1. The last '@' separates credentials from the host (handles passwords with '@')
  * 2. The first ':' between '://' and '@' separates username from password
  *    (handles passwords with ':', e.g. base64 a:b=)

@@ -146,7 +146,7 @@ SQS provides:
 
 ### 1. Job Spawner (replaces current executor)
 
-**Location**: `scripts/job-spawner.ts`
+**Location**: `scripts/scheduler/job-spawner.ts`
 
 **Responsibilities**:
 - Poll SQS for workflow trigger messages
@@ -181,7 +181,7 @@ while (true) {
 
 ### 2. Workflow Runner (new image)
 
-**Location**: `scripts/workflow-runner.ts`
+**Location**: `scripts/runtime/workflow-runner.ts`
 
 **Responsibilities**:
 - Receive execution context from environment
@@ -192,7 +192,7 @@ while (true) {
 
 **Flow**:
 ```typescript
-// scripts/workflow-runner.ts
+// scripts/runtime/workflow-runner.ts
 async function main() {
   const workflowId = process.env.WORKFLOW_ID;
   const executionId = process.env.EXECUTION_ID;
@@ -247,7 +247,7 @@ COPY --from=builder /app/tsconfig.json ./tsconfig.json
 ENV NODE_ENV=production
 
 # Default command - can be overridden
-CMD ["tsx", "scripts/workflow-runner.ts"]
+CMD ["tsx", "scripts/runtime/workflow-runner.ts"]
 ```
 
 ---
@@ -378,11 +378,11 @@ Workflows need access to:
 ## Implementation Phases
 
 ### Phase 1: Workflow Runner Script
-- [ ] Create `scripts/workflow-runner.ts`
+- [ ] Create `scripts/runtime/workflow-runner.ts`
 - [ ] Extract execution logic from API route
 - [ ] Add environment variable handling
 - [ ] Add proper exit codes and error handling
-- [ ] Test locally with `tsx scripts/workflow-runner.ts`
+- [ ] Test locally with `tsx scripts/runtime/workflow-runner.ts`
 
 ### Phase 2: Docker Image
 - [ ] Add `workflow-runner` stage to Dockerfile
@@ -391,7 +391,7 @@ Workflows need access to:
 - [ ] Verify execution works in container
 
 ### Phase 3: Job Spawner
-- [ ] Create `scripts/job-spawner.ts`
+- [ ] Create `scripts/scheduler/job-spawner.ts`
 - [ ] Implement K8s Job creation via API
 - [ ] Handle SQS message processing
 - [ ] Add job cleanup logic
@@ -416,8 +416,8 @@ Workflows need access to:
 
 | File | Action | Description |
 |------|--------|-------------|
-| `scripts/workflow-runner.ts` | Create | Standalone workflow execution script |
-| `scripts/job-spawner.ts` | Create | SQS consumer that creates K8s Jobs |
+| `scripts/runtime/workflow-runner.ts` | Create | Standalone workflow execution script |
+| `scripts/scheduler/job-spawner.ts` | Create | SQS consumer that creates K8s Jobs |
 | `Dockerfile` | Modify | Add `workflow-runner` build stage |
 | `deploy/local/schedule-trigger.yaml` | Modify | Update executor to job-spawner |
 | `deploy/local/workflow-runner-job.yaml` | Create | Job template for reference |

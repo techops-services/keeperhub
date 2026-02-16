@@ -1,0 +1,196 @@
+# Tests
+
+## Commands
+
+```bash
+pnpm test                    # All vitest tests (unit + integration + e2e vitest)
+pnpm test:unit               # Unit tests only
+pnpm test:integration        # Integration tests only
+pnpm test:e2e                # Playwright E2E (browser)
+pnpm test:e2e:ui             # Playwright E2E with interactive UI
+pnpm test:e2e:vitest         # All vitest E2E tests
+pnpm test:e2e:schedule       # Schedule pipeline infrastructure checks
+pnpm test:e2e:schedule:full  # Schedule pipeline with FULL_E2E=true
+pnpm test:e2e:runner         # Workflow runner lifecycle tests
+```
+
+Makefile targets:
+
+```bash
+make test                    # pnpm test
+make test-unit               # tests/unit/
+make test-integration        # tests/integration/
+make test-e2e                # Vitest E2E against local K8s (port-forwards DB + SQS)
+make test-e2e-hybrid         # Vitest E2E against docker-compose hybrid deployment
+```
+
+---
+
+## Persistent Test Account
+
+The seed script `scripts/seed/seed-test-wallet.ts` provisions a persistent test account used by both Playwright and vitest E2E tests. It is idempotent -- safe to run multiple times.
+
+```bash
+pnpm db:seed-test-wallet
+```
+
+| Field | Value |
+|-------|-------|
+| Email | `e2e-test@keeperhub.test` |
+| Password | `TestPassword123!` |
+| Org Slug | `e2e-test-org` |
+| Org Name | `E2E Test Organization` |
+| Role | `owner` |
+
+The script also provisions a **Para wallet** (EVM) linked to the test organization, required for `write-contract-workflow.test.ts` and any test that needs on-chain signing.
+
+**Environment variables required for wallet provisioning:**
+
+| Variable | Purpose |
+|----------|---------|
+| `DATABASE_URL` | PostgreSQL connection |
+| `PARA_API_KEY` | Para SDK key |
+| `PARA_ENVIRONMENT` | `beta` or `prod` (default: `beta`) |
+| `WALLET_ENCRYPTION_KEY` | Encrypts user share at rest |
+
+If these env vars are missing, the user + org are still created but the wallet step will fail.
+
+---
+
+## When to Write a Playwright Test vs a Vitest E2E Test
+
+### Playwright (browser E2E)
+
+Use Playwright when the test **requires a browser** or validates **user-visible behavior**:
+
+- UI rendering, layout, and interaction (clicks, form fills, drag-and-drop)
+- Navigation flows (sign up, onboarding, page transitions)
+- Visual state after actions (toasts, error messages, saved configs reloading)
+- Full user journeys that start in the browser ("create workflow, configure trigger, save, reload, verify")
+
+Playwright tests live in `tests/e2e/playwright/`. They run against a live (or deployed) app with a real database. The test user authenticates through the actual sign-up/login UI or via the persistent test account.
+
+**Config:** `playwright.config.ts` -- single worker, chromium only, auto-starts `pnpm dev` locally.
+
+### Vitest E2E (API/infrastructure)
+
+Use Vitest when the test validates **backend behavior** that does not need a browser:
+
+- API endpoint correctness (auth, status codes, response shapes)
+- Database operations and record lifecycle (create, update, query execution records)
+- Infrastructure integration (SQS send/receive, DB connectivity, RPC failover)
+- Script behavior (workflow-runner exit codes, graceful shutdown, signal handling)
+- On-chain interactions (balance checks, gas estimation, nonce management, real transactions)
+- Pipeline flows (dispatcher -> SQS -> executor -> API -> runner)
+
+Vitest E2E tests live in `tests/e2e/vitest/`. They connect directly to the database and infrastructure services. Some spawn child processes (workflow-runner). Some hit live RPC endpoints.
+
+**Config:** `vitest.config.mts` -- excludes `tests/e2e/playwright/`, uses `tests/setup.ts` for mocks and env defaults.
+
+### Decision rule
+
+If the assertion is about **what the user sees in the browser**, use Playwright.
+If the assertion is about **what happens in the database, queue, API, or chain**, use Vitest.
+
+---
+
+## Test Index
+
+### Unit Tests (`tests/unit/`)
+
+No external infrastructure. All dependencies mocked.
+
+| File | What it tests |
+|------|---------------|
+| `abi-utils.test.ts` | 4-byte function selector computation from signatures |
+| `address-utils.test.ts` | EIP-55 checksum formatting, normalization, truncation |
+| `api-metrics.test.ts` | Webhook and status poll metrics instrumentation |
+| `balance-formatting.test.ts` | BigInt precision formatting for different decimals (18, 8, 6) |
+| `builtin-variables.test.ts` | Builtin variables (timestamps, dates) in workflow conditions |
+| `chain-service.test.ts` | Chain CRUD operations (create, read, update, enable/disable) |
+| `config-service.test.ts` | User RPC preference CRUD and config resolution |
+| `database-secrets.test.ts` | Password and URL stripping from database integration configs |
+| `db-template-params.test.ts` | Database config merging and secret stripping for integrations |
+| `explorer.test.ts` | Blockchain explorer URL generation and ABI fetching (Etherscan, Blockscout) |
+| `gas-strategy.test.ts` | Gas price strategy calculation with hardcoded fallback configs |
+| `metrics.test.ts` | Metrics collectors (console, noop, prefixed) and latency tracking |
+| `network-utils.test.ts` | Chain ID resolution from network names |
+| `nonce-manager.test.ts` | Nonce lock acquisition and database-backed nonce management |
+| `plugin-metrics.test.ts` | Plugin execution metrics recording and wrappers |
+| `rpc-config.test.ts` | RPC URL resolution priority (JSON config, env vars, public defaults) |
+| `rpc-preferences-routes.test.ts` | RPC preferences API routes with mocked auth |
+| `rpc-provider.test.ts` | EVM RPC provider manager with failover states and metrics |
+| `saturation-metrics.test.ts` | Concurrent execution, queue depth, and DB pool saturation metrics |
+| `schedule-dispatcher.test.ts` | `shouldTriggerNow` cron matching logic |
+| `schedule-executor.test.ts` | SQS-based schedule execution and DB updates |
+| `schedule-service.test.ts` | Cron expression validation, timezone validation, next run time |
+| `serialize-sql-params.test.ts` | SQL parameter serialization (null, primitives, dates, BigInt) |
+| `solana-provider.test.ts` | Solana RPC provider manager with failover and metrics |
+| `template.test.ts` | Template processing with `@` references and nested path resolution |
+| `template-remap.test.ts` | Template reference remapping during workflow duplication |
+| `workflow-codegen-condition.test.ts` | Condition node validation for empty/unconfigured expressions |
+| `workflow-metrics.test.ts` | Workflow execution metrics (trigger detection, step metrics) |
+| `workflow-runner.test.ts` | Graceful shutdown implementation with exit codes and signals |
+
+### Integration Tests (`tests/integration/`)
+
+Mock the database and HTTP layer but test real module wiring.
+
+| File | What it tests |
+|------|---------------|
+| `abi-route.test.ts` | ABI fetching endpoint for Etherscan, Basescan, Blockscout |
+| `chains-route.test.ts` | Chains listing endpoint with enabled/disabled filtering |
+| `execute-api.test.ts` | Workflow execution endpoint with DB and session mocking |
+| `schedule-sync.test.ts` | Schedule synchronization between workflow config and DB |
+| `web3-steps.test.ts` | Web3 plugin steps (check-balance, transfer-funds) with mocked providers |
+| `workflow-duplicate.test.ts` | Workflow duplication with template reference remapping |
+| `workflow-runner.test.ts` | Graceful shutdown by spawning actual workflow-runner process |
+
+### Vitest E2E Tests (`tests/e2e/vitest/`)
+
+Run against real infrastructure (DB, SQS, RPC endpoints). Some spawn child processes.
+
+| File | What it tests | Infra |
+|------|---------------|-------|
+| `api-key-auth.test.ts` | API key auth across all workflow endpoints (valid, invalid, expired, revoked, cross-org) | DB, App |
+| `check-balance.test.ts` | Balance checking on EVM (Mainnet, Sepolia, Base) and Solana with failover | RPC |
+| `full-pipeline.test.ts` | Complete execution pipeline: SQS -> executor -> workflow-runner for manual and schedule triggers, disabled workflow handling | DB, SQS, spawns runner |
+| `gas-strategy.test.ts` | Adaptive gas estimation from live RPCs -- multipliers, fee history, chain-specific configs, clamping | RPC |
+| `graceful-shutdown.test.ts` | SIGTERM handling in workflow-runner, exit code semantics (0 = business failure, 1 = system kill) | DB |
+| `nonce-manager.test.ts` | PostgreSQL advisory locks for wallet/chain nonces -- lock lifecycle, session management, crash simulation | DB |
+| `rpc-failover.test.ts` | Chain config resolution, user RPC preference CRUD, failover from bad primary to real fallback | DB, RPC |
+| `schedule-pipeline.test.ts` | Infrastructure health checks -- DB connectivity, SQS send/receive, schema verification, internal auth header | DB, SQS, optional App |
+| `transaction-flow.test.ts` | Integrated nonce + gas strategy for tx lifecycle (pending -> confirmed, replacement, recovery). Optional real Sepolia tx | DB, RPC, optional funded wallet |
+| `user-rpc-workflow.test.ts` | Full user RPC preferences -> workflow execution with custom/default RPCs, preference CRUD, edge cases | DB, spawns runner, RPC |
+| `workflow-runner.test.ts` | Execution record CRUD lifecycle, API key validation, workflow ownership, progress tracking, concurrent executions | DB, optional App |
+| `write-contract-workflow.test.ts` | Write-contract step against SimpleStorage on Sepolia with Para wallet, on-chain verification, auto-funding | DB, Sepolia RPC, funded wallet, Para API |
+
+### Playwright E2E Tests (`tests/e2e/playwright/`)
+
+Run against a live app in a real browser. Require the app and database to be running.
+
+| File | What it tests |
+|------|---------------|
+| `auth.test.ts` | Email OTP verification flow on signup |
+| `invitations.test.ts` | Organization invitation acceptance with navigation retry |
+| `organization-wallet.test.ts` | Organization wallet creation and address display |
+| `schedule-trigger.test.ts` | Schedule trigger node configuration UI |
+| `workflow.test.ts` | Workflow canvas rendering and drag-to-create node |
+| **happy-paths/** | |
+| `scheduled-workflow.test.ts` | Create and save a scheduled workflow with webhook action, verify persistence |
+| `web3-balance.test.ts` | Create workflow with Web3 check-balance action, configure network, trigger execution |
+| `webhook-workflow.test.ts` | Webhook-triggered workflow execution with API key auth, verify DB completion |
+
+---
+
+## Shared Utilities
+
+| File | Purpose |
+|------|---------|
+| `tests/setup.ts` | Vitest global setup -- mocks `server-only`, sets env defaults |
+| `tests/utils/db.ts` | Shared DB helpers: `createTestWorkflow`, `waitForWorkflowExecution`, `createApiKey`, `getUserIdByEmail` |
+| `tests/fixtures/workflows.ts` | Workflow builders: `createScheduledWorkflow`, `createWebhookWorkflow`, trigger/action node factories, cron presets |
+| `tests/fixtures/workflow-runner-harness.ts` | Harness for spawning workflow-runner as child process |
+| `tests/e2e/playwright/utils/auth.ts` | `signUpAndVerify()` for Playwright browser auth |
+| `tests/e2e/playwright/utils/db.ts` | Playwright-specific DB utilities |
+| `tests/e2e/playwright/utils/workflow.ts` | `waitForWorkflowSave()` and other Playwright workflow helpers |

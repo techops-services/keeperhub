@@ -8,16 +8,16 @@
  *
  * Usage:
  *   # Profile a workflow execution (sampling mode - statistical)
- *   WORKFLOW_ID=xxx EXECUTION_ID=yyy pnpm tsx scripts/workflow-runner-profiled.ts
+ *   WORKFLOW_ID=xxx EXECUTION_ID=yyy pnpm tsx scripts/runtime/workflow_runtime_analysis/workflow-runner-profiled.ts
  *
  *   # Profile with PRECISE coverage (exact call counts)
- *   PRECISE_COVERAGE=true WORKFLOW_ID=xxx EXECUTION_ID=yyy pnpm tsx scripts/workflow-runner-profiled.ts
+ *   PRECISE_COVERAGE=true WORKFLOW_ID=xxx EXECUTION_ID=yyy pnpm tsx scripts/runtime/workflow_runtime_analysis/workflow-runner-profiled.ts
  *
  *   # Profile with detailed output
- *   PROFILE_DETAIL=true WORKFLOW_ID=xxx EXECUTION_ID=yyy pnpm tsx scripts/workflow-runner-profiled.ts
+ *   PROFILE_DETAIL=true WORKFLOW_ID=xxx EXECUTION_ID=yyy pnpm tsx scripts/runtime/workflow_runtime_analysis/workflow-runner-profiled.ts
  *
  *   # Output profile to JSON file
- *   PROFILE_OUTPUT=/tmp/profile.json WORKFLOW_ID=xxx EXECUTION_ID=yyy pnpm tsx scripts/workflow-runner-profiled.ts
+ *   PROFILE_OUTPUT=/tmp/profile.json WORKFLOW_ID=xxx EXECUTION_ID=yyy pnpm tsx scripts/runtime/workflow_runtime_analysis/workflow-runner-profiled.ts
  *
  * Environment variables:
  *   WORKFLOW_ID - ID of the workflow to execute
@@ -35,15 +35,15 @@ import { CronExpressionParser } from "cron-parser";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { validateWorkflowIntegrations } from "../../lib/db/integrations";
+import { validateWorkflowIntegrations } from "../../../lib/db/integrations";
 import {
   workflowExecutions,
   workflowSchedules,
   workflows,
-} from "../../lib/db/schema";
-import { executeWorkflow } from "../../lib/workflow-executor.workflow";
-import { calculateTotalSteps } from "../../lib/workflow-progress";
-import type { WorkflowEdge, WorkflowNode } from "../../lib/workflow-store";
+} from "../../../lib/db/schema";
+import { executeWorkflow } from "../../../lib/workflow-executor.workflow";
+import { calculateTotalSteps } from "../../../lib/workflow-progress";
+import type { WorkflowEdge, WorkflowNode } from "../../../lib/workflow-store";
 
 // ============================================================================
 // Profiler Types
