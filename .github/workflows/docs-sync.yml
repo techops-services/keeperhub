@@ -491,6 +491,8 @@ jobs:
 
           echo "Found $COMMIT_COUNT new commit(s). Pushing branch and creating PR."
 
+          # Re-set remote URL with token (claude-code-action reconfigures git auth)
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
           git push origin "$BRANCH"
 
           BODY="Automated documentation sync triggered by release/manual workflow."
