@@ -32,7 +32,6 @@ export type GroupedLogEntry<T extends IterationLogFields> =
       type: typeof FOR_EACH_GROUP_TYPE;
       forEachLog: T;
       iterations: IterationGroup<T>[];
-      collectLog: T | null;
     };
 
 /**
@@ -72,19 +71,11 @@ export function groupLogsByIteration<T extends IterationLogFields>(
 
   // Collect logs that belong to a For Each loop body (iteration body logs)
   const forEachChildLogs = new Map<string, T[]>();
-  // Collect node logs linked to a For Each (forEachNodeId set, iterationIndex null)
-  const forEachCollectLogs = new Map<string, T>();
   for (const log of logs) {
     if (log.forEachNodeId !== null && log.iterationIndex !== null) {
       const existing = forEachChildLogs.get(log.forEachNodeId) ?? [];
       existing.push(log);
       forEachChildLogs.set(log.forEachNodeId, existing);
-    } else if (
-      log.forEachNodeId !== null &&
-      log.iterationIndex === null &&
-      log.nodeType === "Collect"
-    ) {
-      forEachCollectLogs.set(log.forEachNodeId, log);
     }
   }
 
@@ -95,25 +86,14 @@ export function groupLogsByIteration<T extends IterationLogFields>(
       continue;
     }
 
-    // Skip Collect logs linked to a For Each -- they'll be attached to their group
-    if (
-      forEachCollectLogs.has(log.forEachNodeId ?? "") &&
-      log.nodeType === "Collect" &&
-      log.iterationIndex === null
-    ) {
-      continue;
-    }
-
     // For Each parent with child logs: build iteration groups
     if (log.nodeType === "For Each" && forEachChildLogs.has(log.nodeId)) {
       const childLogs = forEachChildLogs.get(log.nodeId) ?? [];
       const iterations = buildIterationGroups(childLogs);
-      const collectLog = forEachCollectLogs.get(log.nodeId) ?? null;
       result.push({
         type: FOR_EACH_GROUP_TYPE,
         forEachLog: log,
         iterations,
-        collectLog,
       });
     } else {
       result.push({ type: "standalone", log });
