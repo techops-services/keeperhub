@@ -1,4 +1,0 @@
-> ai-workflow-builder-template@0.1.0 check /Users/taitsengstock/Documents/GitHub/techops-workflow-builder-template
-> npx ultracite@latest check
-
-Checked 474 files in 239ms. No fixes applied.

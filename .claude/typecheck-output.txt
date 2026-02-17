@@ -1,2 +1,0 @@
-> ai-workflow-builder-template@0.1.0 type-check /Users/taitsengstock/Documents/GitHub/techops-workflow-builder-template
-> tsc --noEmit
