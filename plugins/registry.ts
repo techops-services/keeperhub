@@ -96,6 +96,11 @@ export type ActionConfigFieldBase = {
 
   // For abi-with-auto-fetch: "read" or "write" so the node shows the right proxy option label (Read as Proxy / Write as Proxy)
   contractInteractionType?: "read" | "write";
+
+  // start custom keeperhub code //
+  // Tooltip text shown next to the label via an info icon
+  helpTip?: string;
+  // end keeperhub code //
 };
 
 /**

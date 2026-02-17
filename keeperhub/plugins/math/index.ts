@@ -109,7 +109,9 @@ const mathPlugin: IntegrationPlugin = {
           key: "fieldPath",
           label: "Field Path",
           type: "template-input",
-          placeholder: "e.g. balance.amount",
+          placeholder: "e.g. data or balance.amount",
+          helpTip:
+            'Property to extract from each array item.\n\n[{balance: "100"}, {balance: "200"}] → balance\n[{token: {amount: 50}}] → token.amount\n[{result: {value: "3"}}] → result.value\n[1, 2, 3] → leave empty',
           showWhen: { field: "inputMode", equals: "array" },
         },
         {
