@@ -19,6 +19,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { registerSidebarRefetch } from "@/keeperhub/lib/refetch-sidebar";
 import type { Project, SavedWorkflow, Tag } from "@/lib/api-client";
 import { api } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
@@ -210,12 +211,22 @@ function TagsPanel({
   hasUntagged,
   selectedTagId,
   onSelectTag,
+  loading,
 }: {
   projectTags: Tag[];
   hasUntagged: boolean;
   selectedTagId: string | null;
   onSelectTag: (id: string) => void;
+  loading: boolean;
 }): React.ReactNode {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   const hasAny = projectTags.length > 0 || hasUntagged;
 
   if (!hasAny) {
@@ -269,10 +280,20 @@ function TagsPanel({
 function WorkflowsPanel({
   workflows,
   activeWorkflowId,
+  loading,
 }: {
   workflows: WorkflowEntry[];
   activeWorkflowId: string | undefined;
+  loading: boolean;
 }): React.ReactNode {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   if (workflows.length === 0) {
     return (
       <p className="py-4 text-center text-muted-foreground text-sm">
@@ -309,33 +330,35 @@ export function NavigationSidebar(): React.ReactNode {
   const isDragging = useRef(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function fetchData(): Promise<void> {
-      try {
-        const [w, p, t] = await Promise.all([
-          api.workflow.getAll(),
-          api.project.getAll(),
-          api.tag.getAll(),
-        ]);
-        if (!cancelled) {
-          setWorkflows(w);
-          setProjects(p);
-          setTags(t);
-        }
-      } finally {
-        if (!cancelled) {
-          setDataLoading(false);
-        }
-      }
+  const fetchData = useCallback(async (): Promise<void> => {
+    try {
+      const [w, p, t] = await Promise.all([
+        api.workflow.getAll(),
+        api.project.getAll(),
+        api.tag.getAll(),
+      ]);
+      setWorkflows(w);
+      setProjects(p);
+      setTags(t);
+    } finally {
+      setDataLoading(false);
     }
-
-    fetchData().catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  useEffect(() => {
+    fetchData().catch(() => undefined);
+  }, [fetchData]);
+
+  useEffect(
+    () =>
+      registerSidebarRefetch((options) => {
+        if (options?.closeFlyout) {
+          navState.closeAll();
+        }
+        fetchData().catch(() => undefined);
+      }),
+    [fetchData, navState.closeAll]
+  );
 
   // Validate persisted selections after data loads
   useEffect(() => {
@@ -406,30 +429,17 @@ export function NavigationSidebar(): React.ReactNode {
       return;
     }
 
-    function handleMouseDown(e: MouseEvent): void {
-      const target = e.target as HTMLElement;
-      if (
-        sidebarRef.current?.contains(target) ||
-        target.closest("[data-flyout]")
-      ) {
-        return;
-      }
-      navState.closeAll();
-    }
-
     function handleKeyDown(e: KeyboardEvent): void {
       if (e.key === "Escape") {
         navState.peelRightmost();
       }
     }
 
-    document.addEventListener("mousedown", handleMouseDown);
     document.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.removeEventListener("mousedown", handleMouseDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [anyPanelOpen, navState.closeAll, navState.peelRightmost]);
+  }, [anyPanelOpen, navState.peelRightmost]);
 
   if (isMobile) {
     return null;
@@ -681,6 +691,7 @@ export function NavigationSidebar(): React.ReactNode {
       >
         <TagsPanel
           hasUntagged={untaggedWorkflows.length > 0}
+          loading={dataLoading}
           onSelectTag={handleSelectTag}
           projectTags={projectTagsWithCounts}
           selectedTagId={selectedTagId}
@@ -698,6 +709,7 @@ export function NavigationSidebar(): React.ReactNode {
       >
         <WorkflowsPanel
           activeWorkflowId={workflowId}
+          loading={dataLoading}
           workflows={tagWorkflows}
         />
       </FlyoutPanel>

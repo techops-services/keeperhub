@@ -29,6 +29,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ProjectSelect } from "@/keeperhub/components/projects/project-select";
 import { TagSelect } from "@/keeperhub/components/tags/tag-select";
+import { refetchSidebar } from "@/keeperhub/lib/refetch-sidebar";
 import { api } from "@/lib/api-client";
 import { integrationsAtom } from "@/lib/integrations-store";
 import type { IntegrationType } from "@/lib/types/integration";
@@ -633,6 +634,7 @@ export const PanelInner = () => {
         await api.workflow.update(currentWorkflowId, {
           projectId: newProjectId,
         });
+        refetchSidebar();
       } catch (error) {
         console.error("Failed to update workflow project:", error);
         toast.error("Failed to update workflow project");
@@ -649,6 +651,7 @@ export const PanelInner = () => {
         await api.workflow.update(currentWorkflowId, {
           tagId: newTagId,
         });
+        refetchSidebar();
       } catch (error) {
         console.error("Failed to update workflow tag:", error);
         toast.error("Failed to update workflow tag");
