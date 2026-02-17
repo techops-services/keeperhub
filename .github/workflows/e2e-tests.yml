@@ -114,14 +114,26 @@ jobs:
 
       - name: Wait for services
         run: |
-          # Wait for PostgreSQL
+          # Wait for PostgreSQL (max 60s)
+          retries=0
           until pg_isready -h localhost -p 5432 -U postgres; do
+            retries=$((retries + 1))
+            if [ $retries -ge 30 ]; then
+              echo "PostgreSQL did not become ready in 60s"
+              exit 1
+            fi
             echo "Waiting for PostgreSQL..."
             sleep 2
           done
 
-          # Wait for LocalStack
+          # Wait for LocalStack (max 60s)
+          retries=0
           until curl -s http://localhost:4566/_localstack/health | grep -q '"sqs": "available"'; do
+            retries=$((retries + 1))
+            if [ $retries -ge 30 ]; then
+              echo "LocalStack did not become ready in 60s"
+              exit 1
+            fi
             echo "Waiting for LocalStack..."
             sleep 2
           done
