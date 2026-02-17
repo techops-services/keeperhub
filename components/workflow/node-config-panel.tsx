@@ -59,7 +59,9 @@ import {
   updateNodeDataAtom,
   workflowNotFoundAtom,
 } from "@/lib/workflow-store";
-import { findActionById } from "@/plugins";
+// start custom keeperhub code //
+import { findActionById, flattenConfigFields } from "@/plugins";
+// end keeperhub code //
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { ActionConfig } from "./config/action-config";
 import { ActionGrid } from "./config/action-grid";
@@ -554,6 +556,24 @@ export const PanelInner = () => {
       if (key === "actionType" && baseConfig?.integrationId) {
         newConfig = { ...newConfig, integrationId: undefined };
       }
+
+      // start custom keeperhub code //
+      // When action type is selected, persist defaultValues from configFields
+      // into config so that showWhen conditions and validation work immediately
+      if (key === "actionType") {
+        const selectedAction = findActionById(value);
+        if (selectedAction?.configFields) {
+          for (const field of flattenConfigFields(selectedAction.configFields)) {
+            if (
+              field.defaultValue !== undefined &&
+              !(field.key in newConfig)
+            ) {
+              newConfig = { ...newConfig, [field.key]: field.defaultValue };
+            }
+          }
+        }
+      }
+      // end keeperhub code //
 
       // start custom keeperhub code //
       pendingConfigRef.current = newConfig;

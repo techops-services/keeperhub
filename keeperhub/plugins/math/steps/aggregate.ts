@@ -452,7 +452,7 @@ function applyPostOperation(
     }
     return applyBinaryPostOperation(value, postOp, operand);
   }
-  return applyUnaryPostOperation(value, postOp as UnaryPostOperation);
+  return applyUnaryPostOperation(value, postOp);
 }
 
 // ─── Input parsing ──────────────────────────────────────────────────────────

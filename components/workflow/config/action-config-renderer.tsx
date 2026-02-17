@@ -493,9 +493,15 @@ function renderField(
   // Check conditional rendering
   if (field.showWhen) {
     const dependentValue = config[field.showWhen.field];
-    if (dependentValue !== field.showWhen.equals) {
+    // start custom keeperhub code //
+    if (field.showWhen.oneOf) {
+      if (!field.showWhen.oneOf.includes(dependentValue as string)) {
+        return null;
+      }
+    } else if (dependentValue !== field.showWhen.equals) {
       return null;
     }
+    // end keeperhub code //
   }
 
   const value =
