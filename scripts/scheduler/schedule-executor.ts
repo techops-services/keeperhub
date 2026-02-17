@@ -312,11 +312,11 @@ async function listen(): Promise<void> {
         );
 
         // Log any failures
-        results.forEach((result, idx) => {
+        for (const [idx, result] of results.entries()) {
           if (result.status === "rejected") {
             console.error(`[Executor] Message ${idx} failed:`, result.reason);
           }
-        });
+        }
       }
     } catch (error) {
       console.error("[Executor] Error receiving messages:", error);
