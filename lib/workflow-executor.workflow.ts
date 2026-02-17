@@ -27,6 +27,7 @@ import {
   detectTriggerType,
   recordWorkflowComplete,
 } from "@/keeperhub/lib/metrics/instrumentation/workflow";
+import { ARRAY_SOURCE_RE } from "@/keeperhub/lib/for-each-utils";
 import {
   preValidateConditionExpression,
   validateConditionExpression,
@@ -60,6 +61,20 @@ const SYSTEM_ACTIONS: Record<string, StepImporter> = {
     importer: () => import("./steps/condition") as Promise<any>,
     stepFunction: "conditionStep",
   },
+  // start custom keeperhub code //
+  "For Each": {
+    importer: () =>
+      // biome-ignore lint/suspicious/noExplicitAny: Dynamic module import matches existing pattern
+      import("@/keeperhub/lib/steps/for-each") as Promise<any>,
+    stepFunction: "forEachStep",
+  },
+  Collect: {
+    importer: () =>
+      // biome-ignore lint/suspicious/noExplicitAny: Dynamic module import matches existing pattern
+      import("@/keeperhub/lib/steps/collect") as Promise<any>,
+    stepFunction: "collectStep",
+  },
+  // end keeperhub code //
 };
 
 type ExecutionResult = {
@@ -679,6 +694,173 @@ function findOutputByLabelFallback(
   const label = dotIndex === -1 ? rest : rest.substring(0, dotIndex);
   return findOutputByLabel(label, outputs);
 }
+
+// ---------------------------------------------------------------------------
+// For Each / Collect helpers
+// ---------------------------------------------------------------------------
+
+export type LoopBodyInfo = {
+  bodyNodeIds: string[];
+  collectNodeId: string | undefined;
+  bodyEdgesBySource: Map<string, string[]>;
+};
+
+/**
+ * Compute the next BFS depth when traversing loop body nodes.
+ * Inner For Each increments depth, inner Collect decrements it.
+ */
+function computeNextDepth(
+  isForEach: boolean,
+  isCollect: boolean,
+  currentDepth: number
+): number {
+  if (isForEach) {
+    return currentDepth + 1;
+  }
+  if (isCollect) {
+    return currentDepth - 1;
+  }
+  return currentDepth;
+}
+
+/**
+ * Identify the loop body subgraph between a For Each node and its paired
+ * Collect node. Uses BFS with depth tracking so nested For Each / Collect
+ * pairs are correctly skipped.
+ */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: BFS with depth tracking requires multiple condition branches
+export function identifyLoopBody(
+  forEachNodeId: string,
+  edgesBySource: Map<string, string[]>,
+  nodeMap: Map<string, WorkflowNode>
+): LoopBodyInfo {
+  const bodyNodeIds: string[] = [];
+  const bodyEdgesBySource = new Map<string, string[]>();
+  let collectNodeId: string | undefined;
+  const visited = new Set<string>();
+
+  // Seed queue with direct children of the For Each node
+  const initialTargets = edgesBySource.get(forEachNodeId) ?? [];
+  for (const targetId of initialTargets) {
+    if (!bodyEdgesBySource.has(forEachNodeId)) {
+      bodyEdgesBySource.set(forEachNodeId, []);
+    }
+    bodyEdgesBySource.get(forEachNodeId)!.push(targetId);
+  }
+
+  const queue: Array<{ nodeId: string; depth: number }> = initialTargets.map(
+    (id) => ({ nodeId: id, depth: 0 })
+  );
+
+  while (queue.length > 0) {
+    const entry = queue.shift();
+    if (!entry) {
+      break;
+    }
+    const { nodeId, depth } = entry;
+
+    if (visited.has(nodeId)) {
+      continue;
+    }
+    visited.add(nodeId);
+
+    const node = nodeMap.get(nodeId);
+    if (!node) {
+      continue;
+    }
+
+    const actionType = node.data.config?.actionType as string | undefined;
+    const isCollect = node.data.type === "action" && actionType === "Collect";
+    const isForEach = node.data.type === "action" && actionType === "For Each";
+
+    // Collect at depth 0 is OUR boundary
+    if (isCollect && depth === 0) {
+      if (collectNodeId && collectNodeId !== nodeId) {
+        throw new Error(
+          "For Each node has multiple Collect nodes at the same nesting level. " +
+            "Each For Each must have exactly one Collect boundary."
+        );
+      }
+      collectNodeId = nodeId;
+      continue; // Don't traverse past our Collect
+    }
+
+    bodyNodeIds.push(nodeId);
+
+    const nextDepth = computeNextDepth(isForEach, isCollect, depth);
+    const nextIds = edgesBySource.get(nodeId) ?? [];
+    for (const nextId of nextIds) {
+      if (!bodyEdgesBySource.has(nodeId)) {
+        bodyEdgesBySource.set(nodeId, []);
+      }
+      bodyEdgesBySource.get(nodeId)!.push(nextId);
+      queue.push({ nodeId: nextId, depth: nextDepth });
+    }
+  }
+
+  return { bodyNodeIds, collectNodeId, bodyEdgesBySource };
+}
+
+/**
+ * Resolve a template string to its raw array value.
+ * Accepts {{@nodeId:Label.field}} syntax or a JSON array literal.
+ */
+export function resolveArraySource(
+  source: unknown,
+  outputs: NodeOutputs
+): unknown[] {
+  if (typeof source !== "string" || !source.trim()) {
+    throw new Error(
+      "For Each: arraySource is required. " +
+        "Configure a template reference to an array (e.g., {{@nodeId:Label.rows}})."
+    );
+  }
+
+  const match = source.trim().match(ARRAY_SOURCE_RE);
+
+  if (!match) {
+    // Try to parse as a JSON array literal
+    try {
+      const parsed: unknown = JSON.parse(source);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch {
+      // Not valid JSON
+    }
+    throw new Error(
+      `For Each: arraySource "${source}" is not a valid template reference. ` +
+        "Use {{@nodeId:Label.field}} syntax to reference an array from an upstream node."
+    );
+  }
+
+  const [, nodeId, label, fieldPath] = match;
+  const rest = fieldPath ? `${label}.${fieldPath}` : label;
+  const raw = resolveTemplateToRawValue(nodeId, rest, outputs);
+
+  if (raw === null || raw === undefined) {
+    const sanitizedId = nodeId.trim().replace(/[^a-zA-Z0-9]/g, "_");
+    const nodeExists =
+      outputs[sanitizedId] !== undefined ||
+      outputs[nodeId.trim()] !== undefined;
+    const detail = nodeExists
+      ? "The referenced node executed but its output resolved to null."
+      : `Node "${nodeId.trim()}" was not found in outputs. Ensure it has executed before this For Each.`;
+    throw new Error(
+      `For Each: arraySource resolved to ${String(raw)}. ${detail}`
+    );
+  }
+
+  if (!Array.isArray(raw)) {
+    throw new Error(
+      `For Each: arraySource must resolve to an array, got ${typeof raw}. ` +
+        `Referenced: ${source}`
+    );
+  }
+
+  return raw;
+}
+
 // end keeperhub code //
 
 /**
@@ -764,6 +946,438 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
     }
     return node.data.type;
   }
+
+  // start custom keeperhub code //
+
+  /**
+   * Process a node's config by resolving templates and handling special fields
+   * (condition, dbQuery). Shared by executeNode and executeBodyNode.
+   */
+  function processActionConfig(
+    config: Record<string, unknown>,
+    actionType: string,
+    currentOutputs: NodeOutputs
+  ): Record<string, unknown> {
+    const configWithoutSpecial = { ...config };
+    const originalCondition = config.condition;
+    configWithoutSpecial.condition = undefined;
+    const originalDbQuery = config.dbQuery;
+    if (actionType === "Database Query") {
+      configWithoutSpecial.dbQuery = undefined;
+    }
+
+    const processedConfig = processTemplates(
+      configWithoutSpecial,
+      currentOutputs
+    );
+
+    if (originalCondition !== undefined) {
+      processedConfig.condition = originalCondition;
+    }
+
+    if (
+      actionType === "Database Query" &&
+      typeof originalDbQuery === "string"
+    ) {
+      const { parameterizedQuery, paramValues } = extractTemplateParameters(
+        originalDbQuery,
+        currentOutputs
+      );
+      processedConfig.dbQuery = parameterizedQuery;
+      processedConfig._dbParams = paramValues;
+    } else if (
+      actionType === "Database Query" &&
+      originalDbQuery !== undefined
+    ) {
+      processedConfig.dbQuery = originalDbQuery;
+    }
+
+    return processedConfig;
+  }
+
+  // -------------------------------------------------------------------
+  // For Each: body-node executor (scoped outputs, body-only edges)
+  // -------------------------------------------------------------------
+
+  /**
+   * Execute a single body node within a For Each iteration.
+   * Uses scoped outputs so loop variable references resolve correctly
+   * and body-specific edges so traversal stays within the loop body.
+   */
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Body execution mirrors main executeNode with loop-specific scoping
+  async function executeBodyNode(
+    nodeId: string,
+    bodyVisited: Set<string>,
+    scopedOutputs: NodeOutputs,
+    bodyResults: Record<string, ExecutionResult>,
+    bodyEdgesBySource: Map<string, string[]>,
+    collectNodeId: string | undefined,
+    iterationMeta?: { iterationIndex: number; forEachNodeId: string }
+  ): Promise<void> {
+    if (bodyVisited.has(nodeId)) {
+      return;
+    }
+    if (nodeId === collectNodeId) {
+      return; // Don't execute the Collect boundary
+    }
+    bodyVisited.add(nodeId);
+
+    const node = nodeMap.get(nodeId);
+    if (!node) {
+      return;
+    }
+
+    // Skip disabled nodes
+    if (node.data.enabled === false) {
+      const sanitizedId = nodeId.replace(/[^a-zA-Z0-9]/g, "_");
+      scopedOutputs[sanitizedId] = {
+        label: getNodeName(node),
+        data: null,
+      };
+      const nextNodes = bodyEdgesBySource.get(nodeId) ?? [];
+      for (const next of nextNodes) {
+        await executeBodyNode(
+          next,
+          bodyVisited,
+          scopedOutputs,
+          bodyResults,
+          bodyEdgesBySource,
+          collectNodeId,
+          iterationMeta
+        );
+      }
+      return;
+    }
+
+    // Inject builtin variables
+    const builtinSanitized = BUILTIN_NODE_ID.replace(/[^a-zA-Z0-9]/g, "_");
+    scopedOutputs[builtinSanitized] = {
+      label: BUILTIN_NODE_LABEL,
+      data: getBuiltinVariables(),
+    };
+
+    try {
+      const config = node.data.config ?? {};
+      const actionType = config.actionType as string | undefined;
+
+      if (!actionType) {
+        bodyResults[nodeId] = {
+          success: false,
+          error: `Action node "${node.data.label || node.id}" has no action type configured`,
+        };
+        return;
+      }
+
+      const processedConfig = processActionConfig(
+        config,
+        actionType,
+        scopedOutputs
+      );
+
+      const stepContext: StepContext = {
+        executionId,
+        nodeId: node.id,
+        nodeName: getNodeName(node),
+        nodeType: actionType,
+        iterationIndex: iterationMeta?.iterationIndex,
+        forEachNodeId: iterationMeta?.forEachNodeId,
+      };
+
+      const stepResult = await executeActionStep({
+        actionType,
+        config: processedConfig,
+        outputs: scopedOutputs,
+        context: stepContext,
+      });
+
+      const isErrorResult =
+        stepResult &&
+        typeof stepResult === "object" &&
+        "success" in stepResult &&
+        (stepResult as { success: boolean }).success === false;
+
+      const result: ExecutionResult = isErrorResult
+        ? {
+            success: false,
+            error:
+              (stepResult as { error?: string }).error ||
+              `Step "${actionType}" failed.`,
+          }
+        : { success: true, data: stepResult };
+
+      bodyResults[nodeId] = result;
+      const sanitizedId = nodeId.replace(/[^a-zA-Z0-9]/g, "_");
+      scopedOutputs[sanitizedId] = {
+        label: getNodeName(node),
+        data: result.data,
+      };
+
+      if (!result.success) {
+        return;
+      }
+
+      // Nested For Each inside the body
+      if (actionType === "For Each") {
+        await handleForEachExecution({
+          forEachNodeId: nodeId,
+          forEachNode: node,
+          processedConfig,
+          currentOutputs: scopedOutputs,
+          currentResults: bodyResults,
+          currentVisited: bodyVisited,
+          currentEdgesBySource: bodyEdgesBySource,
+          continueAfterCollect: async (collectId) => {
+            const nextNodes = bodyEdgesBySource.get(collectId) ?? [];
+            for (const next of nextNodes) {
+              await executeBodyNode(
+                next,
+                bodyVisited,
+                scopedOutputs,
+                bodyResults,
+                bodyEdgesBySource,
+                collectNodeId,
+                iterationMeta
+              );
+            }
+          },
+        });
+      } else if (actionType === "Condition") {
+        const conditionValue = (result.data as { condition?: boolean })
+          ?.condition;
+        if (conditionValue !== true) {
+          return;
+        }
+      }
+
+      // Continue to downstream body nodes
+      const nextNodes = bodyEdgesBySource.get(nodeId) ?? [];
+      for (const next of nextNodes) {
+        await executeBodyNode(
+          next,
+          bodyVisited,
+          scopedOutputs,
+          bodyResults,
+          bodyEdgesBySource,
+          collectNodeId,
+          iterationMeta
+        );
+      }
+    } catch (error) {
+      const errorMessage = await getErrorMessageAsync(error);
+      bodyResults[nodeId] = { success: false, error: errorMessage };
+    }
+  }
+
+  // -------------------------------------------------------------------
+  // For Each: iteration orchestrator
+  // -------------------------------------------------------------------
+
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Orchestrates loop iteration with error handling and result collection
+  async function handleForEachExecution(params: {
+    forEachNodeId: string;
+    forEachNode: WorkflowNode;
+    processedConfig: Record<string, unknown>;
+    currentOutputs: NodeOutputs;
+    currentResults: Record<string, ExecutionResult>;
+    currentVisited: Set<string>;
+    currentEdgesBySource: Map<string, string[]>;
+    continueAfterCollect?: (collectNodeId: string) => Promise<void>;
+  }): Promise<{
+    arrayLength: number;
+    maxIterations: number;
+    iterationsRan: number;
+  }> {
+    const {
+      forEachNodeId,
+      forEachNode,
+      processedConfig,
+      currentOutputs,
+      currentResults,
+      currentVisited,
+      currentEdgesBySource,
+      continueAfterCollect,
+    } = params;
+
+    // 1. Resolve array
+    const resolvedArray = resolveArraySource(
+      processedConfig.arraySource,
+      currentOutputs
+    );
+    const parsedMax = Number(processedConfig.maxIterations);
+    const maxIterations = parsedMax > 0 ? parsedMax : resolvedArray.length;
+    const itemsToProcess = resolvedArray.slice(0, maxIterations);
+
+    // 2. Identify body subgraph
+    const { bodyNodeIds, collectNodeId, bodyEdgesBySource } = identifyLoopBody(
+      forEachNodeId,
+      currentEdgesBySource,
+      nodeMap
+    );
+
+    const sanitizedForEachId = forEachNodeId.replace(/[^a-zA-Z0-9]/g, "_");
+
+    // 3. Single iteration executor
+    const mapExpression = processedConfig.mapExpression as string | undefined;
+
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: iteration logic has inherent complexity from scoped output capture, body execution, and map expression
+    async function executeIteration(
+      item: unknown,
+      index: number
+    ): Promise<unknown> {
+      const scopedOutputs: NodeOutputs = structuredClone(currentOutputs);
+      const bodyResults: Record<string, ExecutionResult> = {};
+
+      // Apply map expression to transform each item before body execution
+      let currentItem: unknown = item;
+      if (mapExpression && typeof item === "object" && item !== null) {
+        currentItem = resolveFromOutputData(item, mapExpression) ?? item;
+      }
+
+      // Inject loop variables
+      scopedOutputs[sanitizedForEachId] = {
+        label: getNodeName(forEachNode),
+        data: {
+          currentItem,
+          index,
+          totalItems: itemsToProcess.length,
+        },
+      };
+
+      // Execute body starting from For Each's direct children
+      const bodyVisited = new Set<string>();
+      const firstBodyNodes = bodyEdgesBySource.get(forEachNodeId) ?? [];
+      const iterationMeta = { iterationIndex: index, forEachNodeId };
+
+      for (const bodyNodeId of firstBodyNodes) {
+        await executeBodyNode(
+          bodyNodeId,
+          bodyVisited,
+          scopedOutputs,
+          bodyResults,
+          bodyEdgesBySource,
+          collectNodeId,
+          iterationMeta
+        );
+      }
+
+      // If any body node failed, surface the error in the iteration result
+      const bodyFailure = Object.entries(bodyResults).find(
+        ([, r]) => !r.success
+      );
+      if (bodyFailure) {
+        return {
+          success: false as const,
+          error: bodyFailure[1].error ?? "Body node failed",
+          nodeId: bodyFailure[0],
+        };
+      }
+
+      // Capture output from the last body node(s) that produced data.
+      // First check nodes directly before Collect; if those were skipped
+      // (e.g., a Condition that evaluated false), fall back to the last
+      // body node that actually produced output.
+      let iterationOutput: unknown;
+      if (collectNodeId) {
+        // Primary: nodes whose edges target Collect
+        for (const bodyNodeId of bodyNodeIds) {
+          const targets = bodyEdgesBySource.get(bodyNodeId) ?? [];
+          if (targets.includes(collectNodeId)) {
+            const sanitizedBodyId = bodyNodeId.replace(/[^a-zA-Z0-9]/g, "_");
+            const output = scopedOutputs[sanitizedBodyId];
+            if (output?.data !== undefined) {
+              iterationOutput = output.data;
+            }
+          }
+        }
+
+        // Fallback: last body node with output (handles skipped Conditions)
+        if (iterationOutput === undefined) {
+          for (const bodyNodeId of bodyNodeIds) {
+            const sanitizedBodyId = bodyNodeId.replace(/[^a-zA-Z0-9]/g, "_");
+            const output = scopedOutputs[sanitizedBodyId];
+            if (output?.data !== undefined) {
+              iterationOutput = output.data;
+            }
+          }
+        }
+      }
+
+      // Final fallback: use the mapped item itself
+      if (iterationOutput === undefined) {
+        iterationOutput = currentItem;
+      }
+
+      return iterationOutput;
+    }
+
+    // start custom keeperhub code //
+    // 4. Run iterations with configurable concurrency
+    const { runIterations } = await import(
+      "@/keeperhub/lib/for-each-concurrency"
+    );
+    const concurrencyMode =
+      (processedConfig.concurrency as string) || "sequential";
+    const concurrencyLimit = Number(processedConfig.concurrencyLimit) || 0;
+    const iterationResults = await runIterations(
+      itemsToProcess,
+      executeIteration,
+      getErrorMessageAsync,
+      concurrencyMode as "sequential" | "parallel" | "custom",
+      concurrencyLimit
+    );
+    // end keeperhub code //
+
+    // 5. Mark body nodes as visited in the parent scope
+    for (const bodyNodeId of bodyNodeIds) {
+      currentVisited.add(bodyNodeId);
+    }
+
+    // 6. Store Collect output and continue downstream (only when Collect exists)
+    if (collectNodeId) {
+      const collectData = {
+        results: iterationResults,
+        count: iterationResults.length,
+      };
+      const sanitizedCollectId = collectNodeId.replace(/[^a-zA-Z0-9]/g, "_");
+      const collectNode = nodeMap.get(collectNodeId);
+      const collectLabel = collectNode ? getNodeName(collectNode) : "Collect";
+
+      // Execute Collect step for logging / observability
+      const collectAction = SYSTEM_ACTIONS.Collect;
+      if (collectAction) {
+        const mod = await collectAction.importer();
+        await mod[collectAction.stepFunction]({
+          ...collectData,
+          _context: {
+            executionId,
+            nodeId: collectNodeId,
+            nodeName: collectLabel,
+            nodeType: "Collect",
+            forEachNodeId,
+          } satisfies StepContext,
+        });
+      }
+
+      currentOutputs[sanitizedCollectId] = {
+        label: collectLabel,
+        data: collectData,
+      };
+      currentResults[collectNodeId] = { success: true, data: collectData };
+      currentVisited.add(collectNodeId);
+
+      if (continueAfterCollect) {
+        await continueAfterCollect(collectNodeId);
+      }
+    }
+
+    return {
+      arrayLength: resolvedArray.length,
+      maxIterations,
+      iterationsRan: itemsToProcess.length,
+    };
+  }
+
+  // end keeperhub code //
 
   // Helper to execute a single node
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Node execution requires type checking and error handling
@@ -900,42 +1514,8 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
           return;
         }
 
-        // Process templates in config, but keep condition and dbQuery unprocessed for special handling
-        const configWithoutSpecial = { ...config };
-        const originalCondition = config.condition;
-        configWithoutSpecial.condition = undefined;
         // start custom keeperhub code //
-        const originalDbQuery = config.dbQuery;
-        if (actionType === "Database Query") {
-          configWithoutSpecial.dbQuery = undefined;
-        }
-        // end keeperhub code //
-
-        const processedConfig = processTemplates(configWithoutSpecial, outputs);
-
-        // Add back the original condition (unprocessed)
-        if (originalCondition !== undefined) {
-          processedConfig.condition = originalCondition;
-        }
-
-        // start custom keeperhub code //
-        // For Database Query, use parameterized queries instead of raw interpolation
-        if (
-          actionType === "Database Query" &&
-          typeof originalDbQuery === "string"
-        ) {
-          const { parameterizedQuery, paramValues } = extractTemplateParameters(
-            originalDbQuery,
-            outputs
-          );
-          processedConfig.dbQuery = parameterizedQuery;
-          processedConfig._dbParams = paramValues;
-        } else if (
-          actionType === "Database Query" &&
-          originalDbQuery !== undefined
-        ) {
-          processedConfig.dbQuery = originalDbQuery;
-        }
+        const processedConfig = processActionConfig(config, actionType, outputs);
         // end keeperhub code //
 
         // Build step context for logging (stepHandler will handle the logging)
@@ -1011,12 +1591,44 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
 
       // Execute next nodes
       if (result.success) {
-        // Check if this is a condition node
-        const isConditionNode =
-          node.data.type === "action" &&
-          node.data.config?.actionType === "Condition";
+        const currentActionType =
+          node.data.type === "action"
+            ? (node.data.config?.actionType as string | undefined)
+            : undefined;
 
-        if (isConditionNode) {
+        // start custom keeperhub code //
+        if (currentActionType === "For Each") {
+          // For Each: iterate over array, execute body subgraph per element,
+          // store results on Collect, then continue from Collect downstream.
+          const forEachConfig = processTemplates(
+            node.data.config ?? {},
+            outputs
+          );
+          const iterationSummary = await handleForEachExecution({
+            forEachNodeId: nodeId,
+            forEachNode: node,
+            processedConfig: forEachConfig,
+            currentOutputs: outputs,
+            currentResults: results,
+            currentVisited: visited,
+            currentEdgesBySource: edgesBySource,
+            continueAfterCollect: async (collectId) => {
+              const nextNodes = edgesBySource.get(collectId) ?? [];
+              await Promise.all(
+                nextNodes.map((nextNodeId) => executeNode(nextNodeId, visited))
+              );
+            },
+          });
+
+          // Update the For Each node's output with resolved iteration metadata
+          const sanitizedFEId = nodeId.replace(/[^a-zA-Z0-9]/g, "_");
+          outputs[sanitizedFEId] = {
+            label: getNodeName(node),
+            data: iterationSummary,
+          };
+          results[nodeId] = { success: true, data: iterationSummary };
+        } else if (currentActionType === "Condition") {
+          // end keeperhub code //
           // For condition nodes, only execute next nodes if condition is true
           const conditionResult = (result.data as { condition?: boolean })
             ?.condition;
@@ -1032,7 +1644,6 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
               nextNodes.length,
               "next nodes in parallel"
             );
-            // Execute all next nodes in parallel
             await Promise.all(
               nextNodes.map((nextNodeId) => executeNode(nextNodeId, visited))
             );
@@ -1049,7 +1660,6 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
             nextNodes.length,
             "next nodes in parallel"
           );
-          // Execute all next nodes in parallel
           await Promise.all(
             nextNodes.map((nextNodeId) => executeNode(nextNodeId, visited))
           );

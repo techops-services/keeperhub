@@ -15,10 +15,21 @@ import { AnimatedBorder } from "@/components/ui/animated-border";
 import { AddStepButton } from "@/keeperhub/components/workflow/add-step-button";
 // end keeperhub code //
 
+// start custom keeperhub code //
+export type SourceHandleConfig = {
+  id: string;
+  label: string;
+  topPercent: number;
+};
+// end keeperhub code //
+
 export type NodeProps = ComponentProps<typeof Card> & {
   handles: {
     target: boolean;
     source: boolean;
+    // start custom keeperhub code //
+    sourceHandles?: SourceHandleConfig[];
+    // end keeperhub code //
   };
   status?: "idle" | "running" | "success" | "error";
   // start custom keeperhub code //
@@ -38,9 +49,47 @@ export const Node = ({ handles, className, status, nodeId, ...props }: NodeProps
   >
     {status === "running" && <AnimatedBorder />}
     {handles.target && <Handle position={Position.Left} type="target" />}
-    {handles.source && <Handle position={Position.Right} type="source" />}
     {/* start custom keeperhub code */}
-    {handles.source && nodeId && <AddStepButton sourceNodeId={nodeId} />}
+    {handles.sourceHandles ? (
+      <>
+        {handles.sourceHandles.map((h) => (
+          <Handle
+            id={h.id}
+            key={h.id}
+            position={Position.Right}
+            style={{ top: `${h.topPercent}%` }}
+            type="source"
+          />
+        ))}
+        {handles.sourceHandles.map((h) => (
+          <span
+            className="pointer-events-none absolute text-[10px] text-muted-foreground"
+            key={`label-${h.id}`}
+            style={{
+              right: 16,
+              top: `${h.topPercent}%`,
+              transform: "translateY(-50%)",
+            }}
+          >
+            {h.label}
+          </span>
+        ))}
+        {nodeId &&
+          handles.sourceHandles.map((h) => (
+            <AddStepButton
+              key={`btn-${h.id}`}
+              offsetTopPercent={h.topPercent}
+              sourceHandleId={h.id}
+              sourceNodeId={nodeId}
+            />
+          ))}
+      </>
+    ) : (
+      <>
+        {handles.source && <Handle position={Position.Right} type="source" />}
+        {handles.source && nodeId && <AddStepButton sourceNodeId={nodeId} />}
+      </>
+    )}
     {/* end keeperhub code */}
     {props.children}
   </Card>

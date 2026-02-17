@@ -24,6 +24,8 @@ export type StepContext = {
   nodeType: string;
   // start custom keeperhub code //
   triggerType?: string;
+  iterationIndex?: number;
+  forEachNodeId?: string;
   // end keeperhub code //
 };
 
@@ -60,6 +62,10 @@ async function logStepStart(
       nodeName: context.nodeName,
       nodeType: context.nodeType,
       input: redactedInput,
+      // start custom keeperhub code //
+      iterationIndex: context.iterationIndex,
+      forEachNodeId: context.forEachNodeId,
+      // end keeperhub code //
     });
 
     return result;
