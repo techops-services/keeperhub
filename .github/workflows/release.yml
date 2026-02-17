@@ -47,7 +47,8 @@ jobs:
 
           # Upper bound: the author date of HEAD (the prod push commit).
           # This prevents including staging PRs merged after the prod push.
-          UNTIL=$(git log -1 --format=%aI HEAD)
+          # Force UTC output so string comparison works with GitHub API dates (also UTC).
+          UNTIL=$(TZ=UTC git log -1 --format='%ad' --date=format-local:'%Y-%m-%dT%H:%M:%SZ' HEAD)
           echo "Upper bound (HEAD author date): $UNTIL"
 
           if [ "$FIRST_RELEASE" = "true" ]; then
@@ -60,8 +61,8 @@ jobs:
               --limit 200 \
               --jq "[.[] | select(.mergedAt <= \"$UNTIL\")]")
           else
-            # Get the date of the previous tag commit
-            SINCE=$(git log -1 --format=%aI "$PREV_TAG")
+            # Get the date of the previous tag commit (UTC to match GitHub API dates)
+            SINCE=$(TZ=UTC git log -1 --format='%ad' --date=format-local:'%Y-%m-%dT%H:%M:%SZ' "$PREV_TAG")
             echo "Finding PRs merged after: $SINCE and before: $UNTIL"
 
             PR_JSON=$(gh pr list \
