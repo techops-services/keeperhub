@@ -288,10 +288,10 @@ export async function waitForWorkflowExecution(
 ): Promise<ExecutionResult | null> {
   const startTime = Date.now();
   const pollInterval = 1000;
+  const sql = getDbConnection();
 
-  while (Date.now() - startTime < timeoutMs) {
-    const sql = getDbConnection();
-    try {
+  try {
+    while (Date.now() - startTime < timeoutMs) {
       const result = await sql`
         SELECT id, status, error FROM workflow_executions
         WHERE workflow_id = ${workflowId}
@@ -311,14 +311,14 @@ export async function waitForWorkflowExecution(
           };
         }
       }
-    } finally {
-      await sql.end();
+
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
     }
 
-    await new Promise((resolve) => setTimeout(resolve, pollInterval));
+    return null;
+  } finally {
+    await sql.end();
   }
-
-  return null;
 }
 
 // ============================================================================
