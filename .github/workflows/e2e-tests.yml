@@ -75,9 +75,15 @@ jobs:
         ports:
           - 4566:4566
         env:
-          SERVICES: sqs,scheduler
+          SERVICES: sqs
           DEBUG: 0
           EAGER_SERVICE_LOADING: 1
+        options: >-
+          --health-cmd "curl -sf http://localhost:4566/_localstack/health || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 15s
 
     steps:
       - name: Checkout code
@@ -126,17 +132,31 @@ jobs:
             sleep 2
           done
 
-          # Wait for LocalStack (max 60s)
+          # Wait for LocalStack SQS (max 90s)
           retries=0
-          until curl -s http://localhost:4566/_localstack/health | grep -q '"sqs": "available"'; do
+          until curl -s http://localhost:4566/_localstack/health | grep -qE '"sqs":\s*"(available|running)"'; do
             retries=$((retries + 1))
-            if [ $retries -ge 30 ]; then
-              echo "LocalStack did not become ready in 60s"
+            if [ $retries -ge 45 ]; then
+              echo "LocalStack SQS did not become ready in 90s"
+              echo "Health response:"
+              curl -s http://localhost:4566/_localstack/health || true
               exit 1
             fi
-            echo "Waiting for LocalStack..."
+            echo "Waiting for LocalStack SQS..."
             sleep 2
           done
+          echo "LocalStack SQS is ready"
+
+      - name: Create SQS queue
+        run: |
+          aws --endpoint-url=http://localhost:4566 sqs create-queue \
+            --queue-name keeperhub-workflow-queue \
+            --attributes '{"VisibilityTimeout":"300","MessageRetentionPeriod":"86400","ReceiveMessageWaitTimeSeconds":"20"}'
+          echo "Created SQS queue: keeperhub-workflow-queue"
+        env:
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_DEFAULT_REGION: us-east-1
 
       - name: Setup database
         run: |
