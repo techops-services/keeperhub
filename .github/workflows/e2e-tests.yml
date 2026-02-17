@@ -2,7 +2,7 @@ name: E2E Tests
 
 on:
   push:
-    branches: [main, staging, production]
+    branches: [staging, prod]
   pull_request:
     types: [labeled, synchronize]
   # Run after PR environment deployment completes
