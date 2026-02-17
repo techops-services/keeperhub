@@ -36,7 +36,9 @@ export type ActionConfigFieldBase = {
     | "token-select" // Token selector with supported/custom toggle
     | "abi-event-select" // Dynamic dropdown that parses ABI and shows events
     // start custom keeperhub code //
-    | "gas-limit-multiplier"; // Gas limit multiplier with chain default display
+    | "gas-limit-multiplier" // Gas limit multiplier with chain default display
+    | "code-editor" // Monaco-based JavaScript code editor
+    | "json-editor"; // Monaco-based JSON editor
   // end keeperhub code //
 
   // For chain-select: filter by chain type (e.g., "evm" or "solana")
