@@ -9,9 +9,10 @@ import {
   List,
   Loader2,
   Plus,
+  X,
 } from "lucide-react";
 import { useParams, usePathname, useRouter } from "next/navigation";
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Tooltip,
   TooltipContent,
@@ -22,11 +23,13 @@ import { registerSidebarRefetch } from "@/keeperhub/lib/refetch-sidebar";
 import type { Project, SavedWorkflow, Tag } from "@/lib/api-client";
 import { api } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import type { NavPanelStates } from "../lib/hooks/use-persisted-nav-state";
+import { usePersistedNavState } from "../lib/hooks/use-persisted-nav-state";
+import { FLYOUT_WIDTH, FlyoutPanel, STRIP_WIDTH } from "./flyout-panel";
 
 const COLLAPSED_WIDTH = 60;
 const EXPANDED_WIDTH = 200;
 const SNAP_THRESHOLD = (COLLAPSED_WIDTH + EXPANDED_WIDTH) / 2;
-const SIDEBAR_STORAGE_KEY = "keeperhub-sidebar-expanded";
 
 type WorkflowEntry = {
   id: string;
@@ -57,8 +60,6 @@ function groupWorkflows(workflows: WorkflowEntry[]): {
   return { byProject, ungrouped };
 }
 
-const FLYOUT_WIDTH = 280;
-
 function WorkflowItem({
   workflow,
   activeWorkflowId,
@@ -84,245 +85,233 @@ function WorkflowItem({
   );
 }
 
-function ProjectFlyout({
-  workflows,
-  tags,
-  activeWorkflowId,
-  leftOffset,
-  projectName,
-  cancelClose,
-  scheduleClose,
-}: {
-  workflows: WorkflowEntry[];
-  tags: Tag[];
-  activeWorkflowId: string | undefined;
-  leftOffset: number;
-  projectName: string;
-  cancelClose: () => void;
-  scheduleClose: () => void;
-}): React.ReactNode {
-  const tagMap = new Map(tags.map((t) => [t.id, t]));
-  const byTag: Record<string, WorkflowEntry[]> = {};
-  const untagged: WorkflowEntry[] = [];
+function computePanelOffsets(
+  sidebarWidth: number,
+  panels: NavPanelStates
+): { projects: number; tags: number; workflows: number; rightEdge: number } {
+  let offset = sidebarWidth;
 
-  for (const w of workflows) {
-    if (w.tagId) {
-      if (!byTag[w.tagId]) {
-        byTag[w.tagId] = [];
-      }
-      byTag[w.tagId].push(w);
-    } else {
-      untagged.push(w);
-    }
+  const projects = offset;
+  if (panels.projects === "open") {
+    offset += FLYOUT_WIDTH;
+  } else if (panels.projects === "collapsed") {
+    offset += STRIP_WIDTH;
   }
 
-  const tagIds = Object.keys(byTag);
+  const tags = offset;
+  if (panels.tags === "open") {
+    offset += FLYOUT_WIDTH;
+  } else if (panels.tags === "collapsed") {
+    offset += STRIP_WIDTH;
+  }
+
+  const workflows = offset;
+  if (panels.workflows === "open") {
+    offset += FLYOUT_WIDTH;
+  } else if (panels.workflows === "collapsed") {
+    offset += STRIP_WIDTH;
+  }
+
+  return { projects, tags, workflows, rightEdge: offset };
+}
+
+function ProjectsPanel({
+  projects,
+  ungrouped,
+  byProject,
+  activeWorkflowId,
+  selectedProjectId,
+  onSelectProject,
+  loading,
+}: {
+  projects: Project[];
+  ungrouped: WorkflowEntry[];
+  byProject: Record<string, WorkflowEntry[]>;
+  activeWorkflowId: string | undefined;
+  selectedProjectId: string | null;
+  onSelectProject: (id: string) => void;
+  loading: boolean;
+}): React.ReactNode {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  const hasAny = projects.length > 0 || ungrouped.length > 0;
+
+  if (!hasAny) {
+    return (
+      <p className="py-4 text-center text-muted-foreground text-sm">
+        No workflows found
+      </p>
+    );
+  }
 
   return (
-    <div
-      className="pointer-events-auto fixed top-[60px] bottom-0 z-30 animate-[flyout-in_150ms_ease-out_forwards] border-r bg-background shadow-lg"
-      data-flyout="project"
-      onMouseEnter={cancelClose}
-      onMouseLeave={scheduleClose}
-      role="menu"
-      style={{ left: leftOffset, width: FLYOUT_WIDTH }}
-    >
-      <div className="flex h-full flex-col">
-        <div className="flex-1 overflow-y-auto p-2">
-          <p className="px-2 pt-1 pb-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-            {projectName}
-          </p>
-          {workflows.length === 0 && (
-            <p className="py-4 text-center text-muted-foreground text-sm">
-              No workflows
-            </p>
+    <div className="flex flex-col gap-0.5">
+      {projects.length > 0 && (
+        <p className="px-2 pt-1 pb-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+          Projects
+        </p>
+      )}
+      {projects.map((project) => {
+        const projectWorkflows = byProject[project.id] ?? [];
+        const isActive = project.id === selectedProjectId;
+        return (
+          <button
+            className={cn(
+              "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted",
+              isActive && "bg-muted"
+            )}
+            key={project.id}
+            onClick={() => onSelectProject(project.id)}
+            type="button"
+          >
+            <span
+              className="inline-block size-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: project.color ?? "#888" }}
+            />
+            <span className="truncate">{project.name}</span>
+            <span className="ml-auto flex items-center gap-1 text-muted-foreground text-xs">
+              {projectWorkflows.length}
+              <ChevronRight className="size-3.5" />
+            </span>
+          </button>
+        );
+      })}
+
+      {ungrouped.length > 0 && (
+        <>
+          {projects.length > 0 && (
+            <>
+              <div className="my-1 border-t" />
+              <p className="px-2 pt-1 pb-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                Other Workflows
+              </p>
+            </>
           )}
-          {workflows.length > 0 && (
-            <div className="flex flex-col gap-0.5">
-              {tagIds.map((tagId, index) => {
-                const tag = tagMap.get(tagId);
-                return (
-                  <Fragment key={tagId}>
-                    {index > 0 && <div className="my-1 border-t" />}
-                    <div className="flex items-center gap-1.5 px-2 pt-2 pb-1 text-muted-foreground text-xs">
-                      <span
-                        className="inline-block size-2 shrink-0 rounded-full"
-                        style={{ backgroundColor: tag?.color ?? "#888" }}
-                      />
-                      {tag?.name ?? "Unknown"}
-                    </div>
-                    {byTag[tagId].map((w) => (
-                      <WorkflowItem
-                        activeWorkflowId={activeWorkflowId}
-                        key={w.id}
-                        workflow={w}
-                      />
-                    ))}
-                  </Fragment>
-                );
-              })}
-              {untagged.length > 0 && (
-                <>
-                  {tagIds.length > 0 && <div className="my-1 border-t" />}
-                  <div className="flex items-center gap-1.5 px-2 pt-2 pb-1 text-muted-foreground text-xs">
-                    <span className="inline-block size-2 shrink-0 rounded-full bg-muted-foreground/30" />
-                    Untagged
-                  </div>
-                </>
-              )}
-              {untagged.map((w) => (
-                <WorkflowItem
-                  activeWorkflowId={activeWorkflowId}
-                  key={w.id}
-                  workflow={w}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+          {ungrouped.map((w) => (
+            <WorkflowItem
+              activeWorkflowId={activeWorkflowId}
+              key={w.id}
+              workflow={w}
+            />
+          ))}
+        </>
+      )}
     </div>
   );
 }
 
-function WorkflowsFlyout({
-  activeWorkflowId,
-  cancelClose,
+function TagsPanel({
+  projectTags,
+  hasUntagged,
+  selectedTagId,
+  onSelectTag,
   loading,
-  projects,
-  scheduleClose,
-  sidebarWidth,
-  tags,
-  workflows,
 }: {
-  activeWorkflowId: string | undefined;
-  cancelClose: () => void;
+  projectTags: Tag[];
+  hasUntagged: boolean;
+  selectedTagId: string | null;
+  onSelectTag: (id: string) => void;
   loading: boolean;
-  projects: Project[];
-  scheduleClose: () => void;
-  sidebarWidth: number;
-  tags: Tag[];
-  workflows: WorkflowEntry[];
 }): React.ReactNode {
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
-  const projectPinnedRef = useRef(false);
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
-  const visibleWorkflows = workflows;
-  const { byProject, ungrouped } = groupWorkflows(visibleWorkflows);
+  const hasAny = projectTags.length > 0 || hasUntagged;
 
-  const activeProject = projects.find((p) => p.id === activeProjectId);
-  const mainFlyoutLeft = sidebarWidth;
-  const projectFlyoutLeft = mainFlyoutLeft + FLYOUT_WIDTH;
+  if (!hasAny) {
+    return (
+      <p className="py-4 text-center text-muted-foreground text-sm">No tags</p>
+    );
+  }
 
   return (
-    <>
-      <div
-        className="pointer-events-auto fixed top-[60px] bottom-0 z-30 animate-[flyout-in_150ms_ease-out_forwards] border-r bg-background shadow-lg"
-        data-flyout="main"
-        onMouseEnter={cancelClose}
-        onMouseLeave={scheduleClose}
-        role="menu"
-        style={{ left: mainFlyoutLeft, width: FLYOUT_WIDTH }}
-      >
-        <div className="flex h-full flex-col">
-          <div className="flex-1 overflow-y-auto p-2">
-            {loading && (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="size-5 animate-spin text-muted-foreground" />
-              </div>
+    <div className="flex flex-col gap-0.5">
+      {projectTags.map((tag) => {
+        const isActive = tag.id === selectedTagId;
+        return (
+          <button
+            className={cn(
+              "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted",
+              isActive && "bg-muted"
             )}
-            {!loading && visibleWorkflows.length === 0 && (
-              <p className="py-4 text-center text-muted-foreground text-sm">
-                No workflows found
-              </p>
-            )}
-            {!loading && visibleWorkflows.length > 0 && (
-              <div className="flex flex-col gap-0.5">
-                {projects.length > 0 && (
-                  <p className="px-2 pt-1 pb-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                    Projects
-                  </p>
-                )}
-                {projects.map((project) => {
-                  const projectWorkflows = byProject[project.id] ?? [];
-                  const isActive = project.id === activeProjectId;
-                  return (
-                    <button
-                      className={cn(
-                        "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted",
-                        isActive && "bg-muted"
-                      )}
-                      key={project.id}
-                      onClick={() => {
-                        if (
-                          activeProjectId === project.id &&
-                          projectPinnedRef.current
-                        ) {
-                          projectPinnedRef.current = false;
-                        } else {
-                          setActiveProjectId(project.id);
-                          projectPinnedRef.current = true;
-                        }
-                      }}
-                      onMouseEnter={() => {
-                        if (!projectPinnedRef.current) {
-                          setActiveProjectId(project.id);
-                        }
-                      }}
-                      type="button"
-                    >
-                      <span
-                        className="inline-block size-2.5 shrink-0 rounded-full"
-                        style={{
-                          backgroundColor: project.color ?? "#888",
-                        }}
-                      />
-                      <span className="truncate">{project.name}</span>
-                      <span className="ml-auto flex items-center gap-1 text-muted-foreground text-xs">
-                        {projectWorkflows.length}
-                        <ChevronRight className="size-3.5" />
-                      </span>
-                    </button>
-                  );
-                })}
-
-                {ungrouped.length > 0 && (
-                  <>
-                    {projects.length > 0 && (
-                      <>
-                        <div className="my-1 border-t" />
-                        <p className="px-2 pt-1 pb-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                          Other Workflows
-                        </p>
-                      </>
-                    )}
-                    {ungrouped.map((w) => (
-                      <WorkflowItem
-                        activeWorkflowId={activeWorkflowId}
-                        key={w.id}
-                        workflow={w}
-                      />
-                    ))}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {activeProject && (
-        <ProjectFlyout
-          activeWorkflowId={activeWorkflowId}
-          cancelClose={cancelClose}
-          leftOffset={projectFlyoutLeft}
-          projectName={activeProject.name}
-          scheduleClose={scheduleClose}
-          tags={tags}
-          workflows={byProject[activeProject.id] ?? []}
-        />
+            key={tag.id}
+            onClick={() => onSelectTag(tag.id)}
+            type="button"
+          >
+            <span
+              className="inline-block size-2 shrink-0 rounded-full"
+              style={{ backgroundColor: tag.color }}
+            />
+            <span className="truncate">{tag.name}</span>
+            <span className="ml-auto text-muted-foreground text-xs">
+              {tag.workflowCount}
+            </span>
+          </button>
+        );
+      })}
+      {hasUntagged && (
+        <button
+          className={cn(
+            "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted",
+            selectedTagId === "__untagged__" && "bg-muted"
+          )}
+          onClick={() => onSelectTag("__untagged__")}
+          type="button"
+        >
+          <span className="inline-block size-2 shrink-0 rounded-full bg-muted-foreground/30" />
+          <span className="truncate">Untagged</span>
+        </button>
       )}
-    </>
+    </div>
+  );
+}
+
+function WorkflowsPanel({
+  workflows,
+  activeWorkflowId,
+  loading,
+}: {
+  workflows: WorkflowEntry[];
+  activeWorkflowId: string | undefined;
+  loading: boolean;
+}): React.ReactNode {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (workflows.length === 0) {
+    return (
+      <p className="py-4 text-center text-muted-foreground text-sm">
+        No workflows
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      {workflows.map((w) => (
+        <WorkflowItem
+          activeWorkflowId={activeWorkflowId}
+          key={w.id}
+          workflow={w}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -331,33 +320,15 @@ export function NavigationSidebar(): React.ReactNode {
   const router = useRouter();
   const pathname = usePathname();
   const params = useParams();
-  const [expanded, setExpanded] = useState(false);
-  const hasMounted = useRef(false);
-
-  useEffect(() => {
-    const stored = localStorage.getItem(SIDEBAR_STORAGE_KEY);
-    if (stored === "true") {
-      setExpanded(true);
-    }
-    hasMounted.current = true;
-  }, []);
-
-  useEffect(() => {
-    if (hasMounted.current) {
-      localStorage.setItem(SIDEBAR_STORAGE_KEY, String(expanded));
-    }
-  }, [expanded]);
+  const navState = usePersistedNavState();
 
   const [dragWidth, setDragWidth] = useState<number | null>(null);
-  const [flyoutOpen, setFlyoutOpen] = useState(false);
   const [workflows, setWorkflows] = useState<SavedWorkflow[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
   const isDragging = useRef(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const closeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const flyoutPinnedRef = useRef(false);
 
   const fetchData = useCallback(async (): Promise<void> => {
     try {
@@ -382,36 +353,31 @@ export function NavigationSidebar(): React.ReactNode {
     () =>
       registerSidebarRefetch((options) => {
         if (options?.closeFlyout) {
-          flyoutPinnedRef.current = false;
-          setFlyoutOpen(false);
+          navState.closeAll();
         }
         fetchData().catch(() => undefined);
       }),
-    [fetchData]
+    [fetchData, navState.closeAll]
   );
 
+  // Validate persisted selections after data loads
+  useEffect(() => {
+    if (!dataLoading) {
+      navState.validateSelections(
+        projects.map((p) => p.id),
+        tags.map((t) => t.id)
+      );
+    }
+  }, [dataLoading, navState.validateSelections, projects, tags]);
+
   const visibleWorkflows = workflows.filter((w) => w.name !== "__current__");
-
-  const cancelClose = useCallback(() => {
-    if (closeTimeout.current) {
-      clearTimeout(closeTimeout.current);
-      closeTimeout.current = null;
-    }
-  }, []);
-
-  const scheduleClose = useCallback(() => {
-    if (flyoutPinnedRef.current) {
-      return;
-    }
-    cancelClose();
-    closeTimeout.current = setTimeout(() => {
-      setFlyoutOpen(false);
-    }, 150);
-  }, [cancelClose]);
 
   const workflowId =
     typeof params.workflowId === "string" ? params.workflowId : undefined;
   const isHubPage = pathname === "/hub";
+
+  const expanded = navState.state.sidebar;
+  const setExpanded = navState.setSidebar;
 
   const handleResizeStart = useCallback(
     (e: React.MouseEvent) => {
@@ -449,66 +415,73 @@ export function NavigationSidebar(): React.ReactNode {
       document.body.style.cursor = "col-resize";
       document.body.style.userSelect = "none";
     },
-    [expanded]
+    [expanded, setExpanded]
   );
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: close flyout on navigation
-  useEffect(() => {
-    flyoutPinnedRef.current = false;
-    setFlyoutOpen(false);
-  }, [pathname]);
+  // Escape peels rightmost panel, click outside closes all
+  const anyPanelOpen =
+    navState.state.panels.projects !== "closed" ||
+    navState.state.panels.tags !== "closed" ||
+    navState.state.panels.workflows !== "closed";
 
   useEffect(() => {
-    if (!flyoutOpen) {
+    if (!anyPanelOpen) {
       return;
-    }
-
-    function handleMouseDown(e: MouseEvent): void {
-      const target = e.target as HTMLElement;
-      if (
-        sidebarRef.current?.contains(target) ||
-        target.closest("[data-flyout]")
-      ) {
-        return;
-      }
-      flyoutPinnedRef.current = false;
-      setFlyoutOpen(false);
     }
 
     function handleKeyDown(e: KeyboardEvent): void {
       if (e.key === "Escape") {
-        flyoutPinnedRef.current = false;
-        setFlyoutOpen(false);
+        navState.peelRightmost();
       }
     }
 
-    document.addEventListener("mousedown", handleMouseDown);
     document.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.removeEventListener("mousedown", handleMouseDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [flyoutOpen]);
-
-  useEffect(
-    () => () => {
-      if (closeTimeout.current) {
-        clearTimeout(closeTimeout.current);
-      }
-    },
-    []
-  );
+  }, [anyPanelOpen, navState.peelRightmost]);
 
   if (isMobile) {
     return null;
   }
+
+  // Derived data
+  const { byProject, ungrouped } = groupWorkflows(visibleWorkflows);
+  const selectedProjectId = navState.state.selectedProjectId;
+  const selectedTagId = navState.state.selectedTagId;
+  const selectedProject = projects.find((p) => p.id === selectedProjectId);
+  const projectWorkflows = byProject[selectedProjectId ?? ""] ?? [];
+  const projectTagIds = new Set(
+    projectWorkflows.filter((w) => w.tagId).map((w) => w.tagId)
+  );
+  const projectTags = tags.filter((t) => projectTagIds.has(t.id));
+  const untaggedWorkflows = projectWorkflows.filter((w) => !w.tagId);
+  const tagWorkflows = projectWorkflows.filter((w) =>
+    selectedTagId === "__untagged__" ? !w.tagId : w.tagId === selectedTagId
+  );
+
+  // Update tag workflow counts for the project context
+  const projectTagsWithCounts = projectTags.map((t) => ({
+    ...t,
+    workflowCount: projectWorkflows.filter((w) => w.tagId === t.id).length,
+  }));
+
+  const selectedTag =
+    selectedTagId === "__untagged__"
+      ? { name: "Untagged" }
+      : tags.find((t) => t.id === selectedTagId);
+
+  const currentWidth =
+    dragWidth ?? (expanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH);
+  const showLabels = currentWidth >= SNAP_THRESHOLD;
+  const offsets = computePanelOffsets(currentWidth, navState.state.panels);
 
   function isActive(id: string): boolean {
     if (id === "new") {
       return !(workflowId || isHubPage);
     }
     if (id === "workflows") {
-      return flyoutOpen;
+      return navState.state.panels.projects !== "closed";
     }
     if (id === "hub") {
       return isHubPage;
@@ -516,37 +489,51 @@ export function NavigationSidebar(): React.ReactNode {
     return false;
   }
 
-  const currentWidth =
-    dragWidth ?? (expanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH);
-  const showLabels = currentWidth >= SNAP_THRESHOLD;
-
   function handleNavClick(id: string, href: string | null): void {
     if (id === "workflows") {
-      if (flyoutOpen && flyoutPinnedRef.current) {
-        flyoutPinnedRef.current = false;
-        setFlyoutOpen(false);
+      if (navState.state.panels.projects !== "closed") {
+        navState.closeAll();
       } else {
-        flyoutPinnedRef.current = true;
-        cancelClose();
-        setFlyoutOpen(true);
+        navState.setPanelState("projects", "open");
       }
       return;
     }
-    flyoutPinnedRef.current = false;
-    setFlyoutOpen(false);
+    navState.closeAll();
     if (href) {
       router.push(href);
     }
   }
 
-  function handleNavHover(id: string): void {
-    if (id === "workflows") {
-      cancelClose();
-      setFlyoutOpen(true);
-    } else if (flyoutOpen && !flyoutPinnedRef.current) {
-      cancelClose();
-      setFlyoutOpen(false);
+  function handleSelectProject(id: string): void {
+    if (id === selectedProjectId) {
+      // Re-clicking same project toggles tags panel
+      if (navState.state.panels.tags !== "closed") {
+        navState.setPanelState("tags", "closed");
+      } else {
+        navState.setSelectedProject(id);
+        navState.setPanelState("tags", "open");
+      }
+      return;
     }
+    navState.setSelectedProject(id);
+    navState.setSelectedTag(null);
+    navState.setPanelState("tags", "open");
+    navState.setPanelState("workflows", "closed");
+  }
+
+  function handleSelectTag(id: string): void {
+    if (id === selectedTagId) {
+      // Re-clicking same tag toggles workflows panel
+      if (navState.state.panels.workflows !== "closed") {
+        navState.setPanelState("workflows", "closed");
+      } else {
+        navState.setSelectedTag(id);
+        navState.setPanelState("workflows", "open");
+      }
+      return;
+    }
+    navState.setSelectedTag(id);
+    navState.setPanelState("workflows", "open");
   }
 
   function renderNavItem(item: {
@@ -592,7 +579,6 @@ export function NavigationSidebar(): React.ReactNode {
         )}
         key={item.id}
         onClick={() => handleNavClick(item.id, item.href)}
-        onMouseEnter={() => handleNavHover(item.id)}
         type="button"
       >
         <item.icon className="size-4 shrink-0" />
@@ -631,18 +617,11 @@ export function NavigationSidebar(): React.ReactNode {
 
   return (
     <>
-      {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: hover-based flyout dismissal */}
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: hover-based flyout dismissal */}
       <div
         className={cn(
           "pointer-events-auto fixed top-[60px] bottom-0 left-0 z-40 flex flex-col bg-background",
           dragWidth === null && "transition-[width] duration-200 ease-out"
         )}
-        onMouseLeave={() => {
-          if (flyoutOpen) {
-            scheduleClose();
-          }
-        }}
         ref={sidebarRef}
         style={{ width: currentWidth }}
       >
@@ -666,7 +645,7 @@ export function NavigationSidebar(): React.ReactNode {
               className="absolute top-1/2 right-0 flex size-6 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border bg-background opacity-0 shadow-sm transition-opacity hover:bg-muted group-hover:opacity-100"
               onClick={(e) => {
                 e.stopPropagation();
-                setExpanded((prev) => !prev);
+                setExpanded(!expanded);
               }}
               onMouseDown={(e) => e.stopPropagation()}
               type="button"
@@ -681,18 +660,76 @@ export function NavigationSidebar(): React.ReactNode {
         </div>
       </div>
 
-      {/* Workflows flyout panel */}
-      {flyoutOpen && (
-        <WorkflowsFlyout
+      {/* Panel 1: Projects */}
+      <FlyoutPanel
+        collapsedLabel="Projects"
+        leftOffset={offsets.projects}
+        onCollapse={() => navState.setPanelState("projects", "collapsed")}
+        onExpand={() => navState.setPanelState("projects", "open")}
+        state={navState.state.panels.projects}
+        title="All Workflows"
+      >
+        <ProjectsPanel
           activeWorkflowId={workflowId}
-          cancelClose={cancelClose}
+          byProject={byProject}
           loading={dataLoading}
+          onSelectProject={handleSelectProject}
           projects={projects}
-          scheduleClose={scheduleClose}
-          sidebarWidth={currentWidth}
-          tags={tags}
-          workflows={visibleWorkflows}
+          selectedProjectId={selectedProjectId}
+          ungrouped={ungrouped}
         />
+      </FlyoutPanel>
+
+      {/* Panel 2: Tags */}
+      <FlyoutPanel
+        collapsedLabel={selectedProject?.name}
+        leftOffset={offsets.tags}
+        onCollapse={() => navState.setPanelState("tags", "collapsed")}
+        onExpand={() => navState.setPanelState("tags", "open")}
+        state={navState.state.panels.tags}
+        title={selectedProject?.name ?? "Tags"}
+      >
+        <TagsPanel
+          hasUntagged={untaggedWorkflows.length > 0}
+          loading={dataLoading}
+          onSelectTag={handleSelectTag}
+          projectTags={projectTagsWithCounts}
+          selectedTagId={selectedTagId}
+        />
+      </FlyoutPanel>
+
+      {/* Panel 3: Workflows */}
+      <FlyoutPanel
+        collapsedLabel={selectedTag?.name}
+        leftOffset={offsets.workflows}
+        onCollapse={() => navState.setPanelState("workflows", "collapsed")}
+        onExpand={() => navState.setPanelState("workflows", "open")}
+        state={navState.state.panels.workflows}
+        title={selectedTag?.name ?? "Workflows"}
+      >
+        <WorkflowsPanel
+          activeWorkflowId={workflowId}
+          loading={dataLoading}
+          workflows={tagWorkflows}
+        />
+      </FlyoutPanel>
+
+      {/* Close-all button outside the rightmost panel */}
+      {anyPanelOpen && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              className="pointer-events-auto fixed top-[68px] z-40 flex size-6 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm transition-[left] duration-200 ease-out hover:bg-muted hover:text-foreground"
+              data-flyout
+              onClick={navState.closeAll}
+              style={{ left: offsets.rightEdge + 6 }}
+              type="button"
+            >
+              <X className="size-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">Close menu</TooltipContent>
+        </Tooltip>
       )}
     </>
   );
