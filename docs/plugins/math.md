@@ -69,7 +69,11 @@ Applied to the aggregated result. Useful for unit conversions, thresholds, and f
 **Array from Upstream Node** -- reference a JSON array from an upstream node (e.g., loop output, database query rows) and optionally specify a dot-path to the numeric field within each element.
 
 - `arrayInput`: The array data, e.g., `{{@loop:For Each.results}}`
-- `fieldPath`: Dot-path to the numeric value in each element, e.g., `balance.amount`
+- `fieldPath`: Property to extract from each array item (supports dot notation for nested objects). Examples:
+  - `[{balance: "100"}, {balance: "200"}]` -- use `balance`
+  - `[{token: {amount: 50}}]` -- use `token.amount`
+  - `[{result: {value: "3"}}]` -- use `result.value`
+  - `[1, 2, 3]` -- leave empty (items are plain values)
 
 ### Inputs
 
