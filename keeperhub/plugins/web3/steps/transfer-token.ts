@@ -2,6 +2,7 @@ import "server-only";
 
 import { and, eq, inArray } from "drizzle-orm";
 import { ethers } from "ethers";
+import { ErrorCategory, logUserError } from "@/keeperhub/lib/logging";
 import {
   getOrganizationWalletAddress,
   initializeParaSigner,
@@ -196,7 +197,15 @@ async function stepHandler(
     chainId = getChainIdFromNetwork(network);
     console.log("[Transfer Token] Resolved chain ID:", chainId);
   } catch (error) {
-    console.error("[Transfer Token] Failed to resolve network:", error);
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Transfer Token] Failed to resolve network",
+      error,
+      {
+        plugin_name: "web3",
+        action_name: "transfer-token",
+      }
+    );
     return {
       success: false,
       error: getErrorMessage(error),
@@ -244,7 +253,16 @@ async function stepHandler(
   try {
     organizationId = await getOrganizationIdFromExecution(_context.executionId);
   } catch (error) {
-    console.error("[Transfer Token] Failed to get organization ID:", error);
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Transfer Token] Failed to get organization ID",
+      error,
+      {
+        plugin_name: "web3",
+        action_name: "transfer-token",
+        chain_id: String(chainId),
+      }
+    );
     return {
       success: false,
       error: `Failed to get organization ID: ${getErrorMessage(error)}`,
@@ -264,7 +282,16 @@ async function stepHandler(
     }
     userId = execution.userId;
   } catch (error) {
-    console.error("[Transfer Token] Failed to get user ID:", error);
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Transfer Token] Failed to get user ID",
+      error,
+      {
+        plugin_name: "web3",
+        action_name: "transfer-token",
+        chain_id: String(chainId),
+      }
+    );
     return {
       success: false,
       error: `Failed to get user ID: ${getErrorMessage(error)}`,
@@ -287,7 +314,16 @@ async function stepHandler(
       rpcConfig.source
     );
   } catch (error) {
-    console.error("[Transfer Token] Failed to resolve RPC config:", error);
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Transfer Token] Failed to resolve RPC config",
+      error,
+      {
+        plugin_name: "web3",
+        action_name: "transfer-token",
+        chain_id: String(chainId),
+      }
+    );
     return {
       success: false,
       error: getErrorMessage(error),
@@ -488,7 +524,16 @@ async function stepHandler(
         recipient: recipientAddress,
       };
     } catch (error) {
-      console.error("[Transfer Token] Transaction failed:", error);
+      logUserError(
+        ErrorCategory.TRANSACTION,
+        "[Transfer Token] Transaction failed",
+        error,
+        {
+          plugin_name: "web3",
+          action_name: "transfer-token",
+          chain_id: String(chainId),
+        }
+      );
       return {
         success: false,
         error: `Token transfer failed: ${getErrorMessage(error)}`,

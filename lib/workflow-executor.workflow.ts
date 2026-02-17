@@ -10,6 +10,11 @@ import {
   getBuiltinVariables,
 } from "@/keeperhub/lib/builtin-variables";
 import {
+  ErrorCategory,
+  logSystemError,
+  logUserError,
+} from "@/keeperhub/lib/logging";
+import {
   getMetricsCollector,
   LabelKeys,
   MetricNames,
@@ -258,9 +263,15 @@ export function evaluateConditionExpression(
       ) {
         throw error;
       }
-      // Other errors (syntax errors, etc.) should still fail loudly
-      console.error("[Condition] Failed to evaluate condition:", error);
-      console.error("[Condition] Expression was:", conditionExpression);
+      // Other errors (syntax errors, etc.) are user input errors - log as WARN not ERROR
+      logUserError(
+        ErrorCategory.VALIDATION,
+        "[Condition] Failed to evaluate user expression:",
+        error,
+        {
+          expression: conditionExpression,
+        }
+      );
       throw new Error(
         `Failed to evaluate condition expression: ${error instanceof Error ? error.message : String(error)}`
       );
@@ -673,6 +684,7 @@ function findOutputByLabelFallback(
 /**
  * Main workflow executor function
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Core workflow engine function requires comprehensive logic
 export async function executeWorkflow(input: WorkflowExecutionInput) {
   "use workflow";
 
@@ -826,9 +838,14 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
               mockData
             );
           } catch (error) {
-            console.error(
+            logUserError(
+              ErrorCategory.VALIDATION,
               "[Workflow Executor] Failed to parse webhook mock request:",
-              error
+              error,
+              {
+                ...(workflowId ? { workflow_id: workflowId } : {}),
+                ...(executionId ? { execution_id: executionId } : {}),
+              }
             );
           }
         } else if (triggerInput && Object.keys(triggerInput).length > 0) {
@@ -1039,7 +1056,16 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
         }
       }
     } catch (error) {
-      console.error("[Workflow Executor] Error executing node:", nodeId, error);
+      logSystemError(
+        ErrorCategory.WORKFLOW_ENGINE,
+        "[Workflow Executor] Error executing node:",
+        error,
+        {
+          ...(workflowId ? { workflow_id: workflowId } : {}),
+          ...(executionId ? { execution_id: executionId } : {}),
+          node_id: nodeId,
+        }
+      );
       const errorMessage = await getErrorMessageAsync(error);
       const errorResult = {
         success: false,
@@ -1104,9 +1130,14 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
         });
         console.log("[Workflow Executor] Updated execution record");
       } catch (error) {
-        console.error(
+        logSystemError(
+          ErrorCategory.DATABASE,
           "[Workflow Executor] Failed to update execution record:",
-          error
+          error,
+          {
+            ...(workflowId ? { workflow_id: workflowId } : {}),
+            ...(executionId ? { execution_id: executionId } : {}),
+          }
         );
       }
     }
@@ -1117,9 +1148,14 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
       outputs,
     };
   } catch (error) {
-    console.error(
+    logSystemError(
+      ErrorCategory.WORKFLOW_ENGINE,
       "[Workflow Executor] Fatal error during workflow execution:",
-      error
+      error,
+      {
+        ...(workflowId ? { workflow_id: workflowId } : {}),
+        ...(executionId ? { execution_id: executionId } : {}),
+      }
     );
 
     const errorMessage = await getErrorMessageAsync(error);
@@ -1149,7 +1185,15 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
           },
         });
       } catch (logError) {
-        console.error("[Workflow Executor] Failed to log error:", logError);
+        logSystemError(
+          ErrorCategory.INFRASTRUCTURE,
+          "[Workflow Executor] Failed to log error:",
+          logError,
+          {
+            ...(workflowId ? { workflow_id: workflowId } : {}),
+            ...(executionId ? { execution_id: executionId } : {}),
+          }
+        );
       }
     }
 

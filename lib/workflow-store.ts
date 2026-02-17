@@ -125,7 +125,7 @@ export const autosaveAtom = atom(
         // Clear the unsaved changes indicator after successful save
         set(hasUnsavedChangesAtom, false);
       } catch (error) {
-        console.error("Autosave failed:", error);
+        console.warn("Autosave failed:", error);
       }
     };
 
