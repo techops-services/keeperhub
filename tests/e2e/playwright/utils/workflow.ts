@@ -337,4 +337,3 @@ export async function copyWebhookUrl(page: Page): Promise<string> {
 
   return url;
 }
-
