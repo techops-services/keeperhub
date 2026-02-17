@@ -134,55 +134,53 @@ export default function HubPage() {
       className="pointer-events-auto fixed inset-0 overflow-y-auto bg-sidebar [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       ref={scrollContainerRef}
     >
-      <div className="container relative mx-auto px-4 py-4 pt-28 pb-12">
-        {/* start custom KeeperHub code */}
+      {/* start custom KeeperHub code */}
+      <div className="md:ml-[60px]">
         {isLoading ? (
-          <p className="text-muted-foreground">Loading workflows...</p>
+          <div className="px-4 pt-28 pb-12">
+            <p className="text-muted-foreground">Loading workflows...</p>
+          </div>
         ) : (
           <>
-            <HubHero />
+            <div className="container mx-auto px-4 pt-28">
+              <HubHero />
+            </div>
 
-            <div className="relative right-1/2 left-1/2 -mr-[50vw] -ml-[50vw] w-screen bg-sidebar">
-              <div className="bg-white/[0.03] py-12">
-                <div className="container mx-auto px-4">
-                  <FeaturedCarousel workflows={featuredWorkflows} />
-                </div>
+            <div className="bg-white/[0.03] py-12">
+              <div className="container mx-auto px-4">
+                <FeaturedCarousel workflows={featuredWorkflows} />
               </div>
             </div>
 
-            <div className="relative right-1/2 left-1/2 -mr-[50vw] -ml-[50vw] w-screen">
-              <div className="bg-sidebar px-4 pt-8 pb-12">
-                <div className="container mx-auto">
-                  <h2 className="mb-8 font-bold text-2xl">
-                    Community Workflows
-                  </h2>
-                </div>
-                <div className="container mx-auto grid grid-cols-[1fr_3fr] items-start gap-8">
-                  <div className="sticky top-28">
-                    <WorkflowSearchFilter
-                      onSearchChange={setSearchQuery}
-                      onTagToggle={handleToggleTag}
-                      onTriggerChange={setSelectedTrigger}
-                      publicTags={publicTags}
-                      searchQuery={searchQuery}
-                      selectedTagSlugs={selectedTagSlugs}
-                      selectedTrigger={selectedTrigger}
-                      triggers={triggers}
-                    />
-                  </div>
-
-                  <HubResults
-                    communityWorkflows={communityWorkflows}
-                    isSearchActive={isSearchActive}
-                    searchResults={searchResults}
+            <div className="bg-sidebar px-4 pt-8 pb-12">
+              <div className="container mx-auto">
+                <h2 className="mb-8 font-bold text-2xl">Community Workflows</h2>
+              </div>
+              <div className="container mx-auto grid grid-cols-[1fr_3fr] items-start gap-8">
+                <div className="sticky top-28">
+                  <WorkflowSearchFilter
+                    onSearchChange={setSearchQuery}
+                    onTagToggle={handleToggleTag}
+                    onTriggerChange={setSelectedTrigger}
+                    publicTags={publicTags}
+                    searchQuery={searchQuery}
+                    selectedTagSlugs={selectedTagSlugs}
+                    selectedTrigger={selectedTrigger}
+                    triggers={triggers}
                   />
                 </div>
+
+                <HubResults
+                  communityWorkflows={communityWorkflows}
+                  isSearchActive={isSearchActive}
+                  searchResults={searchResults}
+                />
               </div>
             </div>
           </>
         )}
-        {/* end custom KeeperHub code */}
       </div>
+      {/* end custom KeeperHub code */}
     </div>
   );
 }
