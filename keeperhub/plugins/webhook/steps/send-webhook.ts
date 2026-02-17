@@ -1,5 +1,6 @@
 import "server-only";
 
+import { ErrorCategory, logUserError } from "@/keeperhub/lib/logging";
 import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 import { getErrorMessage } from "@/lib/utils";
@@ -28,7 +29,15 @@ function parseJsonSafely(jsonString: string | undefined): unknown {
   try {
     return JSON.parse(jsonString);
   } catch (error) {
-    console.error("[Webhook] Failed to parse JSON:", error);
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Webhook] Failed to parse JSON:",
+      error,
+      {
+        plugin_name: "webhook",
+        action_name: "send-webhook",
+      }
+    );
     return null;
   }
 }
@@ -46,7 +55,15 @@ async function stepHandler(
   const method = input.webhookMethod || "POST";
 
   if (!url) {
-    console.error("[Webhook] No URL provided");
+    logUserError(
+      ErrorCategory.CONFIGURATION,
+      "[Webhook] No URL provided",
+      undefined,
+      {
+        plugin_name: "webhook",
+        action_name: "send-webhook",
+      }
+    );
     return {
       success: false,
       error: "Webhook URL is required",
@@ -57,7 +74,15 @@ async function stepHandler(
   try {
     new URL(url);
   } catch {
-    console.error("[Webhook] Invalid URL format");
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Webhook] Invalid URL format",
+      url,
+      {
+        plugin_name: "webhook",
+        action_name: "send-webhook",
+      }
+    );
     return {
       success: false,
       error: "Invalid webhook URL format",
@@ -122,7 +147,16 @@ async function stepHandler(
     }
 
     if (!response.ok) {
-      console.error("[Webhook] API error:", response.status, responseData);
+      logUserError(
+        ErrorCategory.EXTERNAL_SERVICE,
+        "[Webhook] API error:",
+        { status: response.status, responseData },
+        {
+          plugin_name: "webhook",
+          action_name: "send-webhook",
+          service: "webhook",
+        }
+      );
       return {
         success: false,
         error: `HTTP ${response.status}: ${typeof responseData === "string" ? responseData : JSON.stringify(responseData)}`,
@@ -137,7 +171,16 @@ async function stepHandler(
       response: responseData,
     };
   } catch (error) {
-    console.error("[Webhook] Error sending webhook:", error);
+    logUserError(
+      ErrorCategory.EXTERNAL_SERVICE,
+      "[Webhook] Error sending webhook:",
+      error,
+      {
+        plugin_name: "webhook",
+        action_name: "send-webhook",
+        service: "webhook",
+      }
+    );
     return {
       success: false,
       error: `Failed to send webhook: ${getErrorMessage(error)}`,

@@ -11,7 +11,7 @@ on:
       days_back:
         description: 'Number of days to look back for code changes'
         required: false
-        default: '30'
+        default: '14'
         type: string
 
 permissions:
@@ -59,9 +59,12 @@ jobs:
           echo "Latest release: $RELEASE_TAG"
           echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
 
+          # Exclusion pattern for non-doc-relevant files
+          EXCLUDE_PATTERN='(og/|metrics/|internal/|db/|test-connection|extensions\.tsx)'
+
           if [ -z "$PREV_TAG" ]; then
             echo "No previous tag found. Scanning all files in release tag."
-            CHANGED_FILES=$(git ls-tree -r --name-only "$RELEASE_TAG" -- \
+            RAW_FILES=$(git ls-tree -r --name-only "$RELEASE_TAG" -- \
               'keeperhub/plugins/' \
               'keeperhub/api/' \
               'keeperhub/lib/' \
@@ -70,11 +73,11 @@ jobs:
               'app/api/' \
               | grep -E '\.(ts|tsx|js|jsx)$' \
               | grep -vE '\.(test|spec|stories)\.' \
-              | head -100 \
+              | grep -vE "$EXCLUDE_PATTERN" \
               || true)
           else
             echo "Previous release: $PREV_TAG"
-            CHANGED_FILES=$(git diff --name-only "$PREV_TAG".."$RELEASE_TAG" -- \
+            RAW_FILES=$(git diff --name-only "$PREV_TAG".."$RELEASE_TAG" -- \
               'keeperhub/plugins/' \
               'keeperhub/api/' \
               'keeperhub/lib/' \
@@ -83,19 +86,43 @@ jobs:
               'app/api/' \
               | grep -E '\.(ts|tsx|js|jsx)$' \
               | grep -vE '\.(test|spec|stories)\.' \
-              | head -100 \
+              | grep -vE "$EXCLUDE_PATTERN" \
               || true)
           fi
+
+          # Deduplicate: if keeperhub/ version exists, drop the app/ or lib/ mirror
+          CHANGED_FILES=""
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            MIRROR=""
+            case "$f" in
+              app/api/*) MIRROR="keeperhub/api/${f#app/api/}" ;;
+              lib/*) MIRROR="keeperhub/lib/${f#lib/}" ;;
+              plugins/*) MIRROR="keeperhub/plugins/${f#plugins/}" ;;
+            esac
+            if [ -n "$MIRROR" ] && echo "$RAW_FILES" | grep -qF "$MIRROR"; then
+              echo "Skipping mirror: $f (keeperhub version exists)"
+              continue
+            fi
+            CHANGED_FILES="${CHANGED_FILES}${f}"$'\n'
+          done <<< "$RAW_FILES"
+
+          # Trim trailing newline and cap at 40 files, prioritizing plugins > api > lib
+          CHANGED_FILES=$(echo "$CHANGED_FILES" | sed '/^$/d' \
+            | awk '
+              /plugins\// { print 1, $0; next }
+              /api\//     { print 2, $0; next }
+                          { print 3, $0 }
+            ' | sort -k1,1n -k2 | cut -d' ' -f2- | head -40)
 
           if [ -z "$CHANGED_FILES" ]; then
             echo "No relevant code changes detected between tags."
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
           else
             FILE_COUNT=$(echo "$CHANGED_FILES" | wc -l | tr -d ' ')
-            echo "Found $FILE_COUNT changed files."
+            echo "Found $FILE_COUNT changed files (after filtering)."
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
 
-            # Save file list to output using heredoc
             echo "changed_files<<CHANGED_FILES_EOF" >> "$GITHUB_OUTPUT"
             echo "$CHANGED_FILES" >> "$GITHUB_OUTPUT"
             echo "CHANGED_FILES_EOF" >> "$GITHUB_OUTPUT"
@@ -122,7 +149,10 @@ jobs:
           RELEASE_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || echo "manual-sync")
           echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
 
-          CHANGED_FILES=$(git log --since="${DAYS_BACK} days ago" --name-only --pretty=format: -- \
+          # Exclusion pattern for non-doc-relevant files
+          EXCLUDE_PATTERN='(og/|metrics/|internal/|db/|test-connection|extensions\.tsx)'
+
+          RAW_FILES=$(git log --since="${DAYS_BACK} days ago" --name-only --pretty=format: -- \
             'keeperhub/plugins/' \
             'keeperhub/api/' \
             'keeperhub/lib/' \
@@ -132,15 +162,40 @@ jobs:
             | sort -u \
             | grep -E '\.(ts|tsx|js|jsx)$' \
             | grep -vE '\.(test|spec|stories)\.' \
-            | head -100 \
+            | grep -vE "$EXCLUDE_PATTERN" \
             || true)
+
+          # Deduplicate: if keeperhub/ version exists, drop the app/ or lib/ mirror
+          CHANGED_FILES=""
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            MIRROR=""
+            case "$f" in
+              app/api/*) MIRROR="keeperhub/api/${f#app/api/}" ;;
+              lib/*) MIRROR="keeperhub/lib/${f#lib/}" ;;
+              plugins/*) MIRROR="keeperhub/plugins/${f#plugins/}" ;;
+            esac
+            if [ -n "$MIRROR" ] && echo "$RAW_FILES" | grep -qF "$MIRROR"; then
+              echo "Skipping mirror: $f (keeperhub version exists)"
+              continue
+            fi
+            CHANGED_FILES="${CHANGED_FILES}${f}"$'\n'
+          done <<< "$RAW_FILES"
+
+          # Trim trailing newline and cap at 40 files, prioritizing plugins > api > lib
+          CHANGED_FILES=$(echo "$CHANGED_FILES" | sed '/^$/d' \
+            | awk '
+              /plugins\// { print 1, $0; next }
+              /api\//     { print 2, $0; next }
+                          { print 3, $0 }
+            ' | sort -k1,1n -k2 | cut -d' ' -f2- | head -40)
 
           if [ -z "$CHANGED_FILES" ]; then
             echo "No relevant code changes in the last $DAYS_BACK days."
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
           else
             FILE_COUNT=$(echo "$CHANGED_FILES" | wc -l | tr -d ' ')
-            echo "Found $FILE_COUNT changed files."
+            echo "Found $FILE_COUNT changed files (after filtering)."
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
 
             echo "changed_files<<CHANGED_FILES_EOF" >> "$GITHUB_OUTPUT"
@@ -175,49 +230,87 @@ jobs:
 
           if [ -z "$CHANGED_FILES" ]; then
             echo "No changed files to diff."
-            echo "diff_content=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          # Generate compact diffs for each changed file
-          # This saves Claude from spending turns reading files individually
-          DIFF_OUTPUT=""
+          # For release trigger, find the base commit from the previous tag
+          # For manual trigger, find the oldest commit in the lookback window
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            PREV_TAG=$(gh release list --limit 2 --json tagName --jq '.[1].tagName' 2>/dev/null || echo "")
+            CURRENT_TAG="${{ steps.tag.outputs.release_tag }}"
+            if [ -n "$PREV_TAG" ]; then
+              BASE_REF="$PREV_TAG"
+              HEAD_REF="$CURRENT_TAG"
+            else
+              BASE_REF=$(git rev-list --max-parents=0 HEAD | head -1)
+              HEAD_REF="$CURRENT_TAG"
+            fi
+          else
+            DAYS_BACK="${{ github.event.inputs.days_back || '30' }}"
+            BASE_REF=$(git log --since="${DAYS_BACK} days ago" --format=%H -- | tail -1)
+            HEAD_REF="HEAD"
+            # Fallback if no commits found in range
+            if [ -z "$BASE_REF" ]; then
+              BASE_REF=$(git rev-list --max-parents=0 HEAD | head -1)
+            fi
+          fi
+
+          echo "Diffing: $BASE_REF..$HEAD_REF"
+
+          # Generate compact, unified diffs (single pass, not per-commit)
+          # Cap each file at 60 lines and total output at 3000 lines
           FILE_COUNT=0
+          TOTAL_LINES=0
+          MAX_LINES_PER_FILE=60
+          MAX_TOTAL_LINES=3000
+
+          > /tmp/file-diffs.txt
 
           while IFS= read -r file; do
             [ -z "$file" ] && continue
             FILE_COUNT=$((FILE_COUNT + 1))
 
-            # Get the diff between the two most recent tags, or show the file if new
-            if [ "${{ github.event_name }}" = "workflow_run" ]; then
-              PREV_TAG=$(gh release list --limit 2 --json tagName --jq '.[1].tagName' 2>/dev/null || echo "")
-              CURRENT_TAG="${{ steps.tag.outputs.release_tag }}"
-              if [ -n "$PREV_TAG" ]; then
-                FILE_DIFF=$(git diff "$PREV_TAG".."$CURRENT_TAG" -- "$file" 2>/dev/null | head -80 || echo "(binary or unavailable)")
-              else
-                FILE_DIFF=$(git show "$CURRENT_TAG":"$file" 2>/dev/null | head -60 || echo "(unavailable)")
-              fi
-            else
-              # For manual trigger, show recent diff
-              FILE_DIFF=$(git log --since="${{ github.event.inputs.days_back || '30' }} days ago" -p -- "$file" 2>/dev/null | head -80 || echo "(unavailable)")
+            if [ "$TOTAL_LINES" -ge "$MAX_TOTAL_LINES" ]; then
+              echo "=== TRUNCATED: reached ${MAX_TOTAL_LINES} total diff lines ===" >> /tmp/file-diffs.txt
+              break
             fi
 
-            DIFF_OUTPUT="${DIFF_OUTPUT}
-          === ${file} ===
-          ${FILE_DIFF}
-          "
+            echo "=== ${file} ===" >> /tmp/file-diffs.txt
+
+            FILE_DIFF=$(git diff "$BASE_REF".."$HEAD_REF" -- "$file" 2>/dev/null | head -"$MAX_LINES_PER_FILE" || echo "(unavailable)")
+
+            if [ -z "$FILE_DIFF" ]; then
+              echo "(no diff available - file may be new)" >> /tmp/file-diffs.txt
+              # Show first 40 lines of new files
+              git show "$HEAD_REF":"$file" 2>/dev/null | head -40 >> /tmp/file-diffs.txt || true
+            else
+              echo "$FILE_DIFF" >> /tmp/file-diffs.txt
+            fi
+
+            echo "" >> /tmp/file-diffs.txt
+            DIFF_LINES=$(echo "$FILE_DIFF" | wc -l | tr -d ' ')
+            TOTAL_LINES=$((TOTAL_LINES + DIFF_LINES))
           done <<< "$CHANGED_FILES"
 
-          echo "Prepared diffs for $FILE_COUNT files."
+          echo "Prepared diffs for $FILE_COUNT files ($TOTAL_LINES total lines)."
 
-          # Write to a temp file to avoid GitHub output size limits
-          echo "$DIFF_OUTPUT" > /tmp/file-diffs.txt
-
-          # Also prepare the docs directory listing
-          DOCS_LISTING=$(find docs -name "*.md" -o -name "_meta.json" | sort)
-          echo "$DOCS_LISTING" > /tmp/docs-listing.txt
+          # Prepare the docs directory listing
+          find docs -name "*.md" -o -name "_meta.json" | sort > /tmp/docs-listing.txt
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create docs branch
+        if: steps.tag.outputs.release_tag != ''
+        id: branch
+        run: |
+          RELEASE_TAG="${{ steps.tag.outputs.release_tag }}"
+          TIMESTAMP=$(date +%s)
+          # Sanitize tag for branch name (replace non-alphanumeric with dash)
+          SAFE_TAG=$(echo "$RELEASE_TAG" | sed 's/[^a-zA-Z0-9.-]/-/g')
+          BRANCH_NAME="docs-sync-${SAFE_TAG}-${TIMESTAMP}"
+          echo "Creating branch: $BRANCH_NAME from staging"
+          git checkout -b "$BRANCH_NAME"
+          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Validate Anthropic API key
         if: steps.tag.outputs.release_tag != ''
@@ -244,10 +337,11 @@ jobs:
         if: steps.tag.outputs.release_tag != ''
         id: claude
         uses: anthropics/claude-code-action@v1
+        env:
+          CLAUDE_BRANCH: ${{ steps.branch.outputs.branch_name }}
+          BASE_BRANCH: staging
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          base_branch: staging
-          branch_prefix: docs-sync-
           prompt: |
             REPO: ${{ github.repository }}
             RELEASE TAG: ${{ steps.tag.outputs.release_tag }}
@@ -262,6 +356,19 @@ jobs:
             changed. Your job is to ensure the documentation in `/docs/` stays accurate and
             in sync with the codebase.
 
+            ## CRITICAL: Turn Budget
+
+            You have a maximum of 75 turns. Manage them carefully:
+            - Turns 1-5: Read pre-loaded context files and docs listing.
+            - Turns 6-40: Analyze changes and search/read relevant docs.
+            - Turns 41-65: Make edits to documentation files.
+            - Turns 66-75: Commit changes (git add + git commit). You MUST commit
+              before turn 70. If you reach turn 50 without finding docs that need
+              updates, immediately state "Documentation is up to date" and stop.
+            - Do NOT spend turns reading source files individually when the diff
+              already provides the information you need.
+            - Maximize parallel tool calls -- read multiple docs pages in one turn.
+
             ## IMPORTANT: Tool Usage
 
             You have access to: Read, Write, Edit, Glob, Grep, and Bash (git/gh commands only).
@@ -273,12 +380,17 @@ jobs:
 
             ## Pre-loaded Context
 
-            The file `/tmp/file-diffs.txt` contains the git diffs for all changed files.
+            The file `/tmp/file-diffs.txt` contains compact unified diffs for all
+            changed files (capped at 60 lines per file, 3000 lines total).
             The file `/tmp/docs-listing.txt` contains the full docs directory listing.
 
             **Start by reading these two files** instead of individually reading each source
             file. This saves significant time. Only read individual source files if you need
             more context than the diff provides.
+
+            NOTE: Internal/non-user-facing files (OG images, metrics, db internals,
+            internal APIs) have already been filtered out. All files in the list are
+            potentially docs-relevant.
 
             ## Documentation Infrastructure
 
@@ -314,7 +426,6 @@ jobs:
             1. Read `/tmp/file-diffs.txt` and `/tmp/docs-listing.txt` first.
                Analyze the diffs to understand what changed. Focus on: API endpoint changes,
                plugin interface changes, configuration changes, new features, removed features.
-               Skip internal files (OG images, metrics, internal APIs) - they don't need docs.
 
             2. For each meaningful user-facing change, search the `/docs/` directory for
                related documentation pages. Check:
@@ -351,36 +462,67 @@ jobs:
                are needed (the docs are already accurate), report that finding and do not
                create a PR. Simply state: "Documentation is up to date. No changes needed."
 
-            7. If you do make changes, commit them to the branch. The CI system will
-               automatically create a pull request from your commits. Use a commit message
-               format like: "docs: sync documentation with ${{ steps.tag.outputs.release_tag }}"
+            7. If you do make changes, commit them to the current branch. Use a commit
+               message format like: "docs: sync documentation with ${{ steps.tag.outputs.release_tag }}"
                and include a summary of what was updated and why in the commit body.
+               The CI system will push the branch and create a PR automatically after you commit.
           claude_args: |
             --model claude-sonnet-4-5-20250929
-            --max-turns 50
+            --max-turns 75
             --allowedTools "Read,Write,Edit,Glob,Grep,Bash(git:*),Bash(gh:*)"
 
+      - name: Push branch and create PR
+        if: steps.claude.outcome == 'success' && steps.branch.outputs.branch_name != ''
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="${{ steps.branch.outputs.branch_name }}"
+          RELEASE_TAG="${{ steps.tag.outputs.release_tag }}"
+
+          # Check if Claude made any commits on this branch beyond staging
+          COMMIT_COUNT=$(git rev-list staging.."$BRANCH" --count 2>/dev/null || echo "0")
+
+          if [ "$COMMIT_COUNT" = "0" ]; then
+            echo "No commits made by Claude. Documentation is up to date."
+            echo "has_pr=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Found $COMMIT_COUNT new commit(s). Pushing branch and creating PR."
+
+          # Re-set remote URL with token (claude-code-action reconfigures git auth)
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          git push origin "$BRANCH"
+
+          BODY="Automated documentation sync triggered by release/manual workflow."
+          BODY="${BODY}"$'\n\n'"This PR was generated by Claude Code to keep docs in sync with code changes."
+          BODY="${BODY}"$'\n'"Please review the changes and merge if they look correct."
+
+          PR_URL=$(gh pr create \
+            --base staging \
+            --head "$BRANCH" \
+            --title "docs: sync documentation with ${RELEASE_TAG}" \
+            --body "$BODY")
+
+          echo "Created PR: $PR_URL"
+          PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+          echo "has_pr=true" >> "$GITHUB_OUTPUT"
+
       - name: Notify Discord on docs update
-        if: steps.claude.outcome == 'success' && steps.claude.outputs.branch_name != ''
+        if: steps.pr.outputs.has_pr == 'true'
         continue-on-error: true
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           RELEASE_TAG="${{ steps.tag.outputs.release_tag }}"
-          BRANCH="${{ steps.claude.outputs.branch_name }}"
+          PR_URL="${{ steps.pr.outputs.pr_url }}"
+          PR_NUMBER="${{ steps.pr.outputs.pr_number }}"
 
-          # Find the PR created from this branch
-          PR_JSON=$(gh pr list --head "$BRANCH" --state open --json number,title,body --limit 1)
-          PR_NUMBER=$(echo "$PR_JSON" | jq -r '.[0].number // empty')
-
-          if [ -z "$PR_NUMBER" ]; then
-            echo "No docs PR found. Skipping notification."
-            exit 0
-          fi
-
-          PR_URL="https://github.com/${{ github.repository }}/pull/$PR_NUMBER"
-          PR_BODY=$(echo "$PR_JSON" | jq -r '.[0].body // ""' | head -c 1500)
+          PR_BODY=$(gh pr view "$PR_NUMBER" --json body --jq '.body' 2>/dev/null | head -c 1500 || echo "")
 
           # Build message safely with jq
           MESSAGE=$(jq -n \

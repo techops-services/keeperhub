@@ -16,6 +16,15 @@ import Image from "next/image";
 import type { JSX } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toChecksumAddress } from "@/keeperhub/lib/address-utils";
+// start custom keeperhub code //
+import {
+  FOR_EACH_GROUP_TYPE,
+  buildChildLogsLookup,
+  groupLogsByIteration,
+  type ChildLogsLookup,
+  type IterationGroup,
+} from "@/keeperhub/lib/iteration-grouping";
+// end keeperhub code //
 import { api } from "@/lib/api-client";
 import {
   OUTPUT_DISPLAY_CONFIGS,
@@ -43,6 +52,10 @@ type ExecutionLog = {
   input?: unknown;
   output?: unknown;
   error: string | null;
+  // start custom keeperhub code //
+  iterationIndex: number | null;
+  forEachNodeId: string | null;
+  // end keeperhub code //
 };
 
 type WorkflowExecution = {
@@ -100,7 +113,10 @@ function isBase64ImageOutput(output: unknown): output is { base64: string } {
   );
 }
 
-// Helper to convert execution logs to a map by nodeId for the global atom
+// Helper to convert execution logs to a map by nodeId for the global atom.
+// For nodes that appear multiple times (e.g., For Each body nodes),
+// this intentionally keeps only the last entry -- used by template
+// autocomplete which only needs the most recent output.
 function createExecutionLogsMap(logs: ExecutionLog[]): Record<
   string,
   {
@@ -566,6 +582,210 @@ function ExecutionProgress({ execution }: { execution: WorkflowExecution }) {
   );
 }
 
+// start custom keeperhub code //
+// Types and functions (ExecutionLog, IterationGroup, GroupedLogEntry,
+// buildIterationGroups, groupLogsByIteration) imported from
+// @/keeperhub/lib/iteration-grouping
+
+/** Sum the duration (ms) of all logs in an iteration. */
+function computeIterationDuration(
+  logs: Array<{ duration: string | null }>
+): number {
+  let total = 0;
+  for (const log of logs) {
+    if (log.duration) {
+      total += Number.parseInt(log.duration, 10);
+    }
+  }
+  return total;
+}
+
+/** Expand/collapse button for a single iteration with duration and error indicator. */
+function IterationHeader({
+  iterationIndex,
+  isExpanded,
+  hasError,
+  durationMs,
+  onToggle,
+}: {
+  iterationIndex: number;
+  isExpanded: boolean;
+  hasError: boolean;
+  durationMs: number;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      className="group flex w-full items-center gap-2 rounded-lg py-1.5 text-left transition-colors hover:bg-muted/50"
+      onClick={onToggle}
+      type="button"
+    >
+      {isExpanded ? (
+        <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+      ) : (
+        <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+      )}
+      <span className="font-medium text-muted-foreground text-xs">
+        Iteration {iterationIndex + 1}
+      </span>
+      {hasError && (
+        <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+      )}
+      {durationMs > 0 && (
+        <span className="ml-auto shrink-0 font-mono text-muted-foreground text-xs tabular-nums">
+          {durationMs < 1000
+            ? `${durationMs}ms`
+            : `${(durationMs / 1000).toFixed(2)}s`}
+        </span>
+      )}
+    </button>
+  );
+}
+
+/**
+ * Render a For Each node with its iterations grouped and collapsible.
+ */
+function ForEachLogGroup({
+  forEachLog,
+  iterations,
+  collectLog,
+  lookup,
+  expandedLogs,
+  onToggleLog,
+  getStatusIcon,
+  getStatusDotClass,
+  isFirst,
+  isLast,
+}: {
+  forEachLog: ExecutionLog;
+  iterations: IterationGroup<ExecutionLog>[];
+  collectLog: ExecutionLog | null;
+  lookup: ChildLogsLookup<ExecutionLog>;
+  expandedLogs: Set<string>;
+  onToggleLog: (id: string) => void;
+  getStatusIcon: (status: string) => JSX.Element;
+  getStatusDotClass: (status: string) => string;
+  isFirst: boolean;
+  isLast: boolean;
+}) {
+  const [expandedIterations, setExpandedIterations] = useState<Set<number>>(
+    new Set()
+  );
+
+  const toggleIteration = useCallback((index: number) => {
+    setExpandedIterations((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  }, []);
+
+  const hasContent = iterations.length > 0 || collectLog !== null;
+
+  return (
+    <div className="relative">
+      {/* Continuous timeline line from For Each dot through expanded
+          iterations down to Collect (or the group bottom). Without this,
+          the line breaks because expanded content sits between two
+          ExecutionLogEntry siblings whose internal lines don't span
+          across intervening DOM nodes. */}
+      {hasContent && (!isLast || collectLog !== null) && (
+        <div
+          className="absolute w-px bg-border"
+          style={{ left: "9px", top: "calc(0.5rem + 1.25rem)", bottom: 0 }}
+        />
+      )}
+      <ExecutionLogEntry
+        getStatusDotClass={getStatusDotClass}
+        getStatusIcon={getStatusIcon}
+        isExpanded={expandedLogs.has(forEachLog.id)}
+        isFirst={isFirst}
+        isLast={isLast && !hasContent}
+        log={forEachLog}
+        onToggle={() => onToggleLog(forEachLog.id)}
+      />
+
+      {expandedLogs.has(forEachLog.id) && (
+        <div className="ml-6 pl-2">
+          {iterations.map((iteration) => {
+            const isIterExpanded = expandedIterations.has(
+              iteration.iterationIndex
+            );
+
+            return (
+              <div key={iteration.iterationIndex}>
+                <IterationHeader
+                  durationMs={computeIterationDuration(iteration.logs)}
+                  hasError={iteration.logs.some((l) => l.status === "error")}
+                  isExpanded={isIterExpanded}
+                  iterationIndex={iteration.iterationIndex}
+                  onToggle={() => toggleIteration(iteration.iterationIndex)}
+                />
+
+                {isIterExpanded && (
+                  <div className="ml-4 border-border border-l pl-2">
+                    {groupLogsByIteration(iteration.logs, lookup).map(
+                      (subEntry, subIdx, subEntries) => {
+                        if (subEntry.type === FOR_EACH_GROUP_TYPE) {
+                          return (
+                            <ForEachLogGroup
+                              collectLog={subEntry.collectLog}
+                              expandedLogs={expandedLogs}
+                              forEachLog={subEntry.forEachLog}
+                              getStatusDotClass={getStatusDotClass}
+                              getStatusIcon={getStatusIcon}
+                              isFirst={subIdx === 0}
+                              isLast={subIdx === subEntries.length - 1}
+                              iterations={subEntry.iterations}
+                              key={subEntry.forEachLog.id}
+                              lookup={lookup}
+                              onToggleLog={onToggleLog}
+                            />
+                          );
+                        }
+                        return (
+                          <ExecutionLogEntry
+                            getStatusDotClass={getStatusDotClass}
+                            getStatusIcon={getStatusIcon}
+                            isExpanded={expandedLogs.has(subEntry.log.id)}
+                            isFirst={subIdx === 0}
+                            isLast={subIdx === subEntries.length - 1}
+                            key={subEntry.log.id}
+                            log={subEntry.log}
+                            onToggle={() => onToggleLog(subEntry.log.id)}
+                          />
+                        );
+                      }
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {collectLog && (
+        <ExecutionLogEntry
+          getStatusDotClass={getStatusDotClass}
+          getStatusIcon={getStatusIcon}
+          isExpanded={expandedLogs.has(collectLog.id)}
+          isFirst={false}
+          isLast={isLast}
+          log={collectLog}
+          onToggle={() => onToggleLog(collectLog.id)}
+        />
+      )}
+    </div>
+  );
+}
+
+// end keeperhub code //
+
 // Component for rendering individual execution log entries
 function ExecutionLogEntry({
   log,
@@ -749,6 +969,10 @@ export function WorkflowRuns({
         startedAt: Date;
         completedAt: Date | null;
         duration: string | null;
+        // start custom keeperhub code //
+        iterationIndex?: number | null;
+        forEachNodeId?: string | null;
+        // end keeperhub code //
       }>,
       _workflow?: {
         nodes: unknown;
@@ -766,6 +990,10 @@ export function WorkflowRuns({
         input: log.input,
         output: log.output,
         error: log.error,
+        // start custom keeperhub code //
+        iterationIndex: log.iterationIndex ?? null,
+        forEachNodeId: log.forEachNodeId ?? null,
+        // end keeperhub code //
       })),
     []
   );
@@ -1066,18 +1294,45 @@ export function WorkflowRuns({
                   </div>
                 ) : (
                   <div className="p-4">
-                    {executionLogs.map((log, logIndex) => (
-                      <ExecutionLogEntry
-                        getStatusDotClass={getStatusDotClass}
-                        getStatusIcon={getStatusIcon}
-                        isExpanded={expandedLogs.has(log.id)}
-                        isFirst={logIndex === 0}
-                        isLast={logIndex === executionLogs.length - 1}
-                        key={log.id}
-                        log={log}
-                        onToggle={() => toggleLog(log.id)}
-                      />
-                    ))}
+                    {/* start custom keeperhub code */}
+                    {(() => {
+                      const lookup = buildChildLogsLookup(executionLogs);
+                      const grouped = groupLogsByIteration(executionLogs, lookup);
+                      return grouped.map(
+                        (entry, entryIndex, entries) => {
+                          if (entry.type === FOR_EACH_GROUP_TYPE) {
+                            return (
+                              <ForEachLogGroup
+                                collectLog={entry.collectLog}
+                                expandedLogs={expandedLogs}
+                                forEachLog={entry.forEachLog}
+                                getStatusDotClass={getStatusDotClass}
+                                getStatusIcon={getStatusIcon}
+                                isFirst={entryIndex === 0}
+                                isLast={entryIndex === entries.length - 1}
+                                iterations={entry.iterations}
+                                key={entry.forEachLog.id}
+                                lookup={lookup}
+                                onToggleLog={toggleLog}
+                              />
+                            );
+                          }
+                          return (
+                            <ExecutionLogEntry
+                              getStatusDotClass={getStatusDotClass}
+                              getStatusIcon={getStatusIcon}
+                              isExpanded={expandedLogs.has(entry.log.id)}
+                              isFirst={entryIndex === 0}
+                              isLast={entryIndex === entries.length - 1}
+                              key={entry.log.id}
+                              log={entry.log}
+                              onToggle={() => toggleLog(entry.log.id)}
+                            />
+                          );
+                        }
+                      );
+                    })()}
+                    {/* end keeperhub code */}
                   </div>
                 )}
               </div>

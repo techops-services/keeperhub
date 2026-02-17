@@ -102,11 +102,13 @@ Event (new transaction on monitored contract)
 
 Execute state-changing functions on smart contracts using your Para wallet. Requires a connected wallet.
 
-**Inputs:** Network, Contract Address, ABI (auto-fetched), Function, Function Arguments
+**Inputs:** Network, Contract Address, ABI (auto-fetched), Function, Function Arguments, Gas Limit Multiplier (optional, in Advanced section)
 
 **Outputs:** `success`, `transactionHash`, `result`, `error`
 
 **When to use:** Execute DeFi operations (harvest, compound, rebalance), respond to on-chain events, automate protocol maintenance.
+
+**Gas Configuration:** Optionally set a custom Gas Limit Multiplier in the Advanced section to override the chain default. See [Gas Management](/wallet-management/gas) for details.
 
 ---
 
@@ -114,11 +116,13 @@ Execute state-changing functions on smart contracts using your Para wallet. Requ
 
 Send ETH, MATIC, or other native tokens from your Para wallet to a recipient address.
 
-**Inputs:** Network, Amount (ETH), Recipient Address
+**Inputs:** Network, Amount (ETH), Recipient Address, Gas Limit Multiplier (optional, in Advanced section)
 
 **Outputs:** `success`, `transactionHash`, `error`
 
 **When to use:** Refill bot wallets, distribute funds, automate payroll.
+
+**Gas Configuration:** Optionally set a custom Gas Limit Multiplier in the Advanced section to override the chain default. See [Gas Management](/wallet-management/gas) for details.
 
 ---
 
@@ -126,11 +130,13 @@ Send ETH, MATIC, or other native tokens from your Para wallet to a recipient add
 
 Send ERC20 tokens from your Para wallet to a recipient address.
 
-**Inputs:** Network, Token, Amount, Recipient Address
+**Inputs:** Network, Token, Amount, Recipient Address, Gas Limit Multiplier (optional, in Advanced section)
 
 **Outputs:** `success`, `transactionHash`, `transactionLink`, `amount`, `symbol`, `recipient`, `error`
 
 **When to use:** Distribute tokens, move funds between wallets, automate token transfers based on conditions.
+
+**Gas Configuration:** Optionally set a custom Gas Limit Multiplier in the Advanced section to override the chain default. See [Gas Management](/wallet-management/gas) for details.
 
 ---
 

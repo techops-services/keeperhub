@@ -9,6 +9,8 @@ import {
   Database,
   EyeOff,
   GitBranch,
+  ListEnd,
+  Repeat,
   XCircle,
   Zap,
 } from "lucide-react";
@@ -18,6 +20,7 @@ import {
   Node,
   NodeDescription,
   NodeTitle,
+  type SourceHandleConfig,
 } from "@/components/ai-elements/node";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -70,12 +73,23 @@ const getModelDisplayName = (modelId: string): string => {
   return modelNames[modelId] || modelId;
 };
 
+// start custom keeperhub code //
+const FOR_EACH_SOURCE_HANDLES: SourceHandleConfig[] = [
+  { id: "done", label: "done", topPercent: 30 },
+  { id: "loop", label: "loop", topPercent: 70 },
+];
+// end keeperhub code //
+
 // System action labels (non-plugin actions)
 const SYSTEM_ACTION_LABELS: Record<string, string> = {
   "HTTP Request": "System",
   "Database Query": "Database",
   Condition: "Condition",
   "Execute Code": "System",
+  // start custom keeperhub code //
+  "For Each": "Loop",
+  Collect: "Loop",
+  // end keeperhub code //
 };
 
 // Helper to get integration name from action type
@@ -137,6 +151,12 @@ const getProviderLogo = (actionType: string) => {
       return <Code className="size-12 text-green-300" strokeWidth={1.5} />;
     case "Condition":
       return <GitBranch className="size-12 text-pink-300" strokeWidth={1.5} />;
+    // start custom keeperhub code //
+    case "For Each":
+      return <Repeat className="size-12 text-purple-300" strokeWidth={1.5} />;
+    case "Collect":
+      return <ListEnd className="size-12 text-purple-300" strokeWidth={1.5} />;
+    // end keeperhub code //
     default:
       // Not a system action, continue to check plugin registry
       break;
@@ -343,6 +363,13 @@ export const ActionNode = memo(({ data, selected, id }: ActionNodeProps) => {
   const aiModel = getAiModel();
   const isDisabled = data.enabled === false;
 
+  // start custom keeperhub code //
+  const isForEach = actionType === "For Each";
+  const handles = isForEach
+    ? { target: true, source: false, sourceHandles: FOR_EACH_SOURCE_HANDLES }
+    : { target: true, source: true };
+  // end keeperhub code //
+
   return (
     <Node
       className={cn(
@@ -351,7 +378,7 @@ export const ActionNode = memo(({ data, selected, id }: ActionNodeProps) => {
         isDisabled && "opacity-50"
       )}
       data-testid={`action-node-${id}`}
-      handles={{ target: true, source: true }}
+      handles={handles}
       nodeId={id}
       status={status}
     >

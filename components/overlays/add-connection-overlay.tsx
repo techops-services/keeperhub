@@ -9,13 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { IntegrationIcon } from "@/components/ui/integration-icon";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   aiGatewayStatusAtom,
@@ -25,7 +18,11 @@ import {
 import { api } from "@/lib/api-client";
 // start keeperhub
 import { useSession } from "@/lib/auth-client";
-import { hasValidDatabaseConfig } from "@/lib/db/connection-utils";
+import {
+  DatabaseConnectionForm,
+  validateDatabaseConfig,
+  type DatabaseTab,
+} from "@/keeperhub/components/database-connection-form";
 import { getCustomIntegrationFormHandler } from "@/lib/extension-registry";
 import { integrationsAtom } from "@/lib/integrations-store";
 // end keeperhub
@@ -324,6 +321,7 @@ export function ConfigureConnectionOverlay({
   const [testing, setTesting] = useState(false);
   const [name, setName] = useState("");
   const [config, setConfig] = useState<Record<string, string>>({});
+  const [dbTab, setDbTab] = useState<DatabaseTab>("url");
   // start keeperhub - derive anonymous state from session reactively
   const { data: session } = useSession();
   const isAnonymous =
@@ -382,17 +380,18 @@ export function ConfigureConnectionOverlay({
     if (saving) {
       return;
     }
-    const hasConfig =
-      type === "database"
-        ? hasValidDatabaseConfig(config)
-        : Object.values(config).some((v) => v && v.length > 0);
-    if (!hasConfig) {
-      toast.error(
-        type === "database"
-          ? "Enter either a connection string or the connection details below."
-          : "Please enter credentials"
-      );
-      return;
+    if (type === "database") {
+      const dbError = validateDatabaseConfig(config, dbTab);
+      if (dbError) {
+        toast.error(dbError);
+        return;
+      }
+    } else {
+      const hasConfig = Object.values(config).some((v) => v && v.length > 0);
+      if (!hasConfig) {
+        toast.error("Please enter credentials");
+        return;
+      }
     }
 
     setSaving(true);
@@ -407,14 +406,12 @@ export function ConfigureConnectionOverlay({
   };
 
   const getTestConfigError = (): string | null => {
-    const hasConfig =
-      type === "database"
-        ? hasValidDatabaseConfig(config)
-        : Object.values(config).some((v) => v && v.length > 0);
+    if (type === "database") {
+      return validateDatabaseConfig(config, dbTab);
+    }
+    const hasConfig = Object.values(config).some((v) => v && v.length > 0);
     if (!hasConfig) {
-      return type === "database"
-        ? "Enter either a connection string or the connection details below."
-        : "Please enter credentials first";
+      return "Please enter credentials first";
     }
     return null;
   };
@@ -467,97 +464,11 @@ export function ConfigureConnectionOverlay({
 
     if (type === "database") {
       return (
-        <div className="space-y-4">
-          <p className="text-muted-foreground text-xs">
-            Enter either a connection string or the connection details below.
-          </p>
-          <SecretField
-            configKey="url"
-            fieldId="db-url"
-            helpText="Connection string: postgresql://user:password@host:port/database (passwords with @ are supported)"
-            label="Connection string"
-            onChange={updateConfig}
-            placeholder="postgresql://user:password@host:port/database"
-            value={config.url || ""}
-          />
-          <div className="border-t pt-3 font-medium text-muted-foreground text-xs">
-            Or use connection details
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="db-host">Host</Label>
-              <Input
-                id="db-host"
-                onChange={(e) => updateConfig("host", e.target.value)}
-                placeholder="e.g. db.example.com or your-provider.supabase.co"
-                value={config.host || ""}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="db-port">Port</Label>
-              <Input
-                id="db-port"
-                onChange={(e) => updateConfig("port", e.target.value)}
-                placeholder="5432"
-                value={config.port || ""}
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="db-username">Username</Label>
-              <Input
-                id="db-username"
-                onChange={(e) => updateConfig("username", e.target.value)}
-                placeholder="postgres"
-                value={config.username || ""}
-              />
-            </div>
-            <div className="space-y-2">
-              <SecretField
-                configKey="password"
-                fieldId="db-password"
-                label="Password"
-                onChange={updateConfig}
-                placeholder=""
-                value={config.password || ""}
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="db-database">Database name</Label>
-            <Input
-              id="db-database"
-              onChange={(e) => updateConfig("database", e.target.value)}
-              placeholder="postgres"
-              value={config.database || ""}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="database-ssl-mode">SSL mode</Label>
-            <Select
-              onValueChange={(value: string) => updateConfig("sslMode", value)}
-              value={(config.sslMode as string) || "auto"}
-            >
-              <SelectTrigger id="database-ssl-mode">
-                <SelectValue placeholder="SSL mode" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="auto">
-                  Auto (use SSL for remote hosts)
-                </SelectItem>
-                <SelectItem value="require">Require</SelectItem>
-                <SelectItem value="prefer">Prefer</SelectItem>
-                <SelectItem value="disable">Disable</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-muted-foreground text-xs">
-              Use Require for cloud providers (e.g. Supabase). Auto enables SSL
-              for remote hosts. For Supabase, use the connection pooler host if
-              your environment cannot resolve IPv6; the pooler uses IPv4.
-            </p>
-          </div>
-        </div>
+        <DatabaseConnectionForm
+          config={config}
+          onTabChange={setDbTab}
+          updateConfig={updateConfig}
+        />
       );
     }
 

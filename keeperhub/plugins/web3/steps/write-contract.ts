@@ -2,11 +2,13 @@ import "server-only";
 
 import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
+import { ErrorCategory, logUserError } from "@/keeperhub/lib/logging";
 import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 import {
   getOrganizationWalletAddress,
   initializeParaSigner,
 } from "@/keeperhub/lib/para/wallet-helpers";
+import { parseGasLimitConfig } from "@/keeperhub/lib/web3/gas-defaults";
 import { getGasStrategy } from "@/keeperhub/lib/web3/gas-strategy";
 import { getNonceManager } from "@/keeperhub/lib/web3/nonce-manager";
 import {
@@ -36,6 +38,7 @@ export type WriteContractCoreInput = {
   abi: string;
   abiFunction: string;
   functionArgs?: string;
+  gasLimitMultiplier?: string;
 };
 
 export type WriteContractInput = StepInput & WriteContractCoreInput;
@@ -47,8 +50,31 @@ export type WriteContractInput = StepInput & WriteContractCoreInput;
 async function stepHandler(
   input: WriteContractInput
 ): Promise<WriteContractResult> {
-  const { contractAddress, network, abi, abiFunction, functionArgs, _context } =
-    input;
+  const {
+    contractAddress,
+    network,
+    abi,
+    abiFunction,
+    functionArgs,
+    gasLimitMultiplier,
+    _context,
+  } = input;
+
+  const gasConfig = parseGasLimitConfig(gasLimitMultiplier);
+  let multiplierOverride: number | undefined;
+  let gasLimitOverride: bigint | undefined;
+
+  if (gasConfig?.mode === "maxGasLimit") {
+    const parsed = Number.parseFloat(gasConfig.value);
+    if (!Number.isNaN(parsed) && parsed > 0) {
+      gasLimitOverride = BigInt(Math.floor(parsed));
+    }
+  } else if (gasConfig?.mode === "multiplier") {
+    const parsed = Number.parseFloat(gasConfig.value);
+    if (!Number.isNaN(parsed)) {
+      multiplierOverride = Math.max(1.0, Math.min(10.0, parsed));
+    }
+  }
 
   // Validate contract address
   if (!ethers.isAddress(contractAddress)) {
@@ -130,7 +156,15 @@ async function stepHandler(
   try {
     organizationId = await getOrganizationIdFromExecution(_context.executionId);
   } catch (error) {
-    console.error("[Write Contract] Failed to get organization ID:", error);
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Write Contract] Failed to get organization ID",
+      error,
+      {
+        plugin_name: "web3",
+        action_name: "write-contract",
+      }
+    );
     return {
       success: false,
       error: `Failed to get organization ID: ${getErrorMessage(error)}`,
@@ -150,7 +184,15 @@ async function stepHandler(
     }
     userId = execution.userId;
   } catch (error) {
-    console.error("[Write Contract] Failed to get user ID:", error);
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Write Contract] Failed to get user ID",
+      error,
+      {
+        plugin_name: "web3",
+        action_name: "write-contract",
+      }
+    );
     return {
       success: false,
       error: `Failed to get user ID: ${getErrorMessage(error)}`,
@@ -177,7 +219,15 @@ async function stepHandler(
       rpcConfig.source
     );
   } catch (error) {
-    console.error("[Write Contract] Failed to resolve RPC config:", error);
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Write Contract] Failed to resolve RPC config",
+      error,
+      {
+        plugin_name: "web3",
+        action_name: "write-contract",
+      }
+    );
     return {
       success: false,
       error: getErrorMessage(error),
@@ -216,6 +266,7 @@ async function stepHandler(
     workflowId,
     chainId,
     rpcUrl,
+    triggerType: _context.triggerType as TransactionContext["triggerType"],
   };
 
   // Execute transaction with nonce management and gas strategy
@@ -275,27 +326,29 @@ async function stepHandler(
         throw new Error("Signer has no provider");
       }
 
-      const gasConfig = await gasStrategy.getGasConfig(
+      const txGasConfig = await gasStrategy.getGasConfig(
         provider,
         txContext.triggerType ?? "manual",
         estimatedGas,
-        chainId
+        chainId,
+        multiplierOverride,
+        gasLimitOverride
       );
 
       console.log("[Write Contract] Gas config:", {
         function: abiFunction,
         estimatedGas: estimatedGas.toString(),
-        gasLimit: gasConfig.gasLimit.toString(),
-        maxFeePerGas: `${ethers.formatUnits(gasConfig.maxFeePerGas, "gwei")} gwei`,
-        maxPriorityFeePerGas: `${ethers.formatUnits(gasConfig.maxPriorityFeePerGas, "gwei")} gwei`,
+        gasLimit: txGasConfig.gasLimit.toString(),
+        maxFeePerGas: `${ethers.formatUnits(txGasConfig.maxFeePerGas, "gwei")} gwei`,
+        maxPriorityFeePerGas: `${ethers.formatUnits(txGasConfig.maxPriorityFeePerGas, "gwei")} gwei`,
       });
 
       // Execute contract call with managed nonce and gas config
       const tx = await contract[abiFunction](...args, {
         nonce,
-        gasLimit: gasConfig.gasLimit,
-        maxFeePerGas: gasConfig.maxFeePerGas,
-        maxPriorityFeePerGas: gasConfig.maxPriorityFeePerGas,
+        gasLimit: txGasConfig.gasLimit,
+        maxFeePerGas: txGasConfig.maxFeePerGas,
+        maxPriorityFeePerGas: txGasConfig.maxPriorityFeePerGas,
       });
 
       // Record pending transaction
@@ -304,7 +357,7 @@ async function stepHandler(
         nonce,
         tx.hash,
         workflowId,
-        gasConfig.maxFeePerGas.toString()
+        txGasConfig.maxFeePerGas.toString()
       );
 
       // Wait for transaction to be mined
@@ -334,7 +387,16 @@ async function stepHandler(
         result: undefined,
       };
     } catch (error) {
-      console.error("[Write Contract] Function call failed:", error);
+      logUserError(
+        ErrorCategory.NETWORK_RPC,
+        "[Write Contract] Function call failed",
+        error,
+        {
+          plugin_name: "web3",
+          action_name: "write-contract",
+          chain_id: String(chainId),
+        }
+      );
       return {
         success: false,
         error: `Contract call failed: ${getErrorMessage(error)}`,

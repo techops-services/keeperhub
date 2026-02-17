@@ -2,11 +2,13 @@ import "server-only";
 
 import { eq } from "drizzle-orm";
 import { ethers } from "ethers";
+import { ErrorCategory, logUserError } from "@/keeperhub/lib/logging";
 import { withPluginMetrics } from "@/keeperhub/lib/metrics/instrumentation/plugin";
 import {
   getOrganizationWalletAddress,
   initializeParaSigner,
 } from "@/keeperhub/lib/para/wallet-helpers";
+import { parseGasLimitConfig } from "@/keeperhub/lib/web3/gas-defaults";
 import { getGasStrategy } from "@/keeperhub/lib/web3/gas-strategy";
 import { getNonceManager } from "@/keeperhub/lib/web3/nonce-manager";
 import {
@@ -29,6 +31,7 @@ export type TransferFundsCoreInput = {
   network: string;
   amount: string;
   recipientAddress: string;
+  gasLimitMultiplier?: string;
 };
 
 export type TransferFundsInput = StepInput & TransferFundsCoreInput;
@@ -36,6 +39,7 @@ export type TransferFundsInput = StepInput & TransferFundsCoreInput;
 /**
  * Core transfer logic
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Step handler with comprehensive validation and error handling
 async function stepHandler(
   input: TransferFundsInput
 ): Promise<TransferFundsResult> {
@@ -47,7 +51,24 @@ async function stepHandler(
     executionId: input._context?.executionId,
   });
 
-  const { network, amount, recipientAddress, _context } = input;
+  const { network, amount, recipientAddress, gasLimitMultiplier, _context } =
+    input;
+
+  const gasLimitConfig = parseGasLimitConfig(gasLimitMultiplier);
+  let multiplierOverride: number | undefined;
+  let gasLimitOverride: bigint | undefined;
+
+  if (gasLimitConfig?.mode === "maxGasLimit") {
+    const parsed = Number.parseFloat(gasLimitConfig.value);
+    if (!Number.isNaN(parsed) && parsed > 0) {
+      gasLimitOverride = BigInt(Math.floor(parsed));
+    }
+  } else if (gasLimitConfig?.mode === "multiplier") {
+    const parsed = Number.parseFloat(gasLimitConfig.value);
+    if (!Number.isNaN(parsed)) {
+      multiplierOverride = Math.max(1.0, Math.min(10.0, parsed));
+    }
+  }
 
   // Validate recipient address
   if (!ethers.isAddress(recipientAddress)) {
@@ -87,7 +108,15 @@ async function stepHandler(
   try {
     organizationId = await getOrganizationIdFromExecution(_context.executionId);
   } catch (error) {
-    console.error("[Transfer Funds] Failed to get organization ID:", error);
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Transfer Funds] Failed to get organization ID",
+      error,
+      {
+        plugin_name: "web3",
+        action_name: "transfer-funds",
+      }
+    );
     return {
       success: false,
       error: `Failed to get organization ID: ${getErrorMessage(error)}`,
@@ -107,7 +136,15 @@ async function stepHandler(
     }
     userId = execution.userId;
   } catch (error) {
-    console.error("[Transfer Funds] Failed to get user ID:", error);
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Transfer Funds] Failed to get user ID",
+      error,
+      {
+        plugin_name: "web3",
+        action_name: "transfer-funds",
+      }
+    );
     return {
       success: false,
       error: `Failed to get user ID: ${getErrorMessage(error)}`,
@@ -134,7 +171,15 @@ async function stepHandler(
       rpcConfig.source
     );
   } catch (error) {
-    console.error("[Transfer Funds] Failed to resolve RPC config:", error);
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Transfer Funds] Failed to resolve RPC config",
+      error,
+      {
+        plugin_name: "web3",
+        action_name: "transfer-funds",
+      }
+    );
     return {
       success: false,
       error: getErrorMessage(error),
@@ -173,6 +218,7 @@ async function stepHandler(
     workflowId,
     chainId,
     rpcUrl,
+    triggerType: _context.triggerType as TransactionContext["triggerType"],
   };
 
   // Execute transaction with nonce management and gas strategy
@@ -226,27 +272,29 @@ async function stepHandler(
       });
 
       // Get gas configuration from strategy
-      const gasConfig = await gasStrategy.getGasConfig(
+      const txGasConfig = await gasStrategy.getGasConfig(
         provider,
         txContext.triggerType ?? "manual",
         estimatedGas,
-        chainId
+        chainId,
+        multiplierOverride,
+        gasLimitOverride
       );
 
       console.log("[Transfer Funds] Gas config:", {
         estimatedGas: estimatedGas.toString(),
-        gasLimit: gasConfig.gasLimit.toString(),
-        maxFeePerGas: `${ethers.formatUnits(gasConfig.maxFeePerGas, "gwei")} gwei`,
-        maxPriorityFeePerGas: `${ethers.formatUnits(gasConfig.maxPriorityFeePerGas, "gwei")} gwei`,
+        gasLimit: txGasConfig.gasLimit.toString(),
+        maxFeePerGas: `${ethers.formatUnits(txGasConfig.maxFeePerGas, "gwei")} gwei`,
+        maxPriorityFeePerGas: `${ethers.formatUnits(txGasConfig.maxPriorityFeePerGas, "gwei")} gwei`,
       });
 
       // Send transaction with nonce and gas config
       const tx = await signer.sendTransaction({
         ...baseTx,
         nonce,
-        gasLimit: gasConfig.gasLimit,
-        maxFeePerGas: gasConfig.maxFeePerGas,
-        maxPriorityFeePerGas: gasConfig.maxPriorityFeePerGas,
+        gasLimit: txGasConfig.gasLimit,
+        maxFeePerGas: txGasConfig.maxFeePerGas,
+        maxPriorityFeePerGas: txGasConfig.maxPriorityFeePerGas,
       });
 
       // Record pending transaction
@@ -255,7 +303,7 @@ async function stepHandler(
         nonce,
         tx.hash,
         workflowId,
-        gasConfig.maxFeePerGas.toString()
+        txGasConfig.maxFeePerGas.toString()
       );
 
       // Wait for transaction to be mined
@@ -291,7 +339,16 @@ async function stepHandler(
         transactionLink,
       };
     } catch (error) {
-      console.error("[Transfer Funds] Transaction failed:", error);
+      logUserError(
+        ErrorCategory.TRANSACTION,
+        "[Transfer Funds] Transaction failed",
+        error,
+        {
+          plugin_name: "web3",
+          action_name: "transfer-funds",
+          chain_id: String(chainId),
+        }
+      );
       return {
         success: false,
         error: `Transaction failed: ${getErrorMessage(error)}`,

@@ -2,6 +2,7 @@ import "server-only";
 
 import { and, eq } from "drizzle-orm";
 import { ethers } from "ethers";
+import { ErrorCategory, logUserError } from "@/keeperhub/lib/logging";
 import type {
   CustomToken,
   TokenFieldValue,
@@ -252,6 +253,34 @@ async function getTokenAddress(
 }
 
 /**
+ * Fetch a string metadata field from a token contract, handling non-standard
+ * tokens (e.g. MKR, DAI v1) that return bytes32 instead of string.
+ */
+async function fetchStringOrBytes32(
+  provider: ethers.JsonRpcProvider,
+  tokenAddress: string,
+  method: "symbol" | "name"
+): Promise<string> {
+  const iface = new ethers.Interface([
+    `function ${method}() view returns (string)`,
+  ]);
+  const data = iface.encodeFunctionData(method);
+  const result = await provider.call({ to: tokenAddress, data });
+
+  try {
+    const decoded = iface.decodeFunctionResult(method, result);
+    return decoded[0] as string;
+  } catch {
+    // Non-standard token returning bytes32 (e.g. MKR, DAI v1)
+    try {
+      return ethers.decodeBytes32String(result);
+    } catch {
+      return method === "symbol" ? "???" : "Unknown";
+    }
+  }
+}
+
+/**
  * Fetch balance for a single token
  */
 async function fetchTokenBalance(
@@ -264,8 +293,8 @@ async function fetchTokenBalance(
   const [balanceRaw, decimals, symbol, name] = await Promise.all([
     contract.balanceOf(walletAddress) as Promise<bigint>,
     contract.decimals() as Promise<bigint>,
-    contract.symbol() as Promise<string>,
-    contract.name() as Promise<string>,
+    fetchStringOrBytes32(provider, tokenAddress, "symbol"),
+    fetchStringOrBytes32(provider, tokenAddress, "name"),
   ]);
 
   const decimalsNum = Number(decimals);
@@ -308,7 +337,15 @@ async function stepHandler(
 
   // Validate wallet address
   if (!ethers.isAddress(address)) {
-    console.error("[Check Token Balance] Invalid wallet address:", address);
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Check Token Balance] Invalid wallet address:",
+      address,
+      {
+        plugin_name: "web3",
+        action_name: "check-token-balance",
+      }
+    );
     return {
       success: false,
       error: `Invalid wallet address: ${address}`,
@@ -321,7 +358,15 @@ async function stepHandler(
     chainId = getChainIdFromNetwork(network);
     console.log("[Check Token Balance] Resolved chain ID:", chainId);
   } catch (error) {
-    console.error("[Check Token Balance] Failed to resolve network:", error);
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Check Token Balance] Failed to resolve network:",
+      error,
+      {
+        plugin_name: "web3",
+        action_name: "check-token-balance",
+      }
+    );
     return {
       success: false,
       error: getErrorMessage(error),
@@ -345,7 +390,15 @@ async function stepHandler(
 
   // Validate token address
   if (!ethers.isAddress(tokenAddress)) {
-    console.error("[Check Token Balance] Invalid token address:", tokenAddress);
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Check Token Balance] Invalid token address:",
+      tokenAddress,
+      {
+        plugin_name: "web3",
+        action_name: "check-token-balance",
+      }
+    );
     return {
       success: false,
       error: `Invalid token address: ${tokenAddress}`,
@@ -367,7 +420,16 @@ async function stepHandler(
       rpcConfig.source
     );
   } catch (error) {
-    console.error("[Check Token Balance] Failed to resolve RPC config:", error);
+    logUserError(
+      ErrorCategory.VALIDATION,
+      "[Check Token Balance] Failed to resolve RPC config:",
+      error,
+      {
+        plugin_name: "web3",
+        action_name: "check-token-balance",
+        chain_id: String(chainId),
+      }
+    );
     return {
       success: false,
       error: getErrorMessage(error),
@@ -402,9 +464,15 @@ async function stepHandler(
       addressLink,
     };
   } catch (error) {
-    console.error(
+    logUserError(
+      ErrorCategory.NETWORK_RPC,
       "[Check Token Balance] Failed to check token balance:",
-      error
+      error,
+      {
+        plugin_name: "web3",
+        action_name: "check-token-balance",
+        chain_id: String(chainId),
+      }
     );
     return {
       success: false,

@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { NextResponse } from "next/server";
 // start custom keeperhub code //
+import { ErrorCategory, logSystemError } from "@/keeperhub/lib/logging";
 import { getOrgContext } from "@/keeperhub/lib/middleware/org-context";
 // end keeperhub code //
 import { auth } from "@/lib/auth";
@@ -236,7 +237,15 @@ export async function POST(
       isOwner: true,
     });
   } catch (error) {
-    console.error("Failed to duplicate workflow:", error);
+    logSystemError(
+      ErrorCategory.DATABASE,
+      "Failed to duplicate workflow",
+      error,
+      {
+        endpoint: "/api/workflows/[workflowId]/duplicate",
+        operation: "create",
+      }
+    );
     return NextResponse.json(
       {
         error:

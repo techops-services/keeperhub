@@ -34,7 +34,10 @@ export type ActionConfigFieldBase = {
     | "abi-function-args" // Dynamic inputs for function arguments based on selected ABI function
     | "abi-with-auto-fetch" // ABI textarea with automatic fetch from Etherscan
     | "token-select" // Token selector with supported/custom toggle
-    | "abi-event-select"; // Dynamic dropdown that parses ABI and shows events
+    | "abi-event-select" // Dynamic dropdown that parses ABI and shows events
+    // start custom keeperhub code //
+    | "gas-limit-multiplier"; // Gas limit multiplier with chain default display
+  // end keeperhub code //
 
   // For chain-select: filter by chain type (e.g., "evm" or "solana")
   chainTypeFilter?: string;
@@ -56,6 +59,17 @@ export type ActionConfigFieldBase = {
 
   // Min value (for number fields)
   min?: number;
+
+  // start custom keeperhub code //
+  // Max value (for number fields)
+  max?: number;
+
+  // Step increment (for number fields)
+  step?: number;
+
+  // For gas-limit-multiplier: which action slug to use for gas estimation
+  actionSlug?: string;
+  // end keeperhub code //
 
   // Whether this field is required (defaults to false)
   required?: boolean;

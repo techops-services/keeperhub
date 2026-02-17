@@ -29,6 +29,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ProjectSelect } from "@/keeperhub/components/projects/project-select";
 import { TagSelect } from "@/keeperhub/components/tags/tag-select";
+import { refetchSidebar } from "@/keeperhub/lib/refetch-sidebar";
 import { api } from "@/lib/api-client";
 import { integrationsAtom } from "@/lib/integrations-store";
 import type { IntegrationType } from "@/lib/types/integration";
@@ -329,8 +330,13 @@ export const PanelInner = () => {
     const isManualTrigger =
       selectedNode.data.type === "trigger" &&
       selectedNode.data.config?.triggerType === "Manual";
+    // start custom keeperhub code //
+    const isForEachOrCollect =
+      selectedNode.data.config?.actionType === "For Each" ||
+      selectedNode.data.config?.actionType === "Collect";
+    // end keeperhub code //
 
-    if (isConditionAction || isManualTrigger) {
+    if (isConditionAction || isManualTrigger || isForEachOrCollect) {
       setActiveTab("properties");
     }
   }, [selectedNode, activeTab, setActiveTab]);
@@ -628,6 +634,7 @@ export const PanelInner = () => {
         await api.workflow.update(currentWorkflowId, {
           projectId: newProjectId,
         });
+        refetchSidebar();
       } catch (error) {
         console.error("Failed to update workflow project:", error);
         toast.error("Failed to update workflow project");
@@ -644,6 +651,7 @@ export const PanelInner = () => {
         await api.workflow.update(currentWorkflowId, {
           tagId: newTagId,
         });
+        refetchSidebar();
       } catch (error) {
         console.error("Failed to update workflow tag:", error);
         toast.error("Failed to update workflow tag");
@@ -999,7 +1007,11 @@ export const PanelInner = () => {
           </TabsTrigger>
           {(selectedNode.data.type !== "trigger" ||
             (selectedNode.data.config?.triggerType as string) !== "Manual") &&
-          selectedNode.data.config?.actionType !== "Condition" ? (
+          selectedNode.data.config?.actionType !== "Condition" &&
+          // start custom keeperhub code //
+          selectedNode.data.config?.actionType !== "For Each" &&
+          selectedNode.data.config?.actionType !== "Collect" ? (
+            // end keeperhub code //
             <TabsTrigger
               className="bg-transparent text-muted-foreground data-[state=active]:text-foreground data-[state=active]:shadow-none"
               value="code"

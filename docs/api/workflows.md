@@ -54,6 +54,31 @@ GET /api/workflows/{workflowId}
 
 Returns a single workflow by ID.
 
+### Response
+
+```json
+{
+  "id": "wf_123",
+  "name": "My Workflow",
+  "description": "Monitors ETH balance",
+  "visibility": "private",
+  "nodes": [...],
+  "edges": [...],
+  "publicTags": [
+    {
+      "id": "tag_1",
+      "name": "DeFi",
+      "slug": "defi"
+    }
+  ],
+  "createdAt": "2024-01-01T00:00:00Z",
+  "updatedAt": "2024-01-01T00:00:00Z",
+  "isOwner": true
+}
+```
+
+Public workflows include a `publicTags` array showing all assigned tags.
+
 ## Create Workflow
 
 ```http
@@ -74,7 +99,7 @@ The `projectId` field is optional. If provided, the workflow is assigned to the 
 
 ### Response
 
-Returns the created workflow with a default trigger node.
+Returns the created workflow with a default trigger node and an empty action node connected to it.
 
 ## Update Workflow
 
@@ -89,11 +114,14 @@ PATCH /api/workflows/{workflowId}
   "name": "Updated Name",
   "description": "Updated description",
   "projectId": "proj_123",
+  "tagId": "tag_456",
   "nodes": [...],
   "edges": [...],
   "visibility": "private"
 }
 ```
+
+The `tagId` field assigns the workflow to an organization tag for categorization.
 
 ## Delete Workflow
 
@@ -114,9 +142,12 @@ Manually trigger a workflow execution.
 ```json
 {
   "executionId": "exec_123",
+  "runId": "run_abc123",
   "status": "pending"
 }
 ```
+
+The `runId` identifies the workflow execution run and is stored in the workflow execution record.
 
 ## Webhook Trigger
 
@@ -157,6 +188,62 @@ POST /api/workflows/{workflowId}/claim
 ```
 
 Claim an anonymous workflow into the authenticated user's organization. Only the original creator of the anonymous workflow can claim it.
+
+## Publish Workflow (Go Live)
+
+```http
+PUT /api/workflows/{workflowId}/go-live
+```
+
+Publish a workflow to make it publicly visible with metadata and tags.
+
+### Request Body
+
+```json
+{
+  "name": "Public Workflow Name",
+  "publicTagIds": ["tag_1", "tag_2"]
+}
+```
+
+The `name` is required. `publicTagIds` is an array of public tag IDs to associate with the workflow (maximum 5 tags).
+
+## List Public Workflows
+
+```http
+GET /api/workflows/public
+```
+
+Returns all public workflows with optional tag filtering.
+
+### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `tag` | string | Optional. Filter by public tag slug (e.g., "defi", "nft") |
+
+### Response
+
+```json
+[
+  {
+    "id": "wf_123",
+    "name": "Public Workflow",
+    "description": "Description",
+    "nodes": [...],
+    "edges": [...],
+    "publicTags": [
+      {
+        "id": "tag_1",
+        "name": "DeFi",
+        "slug": "defi"
+      }
+    ],
+    "createdAt": "2024-01-01T00:00:00Z",
+    "updatedAt": "2024-01-01T00:00:00Z"
+  }
+]
+```
 
 ## Workflow Taxonomy
 
