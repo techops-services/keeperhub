@@ -180,7 +180,7 @@ async function dispatch(): Promise<{
 }
 
 // Main entry point
-async function main() {
+async function main(): Promise<void> {
   try {
     const result = await dispatch();
 
