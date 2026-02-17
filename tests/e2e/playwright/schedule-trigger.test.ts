@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 // Top-level regex patterns
 const SELECTED_CLASS_REGEX = /selected/;
-const DATA_SELECTED_REGEX = /.*/;
+const DATA_SELECTED_REGEX = /true/;
 
 test.describe("Schedule Trigger", () => {
   test.beforeEach(async ({ page }) => {
