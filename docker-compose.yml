@@ -186,7 +186,7 @@ services:
       AWS_ENDPOINT_URL: http://localstack:4566
       SQS_QUEUE_URL: http://localstack:4566/000000000000/keeperhub-workflow-queue
       KEEPERHUB_URL: http://app-dev:3000
-      KEEPERHUB_API_KEY: local-scheduler-key-for-dev
+      KEEPERHUB_API_KEY: ${KEEPERHUB_API_KEY:-local-scheduler-key-for-dev}
     depends_on:
       db:
         condition: service_healthy
@@ -228,7 +228,7 @@ services:
       AWS_ENDPOINT_URL: http://localstack:4566
       SQS_QUEUE_URL: http://localstack:4566/000000000000/keeperhub-workflow-queue
       KEEPERHUB_URL: http://app-dev:3000
-      KEEPERHUB_API_KEY: local-scheduler-key-for-dev
+      KEEPERHUB_API_KEY: ${KEEPERHUB_API_KEY:-local-scheduler-key-for-dev}
     depends_on:
       db:
         condition: service_healthy
@@ -265,7 +265,7 @@ services:
       PORT: 3010
       TIMEOUT_BETWEEN_SYNC: 30000
       KEEPERHUB_API_URL: http://keeperhub:3000
-      KEEPERHUB_API_KEY: local-events-key-for-dev
+      KEEPERHUB_API_KEY: ${KEEPERHUB_API_KEY:-local-events-key-for-dev}
       JWT_TOKEN_USERNAME: ${JWT_TOKEN_USERNAME:-}
       JWT_TOKEN_PASSWORD: ${JWT_TOKEN_PASSWORD:-}
       NODE_ENV: development
@@ -300,7 +300,7 @@ services:
       REDIS_PORT: 6379
       JWT_TOKEN_USERNAME: ${JWT_TOKEN_USERNAME:-}
       JWT_TOKEN_PASSWORD: ${JWT_TOKEN_PASSWORD:-}
-      KEEPERHUB_API_KEY: local-events-key-for-dev
+      KEEPERHUB_API_KEY: ${KEEPERHUB_API_KEY:-local-events-key-for-dev}
       ETHERSCAN_API_KEY: ${ETHERSCAN_API_KEY:-}
       NODE_ENV: development
     depends_on:
