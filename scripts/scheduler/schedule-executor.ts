@@ -61,12 +61,15 @@ const QUEUE_URL =
 
 const KEEPERHUB_URL = process.env.KEEPERHUB_URL || "http://localhost:3000";
 
-const SCHEDULER_SERVICE_API_KEY = process.env.SCHEDULER_SERVICE_API_KEY;
-if (!SCHEDULER_SERVICE_API_KEY) {
-  throw new Error(
-    "SCHEDULER_SERVICE_API_KEY is required. Set it in the environment."
-  );
-}
+const SCHEDULER_SERVICE_API_KEY = (() => {
+  const key = process.env.SCHEDULER_SERVICE_API_KEY;
+  if (!key) {
+    throw new Error(
+      "SCHEDULER_SERVICE_API_KEY is required. Set it in the environment."
+    );
+  }
+  return key;
+})();
 
 const VISIBILITY_TIMEOUT = 300; // 5 minutes
 const WAIT_TIME_SECONDS = 20; // Long polling
