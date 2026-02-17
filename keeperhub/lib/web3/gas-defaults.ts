@@ -86,20 +86,34 @@ export function getChainGasDefaults(chainId: number): ChainGasDefaults {
   return CHAIN_GAS_DEFAULTS[chainId] ?? GLOBAL_DEFAULT;
 }
 
+export type GasLimitOverrides = {
+  multiplierOverride?: number;
+  gasLimitOverride?: bigint;
+};
+
 /**
- * Get the chain name for display purposes.
- * Returns undefined if the chain ID is not recognized.
+ * Resolve gas limit config into overrides for the gas strategy.
+ * Shared by all step handlers (write-contract, transfer-funds, transfer-token).
  */
-export function getChainDisplayName(chainId: number): string | undefined {
-  const names: Record<number, string> = {
-    1: "Ethereum",
-    11155111: "Sepolia",
-    42161: "Arbitrum",
-    421614: "Arbitrum Sepolia",
-    8453: "Base",
-    84532: "Base Sepolia",
-    137: "Polygon",
-    80002: "Polygon Amoy",
-  };
-  return names[chainId];
+export function resolveGasLimitOverrides(
+  raw: string | undefined
+): GasLimitOverrides {
+  const config = parseGasLimitConfig(raw);
+  if (!config) {
+    return {};
+  }
+
+  if (config.mode === "maxGasLimit") {
+    const value = Number.parseFloat(config.value);
+    if (!Number.isNaN(value) && value > 0) {
+      return { gasLimitOverride: BigInt(Math.floor(value)) };
+    }
+  } else if (config.mode === "multiplier") {
+    const value = Number.parseFloat(config.value);
+    if (!Number.isNaN(value)) {
+      return { multiplierOverride: Math.max(1.0, Math.min(10.0, value)) };
+    }
+  }
+
+  return {};
 }

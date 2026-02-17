@@ -61,13 +61,8 @@ export type ActionConfigFieldBase = {
   min?: number;
 
   // start custom keeperhub code //
-  // Max value (for number fields)
   max?: number;
-
-  // Step increment (for number fields)
   step?: number;
-
-  // For gas-limit-multiplier: which action slug to use for gas estimation
   actionSlug?: string;
   // end keeperhub code //
 
