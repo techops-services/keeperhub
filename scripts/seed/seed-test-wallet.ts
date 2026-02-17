@@ -183,7 +183,42 @@ async function ensureParaWallet(
   console.log(`Created wallet: ${wallet.address}`);
 }
 
+function assertNotProduction(): void {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "Refusing to seed test account: NODE_ENV=production. " +
+        "Set ALLOW_SEED_TEST_WALLET=true to override."
+    );
+  }
+
+  const dbUrl = process.env.DATABASE_URL ?? "";
+  try {
+    const parsed = new URL(dbUrl);
+    const host = parsed.hostname;
+    const isLocal =
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "" ||
+      host.endsWith(".svc.cluster.local") ||
+      host.endsWith(".internal");
+
+    if (!isLocal && process.env.ALLOW_SEED_TEST_WALLET !== "true") {
+      throw new Error(
+        `Refusing to seed test account: DATABASE_URL host "${host}" looks like a remote database. ` +
+          "Set ALLOW_SEED_TEST_WALLET=true to override."
+      );
+    }
+  } catch (error) {
+    if (error instanceof TypeError) {
+      return;
+    }
+    throw error;
+  }
+}
+
 async function seedTestWallet(): Promise<void> {
+  assertNotProduction();
+
   const connectionString = getDatabaseUrl();
   console.log("Connecting to database...");
 
