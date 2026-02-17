@@ -61,6 +61,13 @@ const QUEUE_URL =
 
 const KEEPERHUB_URL = process.env.KEEPERHUB_URL || "http://localhost:3000";
 
+const SCHEDULER_SERVICE_API_KEY = process.env.SCHEDULER_SERVICE_API_KEY;
+if (!SCHEDULER_SERVICE_API_KEY) {
+  throw new Error(
+    "SCHEDULER_SERVICE_API_KEY is required. Set it in the environment."
+  );
+}
+
 const VISIBILITY_TIMEOUT = 300; // 5 minutes
 const WAIT_TIME_SECONDS = 20; // Long polling
 const MAX_MESSAGES = 10;
@@ -195,7 +202,7 @@ async function processScheduledWorkflow(
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Service-Key": process.env.SCHEDULER_SERVICE_API_KEY || "",
+          "X-Service-Key": SCHEDULER_SERVICE_API_KEY,
         },
         body: JSON.stringify({
           executionId,
