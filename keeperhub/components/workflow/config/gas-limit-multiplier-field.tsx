@@ -54,18 +54,48 @@ export function GasLimitMultiplierField({
   const parsed = useMemo(() => parseGasLimitConfig(value), [value]);
   const inputValue = parsed?.value ?? "";
 
+  // Memoize only the config fields relevant to gas estimation.
+  // Excludes gasLimitMultiplier so typing in the gas limit input
+  // doesn't re-trigger the estimate fetch.
+  const estimationConfig = useMemo(
+    () =>
+      JSON.stringify({
+        contractAddress: config.contractAddress,
+        abi: config.abi,
+        abiFunction: config.abiFunction,
+        functionArgs: config.functionArgs,
+        recipientAddress: config.recipientAddress,
+        amount: config.amount,
+        tokenConfig: config.tokenConfig,
+      }),
+    [
+      config.contractAddress,
+      config.abi,
+      config.abiFunction,
+      config.functionArgs,
+      config.recipientAddress,
+      config.amount,
+      config.tokenConfig,
+    ]
+  );
+
   const [estimate, setEstimate] = useState<GasEstimateState>({
     status: "idle",
   });
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const configHasTemplateRefs = useMemo(
+    () => hasTemplateRefs(config),
+    [config]
+  );
+
   // Determine if we have enough config to estimate
   const canEstimate = useMemo(() => {
     if (!(chainId && actionSlug)) {
       return false;
     }
-    if (hasTemplateRefs(config)) {
+    if (configHasTemplateRefs) {
       return false;
     }
 
@@ -81,7 +111,16 @@ export function GasLimitMultiplierField({
       default:
         return false;
     }
-  }, [chainId, actionSlug, config]);
+  }, [
+    chainId,
+    actionSlug,
+    configHasTemplateRefs,
+    config.recipientAddress,
+    config.tokenConfig,
+    config.contractAddress,
+    config.abi,
+    config.abiFunction,
+  ]);
 
   // Fetch gas estimate with debounce
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: fetch with validation, error handling, and abort support
@@ -107,15 +146,7 @@ export function GasLimitMultiplierField({
         body: JSON.stringify({
           chainId,
           actionSlug,
-          config: {
-            contractAddress: config.contractAddress,
-            abi: config.abi,
-            abiFunction: config.abiFunction,
-            functionArgs: config.functionArgs,
-            recipientAddress: config.recipientAddress,
-            amount: config.amount,
-            tokenConfig: config.tokenConfig,
-          },
+          config: JSON.parse(estimationConfig),
         }),
         signal: controller.signal,
       });
@@ -145,7 +176,7 @@ export function GasLimitMultiplierField({
           error instanceof Error ? error.message : "Failed to estimate gas",
       });
     }
-  }, [canEstimate, chainId, actionSlug, config]);
+  }, [canEstimate, chainId, actionSlug, estimationConfig]);
 
   useEffect(() => {
     if (debounceRef.current) {
@@ -174,6 +205,9 @@ export function GasLimitMultiplierField({
   );
 
   const handleValueChange = (newValue: string) => {
+    if (!newValue && estimate.status === "error") {
+      setEstimate({ status: "idle" });
+    }
     onChange(
       newValue ? JSON.stringify({ mode: "maxGasLimit", value: newValue }) : ""
     );
@@ -219,7 +253,7 @@ export function GasLimitMultiplierField({
         value={inputValue}
       />
 
-      <div className="space-y-1 overflow-hidden">
+      <div className="min-w-0 space-y-1">
         {estimate.status === "loading" && (
           <div className="flex items-center gap-1.5 text-foreground text-sm">
             <Spinner className="size-3" />
@@ -232,9 +266,9 @@ export function GasLimitMultiplierField({
           </p>
         )}
         {estimate.status === "error" && (
-          <div className="flex items-start gap-1.5 text-destructive text-xs">
-            <AlertTriangle className="mt-0.5 size-3 shrink-0" />
-            <span className="break-words">{estimate.message}</span>
+          <div className="flex items-start gap-1.5 text-red-600 text-sm dark:text-red-400">
+            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+            <span className="break-words font-medium">{estimate.message}</span>
           </div>
         )}
         {estimate.status === "idle" &&
@@ -242,7 +276,7 @@ export function GasLimitMultiplierField({
           chainId &&
           actionSlug && (
             <p className="text-muted-foreground text-xs">
-              {hasTemplateRefs(config)
+              {configHasTemplateRefs
                 ? "Cannot estimate with template references"
                 : "Configure required fields to see gas estimate"}
             </p>
@@ -250,13 +284,13 @@ export function GasLimitMultiplierField({
 
         {gasWarning && (
           <div
-            className={`flex items-start gap-1.5 text-xs ${
+            className={`flex items-start gap-1.5 font-medium text-sm ${
               gasWarning.level === "error"
-                ? "text-destructive"
+                ? "text-red-600 dark:text-red-400"
                 : "text-yellow-600 dark:text-yellow-500"
             }`}
           >
-            <AlertTriangle className="mt-0.5 size-3 shrink-0" />
+            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
             <span className="break-words">{gasWarning.message}</span>
           </div>
         )}
