@@ -2,14 +2,9 @@
 
 import { AlertTriangle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import {
-  type GasLimitConfig,
-  getChainGasDefaults,
-  parseGasLimitConfig,
-} from "@/keeperhub/lib/web3/gas-defaults";
+import { parseGasLimitConfig } from "@/keeperhub/lib/web3/gas-defaults";
 import type { ActionConfigFieldBase } from "@/plugins";
 
 type GasLimitMultiplierFieldProps = {
@@ -43,42 +38,6 @@ function formatGasNumber(value: string): string {
   return num.toLocaleString();
 }
 
-function serializeConfig(config: GasLimitConfig): string {
-  return JSON.stringify(config);
-}
-
-function computeFinalMaxGas(
-  estimate: GasEstimateState,
-  mode: string,
-  inputValue: string,
-  defaultMultiplier: number
-): number | undefined {
-  if (estimate.status !== "success") {
-    return;
-  }
-  const estimated = Number(estimate.estimatedGas);
-
-  if (mode === "multiplier") {
-    const multiplier = inputValue
-      ? Number.parseFloat(inputValue)
-      : defaultMultiplier;
-    if (Number.isNaN(multiplier)) {
-      return;
-    }
-    return Math.ceil(estimated * multiplier);
-  }
-
-  if (mode === "maxGasLimit" && inputValue) {
-    const limit = Number(inputValue);
-    if (!Number.isNaN(limit) && limit >= estimated) {
-      return limit;
-    }
-  }
-
-  return;
-}
-
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: React component with conditional rendering for multiple UI states
 export function GasLimitMultiplierField({
   field,
   value,
@@ -91,20 +50,9 @@ export function GasLimitMultiplierField({
   const chainId = chainIdRaw ? Number(chainIdRaw) : undefined;
   const actionSlug = field.actionSlug;
 
-  const defaults =
-    chainId && !Number.isNaN(chainId)
-      ? getChainGasDefaults(chainId)
-      : undefined;
-  const defaultMultiplier = defaults?.multiplier ?? 2.0;
-
-  // Parse the current value to determine mode
-  const parsedConfig = useMemo(() => parseGasLimitConfig(value), [value]);
-  const mode = parsedConfig?.mode ?? "multiplier";
-  const rawInputValue = parsedConfig?.value ?? "";
-  const inputValue =
-    mode === "multiplier" && rawInputValue === "" ? "2.00" : rawInputValue;
-  const isCustomMultiplier =
-    mode === "multiplier" && inputValue !== "" && inputValue !== "2.00";
+  // Parse the current value — always treat as maxGasLimit mode
+  const parsed = useMemo(() => parseGasLimitConfig(value), [value]);
+  const inputValue = parsed?.value ?? "";
 
   const [estimate, setEstimate] = useState<GasEstimateState>({
     status: "idle",
@@ -143,7 +91,6 @@ export function GasLimitMultiplierField({
       return;
     }
 
-    // Abort previous request
     if (abortRef.current) {
       abortRef.current.abort();
     }
@@ -190,7 +137,7 @@ export function GasLimitMultiplierField({
       setEstimate({ status: "success", estimatedGas: data.estimatedGas });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
-        return; // Ignore aborted requests
+        return;
       }
       setEstimate({
         status: "error",
@@ -200,7 +147,6 @@ export function GasLimitMultiplierField({
     }
   }, [canEstimate, chainId, actionSlug, config]);
 
-  // Debounced effect for fetching estimate
   useEffect(() => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
@@ -218,7 +164,6 @@ export function GasLimitMultiplierField({
     };
   }, [fetchEstimate]);
 
-  // Cleanup abort controller on unmount
   useEffect(
     () => () => {
       if (abortRef.current) {
@@ -228,53 +173,30 @@ export function GasLimitMultiplierField({
     []
   );
 
-  const handleModeChange = (newMode: "multiplier" | "maxGasLimit") => {
-    if (newMode === mode) {
-      return;
-    }
-    // Reset value when switching modes
-    onChange(serializeConfig({ mode: newMode, value: "" }));
-  };
-
   const handleValueChange = (newValue: string) => {
-    if (mode === "multiplier") {
-      if (newValue === "") {
-        // Empty multiplier = use chain default, store empty string for backward compat
-        onChange("");
-        return;
-      }
-      const numericValue = Number.parseFloat(newValue);
-      if (!Number.isNaN(numericValue) && numericValue < 1) {
-        onChange(serializeConfig({ mode, value: "1" }));
-        return;
-      }
-    }
-    onChange(serializeConfig({ mode, value: newValue }));
+    onChange(
+      newValue ? JSON.stringify({ mode: "maxGasLimit", value: newValue }) : ""
+    );
   };
 
-  // Final max gas for both modes
-  const finalMaxGas = useMemo(
-    () => computeFinalMaxGas(estimate, mode, inputValue, defaultMultiplier),
-    [mode, estimate, inputValue, defaultMultiplier]
-  );
-
-  // Warnings for both modes when final gas is below or close to estimate
+  // Warning when gas limit is below or close to estimate
   const gasWarning = useMemo(() => {
-    if (estimate.status !== "success" || finalMaxGas === undefined) {
+    if (estimate.status !== "success" || !inputValue) {
       return;
     }
     const estimated = Number(estimate.estimatedGas);
-    if (Number.isNaN(estimated) || estimated === 0) {
+    const limit = Number(inputValue);
+    if (Number.isNaN(estimated) || estimated === 0 || Number.isNaN(limit)) {
       return;
     }
-    if (finalMaxGas < estimated) {
+    if (limit < estimated) {
       return {
         level: "error" as const,
         message:
           "Gas limit is below the estimate \u2014 transaction will likely fail",
       };
     }
-    if (finalMaxGas < estimated * 1.2) {
+    if (limit < estimated * 1.2) {
       return {
         level: "warning" as const,
         message:
@@ -282,62 +204,22 @@ export function GasLimitMultiplierField({
       };
     }
     return;
-  }, [estimate, finalMaxGas]);
+  }, [estimate, inputValue]);
 
   return (
     <div className="space-y-2">
-      {/* Mode toggle */}
-      <div className="flex gap-1 rounded-md border bg-muted/40 p-0.5">
-        <Button
-          className={`h-7 flex-1 text-xs ${mode === "multiplier" ? "bg-background font-medium shadow-sm" : "text-muted-foreground"}`}
-          disabled={disabled}
-          onClick={() => handleModeChange("multiplier")}
-          size="sm"
-          type="button"
-          variant="ghost"
-        >
-          Gas Estimate Multiplier
-        </Button>
-        <Button
-          className={`h-7 flex-1 text-xs ${mode === "maxGasLimit" ? "bg-background font-medium shadow-sm" : "text-muted-foreground"}`}
-          disabled={disabled}
-          onClick={() => handleModeChange("maxGasLimit")}
-          size="sm"
-          type="button"
-          variant="ghost"
-        >
-          Absolute Gas Limit
-        </Button>
-      </div>
+      <Input
+        disabled={disabled}
+        id={field.key}
+        min={0}
+        onChange={(e) => handleValueChange(e.target.value)}
+        placeholder="e.g. 500000"
+        step={1}
+        type="number"
+        value={inputValue}
+      />
 
-      {/* Input field */}
-      {mode === "multiplier" ? (
-        <Input
-          disabled={disabled}
-          id={field.key}
-          max={field.max ?? 10}
-          min={field.min ?? 1}
-          onChange={(e) => handleValueChange(e.target.value)}
-          placeholder="2.00"
-          step={field.step ?? 0.01}
-          type="number"
-          value={inputValue}
-        />
-      ) : (
-        <Input
-          disabled={disabled}
-          id={field.key}
-          min={0}
-          onChange={(e) => handleValueChange(e.target.value)}
-          placeholder="e.g. 500000"
-          step={1}
-          type="number"
-          value={inputValue}
-        />
-      )}
-
-      {/* Gas estimate and evaluation below fields */}
-      <div className="space-y-1">
+      <div className="space-y-1 overflow-hidden">
         {estimate.status === "loading" && (
           <div className="flex items-center gap-1.5 text-foreground text-sm">
             <Spinner className="size-3" />
@@ -345,27 +227,15 @@ export function GasLimitMultiplierField({
           </div>
         )}
         {estimate.status === "success" && (
-          <div className="space-y-0.5">
-            <p className="font-medium text-foreground text-sm">
-              Gas Estimate: {formatGasNumber(estimate.estimatedGas)}
-            </p>
-            {finalMaxGas !== undefined && (
-              <p className="font-medium text-foreground text-sm">
-                Final Gas Limit:{" "}
-                {mode === "multiplier" ? (
-                  <>
-                    {formatGasNumber(estimate.estimatedGas)} x {inputValue} ={" "}
-                    {finalMaxGas.toLocaleString()}
-                  </>
-                ) : (
-                  finalMaxGas.toLocaleString()
-                )}
-              </p>
-            )}
-          </div>
+          <p className="font-medium text-foreground text-sm">
+            Gas Estimate: {formatGasNumber(estimate.estimatedGas)}
+          </p>
         )}
         {estimate.status === "error" && (
-          <p className="text-muted-foreground text-sm">{estimate.message}</p>
+          <div className="flex items-start gap-1.5 text-destructive text-xs">
+            <AlertTriangle className="mt-0.5 size-3 shrink-0" />
+            <span className="break-words">{estimate.message}</span>
+          </div>
         )}
         {estimate.status === "idle" &&
           canEstimate === false &&
@@ -378,10 +248,6 @@ export function GasLimitMultiplierField({
             </p>
           )}
 
-        {isCustomMultiplier && (
-          <p className="text-muted-foreground text-xs">Custom: {inputValue}x</p>
-        )}
-
         {gasWarning && (
           <div
             className={`flex items-start gap-1.5 text-xs ${
@@ -391,7 +257,7 @@ export function GasLimitMultiplierField({
             }`}
           >
             <AlertTriangle className="mt-0.5 size-3 shrink-0" />
-            {gasWarning.message}
+            <span className="break-words">{gasWarning.message}</span>
           </div>
         )}
       </div>
