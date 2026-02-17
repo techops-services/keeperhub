@@ -243,8 +243,8 @@ export function GasLimitMultiplierField({
         onChange("");
         return;
       }
-      const parsed = Number.parseFloat(newValue);
-      if (!Number.isNaN(parsed) && parsed < 1) {
+      const numericValue = Number.parseFloat(newValue);
+      if (!Number.isNaN(numericValue) && numericValue < 1) {
         onChange(serializeConfig({ mode, value: "1" }));
         return;
       }
