@@ -32,7 +32,7 @@ export function useOrganization() {
     await authClient.organization.setActive({ organizationId: orgId });
     // Reset workflow state only after org switch succeeds (safe in hook context)
     getDefaultStore().set(resetWorkflowStateForOrgSwitchAtom);
-    refetchSidebar({ closeFlyout: true });
+    refetchSidebar();
     try {
       const list = await api.workflow.getAll();
       // Sort by createdAt descending to get the most recent workflow
