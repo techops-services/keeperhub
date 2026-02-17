@@ -43,6 +43,7 @@ const RESULT_TYPES = ["number", "bigint"] as const;
 
 const BIGINT_ZERO = BigInt(0);
 const BIGINT_ONE = BigInt(1);
+const BIGINT_TWO = BigInt(2);
 const EXPLICIT_SEPARATOR = /[,\n]+/;
 const COMMA_STRIP = /,/g;
 const INTEGER_PATTERN = /^-?\d+$/;
@@ -82,6 +83,23 @@ export type AggregateCoreInput = {
 
 export type AggregateInput = StepInput & AggregateCoreInput;
 
+/**
+ * Arithmetic primitives for a numeric type.
+ * Allows a single generic aggregation function to work with both number and bigint.
+ */
+type ArithmeticOperations<T> = {
+  zero: T;
+  one: T;
+  two: T;
+  addition: (a: T, b: T) => T;
+  multiply: (a: T, b: T) => T;
+  divide: (a: T, b: T) => T;
+  lessThan: (a: T, b: T) => boolean;
+  sortAscending: (values: T[]) => T[];
+  fromLength: (n: number) => T;
+  toString: (a: T) => string;
+};
+
 // ─── Validation ─────────────────────────────────────────────────────────────
 
 const VALID_OPERATIONS: ReadonlySet<string> = new Set(AGGREGATE_OPERATIONS);
@@ -108,13 +126,50 @@ function isBinaryPostOperation(value: string): value is BinaryPostOperation {
 
 // ─── Error helpers ──────────────────────────────────────────────────────────
 
-function fail(error: string): AggregateResult {
+function failedAggregation(error: string): AggregateResult {
   return { success: false, error };
 }
 
+// ─── Arithmetic implementations ─────────────────────────────────────────────
+
+const NUMBER_ARITHMETIC: ArithmeticOperations<number> = {
+  zero: 0,
+  one: 1,
+  two: 2,
+  addition: (a, b) => a + b,
+  multiply: (a, b) => a * b,
+  divide: (a, b) => a / b,
+  lessThan: (a, b) => a < b,
+  sortAscending: (values) => [...values].sort((a, b) => a - b),
+  fromLength: (n) => n,
+  toString: (a) => String(a),
+};
+
+const BIGINT_ARITHMETIC: ArithmeticOperations<bigint> = {
+  zero: BIGINT_ZERO,
+  one: BIGINT_ONE,
+  two: BIGINT_TWO,
+  addition: (a, b) => a + b,
+  multiply: (a, b) => a * b,
+  divide: (a, b) => a / b,
+  lessThan: (a, b) => a < b,
+  sortAscending: (values) =>
+    [...values].sort((a, b) => {
+      if (a < b) {
+        return -1;
+      }
+      if (a > b) {
+        return 1;
+      }
+      return 0;
+    }),
+  fromLength: (n) => BigInt(n),
+  toString: (a) => a.toString(),
+};
+
 // ─── Numeric parsing ────────────────────────────────────────────────────────
 
-function cleanRawValue(value: unknown): string | null {
+function sanitizeRawValueToString(value: unknown): string | null {
   if (typeof value === "number") {
     return Number.isFinite(value) ? String(value) : null;
   }
@@ -128,7 +183,7 @@ function cleanRawValue(value: unknown): string | null {
   return null;
 }
 
-function parseNumeric(cleaned: string): NumericValue | null {
+function parseStringToNumericValue(cleaned: string): NumericValue | null {
   if (INTEGER_PATTERN.test(cleaned)) {
     const bi = BigInt(cleaned);
     if (
@@ -143,16 +198,16 @@ function parseNumeric(cleaned: string): NumericValue | null {
   return Number.isFinite(num) ? { kind: "number", value: num } : null;
 }
 
-function toNumeric(value: unknown): NumericValue | null {
-  const cleaned = cleanRawValue(value);
+function parseUnknownToNumericValue(value: unknown): NumericValue | null {
+  const cleaned = sanitizeRawValueToString(value);
   if (cleaned === null) {
     return null;
   }
-  return parseNumeric(cleaned);
+  return parseStringToNumericValue(cleaned);
 }
 
-function toNumber(value: unknown): number | null {
-  const cleaned = cleanRawValue(value);
+function parseUnknownToNumber(value: unknown): number | null {
+  const cleaned = sanitizeRawValueToString(value);
   if (cleaned === null) {
     return null;
   }
@@ -179,7 +234,7 @@ function resolveFieldPath(obj: unknown, path: string): unknown {
 
 // ─── Value extraction ───────────────────────────────────────────────────────
 
-function unwrapArray(input: string): unknown[] {
+function parseJsonToArray(input: string): unknown[] {
   let parsed: unknown;
   try {
     parsed = JSON.parse(input);
@@ -210,9 +265,9 @@ function collectNumericValues(
   const values: NumericValue[] = [];
   for (const item of items) {
     const raw = fieldPath ? resolveFieldPath(item, fieldPath) : item;
-    const nv = toNumeric(raw);
-    if (nv !== null) {
-      values.push(nv);
+    const numericValue = parseUnknownToNumericValue(raw);
+    if (numericValue !== null) {
+      values.push(numericValue);
     }
   }
   return values;
@@ -222,7 +277,7 @@ function extractArrayValues(
   arrayInput: string,
   fieldPath: string | undefined
 ): NumericValue[] {
-  const items = unwrapArray(arrayInput);
+  const items = parseJsonToArray(arrayInput);
   return collectNumericValues(items, fieldPath);
 }
 
@@ -230,168 +285,106 @@ function extractExplicitValues(explicitValues: string): NumericValue[] {
   const parts = explicitValues.split(EXPLICIT_SEPARATOR);
   const values: NumericValue[] = [];
   for (const part of parts) {
-    const nv = toNumeric(part);
-    if (nv !== null) {
-      values.push(nv);
+    const numericValue = parseUnknownToNumericValue(part);
+    if (numericValue !== null) {
+      values.push(numericValue);
     }
   }
   return values;
 }
 
-// ─── BigInt aggregation ─────────────────────────────────────────────────────
+// ─── Type conversion ────────────────────────────────────────────────────────
 
-function toBigInts(values: NumericValue[]): bigint[] {
+function convertNumericValuesToBigInts(values: NumericValue[]): bigint[] {
   return values.map((v) =>
     v.kind === "bigint" ? v.value : BigInt(Math.trunc(v.value))
   );
 }
 
-function sumBigInt(values: bigint[]): bigint {
-  let result = BIGINT_ZERO;
-  for (const v of values) {
-    result += v;
+function convertNumericValuesToNumbers(values: NumericValue[]): number[] {
+  return values.map((v) => (v.kind === "number" ? v.value : Number(v.value)));
+}
+
+// ─── Generic aggregation ────────────────────────────────────────────────────
+
+function reduceValues<T>(
+  values: T[],
+  initial: T,
+  accumulator: (acc: T, current: T) => T
+): T {
+  let result = initial;
+  for (const value of values) {
+    result = accumulator(result, value);
   }
   return result;
 }
 
-function productBigInt(values: bigint[]): bigint {
-  let result = BIGINT_ONE;
-  for (const v of values) {
-    result *= v;
-  }
-  return result;
-}
-
-function minBigInt(values: bigint[]): bigint {
-  let result = values[0];
-  for (const v of values) {
-    if (v < result) {
-      result = v;
+function findExtremeValue<T>(
+  values: T[],
+  isLessThan: (a: T, b: T) => boolean
+): T {
+  let extreme = values[0];
+  for (const value of values) {
+    if (isLessThan(value, extreme)) {
+      extreme = value;
     }
   }
-  return result;
+  return extreme;
 }
 
-function maxBigInt(values: bigint[]): bigint {
-  let result = values[0];
-  for (const v of values) {
-    if (v > result) {
-      result = v;
-    }
-  }
-  return result;
-}
-
-function medianBigInt(values: bigint[]): bigint {
-  const sorted = [...values].sort((a, b) => {
-    if (a < b) {
-      return -1;
-    }
-    if (a > b) {
-      return 1;
-    }
-    return 0;
-  });
-  const mid = Math.floor(sorted.length / 2);
+function computeMedian<T>(values: T[], arithmetic: ArithmeticOperations<T>): T {
+  const sorted = arithmetic.sortAscending(values);
+  const midIndex = Math.floor(sorted.length / 2);
   if (sorted.length % 2 === 0) {
-    return (sorted[mid - 1] + sorted[mid]) / BigInt(2);
+    return arithmetic.divide(
+      arithmetic.addition(sorted[midIndex - 1], sorted[midIndex]),
+      arithmetic.two
+    );
   }
-  return sorted[mid];
+  return sorted[midIndex];
 }
 
-function aggregateBigInt(
-  values: bigint[],
-  operation: AggregateOperation
+function computeAggregation<T>(
+  values: T[],
+  operation: AggregateOperation,
+  arithmetic: ArithmeticOperations<T>
 ): string {
   if (values.length === 0) {
     if (operation === "count" || operation === "sum") {
-      return "0";
+      return arithmetic.toString(arithmetic.zero);
     }
     if (operation === "product") {
-      return "1";
+      return arithmetic.toString(arithmetic.one);
     }
     throw new Error(`Cannot compute ${operation} on an empty set of values.`);
   }
 
   switch (operation) {
     case "sum":
-      return sumBigInt(values).toString();
+      return arithmetic.toString(
+        reduceValues(values, arithmetic.zero, arithmetic.addition)
+      );
     case "count":
       return String(values.length);
     case "average":
-      return (sumBigInt(values) / BigInt(values.length)).toString();
+      return arithmetic.toString(
+        arithmetic.divide(
+          reduceValues(values, arithmetic.zero, arithmetic.addition),
+          arithmetic.fromLength(values.length)
+        )
+      );
     case "median":
-      return medianBigInt(values).toString();
+      return arithmetic.toString(computeMedian(values, arithmetic));
     case "min":
-      return minBigInt(values).toString();
+      return arithmetic.toString(findExtremeValue(values, arithmetic.lessThan));
     case "max":
-      return maxBigInt(values).toString();
+      return arithmetic.toString(
+        findExtremeValue(values, (a, b) => arithmetic.lessThan(b, a))
+      );
     case "product":
-      return productBigInt(values).toString();
-    default:
-      throw new Error(`Unknown operation: ${operation}`);
-  }
-}
-
-// ─── Number aggregation ─────────────────────────────────────────────────────
-
-function toNumbers(values: NumericValue[]): number[] {
-  return values.map((v) => (v.kind === "number" ? v.value : Number(v.value)));
-}
-
-function medianNumber(values: number[]): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  if (sorted.length % 2 === 0) {
-    return (sorted[mid - 1] + sorted[mid]) / 2;
-  }
-  return sorted[mid];
-}
-
-function aggregateNumber(
-  values: number[],
-  operation: AggregateOperation
-): number {
-  if (values.length === 0) {
-    if (operation === "count" || operation === "sum") {
-      return 0;
-    }
-    if (operation === "product") {
-      return 1;
-    }
-    throw new Error(`Cannot compute ${operation} on an empty set of values.`);
-  }
-
-  switch (operation) {
-    case "sum": {
-      let sum = 0;
-      for (const v of values) {
-        sum += v;
-      }
-      return sum;
-    }
-    case "count":
-      return values.length;
-    case "average": {
-      let sum = 0;
-      for (const v of values) {
-        sum += v;
-      }
-      return sum / values.length;
-    }
-    case "median":
-      return medianNumber(values);
-    case "min":
-      return Math.min(...values);
-    case "max":
-      return Math.max(...values);
-    case "product": {
-      let prod = 1;
-      for (const v of values) {
-        prod *= v;
-      }
-      return prod;
-    }
+      return arithmetic.toString(
+        reduceValues(values, arithmetic.one, arithmetic.multiply)
+      );
     default:
       throw new Error(`Unknown operation: ${operation}`);
   }
@@ -469,7 +462,7 @@ function parseInputValues(
 ): NumericValue[] | AggregateResult {
   if (input.inputMode === "array") {
     if (!input.arrayInput) {
-      return fail(
+      return failedAggregation(
         "arrayInput is required in array mode. Reference an upstream node output containing a JSON array."
       );
     }
@@ -478,14 +471,14 @@ function parseInputValues(
 
   if (input.inputMode === "explicit") {
     if (!input.explicitValues) {
-      return fail(
+      return failedAggregation(
         "explicitValues is required in explicit mode. Provide comma-separated or newline-separated values."
       );
     }
     return extractExplicitValues(input.explicitValues);
   }
 
-  return fail(
+  return failedAggregation(
     `Invalid inputMode "${input.inputMode}". Must be "array" or "explicit".`
   );
 }
@@ -498,14 +491,14 @@ function validatePostOperation(
     return null;
   }
   if (!VALID_POST_OPERATIONS.has(postOperation)) {
-    return fail(
+    return failedAggregation(
       `Invalid postOperation "${postOperation}". Must be one of: ${ALL_POST_OPERATIONS.join(", ")}.`
     );
   }
   if (isBinaryPostOperation(postOperation)) {
-    const operand = toNumber(input.postOperand);
+    const operand = parseUnknownToNumber(input.postOperand);
     if (operand === null) {
-      return fail(
+      return failedAggregation(
         `postOperand is required and must be a valid number for "${postOperation}" post-operation.`
       );
     }
@@ -525,7 +518,7 @@ function buildOperationLabel(input: AggregateCoreInput): string {
 function stepHandler(input: AggregateCoreInput): AggregateResult {
   try {
     if (!isValidOperation(input.operation)) {
-      return fail(
+      return failedAggregation(
         `Invalid operation "${input.operation}". Must be one of: ${AGGREGATE_OPERATIONS.join(", ")}.`
       );
     }
@@ -544,7 +537,11 @@ function stepHandler(input: AggregateCoreInput): AggregateResult {
     const { postOperation } = input;
 
     if (needsBigInt && !isActivePostOperation(postOperation)) {
-      const result = aggregateBigInt(toBigInts(parsed), input.operation);
+      const result = computeAggregation(
+        convertNumericValuesToBigInts(parsed),
+        input.operation,
+        BIGINT_ARITHMETIC
+      );
       return {
         success: true,
         result,
@@ -554,10 +551,15 @@ function stepHandler(input: AggregateCoreInput): AggregateResult {
       };
     }
 
-    let result = aggregateNumber(toNumbers(parsed), input.operation);
+    const aggregated = computeAggregation(
+      convertNumericValuesToNumbers(parsed),
+      input.operation,
+      NUMBER_ARITHMETIC
+    );
+    let result = Number(aggregated);
 
     if (isActivePostOperation(postOperation)) {
-      const operand = toNumber(input.postOperand);
+      const operand = parseUnknownToNumber(input.postOperand);
       result = applyPostOperation(result, postOperation, operand);
     }
 
@@ -569,7 +571,7 @@ function stepHandler(input: AggregateCoreInput): AggregateResult {
       inputCount: parsed.length,
     };
   } catch (error) {
-    return fail(`Aggregation failed: ${getErrorMessage(error)}`);
+    return failedAggregation(`Aggregation failed: ${getErrorMessage(error)}`);
   }
 }
 
