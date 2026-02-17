@@ -18,6 +18,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { registerSidebarRefetch } from "@/keeperhub/lib/refetch-sidebar";
 import type { Project, SavedWorkflow, Tag } from "@/lib/api-client";
 import { api } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
@@ -358,33 +359,36 @@ export function NavigationSidebar(): React.ReactNode {
   const closeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flyoutPinnedRef = useRef(false);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function fetchData(): Promise<void> {
-      try {
-        const [w, p, t] = await Promise.all([
-          api.workflow.getAll(),
-          api.project.getAll(),
-          api.tag.getAll(),
-        ]);
-        if (!cancelled) {
-          setWorkflows(w);
-          setProjects(p);
-          setTags(t);
-        }
-      } finally {
-        if (!cancelled) {
-          setDataLoading(false);
-        }
-      }
+  const fetchData = useCallback(async (): Promise<void> => {
+    try {
+      const [w, p, t] = await Promise.all([
+        api.workflow.getAll(),
+        api.project.getAll(),
+        api.tag.getAll(),
+      ]);
+      setWorkflows(w);
+      setProjects(p);
+      setTags(t);
+    } finally {
+      setDataLoading(false);
     }
-
-    fetchData().catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  useEffect(() => {
+    fetchData().catch(() => undefined);
+  }, [fetchData]);
+
+  useEffect(
+    () =>
+      registerSidebarRefetch((options) => {
+        if (options?.closeFlyout) {
+          flyoutPinnedRef.current = false;
+          setFlyoutOpen(false);
+        }
+        fetchData().catch(() => undefined);
+      }),
+    [fetchData]
+  );
 
   const visibleWorkflows = workflows.filter((w) => w.name !== "__current__");
 

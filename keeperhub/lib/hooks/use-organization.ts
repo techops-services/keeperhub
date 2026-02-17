@@ -4,6 +4,7 @@ import { getDefaultStore } from "jotai";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { registerOrganizationRefetch } from "@/keeperhub/lib/refetch-organizations";
+import { refetchSidebar } from "@/keeperhub/lib/refetch-sidebar";
 import { api } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
 import { resetWorkflowStateForOrgSwitchAtom } from "@/lib/workflow-store";
@@ -31,6 +32,7 @@ export function useOrganization() {
     await authClient.organization.setActive({ organizationId: orgId });
     // Reset workflow state only after org switch succeeds (safe in hook context)
     getDefaultStore().set(resetWorkflowStateForOrgSwitchAtom);
+    refetchSidebar({ closeFlyout: true });
     try {
       const list = await api.workflow.getAll();
       // Sort by createdAt descending to get the most recent workflow
