@@ -160,8 +160,8 @@ jobs:
 
       - name: Setup database
         run: |
-          pnpm db:push
           pnpm db:setup-workflow
+          pnpm db:migrate
           pnpm db:seed
           pnpm db:seed-test-wallet
         env:
