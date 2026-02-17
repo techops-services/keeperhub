@@ -142,7 +142,7 @@ export default function HubPage() {
           </div>
         ) : (
           <>
-            <div className="container mx-auto px-4 pt-28">
+            <div className="container mx-auto overflow-hidden px-4 pt-28">
               <HubHero />
             </div>
 
