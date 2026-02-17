@@ -522,11 +522,15 @@ export function AbiWithAutoFetchField({
   // Sync ABI when Diamond Proxy vs Read/Write as Proxy toggle changes
   const lastUseDiamondAbiRef = useRef<boolean | null>(null);
 
-  // Track last fetched (contract, network) so we only auto-fetch when they change
+  // Track last fetched (contract, network) so we only auto-fetch when they change.
+  // If the ABI is already populated on mount, seed with the current pair so we
+  // don't needlessly refetch when the user clicks back into the node.
   const lastFetchedRef = useRef<{
     contractAddress: string;
     network: string;
-  } | null>(null);
+  } | null>(
+    value && contractAddress && network ? { contractAddress, network } : null
+  );
   const currentTargetRef = useRef<{
     contractAddress: string;
     network: string;
@@ -703,14 +707,6 @@ export function AbiWithAutoFetchField({
     handleProxyContract,
   ]);
 
-  const handleFetchAbi = useCallback(async () => {
-    if (!(isValidAddress && network)) {
-      setError("Please enter a valid contract address and select a network");
-      return;
-    }
-    await performAbiFetch();
-  }, [isValidAddress, network, performAbiFetch]);
-
   // Auto-fetch ABI when contract address or network changes (debounced, once per pair).
   // performAbiFetch is stored in a ref and accessed via performAbiFetchRef.current inside
   // the effect. This avoids adding performAbiFetch to the dependency array, which would
@@ -820,45 +816,28 @@ export function AbiWithAutoFetchField({
     if (checked) {
       onChange("");
       resetProxyState();
-      lastFetchedRef.current = null;
     }
+    // Reset last-fetched so the auto-fetch effect re-triggers when switching
+    // back to automatic mode (unchecking manual ABI).
+    lastFetchedRef.current = null;
   };
 
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <Button
-          disabled={
-            disabled || isLoading || !isValidAddress || !network || useManualAbi
-          }
-          onClick={handleFetchAbi}
-          size="sm"
-          type="button"
-          variant="outline"
+        {isLoading && <Spinner className="h-4 w-4" />}
+        <Checkbox
+          checked={useManualAbi}
+          disabled={disabled}
+          id={`${field.key}-manual`}
+          onCheckedChange={handleManualToggle}
+        />
+        <Label
+          className="cursor-pointer font-normal text-sm"
+          htmlFor={`${field.key}-manual`}
         >
-          {isLoading ? (
-            <>
-              <Spinner className="mr-2" />
-              Fetching...
-            </>
-          ) : (
-            "Fetch ABI from Etherscan"
-          )}
-        </Button>
-        <div className="flex items-center gap-2">
-          <Checkbox
-            checked={useManualAbi}
-            disabled={disabled}
-            id={`${field.key}-manual`}
-            onCheckedChange={handleManualToggle}
-          />
-          <Label
-            className="cursor-pointer font-normal text-sm"
-            htmlFor={`${field.key}-manual`}
-          >
-            Use manual ABI
-          </Label>
-        </div>
+          Use manual ABI
+        </Label>
       </div>
 
       {error && (
@@ -905,25 +884,11 @@ export function AbiWithAutoFetchField({
         placeholder={
           useManualAbi
             ? "Paste your ABI here"
-            : "Click 'Fetch ABI from Etherscan' or enable 'Use manual ABI' to enter manually"
+            : "ABI will be fetched automatically when a contract address and network are set"
         }
         rows={4}
         value={value}
       />
-
-      {!(useManualAbi || error) && (
-        <p className="text-muted-foreground text-xs">
-          {(() => {
-            if (!(isValidAddress && network)) {
-              return "Enter a contract address and select a network to fetch the ABI";
-            }
-            if (isLoading) {
-              return "Fetching ABI from Etherscan...";
-            }
-            return "Click the button above to fetch the ABI from Etherscan";
-          })()}
-        </p>
-      )}
     </div>
   );
 }

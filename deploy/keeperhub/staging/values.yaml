@@ -118,6 +118,9 @@ env:
   NODE_OPTIONS:
     type: kv
     value: "--enable-source-maps --trace-warnings --trace-uncaught --trace-exit"
+  NODE_ENV:
+    type: kv
+    value: "development"
   HOSTNAME:
     type: kv
     value: "0.0.0.0"

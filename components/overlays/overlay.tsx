@@ -44,7 +44,7 @@ export function Overlay({
   className,
 }: OverlayComponentProps) {
   return (
-    <div className={cn("flex flex-col", className)}>
+    <div className={cn("flex max-h-[85vh] flex-col", className)}>
       {/* Header with smart back button detection */}
       {(title || description) && (
         <SmartOverlayHeader

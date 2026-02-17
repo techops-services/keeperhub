@@ -16,6 +16,7 @@ const VALID_ROUTES = new Set([
   "users-teams-orgs",
   "wallet-management",
   "workflows",
+  "guides",
 ]);
 
 // Routes that should bypass the check (static assets, API routes, etc.)

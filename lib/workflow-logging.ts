@@ -14,6 +14,10 @@ export type LogStepStartParams = {
   nodeName: string;
   nodeType: string;
   input?: unknown;
+  // start custom keeperhub code //
+  iterationIndex?: number;
+  forEachNodeId?: string;
+  // end keeperhub code //
 };
 
 export type LogStepStartResult = {
@@ -37,6 +41,10 @@ export async function logStepStartDb(
       status: "running",
       input: params.input,
       startedAt: new Date(),
+      // start custom keeperhub code //
+      iterationIndex: params.iterationIndex ?? null,
+      forEachNodeId: params.forEachNodeId ?? null,
+      // end keeperhub code //
     })
     .returning();
 

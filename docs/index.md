@@ -48,6 +48,9 @@ Welcome to the KeeperHub documentation. Learn how to create and manage blockchai
 ### Recommended Practices
 - [Security Best Practices](practices/security.md)
 
+### Guides
+- [Migrate from OpenZeppelin Defender](guides/defender-migration.md)
+
 ### Plans and Features - Work in Progress
 - [Pricing Plans](plans-features/pricing.md)
 - [Feature Comparison](plans-features/features.md)

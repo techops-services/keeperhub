@@ -8,6 +8,7 @@ import { AiGatewayConsentOverlay } from "@/components/overlays/ai-gateway-consen
 import { useOverlay } from "@/components/overlays/overlay-provider";
 import { Button } from "@/components/ui/button";
 import { CodeEditor } from "@/components/ui/code-editor";
+import { Input } from "@/components/ui/input";
 import { IntegrationIcon } from "@/components/ui/integration-icon";
 import { IntegrationSelector } from "@/components/ui/integration-selector";
 import { Label } from "@/components/ui/label";
@@ -37,6 +38,19 @@ import {
   integrationsVersionAtom,
 } from "@/lib/integrations-store";
 import type { IntegrationType } from "@/lib/types/integration";
+// start custom keeperhub code //
+import {
+  ARRAY_SOURCE_RE,
+  extractObjectPaths,
+  resolveArraySourceElement,
+  traverseDotPath,
+} from "@/keeperhub/lib/for-each-utils";
+import {
+  executionLogsAtom,
+  lastExecutionLogsAtom,
+  nodesAtom,
+} from "@/lib/workflow-store";
+// end keeperhub code //
 import {
   findActionById,
   getActionsByCategory,
@@ -249,6 +263,224 @@ function ConditionFields({
   );
 }
 
+// start custom keeperhub code //
+
+/**
+ * Extract dot-paths from the first element of the array referenced by arraySource.
+ */
+export function useArrayItemFields(arraySource: string | undefined): string[] {
+  const executionLogs = useAtomValue(executionLogsAtom);
+  const lastExecutionLogs = useAtomValue(lastExecutionLogsAtom);
+  const nodes = useAtomValue(nodesAtom);
+
+  return useMemo(() => {
+    if (!arraySource) {
+      return [];
+    }
+
+    const first = resolveArraySourceElement(
+      arraySource,
+      executionLogs,
+      lastExecutionLogs.logs,
+      nodes
+    );
+    if (!first) {
+      return [];
+    }
+
+    const paths: string[] = [];
+    extractObjectPaths(first, "", 0, paths);
+    return paths;
+  }, [arraySource, executionLogs, lastExecutionLogs, nodes]);
+}
+// end keeperhub code //
+
+/** Sentinel value for the "Full element (no mapping)" select option. */
+const FULL_ELEMENT_VALUE = "__full__";
+
+// For Each fields component
+function ForEachFields({
+  config,
+  onUpdateConfig,
+  disabled,
+}: {
+  config: Record<string, unknown>;
+  onUpdateConfig: (key: string, value: string) => void;
+  disabled: boolean;
+}) {
+  // start custom keeperhub code //
+  const itemFields = useArrayItemFields(
+    config?.arraySource as string | undefined
+  );
+  // end keeperhub code //
+  return (
+    <>
+      <div className="space-y-2">
+        <Label htmlFor="arraySource">Array Source</Label>
+        <TemplateBadgeInput
+          disabled={disabled}
+          id="arraySource"
+          onChange={(value) => onUpdateConfig("arraySource", value)}
+          placeholder="e.g., {{Database Query.rows}} or {{HTTP Request.data.items}}"
+          value={(config?.arraySource as string) || ""}
+        />
+        <p className="text-muted-foreground text-xs">
+          Reference an array from a previous node. Use @ to select a field.
+        </p>
+      </div>
+      {/* start custom keeperhub code */}
+      <div className="space-y-2">
+        <Label htmlFor="mapExpression">Extract Field (optional)</Label>
+        {itemFields.length > 0 ? (
+          <Select
+            disabled={disabled}
+            onValueChange={(value) =>
+              onUpdateConfig("mapExpression", value === FULL_ELEMENT_VALUE ? "" : value)
+            }
+            value={(config?.mapExpression as string) || FULL_ELEMENT_VALUE}
+          >
+            <SelectTrigger id="mapExpression">
+              <SelectValue placeholder="Full element" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={FULL_ELEMENT_VALUE}>
+                Full element (no mapping)
+              </SelectItem>
+              <SelectSeparator />
+              {itemFields.map((field) => (
+                <SelectItem key={field} value={field}>
+                  <span className="font-mono text-xs">{field}</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <Input
+            disabled={disabled}
+            id="mapExpression"
+            onChange={(e) => onUpdateConfig("mapExpression", e.target.value)}
+            placeholder="e.g., address or data.name"
+            value={(config?.mapExpression as string) || ""}
+          />
+        )}
+        <p className="text-muted-foreground text-xs">
+          {itemFields.length > 0
+            ? "Pick a field to extract from each element, or keep full element."
+            : "Run the workflow once to see available fields, or type a dot-path manually."}
+        </p>
+      </div>
+      {/* end keeperhub code */}
+      <div className="space-y-2">
+        <Label htmlFor="maxIterations">Max Items (optional)</Label>
+        <Input
+          disabled={disabled}
+          id="maxIterations"
+          min={0}
+          onChange={(e) => {
+            const raw = e.target.value.replace(/[^0-9]/g, "");
+            onUpdateConfig("maxIterations", raw);
+          }}
+          placeholder="All"
+          type="number"
+          value={(config?.maxIterations as string) || ""}
+        />
+        <p className="text-muted-foreground text-xs">
+          Leave empty or set to 0 to process all items. Negative values are not
+          allowed.
+        </p>
+      </div>
+      {/* start custom keeperhub code */}
+      <div className="space-y-2">
+        <Label htmlFor="concurrency">Concurrency</Label>
+        <Select
+          disabled={disabled}
+          onValueChange={(value) => {
+            onUpdateConfig("concurrency", value);
+            if (value !== "custom") {
+              onUpdateConfig("concurrencyLimit", "");
+            }
+          }}
+          value={(config?.concurrency as string) || "sequential"}
+        >
+          <SelectTrigger id="concurrency">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="sequential">Sequential (one at a time)</SelectItem>
+            <SelectItem value="parallel">Parallel (all at once)</SelectItem>
+            <SelectItem value="custom">Custom limit</SelectItem>
+          </SelectContent>
+        </Select>
+        {(config?.concurrency as string) === "custom" && (
+          <Input
+            disabled={disabled}
+            id="concurrencyLimit"
+            min={2}
+            onChange={(e) => {
+              const raw = e.target.value.replace(/[^0-9]/g, "");
+              onUpdateConfig("concurrencyLimit", raw);
+            }}
+            placeholder="e.g., 5"
+            type="number"
+            value={(config?.concurrencyLimit as string) || ""}
+          />
+        )}
+        <p className="text-muted-foreground text-xs">
+          Sequential runs one iteration at a time. Parallel runs all at once.
+          Custom limit runs up to N iterations concurrently.
+        </p>
+      </div>
+      {/* end keeperhub code */}
+      <div className="rounded-lg border bg-muted/30 p-3">
+        <p className="text-muted-foreground text-sm">
+          Connect action nodes after this For Each to define the loop body.
+          Optionally end with a Collect node to aggregate results. Without
+          Collect, the loop runs as fire-and-forget. Inside the loop, use @ to
+          reference <code className="text-xs">For Each.currentItem</code> for
+          the current element and{" "}
+          <code className="text-xs">For Each.index</code> for the iteration
+          index.
+        </p>
+      </div>
+    </>
+  );
+}
+
+// Collect fields component (informational only)
+function CollectFields() {
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg border bg-muted/30 p-3">
+        <p className="text-muted-foreground text-sm">
+          Place this node after a For Each loop to gather iteration outputs into
+          a single array. The Collect node marks the end of the loop body --
+          nodes connected after Collect run once with the aggregated results.
+        </p>
+      </div>
+      <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+        <p className="font-medium text-sm">Available outputs</p>
+        <ul className="list-disc space-y-1 pl-4 text-muted-foreground text-sm">
+          <li>
+            <code className="text-xs">Collect.results</code> -- Array of
+            outputs, one entry per iteration (from the last body node before
+            Collect)
+          </li>
+          <li>
+            <code className="text-xs">Collect.count</code> -- Number of
+            completed iterations
+          </li>
+        </ul>
+        <p className="text-muted-foreground text-xs">
+          Without a Collect node, the loop runs as fire-and-forget with no
+          aggregated output.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// end keeperhub code //
+
 // System action fields wrapper - extracts conditional rendering to reduce complexity
 function SystemActionFields({
   actionType,
@@ -286,6 +518,18 @@ function SystemActionFields({
           onUpdateConfig={onUpdateConfig}
         />
       );
+    // start custom keeperhub code //
+    case "For Each":
+      return (
+        <ForEachFields
+          config={config}
+          disabled={disabled}
+          onUpdateConfig={onUpdateConfig}
+        />
+      );
+    case "Collect":
+      return <CollectFields />;
+    // end keeperhub code //
     default:
       return null;
   }
@@ -296,6 +540,10 @@ const SYSTEM_ACTIONS: Array<{ id: string; label: string }> = [
   { id: "HTTP Request", label: "HTTP Request" },
   { id: "Database Query", label: "Database Query" },
   { id: "Condition", label: "Condition" },
+  // start custom keeperhub code //
+  { id: "For Each", label: "For Each" },
+  { id: "Collect", label: "Collect" },
+  // end keeperhub code //
 ];
 
 const SYSTEM_ACTION_IDS = SYSTEM_ACTIONS.map((a) => a.id);
@@ -307,15 +555,28 @@ const SYSTEM_ACTION_INTEGRATIONS: Record<string, IntegrationType> = {
 
 // Build category mapping dynamically from plugins + System
 function useCategoryData() {
+  // start custom keeperhub code //
+  const nodes = useAtomValue(nodesAtom);
+  const hasForEach = nodes.some(
+    (n) => n.data?.config?.actionType === "For Each"
+  );
+  // end keeperhub code //
+
   return useMemo(() => {
     const pluginCategories = getActionsByCategory();
+
+    // start custom keeperhub code //
+    const systemActions = hasForEach
+      ? SYSTEM_ACTIONS
+      : SYSTEM_ACTIONS.filter((a) => a.id !== "Collect");
+    // end keeperhub code //
 
     // Build category map including System with both id and label
     const allCategories: Record<
       string,
       Array<{ id: string; label: string }>
     > = {
-      System: SYSTEM_ACTIONS,
+      System: systemActions,
     };
 
     for (const [category, actions] of Object.entries(pluginCategories)) {
@@ -326,7 +587,7 @@ function useCategoryData() {
     }
 
     return allCategories;
-  }, []);
+  }, [hasForEach]);
 }
 
 // Get category for an action type (supports both new IDs, labels, and legacy labels)

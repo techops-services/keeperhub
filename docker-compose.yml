@@ -150,6 +150,7 @@ services:
       HOSTNAME: "0.0.0.0"
       KEEPERHUB_API_KEY: ${KEEPERHUB_API_KEY:-some-random-api-key}
       NODE_OPTIONS: "--max-old-space-size=3072"
+      METRICS_COLLECTOR: prometheus
     deploy:
       resources:
         limits:

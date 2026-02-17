@@ -88,7 +88,13 @@ podAnnotations:
   reloader.stakater.com/auto: "true"
 
 serviceMonitors:
-  enabled: false
+  enabled: true
+  monitors:
+    - name: keeperhub-metrics
+      port: http
+      path: /api/metrics
+      interval: 30s
+      scrapeTimeout: 10s
 
 resources:
   limits:

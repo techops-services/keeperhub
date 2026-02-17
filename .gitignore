@@ -124,3 +124,7 @@ tailwindcss-*.log
 
 .planning
 .prompts
+
+# Claude Code cached output
+.claude/lint-output.txt
+.claude/typecheck-output.txt

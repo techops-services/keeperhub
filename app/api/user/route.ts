@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { ErrorCategory, logSystemError } from "@/keeperhub/lib/logging";
 import { getUserWallet } from "@/keeperhub/lib/para/wallet-helpers";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -54,7 +55,10 @@ export async function GET(request: Request) {
       walletAddress,
     });
   } catch (error) {
-    console.error("Failed to get user:", error);
+    logSystemError(ErrorCategory.DATABASE, "Failed to get user", error, {
+      endpoint: "/api/user",
+      operation: "get",
+    });
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Failed to get user",
@@ -105,7 +109,10 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Failed to update user:", error);
+    logSystemError(ErrorCategory.DATABASE, "Failed to update user", error, {
+      endpoint: "/api/user",
+      operation: "update",
+    });
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Failed to update user",

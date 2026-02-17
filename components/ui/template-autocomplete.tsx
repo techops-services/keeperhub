@@ -25,6 +25,7 @@ import { findActionById } from "@/plugins";
 import { getTriggerOutputFields } from "@/keeperhub/lib/trigger-output-fields";
 // start custom keeperhub code //
 import { getReadContractOutputFields } from "@/keeperhub/lib/action-output-fields";
+import { resolveForEachSyntheticOutput } from "@/keeperhub/lib/for-each-utils";
 
 /** Map of nodeId -> execution log entry. Used for last-run fallback in template autocomplete. */
 type ExecutionLogsByNodeId = Record<string, ExecutionLogEntry>;
@@ -211,6 +212,30 @@ const getCommonFields = (node: WorkflowNode) => {
       return dynamicFields;
     }
   }
+
+  if (actionType === "For Each") {
+    return [
+      {
+        field: "currentItem",
+        description: "Current array element (inside loop body)",
+      },
+      { field: "index", description: "Current iteration index (0-based)" },
+      {
+        field: "totalItems",
+        description: "Total number of items in array",
+      },
+    ];
+  }
+
+  if (actionType === "Collect") {
+    return [
+      {
+        field: "results",
+        description: "Array of outputs from each iteration",
+      },
+      { field: "count", description: "Number of completed iterations" },
+    ];
+  }
   // end keeperhub code //
 
   // Check if the plugin defines output fields
@@ -273,10 +298,13 @@ const getCommonFields = (node: WorkflowNode) => {
   return [{ field: "data", description: "Output data" }];
 };
 
+// start custom keeperhub code //
 // Sanitize nodeId the same way as workflow executor for consistent lookup
 function sanitizeNodeId(nodeId: string): string {
   return nodeId.replace(/[^a-zA-Z0-9]/g, "_");
 }
+
+// end keeperhub code //
 
 export function TemplateAutocomplete({
   isOpen,
@@ -436,6 +464,68 @@ export function TemplateAutocomplete({
       : hasLastRunOutput
         ? lastRunOutput
         : null;
+
+    // For Each nodes: override with synthetic output so autocomplete shows
+    // the actual currentItem shape (nested fields) instead of the step's
+    // generic metadata. Resolves the arraySource from upstream execution data.
+    const actionType = node.data.config?.actionType as string | undefined;
+    if (actionType === "For Each") {
+      const syntheticOutput = resolveForEachSyntheticOutput(
+        node,
+        executionLogs,
+        lastLogsForWorkflow,
+        upstreamNodes
+      );
+
+      if (syntheticOutput) {
+        const sanitizedId = sanitizeNodeId(node.id);
+        const nodeOutputs: NodeOutputs = {
+          [sanitizedId]: { label: nodeName, data: syntheticOutput },
+        };
+        const runtimeFields = getAvailableFields(nodeOutputs);
+
+        options.push({
+          type: "node",
+          nodeId: node.id,
+          nodeName,
+          template: `{{@${node.id}:${nodeName}}}`,
+        });
+
+        for (const entry of runtimeFields) {
+          if (entry.fieldPath === "" && entry.field === "") {
+            continue;
+          }
+          const fieldPath = entry.fieldPath || entry.field;
+          options.push({
+            type: "field",
+            nodeId: node.id,
+            nodeName,
+            field: fieldPath,
+            description: undefined,
+            template: `{{@${node.id}:${nodeName}.${fieldPath}}}`,
+          });
+        }
+      } else {
+        const fields = getCommonFields(node);
+        options.push({
+          type: "node",
+          nodeId: node.id,
+          nodeName,
+          template: `{{@${node.id}:${nodeName}}}`,
+        });
+        for (const field of fields) {
+          options.push({
+            type: "field",
+            nodeId: node.id,
+            nodeName,
+            field: field.field,
+            description: field.description,
+            template: `{{@${node.id}:${nodeName}.${field.field}}}`,
+          });
+        }
+      }
+      continue;
+    }
 
     if (outputToUse !== null) {
       const sanitizedId = sanitizeNodeId(node.id);
