@@ -11,7 +11,6 @@ import {
 
 // Top-level regex patterns
 const MAINNET_OPTION_REGEX = /mainnet/i;
-const WORKFLOW_ID_REGEX = /\/workflows?\/([a-zA-Z0-9_-]+)/;
 
 // Run tests serially to maintain user session state
 test.describe.configure({ mode: "serial" });
@@ -147,25 +146,14 @@ test.describe("Happy Path: Web3 Balance Check", () => {
     });
     await saveWorkflow(page);
 
-    // Get actual workflow ID from URL after save
-    const url = page.url();
-    const workflowIdMatch = url.match(WORKFLOW_ID_REGEX);
-    const actualWorkflowId = workflowIdMatch?.[1];
-
     // Trigger workflow manually
     await triggerWorkflowManually(page);
 
-    // Use the "Runs" tab in the current view instead of navigating away
+    // Use the "Runs" tab in the current view
     const runsTab = page.getByRole("tab", { name: "Runs" });
-    if (await runsTab.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await runsTab.click();
-      await page.waitForTimeout(2000);
-    } else if (actualWorkflowId) {
-      // Navigate to execution history if tab not available
-      await page.goto(`/workflow/${actualWorkflowId}/history`, {
-        waitUntil: "domcontentloaded",
-      });
-    }
+    await expect(runsTab).toBeVisible({ timeout: 5000 });
+    await runsTab.click();
+    await page.waitForTimeout(2000);
 
     // Wait for execution to appear - look for "Run #" entries in the Runs tab
     const executionEntry = page.locator("text=/Run #\\d+/").first();
