@@ -43,17 +43,18 @@ Applied to the aggregated result. Useful for unit conversions, thresholds, and f
 | subtract  | Subtract a constant          | Sum - budget threshold              |
 | multiply  | Multiply by a constant       | Convert between denominations       |
 | divide    | Divide by a constant         | Token conversion ratio              |
-| modulo    | Remainder after division     | Cycle detection                     |
-| power     | Raise to a power             | Scale by 10^N for decimal precision |
+| modulo         | Remainder after division          | Cycle detection                     |
+| power          | Raise to a power                  | Scale by 10^N for decimal precision |
+| round-decimals | Round to N decimal places         | Round to 2 decimals for display     |
 
 **Unary (no operand needed):**
 
-| Operation | Description                  | Example                        |
-| --------- | ---------------------------- | ------------------------------ |
-| abs       | Absolute value               | Magnitude of a delta           |
-| round     | Round to nearest integer     | Clean up fractional results    |
-| floor     | Round down                   | Conservative integer estimate  |
-| ceil      | Round up                     | Ensure minimum allocation      |
+| Operation | Description              | Example                       |
+| --------- | ------------------------ | ----------------------------- |
+| abs       | Absolute value           | Magnitude of a delta          |
+| round     | Round to nearest integer | Clean up fractional results   |
+| floor     | Round down               | Conservative integer estimate |
+| ceil      | Round up                 | Ensure minimum allocation     |
 
 ### Input Modes
 
@@ -80,7 +81,7 @@ Applied to the aggregated result. Useful for unit conversions, thresholds, and f
 | arrayInput     | If array mode    | JSON array from upstream node                                         |
 | fieldPath      | No (array mode)  | Dot-path to numeric field in each array element                       |
 | postOperation  | No               | Optional arithmetic on the result (see table above)                   |
-| postOperand    | If binary post-op| Number for binary post-ops (ignored for abs/round/floor/ceil)         |
+| postOperand    | If binary post-op| Number for binary post-ops and round-decimals (decimal count)         |
 
 ### Outputs
 

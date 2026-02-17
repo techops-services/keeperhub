@@ -27,6 +27,7 @@ const BINARY_POST_OPERATIONS = [
   "subtract",
   "add",
   "power",
+  "round-decimals",
 ] as const;
 
 /** Post-ops that take no operand (unary) */
@@ -79,6 +80,7 @@ export type AggregateCoreInput = {
   explicitValues?: string;
   postOperation?: PostOperation;
   postOperand?: string;
+  postDecimalPlaces?: string;
 };
 
 export type AggregateInput = StepInput & AggregateCoreInput;
@@ -416,6 +418,10 @@ function applyBinaryPostOperation(
       return value % operand;
     case "power":
       return value ** operand;
+    case "round-decimals": {
+      const factor = 10 ** Math.trunc(operand);
+      return Math.round(value * factor) / factor;
+    }
     default:
       throw new Error(`Unknown post-operation: ${postOp}`);
   }
@@ -496,10 +502,18 @@ function validatePostOperation(
     );
   }
   if (isBinaryPostOperation(postOperation)) {
-    const operand = parseUnknownToNumber(input.postOperand);
+    const operandSource =
+      postOperation === "round-decimals"
+        ? input.postDecimalPlaces
+        : input.postOperand;
+    const operand = parseUnknownToNumber(operandSource);
     if (operand === null) {
+      const fieldName =
+        postOperation === "round-decimals"
+          ? "postDecimalPlaces"
+          : "postOperand";
       return failedAggregation(
-        `postOperand is required and must be a valid number for "${postOperation}" post-operation.`
+        `${fieldName} is required and must be a valid number for "${postOperation}" post-operation.`
       );
     }
   }
@@ -559,7 +573,11 @@ function stepHandler(input: AggregateCoreInput): AggregateResult {
     let result = Number(aggregated);
 
     if (isActivePostOperation(postOperation)) {
-      const operand = parseUnknownToNumber(input.postOperand);
+      const operandSource =
+        postOperation === "round-decimals"
+          ? input.postDecimalPlaces
+          : input.postOperand;
+      const operand = parseUnknownToNumber(operandSource);
       result = applyPostOperation(result, postOperation, operand);
     }
 
