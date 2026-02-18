@@ -87,7 +87,7 @@ No credentials required -- this is a read-only operation using Multicall3 at `0x
 
 | Mode    | Description                                                                 | Best For                                                              |
 | ------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Uniform | One contract, one function, array of argument sets on a single network      | Same function across many inputs: `balanceOf(addr)` for 50 pools      |
+| Uniform | One contract, one function, multiple arg sets on a single network           | Same function across many inputs: `balanceOf(addr)` for 50 pools      |
 | Mixed   | Each call has its own network, contract address, ABI, function, and args    | Heterogeneous reads: `hat()` + `approvals(addr)` on different chains  |
 
 ### Inputs
@@ -101,8 +101,12 @@ No credentials required -- this is a read-only operation using Multicall3 at `0x
 | contractAddress | Yes      | Target contract address (`0x...` or template variable)                                   |
 | abi             | Yes      | Contract ABI (auto-fetched from block explorer or pasted manually)                       |
 | abiFunction     | Yes      | Function to call (selected from ABI)                                                     |
-| argsList        | No       | JSON array of argument arrays. Each inner array is the args for one call                 |
+| argsList        | No       | Argument sets for each call (see Args List Builder below)                                |
 | batchSize       | No       | Max calls per Multicall3 request (default: 100, range: 1-500)                            |
+
+**Args List Builder (Uniform Mode):**
+
+The Args List field uses a dynamic builder instead of raw JSON. After selecting a function, the UI shows labeled inputs for each parameter based on the ABI signature. For example, selecting `allowance(address owner, address spender)` shows two labeled inputs per row: "owner (address)" and "spender (address)". Click "Add Arg Set" to add more rows, each representing one call. Template variables like `{{NodeName.value}}` are supported in all inputs.
 
 **Mixed Mode:**
 
@@ -160,7 +164,7 @@ Return values are structured based on ABI output definitions:
 
 ### DEX Pool Liquidity Monitor (Uniform Mode)
 
-Monitor a token's balance across multiple DEX pool contracts. One function (`balanceOf`), many addresses.
+Monitor a token's balance across multiple DEX pool contracts. One function (`balanceOf`), many addresses. Each arg set shows a labeled "account (address)" input.
 
 ```
 Schedule (every 5 min)
@@ -169,13 +173,12 @@ Schedule (every 5 min)
        network: ethereum
        contractAddress: 0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2 (MKR)
        function: balanceOf(address)
-       argsList: [
-         ["0xPool1"],
-         ["0xPool2"],
-         ["0xPool3"],
+       argsList:
+         Call 1: account = 0xPool1
+         Call 2: account = 0xPool2
+         Call 3: account = 0xPool3
          ...
-         ["0xPool14"]
-       ]
+         Call 14: account = 0xPool14
   -> Aggregate:
        operation: sum
        inputMode: array
@@ -225,7 +228,7 @@ Schedule (every 15 min)
 
 ### Keeper Network Job Scanner (Uniform Mode)
 
-Check which jobs are workable across a keeper network using a single batched read.
+Check which jobs are workable across a keeper network using a single batched read. Each arg set shows a labeled "keeper (address)" input.
 
 ```
 Schedule (every block)
@@ -234,34 +237,52 @@ Schedule (every block)
        network: ethereum
        contractAddress: 0xKeeperRegistry
        function: workable(address)
-       argsList: [
-         ["0xJob1"],
-         ["0xJob2"],
-         ["0xJob3"],
-         ["0xJob4"]
-       ]
+       argsList:
+         Call 1: keeper = 0xJob1
+         Call 2: keeper = 0xJob2
+         Call 3: keeper = 0xJob3
+         Call 4: keeper = 0xJob4
   -> Condition: any result.success && result.result == true
   -> Write Contract: execute the workable job
 ```
 
 ### Uniswap V2 Pair Reserves (Uniform Mode)
 
-Read reserves from multiple Uniswap V2 pairs to compute prices. Each `getReserves()` returns `(reserve0, reserve1, blockTimestampLast)`.
+Read reserves from multiple Uniswap V2 pairs. `getReserves()` takes no parameters, so each arg set is empty -- just click "Add Arg Set" for each pair contract you want to query. Returns `(reserve0, reserve1, blockTimestampLast)` per call.
 
 ```
 Schedule (every 5 min)
   -> Batch Read Contract:
        inputMode: uniform
        network: ethereum
-       contractAddress: 0xPairFactory
+       contractAddress: 0xPairAddress
        function: getReserves()
-       argsList: []  (no args needed)
+       argsList: (no parameters -- function has no inputs, single arg set added)
   -> Discord: "Pair reserves: {{@batch:Batch Read Contract.results}}"
+```
+
+### Multi-Param Function: Allowance Check (Uniform Mode)
+
+Check token allowances for multiple owner/spender pairs. The `allowance(address,address)` function has two parameters, so each arg set shows labeled inputs for both "owner" and "spender".
+
+```
+Schedule (every hour)
+  -> Batch Read Contract:
+       inputMode: uniform
+       network: ethereum
+       contractAddress: 0xUSDC
+       function: allowance(address,address)
+       argsList:
+         Call 1: owner = 0xTreasury, spender = 0xRouter
+         Call 2: owner = 0xTreasury, spender = 0xBridge
+         Call 3: owner = 0xVault,    spender = 0xRouter
+  -> Condition: any result where result < threshold
+  -> Discord: "Low allowance detected"
 ```
 
 ### Loop + Batch Read (Dynamic Address List)
 
-Use a database query to get a dynamic list of addresses, then batch-read their balances.
+Use a database query to get a dynamic list of addresses, then batch-read their balances. Each arg set's "account" field uses a template variable.
 
 ```
 Schedule (daily)
@@ -271,7 +292,10 @@ Schedule (daily)
        network: ethereum
        contractAddress: 0xUSDC
        function: balanceOf(address)
-       argsList: {{@db:Database Query.rows | map to [["addr1"], ["addr2"], ...]}}
+       argsList:
+         Call 1: account = {{@db:Database Query.rows[0].address}}
+         Call 2: account = {{@db:Database Query.rows[1].address}}
+         ...
   -> Aggregate:
        operation: sum
        inputMode: array
