@@ -143,11 +143,11 @@ Uses Multicall3's `aggregate3` with `allowFailure: true`. If one call reverts, t
 
 ### Cross-Chain Execution (Mixed Mode)
 
-When mixed mode calls target different networks, calls are automatically grouped by network. Each network group is executed as a separate Multicall3 call, and results are merged back in the original call order. This means you can batch reads across Ethereum, Polygon, and Arbitrum in a single node.
+When mixed mode calls target different networks, calls are automatically grouped by network. Each network group is executed in parallel via `Promise.all`, and results are merged back in the original call order. This means you can batch reads across Ethereum, Polygon, and Arbitrum in a single node with minimal latency overhead.
 
 ### Batch Size
 
-The `batchSize` parameter (default: 100) controls how many calls are included in each Multicall3 RPC request. If you have 250 calls with a batch size of 100, the node sends 3 sequential RPC requests (100 + 100 + 50). Lower values reduce payload size and are useful when RPC providers have response size limits.
+The `batchSize` parameter (default: 100, max: 500) controls how many calls are included in each Multicall3 RPC request. If you have 250 calls with a batch size of 100, the node sends 3 sequential RPC requests (100 + 100 + 50). Lower values reduce payload size and are useful when RPC providers have response size limits. Maximum total calls per execution is 5000.
 
 ### Result Structure
 
