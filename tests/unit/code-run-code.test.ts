@@ -12,6 +12,7 @@ vi.mock("@/keeperhub/lib/metrics/instrumentation/plugin", () => ({
 
 vi.mock("@/keeperhub/lib/logging", () => ({
   ErrorCategory: { VALIDATION: "VALIDATION" },
+  // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op mock
   logUserError: () => {},
 }));
 
@@ -208,7 +209,7 @@ describe("code/run-code - console capture", () => {
 describe("code/run-code - sandbox globals", () => {
   it("has access to JSON", async () => {
     const result = await expectSuccess({
-      code: 'return JSON.parse(\'{"a":1}\');',
+      code: "return JSON.parse('{\"a\":1}');",
     });
     expect(result.result).toEqual({ a: 1 });
   });
