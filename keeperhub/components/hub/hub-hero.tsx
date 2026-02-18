@@ -13,6 +13,7 @@ export function HubHero() {
         </p>
       </div>
 
+        
       <div className="relative hidden lg:block">
         <div className="absolute top-1/2 left-1/2 -z-10 h-[150%] w-[150%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,#243548_0%,transparent_70%)]" />
         <Image
@@ -23,7 +24,6 @@ export function HubHero() {
           width={700}
         />
       </div>
-
       <div className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-2/3 bg-[linear-gradient(to_top,oklch(0.2101_0.0318_264.66)_0%,oklch(0.2101_0.0318_264.66)_10%,transparent_100%)] lg:block" />
     </div>
   );
