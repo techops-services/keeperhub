@@ -200,9 +200,9 @@ async function queryEventBatches(
   contract: ethers.Contract,
   eventName: string,
   eventFragment: ethers.EventFragment,
-  range: BlockRange,
-  batchSize: number
+  range: BlockRange
 ): Promise<DecodedEvent[]> {
+  const batchSize = DEFAULT_BATCH_SIZE;
   const eventFilter = contract.filters[eventName]?.();
   if (eventFilter === undefined || eventFilter === null) {
     throw new Error(`Could not create filter for event '${eventName}'`);
@@ -333,8 +333,7 @@ async function stepHandler(
       contract,
       eventName,
       eventFragment,
-      range,
-      DEFAULT_BATCH_SIZE
+      range
     );
 
     console.log("[Query Events] Query complete. Events found:", events.length);
