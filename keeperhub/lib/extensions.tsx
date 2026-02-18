@@ -14,6 +14,7 @@ import { SendGridConnectionSection } from "@/keeperhub/components/settings/sendg
 import { Web3WalletSection } from "@/keeperhub/components/settings/web3-wallet-section";
 import { AbiEventSelectField } from "@/keeperhub/components/workflow/config/abi-event-select-field";
 import { AbiWithAutoFetchField } from "@/keeperhub/components/workflow/config/abi-with-auto-fetch-field";
+import { CallListField } from "@/keeperhub/components/workflow/config/call-list-field";
 import { ChainSelectField } from "@/keeperhub/components/workflow/config/chain-select-field";
 import { GasLimitMultiplierField } from "@/keeperhub/components/workflow/config/gas-limit-multiplier-field";
 import { TokenSelectField } from "@/keeperhub/components/workflow/config/token-select-field";
@@ -169,6 +170,34 @@ registerFieldRenderer(
           disabled={disabled}
           field={field}
           onChange={(val: unknown) => onUpdateConfig(field.key, val)}
+          value={value}
+        />
+      </div>
+    );
+  }
+);
+
+/**
+ * Call List Builder Field
+ * Dynamic list of contract call rows for batch-read-contract mixed mode
+ * Each row configures: network, contract address, ABI, function, and arguments
+ */
+registerFieldRenderer(
+  "call-list-builder",
+  ({ field, config, onUpdateConfig, disabled }) => {
+    const value =
+      (config[field.key] as string | undefined) ?? field.defaultValue ?? "";
+
+    return (
+      <div className="space-y-2" key={field.key}>
+        <Label className="ml-1" htmlFor={field.key}>
+          {field.label}
+          {field.required && <span className="text-red-500">*</span>}
+        </Label>
+        <CallListField
+          disabled={disabled}
+          field={field}
+          onChange={(val: string) => onUpdateConfig(field.key, val)}
           value={value}
         />
       </div>
