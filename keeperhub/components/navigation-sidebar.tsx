@@ -27,8 +27,8 @@ import type { NavPanelStates } from "../lib/hooks/use-persisted-nav-state";
 import { usePersistedNavState } from "../lib/hooks/use-persisted-nav-state";
 import { FLYOUT_WIDTH, FlyoutPanel, STRIP_WIDTH } from "./flyout-panel";
 
-const COLLAPSED_WIDTH = 60;
-const EXPANDED_WIDTH = 200;
+export const COLLAPSED_WIDTH = 60;
+export const EXPANDED_WIDTH = 200;
 const SNAP_THRESHOLD = (COLLAPSED_WIDTH + EXPANDED_WIDTH) / 2;
 
 type WorkflowEntry = {
@@ -441,6 +441,16 @@ export function NavigationSidebar(): React.ReactNode {
     };
   }, [anyPanelOpen, navState.peelRightmost]);
 
+  const currentWidth =
+    dragWidth ?? (expanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      "--nav-sidebar-width",
+      `${currentWidth}px`
+    );
+  }, [currentWidth]);
+
   if (isMobile) {
     return null;
   }
@@ -471,8 +481,6 @@ export function NavigationSidebar(): React.ReactNode {
       ? { name: "Untagged" }
       : tags.find((t) => t.id === selectedTagId);
 
-  const currentWidth =
-    dragWidth ?? (expanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH);
   const showLabels = currentWidth >= SNAP_THRESHOLD;
   const offsets = computePanelOffsets(currentWidth, navState.state.panels);
 

@@ -135,18 +135,20 @@ export default function HubPage() {
       ref={scrollContainerRef}
     >
       {/* start custom KeeperHub code */}
-      <div className="md:ml-[60px]">
+      <div className="transition-[margin-left] duration-200 ease-out md:ml-[var(--nav-sidebar-width,60px)]">
         {isLoading ? (
           <div className="px-4 pt-28 pb-12">
             <p className="text-muted-foreground">Loading workflows...</p>
           </div>
         ) : (
           <>
-            <div className="container mx-auto px-4 pt-28">
-              <HubHero />
+            <div className="relative">
+              <div className="container mx-auto px-4 pt-28">
+                <HubHero />
+              </div>
             </div>
-
-            <div className="bg-white/[0.03] py-12">
+            <div className="bg-white/[0.03] py-12 relative">
+              <div className="absolute top-0 h-full bg-[#171f2e] w-full" />
               <div className="container mx-auto px-4">
                 <FeaturedCarousel workflows={featuredWorkflows} />
               </div>
