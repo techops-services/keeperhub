@@ -39,7 +39,6 @@ export type TransferFundsInput = StepInput & TransferFundsCoreInput;
 /**
  * Core transfer logic
  */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Step handler with comprehensive validation and error handling
 async function stepHandler(
   input: TransferFundsInput
 ): Promise<TransferFundsResult> {

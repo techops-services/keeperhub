@@ -1,0 +1,9 @@
+export default {
+  overview: "Overview",
+  web3: "Web3",
+  math: "Math",
+  discord: "Discord",
+  telegram: "Telegram",
+  sendgrid: "SendGrid",
+  webhook: "Webhook",
+};
