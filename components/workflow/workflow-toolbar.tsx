@@ -268,13 +268,25 @@ function isFieldEmpty(value: unknown): boolean {
 
 // Check if a conditional field should be shown based on current config
 function shouldShowField(
-  field: { showWhen?: { field: string; equals: string } },
+  // start custom keeperhub code //
+  field: {
+    showWhen?:
+      | { field: string; equals: string }
+      | { field: string; oneOf: string[] };
+  },
+  // end keeperhub code //
   config: Record<string, unknown>
 ): boolean {
   if (!field.showWhen) {
     return true;
   }
-  return config[field.showWhen.field] === field.showWhen.equals;
+  // start custom keeperhub code //
+  const dependentValue = config[field.showWhen.field];
+  if ("oneOf" in field.showWhen) {
+    return field.showWhen.oneOf.includes(dependentValue as string);
+  }
+  return dependentValue === field.showWhen.equals;
+  // end keeperhub code //
 }
 
 // Get missing required fields for a single node

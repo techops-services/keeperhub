@@ -135,7 +135,10 @@ const TRIGGERS = {
     description: "Manually triggered workflow via UI or API",
     requiredFields: {},
     optionalFields: {},
-    outputFields: {},
+    outputFields: {
+      triggeredAt:
+        "string - ISO timestamp when the workflow was triggered (available on all trigger types)",
+    },
   },
   Schedule: {
     triggerType: "Schedule",
@@ -149,7 +152,8 @@ const TRIGGERS = {
       scheduleTimezone: 'string - Timezone (e.g., "America/New_York", "UTC")',
     },
     outputFields: {
-      triggeredAt: "string - ISO timestamp when the schedule fired",
+      triggeredAt:
+        "string - ISO timestamp when the schedule fired (available on all trigger types)",
     },
   },
   Webhook: {
@@ -167,6 +171,8 @@ const TRIGGERS = {
       headers: "object - Webhook request headers",
       method: "string - HTTP method (GET, POST, etc.)",
       query: "object - Query parameters",
+      triggeredAt:
+        "string - ISO timestamp when the webhook was received (available on all trigger types)",
     },
   },
   Event: {
@@ -191,6 +197,8 @@ const TRIGGERS = {
       transactionHash: "string - Transaction hash that emitted the event",
       address: "string - Contract address that emitted the event",
       logIndex: "number - Index of the log in the block",
+      triggeredAt:
+        "string - ISO timestamp when the event was detected (available on all trigger types)",
     },
   },
   Block: {
@@ -209,6 +217,8 @@ const TRIGGERS = {
       blockHash: "string - Hash of the block",
       blockTimestamp: "number - Unix timestamp of the block",
       parentHash: "string - Hash of the parent block",
+      triggeredAt:
+        "string - ISO timestamp when the block was detected (available on all trigger types)",
     },
   },
 } as const;
@@ -570,6 +580,7 @@ export async function GET(request: Request) {
       "web3 write actions (transfer-funds, write-contract) require wallet integration",
       "Use projectId to organize related workflows into a project (e.g., all Sky ESM workflows in one project)",
       `Use {{@${BUILTIN_NODE_ID}:${BUILTIN_NODE_LABEL}.unixTimestamp}} for current time comparisons in conditions (e.g., checking if a contract timestamp has passed)`,
+      "All trigger types expose a 'triggeredAt' output field (ISO timestamp). Reference it with {{@triggerId:TriggerLabel.data.triggeredAt}} to include when the workflow fired.",
     ],
   };
 

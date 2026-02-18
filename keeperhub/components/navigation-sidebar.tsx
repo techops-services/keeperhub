@@ -27,8 +27,8 @@ import type { NavPanelStates } from "../lib/hooks/use-persisted-nav-state";
 import { usePersistedNavState } from "../lib/hooks/use-persisted-nav-state";
 import { FLYOUT_WIDTH, FlyoutPanel, STRIP_WIDTH } from "./flyout-panel";
 
-const COLLAPSED_WIDTH = 60;
-const EXPANDED_WIDTH = 200;
+export const COLLAPSED_WIDTH = 60;
+export const EXPANDED_WIDTH = 200;
 const SNAP_THRESHOLD = (COLLAPSED_WIDTH + EXPANDED_WIDTH) / 2;
 
 type WorkflowEntry = {
@@ -208,15 +208,17 @@ function ProjectsPanel({
 
 function TagsPanel({
   projectTags,
-  hasUntagged,
+  untaggedWorkflows,
   selectedTagId,
   onSelectTag,
+  activeWorkflowId,
   loading,
 }: {
   projectTags: Tag[];
-  hasUntagged: boolean;
+  untaggedWorkflows: WorkflowEntry[];
   selectedTagId: string | null;
   onSelectTag: (id: string) => void;
+  activeWorkflowId: string | undefined;
   loading: boolean;
 }): React.ReactNode {
   if (loading) {
@@ -227,11 +229,13 @@ function TagsPanel({
     );
   }
 
-  const hasAny = projectTags.length > 0 || hasUntagged;
+  const hasAny = projectTags.length > 0 || untaggedWorkflows.length > 0;
 
   if (!hasAny) {
     return (
-      <p className="py-4 text-center text-muted-foreground text-sm">No tags</p>
+      <p className="py-4 text-center text-muted-foreground text-sm">
+        No workflows
+      </p>
     );
   }
 
@@ -260,18 +264,24 @@ function TagsPanel({
           </button>
         );
       })}
-      {hasUntagged && (
-        <button
-          className={cn(
-            "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted",
-            selectedTagId === "__untagged__" && "bg-muted"
+      {untaggedWorkflows.length > 0 && (
+        <>
+          {projectTags.length > 0 && (
+            <>
+              <div className="my-1 border-t" />
+              <p className="px-2 pt-1 pb-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                Other Workflows
+              </p>
+            </>
           )}
-          onClick={() => onSelectTag("__untagged__")}
-          type="button"
-        >
-          <span className="inline-block size-2 shrink-0 rounded-full bg-muted-foreground/30" />
-          <span className="truncate">Untagged</span>
-        </button>
+          {untaggedWorkflows.map((w) => (
+            <WorkflowItem
+              activeWorkflowId={activeWorkflowId}
+              key={w.id}
+              workflow={w}
+            />
+          ))}
+        </>
       )}
     </div>
   );
@@ -441,6 +451,16 @@ export function NavigationSidebar(): React.ReactNode {
     };
   }, [anyPanelOpen, navState.peelRightmost]);
 
+  const currentWidth =
+    dragWidth ?? (expanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      "--nav-sidebar-width",
+      `${currentWidth}px`
+    );
+  }, [currentWidth]);
+
   if (isMobile) {
     return null;
   }
@@ -471,8 +491,6 @@ export function NavigationSidebar(): React.ReactNode {
       ? { name: "Untagged" }
       : tags.find((t) => t.id === selectedTagId);
 
-  const currentWidth =
-    dragWidth ?? (expanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH);
   const showLabels = currentWidth >= SNAP_THRESHOLD;
   const offsets = computePanelOffsets(currentWidth, navState.state.panels);
 
@@ -690,11 +708,12 @@ export function NavigationSidebar(): React.ReactNode {
         title={selectedProject?.name ?? "Tags"}
       >
         <TagsPanel
-          hasUntagged={untaggedWorkflows.length > 0}
+          activeWorkflowId={workflowId}
           loading={dataLoading}
           onSelectTag={handleSelectTag}
           projectTags={projectTagsWithCounts}
           selectedTagId={selectedTagId}
+          untaggedWorkflows={untaggedWorkflows}
         />
       </FlyoutPanel>
 

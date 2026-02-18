@@ -1527,6 +1527,7 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
         let triggerData: Record<string, unknown> = {
           triggered: true,
           timestamp: Date.now(),
+          triggeredAt: new Date().toISOString(),
         };
 
         // Handle webhook mock request for test runs
@@ -1567,6 +1568,15 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
           } else {
             // For other trigger types, use as-is
             triggerData = { ...triggerData, ...triggerInput };
+            // Normalize schedule trigger: map triggerTime -> triggeredAt
+            // so the runtime field matches the declared output schema
+            if (
+              triggerType === "Schedule" &&
+              "triggerTime" in triggerInput &&
+              triggerInput.triggerTime
+            ) {
+              triggerData.triggeredAt = triggerInput.triggerTime;
+            }
           }
           // end custom keeperhub code //
         }
@@ -1585,9 +1595,15 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
           _context: triggerContext,
         });
 
+        // Store the full trigger result (not unwrapped) so the shape
+        // matches what withStepLogging writes to the execution log.
+        // This keeps autocomplete-suggested paths (e.g. data.triggeredAt)
+        // consistent with what resolveFromOutputData resolves at runtime.
+        // Direct field names (e.g. triggeredAt) still work via the
+        // hasNestedDataShape fallback in resolveFromOutputData.
         result = {
           success: triggerResult.success,
-          data: triggerResult.data,
+          data: triggerResult,
         };
       } else if (node.data.type === "action") {
         const config = node.data.config || {};

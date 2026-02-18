@@ -4,6 +4,7 @@
   "plugins": [
     "code",
     "discord",
+    "math",
     "sendgrid",
     "slack",
     "telegram",

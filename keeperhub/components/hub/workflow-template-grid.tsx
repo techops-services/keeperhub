@@ -78,7 +78,7 @@ export function WorkflowTemplateGrid({ workflows }: WorkflowTemplateGridProps) {
 
         return (
           <Card
-            className="flex flex-col gap-0 overflow-hidden border-none bg-sidebar py-0 transition-colors hover:brightness-125"
+            className="flex flex-col gap-0 overflow-hidden border border-border/50 bg-sidebar py-0 transition-colors hover:brightness-125"
             key={workflow.id}
           >
             <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden px-8">

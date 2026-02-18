@@ -5,6 +5,12 @@
 
 import type { OutputField } from "@/plugins/registry";
 
+/** Common field available on every trigger type */
+const TRIGGERED_AT_FIELD: OutputField = {
+  field: "triggeredAt",
+  description: "ISO timestamp when the workflow was triggered",
+};
+
 /**
  * Get output fields for Event trigger based on ABI and selected event
  */
@@ -35,6 +41,7 @@ export function getEventTriggerOutputFields(
         field: "address",
         description: "Contract address that emitted the event",
       },
+      TRIGGERED_AT_FIELD,
     ];
   }
 
@@ -106,7 +113,8 @@ export function getEventTriggerOutputFields(
       {
         field: "transactionIndex",
         description: "Index of the transaction in the block",
-      }
+      },
+      TRIGGERED_AT_FIELD
     );
 
     return outputFields;
@@ -137,6 +145,7 @@ export function getBlockTriggerOutputFields(): OutputField[] {
       field: "parentHash",
       description: "Hash of the parent block",
     },
+    TRIGGERED_AT_FIELD,
   ];
 }
 
@@ -177,18 +186,10 @@ export function getTriggerOutputFields(
         field: "query",
         description: "Query parameters",
       },
+      TRIGGERED_AT_FIELD,
     ];
   }
 
-  if (triggerType === "Schedule") {
-    return [
-      {
-        field: "triggeredAt",
-        description: "Timestamp when the schedule was triggered",
-      },
-    ];
-  }
-
-  // Manual trigger - no output fields
-  return [];
+  // Schedule, Manual, and any other trigger type
+  return [TRIGGERED_AT_FIELD];
 }
