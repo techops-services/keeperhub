@@ -463,14 +463,19 @@ describe("math/aggregate - BigInt arithmetic", () => {
     expect(result.resultType).toBe("bigint");
   });
 
-  it("falls back to number when bigint has post-operation", async () => {
+  it("aggregates with bigint precision then converts for post-operation", async () => {
+    // 9007199254740993 + 1 = 9007199254740994 (BigInt aggregation preserves this)
+    // Then multiply by 1 to verify post-op applies to the correct aggregated value
     const result = await expectSuccess({
       operation: "sum",
       explicitValues: `${largeValue1}, 1`,
       postOperation: "multiply",
-      postOperand: "2",
+      postOperand: "1",
     });
     expect(result.resultType).toBe("number");
+    // The aggregation used BigInt (9007199254740993 + 1 = 9007199254740994)
+    // then converted to Number for the post-op
+    expect(result.result).toBe("9007199254740994");
   });
 });
 

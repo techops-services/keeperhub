@@ -545,16 +545,37 @@ function stepHandler(input: AggregateCoreInput): AggregateResult {
     const needsBigInt = parsed.some((v) => v.kind === "bigint");
     const { postOperation } = input;
 
-    if (needsBigInt && !isActivePostOperation(postOperation)) {
-      const result = computeAggregation(
+    if (needsBigInt) {
+      const aggregated = computeAggregation(
         convertNumericValuesToBigInts(parsed),
         input.operation,
         BIGINT_ARITHMETIC
       );
+
+      if (!isActivePostOperation(postOperation)) {
+        return {
+          success: true,
+          result: aggregated,
+          resultType: "bigint",
+          operation: buildOperationLabel(input),
+          inputCount: parsed.length,
+        };
+      }
+
+      // Post-operations use Number arithmetic — convert only the aggregated
+      // result, preserving BigInt precision for the aggregation step itself
+      let result = Number(aggregated);
+      const operandSource =
+        postOperation === "round-decimals"
+          ? input.postDecimalPlaces
+          : input.postOperand;
+      const operand = parseUnknownToNumber(operandSource);
+      result = applyPostOperation(result, postOperation, operand);
+
       return {
         success: true,
-        result,
-        resultType: "bigint",
+        result: String(result),
+        resultType: "number",
         operation: buildOperationLabel(input),
         inputCount: parsed.length,
       };
