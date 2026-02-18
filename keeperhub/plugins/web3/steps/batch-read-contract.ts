@@ -492,54 +492,60 @@ async function executeMulticallBatches(
   chainId: number
 ): Promise<{ results: CallResult[]; error?: string }> {
   const provider = new ethers.JsonRpcProvider(rpcUrl);
-  const multicall = new ethers.Contract(
-    MULTICALL3_ADDRESS,
-    MULTICALL3_ABI,
-    provider
-  );
+  try {
+    const multicall = new ethers.Contract(
+      MULTICALL3_ADDRESS,
+      MULTICALL3_ABI,
+      provider
+    );
 
-  const results: CallResult[] = [];
-  const totalBatches = Math.ceil(encodedCalls.length / batchSize);
+    const results: CallResult[] = [];
+    const totalBatches = Math.ceil(encodedCalls.length / batchSize);
 
-  for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
-    const batchStart = batchIndex * batchSize;
-    const batchEnd = Math.min(batchStart + batchSize, encodedCalls.length);
-    const batch = encodedCalls.slice(batchStart, batchEnd);
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+      const batchStart = batchIndex * batchSize;
+      const batchEnd = Math.min(batchStart + batchSize, encodedCalls.length);
+      const batch = encodedCalls.slice(batchStart, batchEnd);
 
-    const multicallInput = batch.map(({ target, allowFailure, callData }) => ({
-      target,
-      allowFailure,
-      callData,
-    }));
-
-    try {
-      const batchResults: [boolean, string][] =
-        await multicall.aggregate3.staticCall(multicallInput);
-
-      for (const [i, batchResult] of batchResults.entries()) {
-        const [callSuccess, returnData] = batchResult;
-        const callMeta = encodedCalls[batchStart + i];
-        results.push(decodeCallResult(callSuccess, returnData, callMeta));
-      }
-    } catch (error) {
-      logUserError(
-        ErrorCategory.NETWORK_RPC,
-        `${LOG_PREFIX} Multicall batch ${batchIndex + 1} failed`,
-        error,
-        {
-          plugin_name: "web3",
-          action_name: "batch-read-contract",
-          chain_id: String(chainId),
-        }
+      const multicallInput = batch.map(
+        ({ target, allowFailure, callData }) => ({
+          target,
+          allowFailure,
+          callData,
+        })
       );
-      return {
-        results: [],
-        error: `Multicall batch ${batchIndex + 1}/${totalBatches} failed: ${getErrorMessage(error)}`,
-      };
-    }
-  }
 
-  return { results };
+      try {
+        const batchResults: [boolean, string][] =
+          await multicall.aggregate3.staticCall(multicallInput);
+
+        for (const [i, batchResult] of batchResults.entries()) {
+          const [callSuccess, returnData] = batchResult;
+          const callMeta = encodedCalls[batchStart + i];
+          results.push(decodeCallResult(callSuccess, returnData, callMeta));
+        }
+      } catch (error) {
+        logUserError(
+          ErrorCategory.NETWORK_RPC,
+          `${LOG_PREFIX} Multicall batch ${batchIndex + 1} failed`,
+          error,
+          {
+            plugin_name: "web3",
+            action_name: "batch-read-contract",
+            chain_id: String(chainId),
+          }
+        );
+        return {
+          results: [],
+          error: `Multicall batch ${batchIndex + 1}/${totalBatches} failed: ${getErrorMessage(error)}`,
+        };
+      }
+    }
+
+    return { results };
+  } finally {
+    provider.destroy();
+  }
 }
 
 /**
