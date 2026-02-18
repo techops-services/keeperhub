@@ -30,9 +30,20 @@ Template variables like `{{NodeName.field}}` are resolved by the workflow engine
 - `logs` -- Array of captured `console.log`, `console.warn`, `console.error` calls
 - `line` -- Line number where an error occurred (if available)
 
-**Available globals:** `BigInt`, `JSON`, `Math`, `Date`, `Array`, `Object`, `String`, `Number`, `Boolean`, `RegExp`, `Map`, `Set`, `Promise`, `console`, `parseInt`, `parseFloat`, `isNaN`, `isFinite`, `encodeURIComponent`, `decodeURIComponent`, `encodeURI`, `decodeURI`
+**Available globals:**
 
-**Not available:** `require`, `import`, `fetch`, `process`, `fs`, `eval`, `Function` constructor, or any Node.js built-in modules.
+- **I/O:** `console`, `fetch`
+- **Core types:** `BigInt`, `JSON`, `Math`, `Date`, `Array`, `Object`, `String`, `Number`, `Boolean`, `RegExp`, `Symbol`, `Map`, `Set`, `WeakMap`, `WeakSet`, `Promise`
+- **Error types:** `Error`, `TypeError`, `RangeError`, `SyntaxError`, `ReferenceError`, `URIError`
+- **Numeric/parsing:** `parseInt`, `parseFloat`, `isNaN`, `isFinite`, `Infinity`, `NaN`
+- **URI encoding:** `encodeURIComponent`, `decodeURIComponent`, `encodeURI`, `decodeURI`
+- **Base64:** `atob`, `btoa`
+- **Text encoding:** `TextEncoder`, `TextDecoder`
+- **Binary/typed arrays:** `ArrayBuffer`, `SharedArrayBuffer`, `DataView`, `Uint8Array`, `Uint16Array`, `Uint32Array`, `Int8Array`, `Int16Array`, `Int32Array`, `Float32Array`, `Float64Array`, `BigInt64Array`, `BigUint64Array`
+- **Fetch API:** `URL`, `URLSearchParams`, `Headers`, `Request`, `Response`, `AbortController`, `AbortSignal`
+- **Utilities:** `structuredClone`, `Intl`, `crypto`
+
+**Not available:** `require`, `import`, `process`, `fs`, `eval`, `Function` constructor, `setTimeout`, `setInterval`, or any Node.js built-in modules.
 
 **When to use:** Aggregate event data across multiple sources, apply threshold-based anomaly detection, format complex alert payloads, perform custom math or data transformations that don't fit into a predefined node type.
 

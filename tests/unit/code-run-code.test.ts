@@ -258,6 +258,90 @@ describe("code/run-code - sandbox globals", () => {
     expect(result.result).toBe("hello%20world");
   });
 
+  it("has access to fetch", async () => {
+    const result = await expectSuccess({
+      code: "return typeof fetch;",
+    });
+    expect(result.result).toBe("function");
+  });
+
+  it("has access to URL and URLSearchParams", async () => {
+    const code = [
+      "const u = new URL('https://example.com/path?a=1');",
+      "u.searchParams.set('b', '2');",
+      "return u.toString();",
+    ].join("\n");
+    const result = await expectSuccess({ code });
+    expect(result.result).toBe("https://example.com/path?a=1&b=2");
+  });
+
+  it("has access to atob and btoa", async () => {
+    const code = [
+      "const encoded = btoa('hello');",
+      "const decoded = atob(encoded);",
+      "return { encoded, decoded };",
+    ].join("\n");
+    const result = await expectSuccess({ code });
+    expect(result.result).toEqual({ encoded: "aGVsbG8=", decoded: "hello" });
+  });
+
+  it("has access to TextEncoder and TextDecoder", async () => {
+    const code = [
+      "const encoder = new TextEncoder();",
+      "const bytes = encoder.encode('hi');",
+      "const decoder = new TextDecoder();",
+      "return decoder.decode(bytes);",
+    ].join("\n");
+    const result = await expectSuccess({ code });
+    expect(result.result).toBe("hi");
+  });
+
+  it("has access to structuredClone", async () => {
+    const code = [
+      "const obj = { a: 1, b: [2, 3] };",
+      "const clone = structuredClone(obj);",
+      "clone.b.push(4);",
+      "return { original: obj.b.length, cloned: clone.b.length };",
+    ].join("\n");
+    const result = await expectSuccess({ code });
+    expect(result.result).toEqual({ original: 2, cloned: 3 });
+  });
+
+  it("has access to Uint8Array", async () => {
+    const result = await expectSuccess({
+      code: "return new Uint8Array([0xff, 0x00, 0xab]).length;",
+    });
+    expect(result.result).toBe(3);
+  });
+
+  it("has access to crypto.randomUUID", async () => {
+    const result = await expectSuccess({
+      code: "return typeof crypto.randomUUID();",
+    });
+    expect(result.result).toBe("string");
+  });
+
+  it("has access to AbortController", async () => {
+    const result = await expectSuccess({
+      code: "const ac = new AbortController(); return typeof ac.signal;",
+    });
+    expect(result.result).toBe("object");
+  });
+
+  it("has access to Intl", async () => {
+    const result = await expectSuccess({
+      code: "return new Intl.NumberFormat('en-US').format(1234567.89);",
+    });
+    expect(result.result).toBe("1,234,567.89");
+  });
+
+  it("has access to Error types", async () => {
+    const result = await expectFailure({
+      code: "throw new TypeError('bad type');",
+    });
+    expect(result.error).toContain("bad type");
+  });
+
   it("does not have access to require", async () => {
     const result = await expectFailure({ code: 'require("fs")' });
     expect(result.error).toContain("require is not defined");
@@ -266,6 +350,13 @@ describe("code/run-code - sandbox globals", () => {
   it("does not have access to process", async () => {
     const result = await expectFailure({ code: "return process.env" });
     expect(result.error).toContain("process is not defined");
+  });
+
+  it("does not have access to setTimeout", async () => {
+    const result = await expectFailure({
+      code: "setTimeout(() => {}, 100);",
+    });
+    expect(result.error).toContain("setTimeout is not defined");
   });
 });
 

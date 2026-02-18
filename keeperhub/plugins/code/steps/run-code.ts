@@ -106,7 +106,11 @@ async function stepHandler(input: RunCodeCoreInput): Promise<RunCodeResult> {
   const timeoutMs = timeoutSeconds * 1000;
 
   const sandbox = createContext({
+    // I/O
     console: capturedConsole,
+    fetch,
+
+    // Core types
     BigInt,
     JSON,
     Math,
@@ -117,17 +121,71 @@ async function stepHandler(input: RunCodeCoreInput): Promise<RunCodeResult> {
     Number,
     Boolean,
     RegExp,
+    Symbol,
     Map,
     Set,
+    WeakMap,
+    WeakSet,
     Promise,
+
+    // Error types
+    Error,
+    TypeError,
+    RangeError,
+    SyntaxError,
+    ReferenceError,
+    URIError,
+
+    // Numeric / parsing
     parseInt,
     parseFloat,
     isNaN,
     isFinite,
+    Infinity,
+    NaN,
+
+    // URI encoding
     encodeURIComponent,
     decodeURIComponent,
     encodeURI,
     decodeURI,
+
+    // Base64
+    atob,
+    btoa,
+
+    // Text encoding
+    TextEncoder,
+    TextDecoder,
+
+    // Binary / typed arrays
+    ArrayBuffer,
+    SharedArrayBuffer,
+    DataView,
+    Uint8Array,
+    Uint16Array,
+    Uint32Array,
+    Int8Array,
+    Int16Array,
+    Int32Array,
+    Float32Array,
+    Float64Array,
+    BigInt64Array,
+    BigUint64Array,
+
+    // Fetch API types
+    URL,
+    URLSearchParams,
+    Headers,
+    Request,
+    Response,
+    AbortController,
+    AbortSignal,
+
+    // Utilities
+    structuredClone,
+    Intl,
+    crypto,
   });
 
   // Wrap code in an async IIFE so users can use `return` and `await`
