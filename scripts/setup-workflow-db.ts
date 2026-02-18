@@ -52,4 +52,9 @@ async function main(): Promise<void> {
   console.log("All workflow schemas ready.");
 }
 
-main();
+main()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error("Setup failed:", err);
+    process.exit(1);
+  });

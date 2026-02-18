@@ -182,6 +182,44 @@ Run against a live app in a real browser. Require the app and database to be run
 
 ---
 
+## Running CI Locally with `act`
+
+[nektos/act](https://github.com/nektos/act) can emulate GitHub Actions workflows locally. The default `catthehacker/ubuntu:act-latest` image is missing tools that GitHub runners include (`pg_isready`, `aws`), so we build a custom image.
+
+### One-time setup
+
+```bash
+# Build custom runner image with postgresql-client and awscli
+cat > /tmp/Dockerfile.act << 'EOF'
+FROM catthehacker/ubuntu:act-latest
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client python3-pip \
+    && pip3 install awscli --break-system-packages \
+    && rm -rf /var/lib/apt/lists/*
+EOF
+docker build -t act-runner:local -f /tmp/Dockerfile.act /tmp
+```
+
+### Create a secrets file
+
+```bash
+# /tmp/act-secrets.env
+TEST_WALLET_ENCRYPTION_KEY=<32-byte hex key>
+TEST_PARA_USER_SHARE=<base64 user share>
+```
+
+### Run the e2e-vitest job
+
+```bash
+act push --job e2e-vitest \
+  --secret-file /tmp/act-secrets.env \
+  --platform ubuntu-latest=act-runner:local \
+  --pull=false
+```
+
+`--pull=false` prevents act from trying to pull the local image from Docker Hub.
+
+---
+
 ## Shared Utilities
 
 | File | Purpose |

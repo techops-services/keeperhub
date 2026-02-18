@@ -253,7 +253,9 @@ async function seedTestWallet(): Promise<void> {
   }
 }
 
-seedTestWallet().catch((err) => {
-  console.error("Error seeding test wallet:", err);
-  process.exit(1);
-});
+seedTestWallet()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error("Error seeding test wallet:", err);
+    process.exit(1);
+  });
