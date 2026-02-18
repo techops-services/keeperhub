@@ -14,6 +14,7 @@ Interact with EVM-compatible blockchain networks. Read-only actions work without
 | Get Native Token Balance | Web3 | No | Check ETH/MATIC/etc. balance of any address |
 | Get ERC20 Token Balance | Web3 | No | Check token balance of any address |
 | Read Contract | Web3 | No | Call view/pure functions on smart contracts |
+| Batch Read Contract | Web3 | No | Batch multiple contract reads into one RPC call via Multicall3 |
 | Get Transaction | Web3 | No | Fetch full transaction details by hash |
 | Write Contract | Web3 | Wallet | Execute state-changing contract functions |
 | Transfer Native Token | Web3 | Wallet | Send ETH/MATIC/etc. to a recipient |
@@ -72,6 +73,48 @@ Schedule (every 5 min)
   -> Read Contract: Aave getLiquidationThreshold()
   -> Condition: health factor < 1.5
   -> Discord: "Liquidation risk alert"
+```
+
+---
+
+## Batch Read Contract
+
+Call the same contract function with multiple argument sets -- or different functions across contracts -- in a single RPC call using Multicall3. Reduces dozens of individual read-contract nodes into one.
+
+**Input Modes:**
+
+- **Uniform** (default): One contract address, one function, array of argument sets. Best for "same function, many inputs" patterns like `balanceOf(addr)` across pool addresses.
+- **Mixed**: Array of call objects, each with `contractAddress`, `abiFunction`, and `args`. Best for heterogeneous calls like `hat()` + `approvals(addr)` on the same or different contracts.
+
+**Inputs:** Network, ABI (shared), Input Mode, Contract Address (uniform), Function (uniform), Args List (uniform), Calls JSON (mixed), Batch Size (advanced, default: 100)
+
+**Outputs:** `success`, `results` (array of `{ success, result, error? }` in call order), `totalCalls`, `error`
+
+**When to use:** Monitor token balances across many DEX pools, check `workable()` status across keeper networks, read multiple governance parameters in one call, any scenario requiring 5+ individual read-contract nodes.
+
+**Partial failure handling:** Uses Multicall3's `aggregate3` with `allowFailure: true`. If one call reverts, the others still return successfully. Each result has its own `success` flag.
+
+**Example workflow -- DEX pool liquidity monitor (uniform mode):**
+```
+Schedule (every 5 min)
+  -> Batch Read Contract:
+       contract: MKR token address
+       function: balanceOf(address)
+       argsList: [["0xPool1"], ["0xPool2"], ..., ["0xPool14"]]
+  -> Condition: any result < threshold
+  -> Discord: "Low MKR liquidity in pool {{index}}: {{result}}"
+```
+
+**Example workflow -- Keeper health check (mixed mode):**
+```
+Schedule (every block)
+  -> Batch Read Contract:
+       calls: [
+         {"contractAddress":"0xNet1","abiFunction":"workable","args":["0xJob1"]},
+         {"contractAddress":"0xNet2","abiFunction":"workable","args":["0xJob2"]}
+       ]
+  -> Condition: any result.success && result.result == true
+  -> Write Contract: execute the workable job
 ```
 
 ---
