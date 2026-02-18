@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { refetchOrganizations } from "@/keeperhub/lib/refetch-organizations";
+import { refetchSidebar } from "@/keeperhub/lib/refetch-sidebar";
 import {
   authClient,
   signIn,
@@ -803,6 +804,7 @@ export default function AcceptInvitePage() {
     await new Promise((resolve) => setTimeout(resolve, 300));
     await authClient.getSession();
     refetchOrganizations();
+    refetchSidebar();
     toast.success(`Welcome to ${invitation?.organizationName}!`);
     router.push("/workflows");
   };
