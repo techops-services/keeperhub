@@ -796,11 +796,11 @@ const web3Plugin: IntegrationPlugin = {
         {
           key: "argsList",
           label: "Args List",
-          type: "template-textarea",
-          placeholder: '[["0xaddr1"], ["0xaddr2"]] or {{NodeName.argsList}}',
-          rows: 4,
+          type: "args-list-builder",
+          abiField: "abi",
+          abiFunctionField: "abiFunction",
           helpTip:
-            'JSON array of argument arrays. Each inner array is the args for one call. Example: [["0xPool1"], ["0xPool2"]] for balanceOf(address).',
+            "Add argument sets for each call. Each row represents one call with the selected function's parameters.",
           showWhen: { field: "inputMode", oneOf: ["uniform", ""] },
         },
         {

@@ -37,7 +37,8 @@ export type ActionConfigFieldBase = {
     | "abi-event-select" // Dynamic dropdown that parses ABI and shows events
     // start custom keeperhub code //
     | "gas-limit-multiplier" // Gas limit multiplier with chain default display
-    | "call-list-builder"; // Dynamic list of contract calls for batch operations
+    | "call-list-builder" // Dynamic list of contract calls for batch operations
+    | "args-list-builder"; // Dynamic list of argument sets for batch uniform mode
   // end keeperhub code //
 
   // For chain-select: filter by chain type (e.g., "evm" or "solana")
