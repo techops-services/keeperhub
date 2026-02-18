@@ -59,11 +59,23 @@ interface PgQueryError extends Error {
   hint?: string;
 }
 
+const PG_SEVERITIES = new Set([
+  "ERROR",
+  "FATAL",
+  "PANIC",
+  "WARNING",
+  "NOTICE",
+  "DEBUG",
+  "INFO",
+  "LOG",
+]);
+
 function isPgQueryError(error: Error): error is PgQueryError {
-  return (
-    "severity" in error &&
-    typeof (error as { severity: unknown }).severity === "string"
-  );
+  if (!("severity" in error)) {
+    return false;
+  }
+  const severity = (error as { severity: unknown }).severity;
+  return typeof severity === "string" && PG_SEVERITIES.has(severity);
 }
 
 /** Format a PostgreSQL query error with optional detail/hint context. */
