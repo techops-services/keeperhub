@@ -126,7 +126,7 @@ Query historical smart contract events (logs) across a block range with automati
 **Example workflow -- DEX Swap Monitor:**
 ```
 Schedule (every hour)
-  -> Query Contract Events: Uniswap Router, event "Swap", blockCount 300
+  -> Query Contract Events: Uniswap Router, event "Swap", Block Lookback 300
   -> Condition: eventCount > 0
   -> Discord: "{{QueryEvents.eventCount}} swaps in the last hour"
 ```
@@ -134,7 +134,7 @@ Schedule (every hour)
 **Example workflow -- Governance Vote Tracker:**
 ```
 Schedule (daily)
-  -> Query Contract Events: Governor contract, event "VoteCast", blockCount 7200
+  -> Query Contract Events: Governor contract, event "VoteCast", Block Lookback 7200
   -> SendGrid: "{{QueryEvents.eventCount}} votes cast today"
 ```
 
