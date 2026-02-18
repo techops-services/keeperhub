@@ -317,15 +317,16 @@ describe("math/aggregate - array mode", () => {
     expect(result.result).toBe("15");
   });
 
-  it("unwraps object containing an array", async () => {
+  it("rejects object input and suggests referencing array field directly", async () => {
     const data = { rows: [{ cost: 10 }, { cost: 20 }] };
-    const result = await expectSuccess({
+    const result = await expectFailure({
       operation: "sum",
       inputMode: "array",
       arrayInput: JSON.stringify(data),
       fieldPath: "cost",
     });
-    expect(result.result).toBe("30");
+    expect(result.error).toContain("must be a JSON array");
+    expect(result.error).toContain("reference the array field directly");
   });
 
   it("skips elements with missing fieldPath", async () => {

@@ -242,7 +242,7 @@ function parseJsonToArray(input: string): unknown[] {
     parsed = JSON.parse(input);
   } catch {
     throw new Error(
-      "arrayInput is not valid JSON. Expected a JSON array or an object containing an array."
+      "arrayInput is not valid JSON. Expected a JSON array, e.g. [1, 2, 3]."
     );
   }
 
@@ -250,14 +250,9 @@ function parseJsonToArray(input: string): unknown[] {
     return parsed;
   }
 
-  if (typeof parsed === "object" && parsed !== null) {
-    const arrayField = Object.values(parsed).find((v) => Array.isArray(v));
-    if (Array.isArray(arrayField)) {
-      return arrayField;
-    }
-  }
-
-  throw new Error("arrayInput must be a JSON array or object containing one.");
+  throw new Error(
+    "arrayInput must be a JSON array. If your upstream node returns an object, reference the array field directly in your template variable, e.g. {{@node:Label.rows}} instead of {{@node:Label}}."
+  );
 }
 
 function collectNumericValues(
