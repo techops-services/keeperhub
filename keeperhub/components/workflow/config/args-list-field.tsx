@@ -16,7 +16,7 @@ type ArgSetEntry = {
   values: string[];
 };
 
-function parseFunctionInputs(
+export function parseFunctionInputs(
   abiValue: string,
   functionValue: string
 ): FunctionInput[] {
@@ -48,7 +48,7 @@ function parseFunctionInputs(
   }
 }
 
-function parseArgsListValue(
+export function parseArgsListValue(
   value: string,
   paramCount: number,
   nextId: () => number
@@ -78,7 +78,7 @@ function parseArgsListValue(
   }
 }
 
-function serializeArgsList(entries: ArgSetEntry[]): string {
+export function serializeArgsList(entries: ArgSetEntry[]): string {
   const sets = entries
     .filter((e) => e.values.some((v) => v.trim() !== ""))
     .map((e) => e.values);
