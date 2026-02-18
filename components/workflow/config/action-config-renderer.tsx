@@ -171,6 +171,7 @@ function SchemaBuilderField(props: FieldProps) {
   );
 }
 
+// start custom keeperhub code — exported for batch-read-contract call-list-field //
 export type AbiFunctionSelectProps = FieldProps & {
   abiValue: string;
   functionFilter?: "read" | "write";
@@ -392,6 +393,7 @@ export function AbiFunctionArgsField({
     </div>
   );
 }
+// end keeperhub code //
 
 const FIELD_RENDERERS: Partial<
   Record<ActionConfigFieldBase["type"], React.ComponentType<FieldProps>>
