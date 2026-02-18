@@ -13,6 +13,8 @@ import { getErrorMessage } from "@/lib/utils";
 
 const LOG_PREFIX = "[Batch Read Contract]";
 const DEFAULT_BATCH_SIZE = 100;
+const MAX_BATCH_SIZE = 500;
+const MAX_TOTAL_CALLS = 5000;
 
 /**
  * Get userId from executionId by querying the workflowExecutions table
@@ -500,8 +502,8 @@ async function executeMulticallBatches(
       const batchResults: [boolean, string][] =
         await multicall.aggregate3.staticCall(multicallInput);
 
-      for (let i = 0; i < batchResults.length; i++) {
-        const [callSuccess, returnData] = batchResults[i];
+      for (const [i, batchResult] of batchResults.entries()) {
+        const [callSuccess, returnData] = batchResult;
         const callMeta = encodedCalls[batchStart + i];
         results.push(decodeCallResult(callSuccess, returnData, callMeta));
       }
@@ -571,9 +573,14 @@ async function resolveChainRpc(
 }
 
 function parseBatchSize(batchSizeStr: string | undefined): number {
-  return batchSizeStr
-    ? Math.max(1, Number.parseInt(batchSizeStr, 10) || DEFAULT_BATCH_SIZE)
-    : DEFAULT_BATCH_SIZE;
+  if (!batchSizeStr) {
+    return DEFAULT_BATCH_SIZE;
+  }
+  const parsed = Number.parseInt(batchSizeStr, 10);
+  if (Number.isNaN(parsed)) {
+    return DEFAULT_BATCH_SIZE;
+  }
+  return Math.max(1, Math.min(MAX_BATCH_SIZE, parsed));
 }
 
 function logValidationError(message: string): void {
@@ -620,6 +627,13 @@ async function executeUniformMode(
     return { success: false, error: "No calls to execute" };
   }
 
+  if (normalizedCalls.length > MAX_TOTAL_CALLS) {
+    return {
+      success: false,
+      error: `Too many calls (${normalizedCalls.length}). Maximum is ${MAX_TOTAL_CALLS}.`,
+    };
+  }
+
   const { parsed: parsedAbi, error: abiError } = parseAbi(abi);
   if (abiError) {
     logValidationError(abiError);
@@ -653,6 +667,25 @@ async function executeUniformMode(
 
 type IndexedEncodedCall = EncodedCallWithMeta & { originalIndex: number };
 
+/** Group encoded calls by their network, preserving original index for re-ordering. */
+function groupCallsByNetwork(
+  encoded: EncodedCallWithMeta[],
+  normalizedCalls: NormalizedCall[]
+): Map<string, IndexedEncodedCall[]> {
+  const groups = new Map<string, IndexedEncodedCall[]>();
+  for (const [index, call] of encoded.entries()) {
+    const network = normalizedCalls[index].network ?? "";
+    const indexed: IndexedEncodedCall = { ...call, originalIndex: index };
+    const group = groups.get(network);
+    if (group) {
+      group.push(indexed);
+    } else {
+      groups.set(network, [indexed]);
+    }
+  }
+  return groups;
+}
+
 /**
  * Execute mixed mode: calls grouped by network, results merged in original order
  */
@@ -673,6 +706,13 @@ async function executeMixedMode(
     return { success: false, error: "No calls to execute" };
   }
 
+  if (normalizedCalls.length > MAX_TOTAL_CALLS) {
+    return {
+      success: false,
+      error: `Too many calls (${normalizedCalls.length}). Maximum is ${MAX_TOTAL_CALLS}.`,
+    };
+  }
+
   const encodeResult = encodeMixedCalls(normalizedCalls);
   if (encodeResult.error) {
     logValidationError(encodeResult.error);
@@ -680,19 +720,10 @@ async function executeMixedMode(
   }
 
   const batchSize = parseBatchSize(input.batchSize);
-
-  // Group encoded calls by network, preserving original order
-  const networkGroups = new Map<string, IndexedEncodedCall[]>();
-  for (const [index, call] of encodeResult.encoded.entries()) {
-    const callNetwork = normalizedCalls[index].network ?? "";
-    const group = networkGroups.get(callNetwork);
-    const indexed: IndexedEncodedCall = { ...call, originalIndex: index };
-    if (group) {
-      group.push(indexed);
-    } else {
-      networkGroups.set(callNetwork, [indexed]);
-    }
-  }
+  const networkGroups = groupCallsByNetwork(
+    encodeResult.encoded,
+    normalizedCalls
+  );
 
   // Execute each network group
   const allResults: CallResult[] = new Array(normalizedCalls.length);
