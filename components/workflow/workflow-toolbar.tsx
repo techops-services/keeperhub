@@ -269,7 +269,11 @@ function isFieldEmpty(value: unknown): boolean {
 // Check if a conditional field should be shown based on current config
 function shouldShowField(
   // start custom keeperhub code //
-  field: { showWhen?: { field: string; equals?: string; oneOf?: string[] } },
+  field: {
+    showWhen?:
+      | { field: string; equals: string }
+      | { field: string; oneOf: string[] };
+  },
   // end keeperhub code //
   config: Record<string, unknown>
 ): boolean {
@@ -278,7 +282,7 @@ function shouldShowField(
   }
   // start custom keeperhub code //
   const dependentValue = config[field.showWhen.field];
-  if (field.showWhen.oneOf) {
+  if ("oneOf" in field.showWhen) {
     return field.showWhen.oneOf.includes(dependentValue as string);
   }
   return dependentValue === field.showWhen.equals;

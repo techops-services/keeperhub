@@ -501,7 +501,7 @@ function renderField(
   if (field.showWhen) {
     const dependentValue = config[field.showWhen.field];
     // start custom keeperhub code //
-    if (field.showWhen.oneOf) {
+    if ("oneOf" in field.showWhen) {
       if (!field.showWhen.oneOf.includes(dependentValue as string)) {
         return null;
       }

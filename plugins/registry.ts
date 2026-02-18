@@ -72,11 +72,9 @@ export type ActionConfigFieldBase = {
   // Conditional rendering: only show if another field has a specific value
   // start custom keeperhub code //
   // Use `equals` for single value match, `oneOf` for multiple value match
-  showWhen?: {
-    field: string;
-    equals?: string;
-    oneOf?: string[];
-  };
+  showWhen?:
+    | { field: string; equals: string }
+    | { field: string; oneOf: string[] };
   // end keeperhub code //
 
   // For abi-function-select and abi-event-select: which field contains the ABI JSON
