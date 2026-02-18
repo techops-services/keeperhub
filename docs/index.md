@@ -1,57 +1,99 @@
 ---
 title: "Overview"
-description: "KeeperHub documentation - learn how to automate blockchain operations without coding."
+description: "KeeperHub is a no-code blockchain automation platform. Build workflows that automate onchain operations without writing code."
 ---
 
-# KeeperHub Documentation
+# Overview
 
-Welcome to the KeeperHub documentation. Learn how to create and manage blockchain automations without coding knowledge.
+KeeperHub is the reliable execution layer for DeFi security and AI agents. Build visual workflows that monitor onchain state, execute transactions, and send notifications -- without writing code or managing infrastructure. Works with Ethereum, Base, Arbitrum, Polygon, and other EVM-compatible chains.
 
-## Table of Contents
+Whether you are a protocol team automating treasury operations, a security team responding to threats, or an AI agent executing onchain actions, KeeperHub handles gas estimation, transaction ordering, retries, and wallet security so you can focus on what to automate, not how to keep it running.
 
-### Introduction
-- [What is KeeperHub](intro/overview.md)
-- [Core Concepts](intro/concepts.md)
-- [Platform Benefits](intro/benefits.md)
+<!-- TODO: Add workflow builder screenshot -->
 
-### Getting Started
-- [Quick Start Guide](getting-started/quickstart.md)
+## Use Cases
 
-### Keepers
-- [Keeper Types Overview](keepers/overview.md)
-- [Keeper Configuration](keepers/configuration.md)
+- **Treasury monitoring** -- check a vault's collateral ratio on a schedule, call a top-up function when it drops below threshold, send a Telegram alert with the transaction hash
+- **Event response** -- listen for contract events (large withdrawals, governance proposals, ownership transfers), evaluate severity, route notifications to Discord and email based on conditions
+- **Recurring operations** -- distribute rewards, sweep dust from wallets, call keeper functions on DeFi protocols on a schedule
+- **Cross-system integration** -- read contract values, aggregate with Math, post to Discord, fire webhooks to external dashboards
+- **Webhook-driven automation** -- accept an HTTP request from your application and trigger an onchain operation in response
 
-### Keeper Runs
-- [Understanding Keeper Runs](keeper-runs/overview.md)
-- [Run Status and Logs](keeper-runs/status-logs.md)
-- [Troubleshooting Runs](keeper-runs/troubleshooting.md)
-- [Performance Monitoring](keeper-runs/monitoring.md)
+## How It Works
 
-### Workflows
-- [Introduction to Workflows](workflows/introduction.md)
-- [Creating Workflows](workflows/creating.md)
-- [Workflow Examples](workflows/examples.md)
+Every workflow follows the same model: a **trigger** starts execution, **actions** perform operations, and **conditions** control the flow between them.
 
-### Users, Teams & Organizations
-- [User Management](users-teams-orgs/users.md)
-- [Team Collaboration](users-teams-orgs/teams.md)
-- [Organization Settings](users-teams-orgs/organizations.md)
-- [Access Control](users-teams-orgs/permissions.md)
+### Triggers
 
-### Notification Providers
-- [Supported Providers](notifications/providers.md)
+Triggers define when a workflow runs:
 
-### Wallet Management
-- [Para Integration](wallet-management/para.md)
-- [Gas Management](wallet-management/gas.md)
+| Trigger | When it fires |
+|---------|---------------|
+| **Manual** | When you click Run in the builder |
+| **Schedule** | On a recurring interval (every N minutes, hourly, daily) |
+| **Webhook** | When an external service sends an HTTP request to your workflow URL |
+| **Blockchain Event** | When a specific smart contract event is emitted onchain |
+| **Block Interval** | At regular block intervals on a specific chain |
 
-### Recommended Practices
-- [Security Best Practices](practices/security.md)
+### Actions
 
-### Guides
-- [Migrate from OpenZeppelin Defender](guides/defender-migration.md)
+Actions are the operations your workflow performs:
 
-### Plans and Features - Work in Progress
-- [Pricing Plans](plans-features/pricing.md)
-- [Feature Comparison](plans-features/features.md)
-- [Usage Limits](plans-features/limits.md)
+- **Web3** -- check balances, read and write smart contracts, transfer native tokens and ERC-20s, query event logs, and decode calldata
+- **Notifications** -- send messages via Discord, Telegram, and SendGrid email
+- **System** -- HTTP requests, conditional branching, loops (For Each), aggregation (Collect), and template rendering
+- **Math** -- compute aggregations over numeric data: sum, count, average, median, min, max, and product
+
+### Conditions and Branching
+
+Condition nodes evaluate data from previous steps and split the workflow into branches. Use them to gate expensive operations behind threshold checks, route alerts by severity, or skip steps when data is unchanged.
+
+### Data Flow Between Nodes
+
+Each node can reference the output of any previous step. This means you can read a balance in one node, compare it against a threshold in the next, and include the exact value in a notification message -- all through built-in references. See [Core Concepts](/intro/concepts) for details on the reference syntax.
+
+### Failure Handling
+
+When a step fails, KeeperHub retries with configurable behavior. Failed runs are logged with full error context in the [Runs panel](/keeper-runs/overview).
+
+## Platform Capabilities
+
+### Supported Chains
+
+KeeperHub operates on Ethereum, Base, Arbitrum, Polygon, Sepolia, and additional EVM-compatible networks. Chain-specific gas defaults are applied automatically based on network conditions and trigger type. See [Gas Management](/wallet-management/gas) for details.
+
+### Para MPC Wallets
+
+Every account includes a Para wallet secured with multi-party computation. Private keys are split between you and Para -- neither party can sign alone. During workflow execution, the signing flow is automated: KeeperHub coordinates with Para to produce a valid signature without exposing the full key to either side. Write operations (transfers, contract calls) execute through this wallet. Read-only actions do not require a wallet. See [Para Integration](/wallet-management/para) for the full security and trust model.
+
+### AI-Assisted Workflow Generation
+
+Describe what you want to automate in plain language using the AI prompt at the bottom of the canvas. The AI assistant generates a workflow structure with appropriate triggers, actions, and conditions that you can review and customize before enabling.
+
+### Code Optional
+
+The visual builder handles most use cases without writing code. For teams that prefer programmatic control, the REST API lets you create, update, trigger, and monitor workflows from your own tooling or CI/CD pipelines. See the [API documentation](/api) for endpoints and authentication.
+
+### AI Agent Execution
+
+KeeperHub provides an MCP server that exposes workflow creation and execution as tools for AI agents. Agents can autonomously build, trigger, and monitor blockchain automations through the Model Context Protocol -- making KeeperHub the execution layer where autonomous agents delegate their onchain actions.
+
+## Infrastructure
+
+KeeperHub runs your workflows on managed infrastructure with automatic gas estimation, nonce management, and transaction ordering. Whether triggered by a human, a schedule, or an AI agent, every execution gets the same reliability guarantees. For technical details, see [Gas Management](/wallet-management/gas) and [Para Integration](/wallet-management/para).
+
+## Getting Started
+
+The fastest path to your first automation:
+
+1. **Create an account** at app.keeperhub.com -- a Para wallet is provisioned automatically
+2. **Fund your wallet** with ETH on your target network. Start on Sepolia (a free test network) to experiment without real funds
+3. **Build a workflow** using the visual builder or the AI assistant
+4. **Test with a manual trigger** before switching to an automated schedule
+5. **Enable and monitor** execution through the run logs
+
+For a detailed walkthrough, see the [Quick Start Guide](/getting-started/quickstart).
+
+## Coming from Another Platform?
+
+If you are moving from OpenZeppelin Defender, see the [Defender Migration Guide](/guides/defender-migration) for a step-by-step transition plan.
