@@ -51,15 +51,54 @@ export function ensureEncodedConnectionString(
   return `${protocol}${encodeURIComponent(username)}:${encodeURIComponent(password)}@${hostAndDb}`;
 }
 
+interface PgQueryError extends Error {
+  severity: string;
+  code?: string;
+  detail?: string;
+  hint?: string;
+}
+
+function isPgQueryError(error: Error): error is PgQueryError {
+  return (
+    "severity" in error &&
+    typeof (error as { severity: unknown }).severity === "string"
+  );
+}
+
+/** Format a PostgreSQL query error with optional detail/hint context. */
+function formatPgQueryError(error: PgQueryError): string {
+  let message = error.message;
+  if (error.detail) {
+    message += ` Detail: ${error.detail}`;
+  }
+  if (error.hint) {
+    message += ` Hint: ${error.hint}`;
+  }
+  return message;
+}
+
 /**
- * Returns a safe, user-facing message for database connection errors.
- * Avoids leaking credentials or internal details.
+ * Returns a safe, user-facing message for database errors.
+ * Shows query errors from PostgreSQL directly (they don't contain credentials).
+ * Sanitizes connection errors to avoid leaking internal details.
  */
 export function getDatabaseErrorMessage(error: unknown): string {
   if (!(error instanceof Error)) {
     return "Unknown database error";
   }
 
+  // PostgreSQL query errors (syntax errors, constraint violations, etc.)
+  // are safe to show -- they describe the SQL problem, not credentials.
+  // Drizzle ORM wraps PostgresError in error.cause, so check both levels.
+  if (isPgQueryError(error)) {
+    return formatPgQueryError(error);
+  }
+  const cause = error.cause;
+  if (cause instanceof Error && isPgQueryError(cause)) {
+    return formatPgQueryError(cause);
+  }
+
+  // Connection-level errors -- sanitize to avoid leaking credentials
   const errorMessage = error.message;
 
   if (errorMessage.includes("ECONNREFUSED")) {
