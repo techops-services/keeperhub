@@ -683,28 +683,35 @@ const web3Plugin: IntegrationPlugin = {
           required: true,
         },
         {
-          key: "blockCount",
-          label: "Block Count",
-          type: "template-input",
-          placeholder: "Number of blocks to look back (default: 6500, ~1 day)",
-        },
-        {
-          key: "fromBlock",
-          label: "From Block",
-          type: "template-input",
-          placeholder: "Specific start block (overrides Block Count if set)",
-        },
-        {
-          key: "toBlock",
-          label: "To Block",
-          type: "template-input",
-          placeholder: "Block number or 'latest' (default: latest)",
-        },
-        {
-          key: "batchSize",
-          label: "Batch Size",
-          type: "template-input",
-          placeholder: "Blocks per query batch (default: 2000)",
+          type: "group",
+          label: "Block Range",
+          defaultExpanded: true,
+          fields: [
+            {
+              key: "blockCount",
+              label: "Block Lookback",
+              type: "template-input",
+              placeholder: "Number of blocks to look back (default: 6500)",
+              helpTip:
+                "How many blocks to scan backwards from the end block. Default: 6500 (~1 day on Ethereum). Ignored if From Block is set.",
+            },
+            {
+              key: "fromBlock",
+              label: "From Block",
+              type: "template-input",
+              placeholder: "Start block number",
+              helpTip:
+                "Explicit start block. If set, Block Lookback is ignored.",
+            },
+            {
+              key: "toBlock",
+              label: "To Block",
+              type: "template-input",
+              placeholder: "End block number (default: latest)",
+              helpTip:
+                "End block for the query. Defaults to the latest block if left empty.",
+            },
+          ],
         },
       ],
     },
