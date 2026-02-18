@@ -3,13 +3,7 @@
 import type { Monaco, OnMount } from "@monaco-editor/react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { AlertTriangle } from "lucide-react";
-import {
-  type MutableRefObject,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { CodeEditor } from "@/components/ui/code-editor";
 import {
   buildExecutionLogsMap,
@@ -20,6 +14,7 @@ import {
   getNodeDisplayName,
   sanitizeNodeId,
 } from "@/keeperhub/lib/template-helpers";
+import { useStableRef } from "@/keeperhub/lib/use-stable-ref";
 import { api } from "@/lib/api-client";
 import { getAvailableFields, type NodeOutputs } from "@/lib/utils/template";
 import {
@@ -31,23 +26,6 @@ import {
   selectedNodeAtom,
   type WorkflowNode,
 } from "@/lib/workflow-store";
-
-// ---------------------------------------------------------------------------
-// Hooks
-// ---------------------------------------------------------------------------
-
-/**
- * Returns a ref that always holds the latest value of `state`.
- * Useful for reading current React state inside Monaco callbacks
- * without re-registering the callback on every state change.
- */
-function useStableRef<T>(state: T): MutableRefObject<T> {
-  const ref = useRef(state);
-  useEffect(() => {
-    ref.current = state;
-  }, [state]);
-  return ref;
-}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -110,19 +88,44 @@ export function SqlTemplateEditor({
     templateMapRef.current = map;
   }, [value]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: nodesRef is a stable ref; we read .current at call time intentionally
+  const resolveNodeIdByLabel = useCallback(
+    (displayKey: string): string | undefined => {
+      const dotIndex = displayKey.indexOf(".");
+      const label =
+        dotIndex === -1 ? displayKey : displayKey.substring(0, dotIndex);
+      const allNodes = nodesRef.current;
+      for (const node of allNodes) {
+        if (getNodeDisplayName(node) === label) {
+          return node.id;
+        }
+      }
+      return undefined;
+    },
+    []
+  );
+
   // Convert display value -> stored value using template map
   const handleEditorChange = useCallback(
     (newDisplay: string) => {
       const stored = newDisplay.replace(
         /\{\{([^@}][^}]*)\}\}/g,
         (full: string, displayPart: string) => {
-          const nodeId = templateMapRef.current.get(displayPart);
-          return nodeId ? `{{@${nodeId}:${displayPart}}}` : full;
+          const mappedId = templateMapRef.current.get(displayPart);
+          if (mappedId) {
+            return `{{@${mappedId}:${displayPart}}}`;
+          }
+          const foundId = resolveNodeIdByLabel(displayPart);
+          if (foundId) {
+            templateMapRef.current.set(displayPart, foundId);
+            return `{{@${foundId}:${displayPart}}}`;
+          }
+          return full;
         }
       );
       onChange(stored);
     },
-    [onChange]
+    [onChange, resolveNodeIdByLabel]
   );
 
   // Lazy-load last execution logs (same pattern as template-autocomplete.tsx)

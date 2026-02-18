@@ -3,13 +3,7 @@
 import type { Monaco, OnMount } from "@monaco-editor/react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { AlertTriangle } from "lucide-react";
-import {
-  type MutableRefObject,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { CodeEditor } from "@/components/ui/code-editor";
 import {
   buildExecutionLogsMap,
@@ -20,6 +14,7 @@ import {
   getNodeDisplayName,
   sanitizeNodeId,
 } from "@/keeperhub/lib/template-helpers";
+import { useStableRef } from "@/keeperhub/lib/use-stable-ref";
 import { api } from "@/lib/api-client";
 import { getAvailableFields, type NodeOutputs } from "@/lib/utils/template";
 import {
@@ -31,18 +26,6 @@ import {
   selectedNodeAtom,
   type WorkflowNode,
 } from "@/lib/workflow-store";
-
-// ---------------------------------------------------------------------------
-// Hooks
-// ---------------------------------------------------------------------------
-
-function useStableRef<T>(state: T): MutableRefObject<T> {
-  const ref = useRef(state);
-  useEffect(() => {
-    ref.current = state;
-  }, [state]);
-  return ref;
-}
 
 // ---------------------------------------------------------------------------
 // Component
