@@ -221,6 +221,7 @@ jobs:
     needs: [should-run, e2e-vitest]
     if: needs.should-run.outputs.run-e2e == 'true'
     runs-on: ubuntu-latest
+    environment: staging
 
     services:
       postgres:
@@ -287,6 +288,8 @@ jobs:
         run: pnpm test:e2e
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/keeperhub_test
+          PARA_API_KEY: ${{ secrets.TEST_PARA_API_KEY }}
+          PARA_ENVIRONMENT: beta
           CI: true
 
       - name: Upload Playwright report

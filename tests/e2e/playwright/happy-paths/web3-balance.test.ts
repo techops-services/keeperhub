@@ -149,6 +149,10 @@ test.describe("Happy Path: Web3 Balance Check", () => {
     // Trigger workflow manually
     await triggerWorkflowManually(page);
 
+    // Dismiss any modal overlay that may appear after triggering
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(500);
+
     // Use the "Runs" tab in the current view
     const runsTab = page.getByRole("tab", { name: "Runs" });
     await expect(runsTab).toBeVisible({ timeout: 5000 });
