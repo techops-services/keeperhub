@@ -1,9 +1,16 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Info } from "lucide-react";
 import React, { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+// start custom keeperhub code //
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+// end keeperhub code //
 import {
   Select,
   SelectContent,
@@ -493,9 +500,15 @@ function renderField(
   // Check conditional rendering
   if (field.showWhen) {
     const dependentValue = config[field.showWhen.field];
-    if (dependentValue !== field.showWhen.equals) {
+    // start custom keeperhub code //
+    if ("oneOf" in field.showWhen) {
+      if (!field.showWhen.oneOf.includes(dependentValue as string)) {
+        return null;
+      }
+    } else if (dependentValue !== field.showWhen.equals) {
       return null;
     }
+    // end keeperhub code //
   }
 
   const value =
@@ -530,9 +543,21 @@ function renderField(
 
   return (
     <div className="space-y-2" key={field.key}>
-      <Label className="ml-1" htmlFor={field.key}>
+      <Label className="ml-1 flex items-center gap-1.5" htmlFor={field.key}>
         {field.label}
         {field.required && <span className="text-red-500">*</span>}
+        {/* start custom keeperhub code // */}
+        {field.helpTip && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Info className="h-3.5 w-3.5 shrink-0 cursor-help text-muted-foreground" />
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs whitespace-pre-line" side="top">
+              {field.helpTip}
+            </TooltipContent>
+          </Tooltip>
+        )}
+        {/* end keeperhub code // */}
       </Label>
       <FieldRenderer
         // start custom keeperhub code //

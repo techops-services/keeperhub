@@ -38,51 +38,50 @@ Defaults vary by chain type. L2 networks use lower multipliers because their gas
 
 These defaults are resolved in order: database chain config > hardcoded chain overrides > global default (2.0x / 2.5x).
 
-## Gas Limit Multiplier Override
+## Gas Limit Override
 
-You can override the default multiplier per action node:
+You can set an absolute gas limit per action node:
 
 1. Open the action node configuration (Transfer Native Token, Transfer ERC20 Token, or Write Contract)
 2. Expand the **Advanced** section
-3. Set the **Gas Limit Multiplier** field
+3. Set the **Gas Limit** field to an absolute gas unit value (e.g. 500000)
 
 ### Field Behavior
 
-- **Range**: 1.00 to 10.00 (step 0.01)
-- **When empty**: Uses the chain default (shown below the input)
-- **When set**: Your custom value takes precedence over both standard and conservative defaults
-- **Placeholder**: Shows the current chain default, e.g. "Auto (2.0x for Ethereum)"
+- **When empty**: The default 2.0x multiplier is applied to the gas estimate at execution time
+- **When set**: Your absolute value is used directly as the transaction gas limit, bypassing the multiplier
+
+The field also shows a live gas estimate when enough configuration is filled in (network, contract address, function, etc.). This helps you choose an appropriate gas limit. If your value is below the current estimate, a warning is shown.
 
 ### Example
 
 If the network estimates 100,000 gas for your transaction:
 
-| Multiplier | Final Gas Limit |
-|-----------|----------------|
-| 1.00x (minimum) | 100,000 |
-| 1.15x (custom) | 115,000 |
-| 2.00x (Ethereum default) | 200,000 |
-| 10.00x (maximum) | 1,000,000 |
+| Gas Limit Setting | Result |
+|-------------------|--------|
+| Empty (default) | 200,000 (estimate x 2.0) |
+| 150,000 | 150,000 (used directly) |
+| 500,000 | 500,000 (used directly) |
 
-A lower multiplier reduces the maximum gas your transaction can consume (saving costs if the estimate is accurate), but increases the risk of out-of-gas reverts. A higher multiplier provides more headroom but reserves more gas. Unused gas is refunded, so the main cost of over-estimating is opportunity cost (the reserved gas cannot be used by other transactions in the same block).
+Setting a gas limit below the estimate will cause the transaction to revert with an out-of-gas error. Setting it close to the estimate risks failure if on-chain state changes between estimation and execution.
 
 ## FAQ
 
-### Why can't I see the gas estimate at config time?
+### What happens if I leave the gas limit empty?
 
-Gas estimation requires calling the network with the exact transaction parameters (contract address, function, arguments, sender). This can only happen at execution time when all template variables are resolved and the wallet is connected. The multiplier field operates on whatever estimate the network returns at execution time.
+The default 2.0x multiplier is applied to the gas estimate at execution time. For time-sensitive triggers (event-based, webhook), a 2.5x conservative multiplier is used instead.
 
-### What happens if my multiplier is too low?
+### What happens if my gas limit is too low?
 
 The transaction will revert with an "out of gas" error. You will still pay for the gas consumed up to the limit. KeeperHub's retry logic may re-attempt with the default multiplier.
 
-### What happens if my multiplier is too high?
+### What happens if my gas limit is too high?
 
 The transaction reserves more gas but only consumes what it needs. Unused gas is refunded. There is no direct cost penalty, but very high limits may cause the transaction to be deprioritized by some networks.
 
-### Does the override affect gas price/fees?
+### Does the gas limit affect gas price/fees?
 
-No. The gas limit multiplier only affects the gas limit (maximum gas units). Gas pricing (base fee, priority fee) is handled separately by KeeperHub's adaptive fee strategy and is not configurable through this field.
+No. The gas limit only sets the maximum gas units. Gas pricing (base fee, priority fee) is handled separately by KeeperHub's adaptive fee strategy and is not configurable through this field.
 
 ## Wallet Funding
 

@@ -1,0 +1,14 @@
+export default {
+  index: "Overview",
+  authentication: "Authentication",
+  workflows: "Workflows",
+  executions: "Executions",
+  integrations: "Integrations",
+  projects: "Projects",
+  tags: "Tags",
+  chains: "Chains",
+  user: "User",
+  organizations: "Organizations",
+  "api-keys": "API Keys",
+  errors: "Errors",
+};

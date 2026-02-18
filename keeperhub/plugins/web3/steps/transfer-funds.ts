@@ -8,7 +8,7 @@ import {
   getOrganizationWalletAddress,
   initializeParaSigner,
 } from "@/keeperhub/lib/para/wallet-helpers";
-import { parseGasLimitConfig } from "@/keeperhub/lib/web3/gas-defaults";
+import { resolveGasLimitOverrides } from "@/keeperhub/lib/web3/gas-defaults";
 import { getGasStrategy } from "@/keeperhub/lib/web3/gas-strategy";
 import { getNonceManager } from "@/keeperhub/lib/web3/nonce-manager";
 import {
@@ -39,7 +39,6 @@ export type TransferFundsInput = StepInput & TransferFundsCoreInput;
 /**
  * Core transfer logic
  */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Step handler with comprehensive validation and error handling
 async function stepHandler(
   input: TransferFundsInput
 ): Promise<TransferFundsResult> {
@@ -54,21 +53,8 @@ async function stepHandler(
   const { network, amount, recipientAddress, gasLimitMultiplier, _context } =
     input;
 
-  const gasLimitConfig = parseGasLimitConfig(gasLimitMultiplier);
-  let multiplierOverride: number | undefined;
-  let gasLimitOverride: bigint | undefined;
-
-  if (gasLimitConfig?.mode === "maxGasLimit") {
-    const parsed = Number.parseFloat(gasLimitConfig.value);
-    if (!Number.isNaN(parsed) && parsed > 0) {
-      gasLimitOverride = BigInt(Math.floor(parsed));
-    }
-  } else if (gasLimitConfig?.mode === "multiplier") {
-    const parsed = Number.parseFloat(gasLimitConfig.value);
-    if (!Number.isNaN(parsed)) {
-      multiplierOverride = Math.max(1.0, Math.min(10.0, parsed));
-    }
-  }
+  const { multiplierOverride, gasLimitOverride } =
+    resolveGasLimitOverrides(gasLimitMultiplier);
 
   // Validate recipient address
   if (!ethers.isAddress(recipientAddress)) {

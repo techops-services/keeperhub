@@ -64,10 +64,11 @@ function MiniNode({
 }) {
   const x = ((node.position?.x ?? 0) - bounds.minX) * posScale + offsetX;
   const y = ((node.position?.y ?? 0) - bounds.minY) * posScale + offsetY;
+  const isTrigger = node.type === "trigger" || node.data?.type === "trigger";
 
   return (
     <rect
-      className="fill-[#2a3342]"
+      className={isTrigger ? "fill-[#09fd67]/60" : "fill-[#3d4f63]"}
       height={FIXED_NODE_SIZE}
       rx={FIXED_NODE_SIZE * 0.15}
       ry={FIXED_NODE_SIZE * 0.15}

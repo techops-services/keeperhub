@@ -19,6 +19,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { registerSidebarRefetch } from "@/keeperhub/lib/refetch-sidebar";
 import type { Project, SavedWorkflow, Tag } from "@/lib/api-client";
 import { api } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
@@ -26,8 +27,8 @@ import type { NavPanelStates } from "../lib/hooks/use-persisted-nav-state";
 import { usePersistedNavState } from "../lib/hooks/use-persisted-nav-state";
 import { FLYOUT_WIDTH, FlyoutPanel, STRIP_WIDTH } from "./flyout-panel";
 
-const COLLAPSED_WIDTH = 60;
-const EXPANDED_WIDTH = 200;
+export const COLLAPSED_WIDTH = 60;
+export const EXPANDED_WIDTH = 200;
 const SNAP_THRESHOLD = (COLLAPSED_WIDTH + EXPANDED_WIDTH) / 2;
 
 type WorkflowEntry = {
@@ -207,20 +208,34 @@ function ProjectsPanel({
 
 function TagsPanel({
   projectTags,
-  hasUntagged,
+  untaggedWorkflows,
   selectedTagId,
   onSelectTag,
+  activeWorkflowId,
+  loading,
 }: {
   projectTags: Tag[];
-  hasUntagged: boolean;
+  untaggedWorkflows: WorkflowEntry[];
   selectedTagId: string | null;
   onSelectTag: (id: string) => void;
+  activeWorkflowId: string | undefined;
+  loading: boolean;
 }): React.ReactNode {
-  const hasAny = projectTags.length > 0 || hasUntagged;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  const hasAny = projectTags.length > 0 || untaggedWorkflows.length > 0;
 
   if (!hasAny) {
     return (
-      <p className="py-4 text-center text-muted-foreground text-sm">No tags</p>
+      <p className="py-4 text-center text-muted-foreground text-sm">
+        No workflows
+      </p>
     );
   }
 
@@ -249,18 +264,24 @@ function TagsPanel({
           </button>
         );
       })}
-      {hasUntagged && (
-        <button
-          className={cn(
-            "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted",
-            selectedTagId === "__untagged__" && "bg-muted"
+      {untaggedWorkflows.length > 0 && (
+        <>
+          {projectTags.length > 0 && (
+            <>
+              <div className="my-1 border-t" />
+              <p className="px-2 pt-1 pb-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                Other Workflows
+              </p>
+            </>
           )}
-          onClick={() => onSelectTag("__untagged__")}
-          type="button"
-        >
-          <span className="inline-block size-2 shrink-0 rounded-full bg-muted-foreground/30" />
-          <span className="truncate">Untagged</span>
-        </button>
+          {untaggedWorkflows.map((w) => (
+            <WorkflowItem
+              activeWorkflowId={activeWorkflowId}
+              key={w.id}
+              workflow={w}
+            />
+          ))}
+        </>
       )}
     </div>
   );
@@ -269,10 +290,20 @@ function TagsPanel({
 function WorkflowsPanel({
   workflows,
   activeWorkflowId,
+  loading,
 }: {
   workflows: WorkflowEntry[];
   activeWorkflowId: string | undefined;
+  loading: boolean;
 }): React.ReactNode {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   if (workflows.length === 0) {
     return (
       <p className="py-4 text-center text-muted-foreground text-sm">
@@ -309,33 +340,35 @@ export function NavigationSidebar(): React.ReactNode {
   const isDragging = useRef(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function fetchData(): Promise<void> {
-      try {
-        const [w, p, t] = await Promise.all([
-          api.workflow.getAll(),
-          api.project.getAll(),
-          api.tag.getAll(),
-        ]);
-        if (!cancelled) {
-          setWorkflows(w);
-          setProjects(p);
-          setTags(t);
-        }
-      } finally {
-        if (!cancelled) {
-          setDataLoading(false);
-        }
-      }
+  const fetchData = useCallback(async (): Promise<void> => {
+    try {
+      const [w, p, t] = await Promise.all([
+        api.workflow.getAll(),
+        api.project.getAll(),
+        api.tag.getAll(),
+      ]);
+      setWorkflows(w);
+      setProjects(p);
+      setTags(t);
+    } finally {
+      setDataLoading(false);
     }
-
-    fetchData().catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  useEffect(() => {
+    fetchData().catch(() => undefined);
+  }, [fetchData]);
+
+  useEffect(
+    () =>
+      registerSidebarRefetch((options) => {
+        if (options?.closeFlyout) {
+          navState.closeAll();
+        }
+        fetchData().catch(() => undefined);
+      }),
+    [fetchData, navState.closeAll]
+  );
 
   // Validate persisted selections after data loads
   useEffect(() => {
@@ -406,30 +439,27 @@ export function NavigationSidebar(): React.ReactNode {
       return;
     }
 
-    function handleMouseDown(e: MouseEvent): void {
-      const target = e.target as HTMLElement;
-      if (
-        sidebarRef.current?.contains(target) ||
-        target.closest("[data-flyout]")
-      ) {
-        return;
-      }
-      navState.closeAll();
-    }
-
     function handleKeyDown(e: KeyboardEvent): void {
       if (e.key === "Escape") {
         navState.peelRightmost();
       }
     }
 
-    document.addEventListener("mousedown", handleMouseDown);
     document.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.removeEventListener("mousedown", handleMouseDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [anyPanelOpen, navState.closeAll, navState.peelRightmost]);
+  }, [anyPanelOpen, navState.peelRightmost]);
+
+  const currentWidth =
+    dragWidth ?? (expanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      "--nav-sidebar-width",
+      `${currentWidth}px`
+    );
+  }, [currentWidth]);
 
   if (isMobile) {
     return null;
@@ -461,8 +491,6 @@ export function NavigationSidebar(): React.ReactNode {
       ? { name: "Untagged" }
       : tags.find((t) => t.id === selectedTagId);
 
-  const currentWidth =
-    dragWidth ?? (expanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH);
   const showLabels = currentWidth >= SNAP_THRESHOLD;
   const offsets = computePanelOffsets(currentWidth, navState.state.panels);
 
@@ -680,10 +708,12 @@ export function NavigationSidebar(): React.ReactNode {
         title={selectedProject?.name ?? "Tags"}
       >
         <TagsPanel
-          hasUntagged={untaggedWorkflows.length > 0}
+          activeWorkflowId={workflowId}
+          loading={dataLoading}
           onSelectTag={handleSelectTag}
           projectTags={projectTagsWithCounts}
           selectedTagId={selectedTagId}
+          untaggedWorkflows={untaggedWorkflows}
         />
       </FlyoutPanel>
 
@@ -698,6 +728,7 @@ export function NavigationSidebar(): React.ReactNode {
       >
         <WorkflowsPanel
           activeWorkflowId={workflowId}
+          loading={dataLoading}
           workflows={tagWorkflows}
         />
       </FlyoutPanel>

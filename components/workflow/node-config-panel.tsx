@@ -29,6 +29,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ProjectSelect } from "@/keeperhub/components/projects/project-select";
 import { TagSelect } from "@/keeperhub/components/tags/tag-select";
+import { refetchSidebar } from "@/keeperhub/lib/refetch-sidebar";
 import { api } from "@/lib/api-client";
 import { integrationsAtom } from "@/lib/integrations-store";
 import type { IntegrationType } from "@/lib/types/integration";
@@ -58,7 +59,9 @@ import {
   updateNodeDataAtom,
   workflowNotFoundAtom,
 } from "@/lib/workflow-store";
-import { findActionById } from "@/plugins";
+// start custom keeperhub code //
+import { findActionById, flattenConfigFields } from "@/plugins";
+// end keeperhub code //
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { ActionConfig } from "./config/action-config";
 import { ActionGrid } from "./config/action-grid";
@@ -555,6 +558,24 @@ export const PanelInner = () => {
       }
 
       // start custom keeperhub code //
+      // When action type is selected, persist defaultValues from configFields
+      // into config so that showWhen conditions and validation work immediately
+      if (key === "actionType") {
+        const selectedAction = findActionById(value);
+        if (selectedAction?.configFields) {
+          for (const field of flattenConfigFields(selectedAction.configFields)) {
+            if (
+              field.defaultValue !== undefined &&
+              !(field.key in newConfig)
+            ) {
+              newConfig = { ...newConfig, [field.key]: field.defaultValue };
+            }
+          }
+        }
+      }
+      // end keeperhub code //
+
+      // start custom keeperhub code //
       pendingConfigRef.current = newConfig;
       queueMicrotask(() => {
         pendingConfigRef.current = null;
@@ -633,6 +654,7 @@ export const PanelInner = () => {
         await api.workflow.update(currentWorkflowId, {
           projectId: newProjectId,
         });
+        refetchSidebar();
       } catch (error) {
         console.error("Failed to update workflow project:", error);
         toast.error("Failed to update workflow project");
@@ -649,6 +671,7 @@ export const PanelInner = () => {
         await api.workflow.update(currentWorkflowId, {
           tagId: newTagId,
         });
+        refetchSidebar();
       } catch (error) {
         console.error("Failed to update workflow tag:", error);
         toast.error("Failed to update workflow tag");
