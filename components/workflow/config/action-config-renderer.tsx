@@ -171,12 +171,12 @@ function SchemaBuilderField(props: FieldProps) {
   );
 }
 
-type AbiFunctionSelectProps = FieldProps & {
+export type AbiFunctionSelectProps = FieldProps & {
   abiValue: string;
   functionFilter?: "read" | "write";
 };
 
-function AbiFunctionSelectField({
+export function AbiFunctionSelectField({
   field,
   value,
   onChange,
@@ -270,12 +270,12 @@ function AbiFunctionSelectField({
   );
 }
 
-type AbiFunctionArgsProps = FieldProps & {
+export type AbiFunctionArgsProps = FieldProps & {
   abiValue: string;
   functionValue: string;
 };
 
-function AbiFunctionArgsField({
+export function AbiFunctionArgsField({
   field,
   value,
   onChange,

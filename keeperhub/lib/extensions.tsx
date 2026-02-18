@@ -14,6 +14,8 @@ import { SendGridConnectionSection } from "@/keeperhub/components/settings/sendg
 import { Web3WalletSection } from "@/keeperhub/components/settings/web3-wallet-section";
 import { AbiEventSelectField } from "@/keeperhub/components/workflow/config/abi-event-select-field";
 import { AbiWithAutoFetchField } from "@/keeperhub/components/workflow/config/abi-with-auto-fetch-field";
+import { ArgsListField } from "@/keeperhub/components/workflow/config/args-list-field";
+import { CallListField } from "@/keeperhub/components/workflow/config/call-list-field";
 import { ChainSelectField } from "@/keeperhub/components/workflow/config/chain-select-field";
 import { GasLimitMultiplierField } from "@/keeperhub/components/workflow/config/gas-limit-multiplier-field";
 import { TokenSelectField } from "@/keeperhub/components/workflow/config/token-select-field";
@@ -169,6 +171,67 @@ registerFieldRenderer(
           disabled={disabled}
           field={field}
           onChange={(val: unknown) => onUpdateConfig(field.key, val)}
+          value={value}
+        />
+      </div>
+    );
+  }
+);
+
+/**
+ * Call List Builder Field
+ * Dynamic list of contract call rows for batch-read-contract mixed mode
+ * Each row configures: network, contract address, ABI, function, and arguments
+ */
+registerFieldRenderer(
+  "call-list-builder",
+  ({ field, config, onUpdateConfig, disabled }) => {
+    const value =
+      (config[field.key] as string | undefined) ?? field.defaultValue ?? "";
+
+    return (
+      <div className="space-y-2" key={field.key}>
+        <Label className="ml-1" htmlFor={field.key}>
+          {field.label}
+          {field.required && <span className="text-red-500">*</span>}
+        </Label>
+        <CallListField
+          disabled={disabled}
+          field={field}
+          onChange={(val: string) => onUpdateConfig(field.key, val)}
+          value={value}
+        />
+      </div>
+    );
+  }
+);
+
+/**
+ * Args List Builder Field
+ * Dynamic list of argument sets for batch-read-contract uniform mode
+ * Each row shows labeled inputs based on the selected function's ABI signature
+ */
+registerFieldRenderer(
+  "args-list-builder",
+  ({ field, config, onUpdateConfig, disabled }) => {
+    const abiField = field.abiField || "abi";
+    const functionField = field.abiFunctionField || "abiFunction";
+    const abiValue = (config[abiField] as string | undefined) ?? "";
+    const functionValue = (config[functionField] as string | undefined) ?? "";
+    const value =
+      (config[field.key] as string | undefined) ?? field.defaultValue ?? "";
+
+    return (
+      <div className="space-y-2" key={field.key}>
+        <Label className="ml-1" htmlFor={field.key}>
+          {field.label}
+        </Label>
+        <ArgsListField
+          abiValue={abiValue}
+          disabled={disabled}
+          field={field}
+          functionValue={functionValue}
+          onChange={(val: string) => onUpdateConfig(field.key, val)}
           value={value}
         />
       </div>

@@ -709,6 +709,130 @@ const web3Plugin: IntegrationPlugin = {
       ],
     },
     {
+      slug: "batch-read-contract",
+      label: "Batch Read Contract",
+      description:
+        "Call the same contract function with multiple argument sets in a single RPC call using Multicall3",
+      category: "Web3",
+      stepFunction: "batchReadContractStep",
+      stepImportPath: "batch-read-contract",
+      outputFields: [
+        {
+          field: "success",
+          description: "Whether the batch call succeeded",
+        },
+        {
+          field: "results",
+          description:
+            "Array of results in call order, each with { success, result, error? }",
+        },
+        {
+          field: "totalCalls",
+          description: "Total number of calls executed",
+        },
+        {
+          field: "error",
+          description: "Error message if the entire batch failed",
+        },
+      ],
+      configFields: [
+        {
+          key: "inputMode",
+          label: "Input Mode",
+          type: "select",
+          options: [
+            {
+              value: "uniform",
+              label: "Same function, multiple args",
+            },
+            {
+              value: "mixed",
+              label: "Different contracts/functions",
+            },
+          ],
+          defaultValue: "uniform",
+          required: true,
+          helpTip:
+            "Uniform: one contract + one function + array of arg sets. Mixed: each call has its own contract, function, and args.",
+        },
+        {
+          key: "network",
+          label: "Network",
+          type: "chain-select",
+          chainTypeFilter: "evm",
+          placeholder: "Select network",
+          required: true,
+          showWhen: { field: "inputMode", oneOf: ["uniform", ""] },
+        },
+        {
+          key: "contractAddress",
+          label: "Contract Address",
+          type: "template-input",
+          placeholder: "0x... or {{NodeName.contractAddress}}",
+          example: "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+          required: true,
+          showWhen: { field: "inputMode", oneOf: ["uniform", ""] },
+        },
+        {
+          key: "abi",
+          label: "Contract ABI",
+          type: "abi-with-auto-fetch",
+          contractAddressField: "contractAddress",
+          contractInteractionType: "read",
+          networkField: "network",
+          rows: 6,
+          required: true,
+          showWhen: { field: "inputMode", oneOf: ["uniform", ""] },
+        },
+        {
+          key: "abiFunction",
+          label: "Function",
+          type: "abi-function-select",
+          abiField: "abi",
+          placeholder: "Select a function",
+          required: true,
+          showWhen: { field: "inputMode", oneOf: ["uniform", ""] },
+        },
+        {
+          key: "argsList",
+          label: "Args List",
+          type: "args-list-builder",
+          abiField: "abi",
+          abiFunctionField: "abiFunction",
+          helpTip:
+            "Add argument sets for each call. Each row represents one call with the selected function's parameters.",
+          showWhen: { field: "inputMode", oneOf: ["uniform", ""] },
+        },
+        {
+          key: "calls",
+          label: "Calls",
+          type: "call-list-builder",
+          required: true,
+          helpTip:
+            "Add contract calls to batch. Each call has its own network, contract address, ABI, function, and arguments.",
+          showWhen: { field: "inputMode", equals: "mixed" },
+        },
+        {
+          type: "group",
+          label: "Advanced",
+          defaultExpanded: false,
+          fields: [
+            {
+              key: "batchSize",
+              label: "Batch Size",
+              type: "number",
+              placeholder: "100",
+              defaultValue: "100",
+              min: 1,
+              max: 500,
+              helpTip:
+                "Maximum calls per Multicall3 request. Lower values reduce RPC payload size.",
+            },
+          ],
+        },
+      ],
+    },
+    {
       slug: "write-contract",
       label: "Write Contract",
       description: "Write data to a smart contract (state-changing functions)",

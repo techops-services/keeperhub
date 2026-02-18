@@ -14,6 +14,7 @@ Interact with EVM-compatible blockchain networks. Read-only actions work without
 | Get Native Token Balance | Web3 | No | Check ETH/MATIC/etc. balance of any address |
 | Get ERC20 Token Balance | Web3 | No | Check token balance of any address |
 | Read Contract | Web3 | No | Call view/pure functions on smart contracts |
+| Batch Read Contract | Web3 | No | Batch multiple contract reads into one RPC call via Multicall3 |
 | Get Transaction | Web3 | No | Fetch full transaction details by hash |
 | Write Contract | Web3 | Wallet | Execute state-changing contract functions |
 | Transfer Native Token | Web3 | Wallet | Send ETH/MATIC/etc. to a recipient |
@@ -72,6 +73,252 @@ Schedule (every 5 min)
   -> Read Contract: Aave getLiquidationThreshold()
   -> Condition: health factor < 1.5
   -> Discord: "Liquidation risk alert"
+```
+
+---
+
+## Batch Read Contract
+
+Call the same contract function with multiple argument sets -- or different functions across different contracts -- in a single RPC call using Multicall3. Reduces dozens of individual read-contract nodes into one.
+
+No credentials required -- this is a read-only operation using Multicall3 at `0xcA11bde05977b3631167028862bE2a173976CA11`.
+
+### Input Modes
+
+| Mode    | Description                                                                 | Best For                                                              |
+| ------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Uniform | One contract, one function, multiple arg sets on a single network           | Same function across many inputs: `balanceOf(addr)` for 50 pools      |
+| Mixed   | Each call has its own network, contract address, ABI, function, and args    | Heterogeneous reads: `hat()` + `approvals(addr)` on different chains  |
+
+### Inputs
+
+**Uniform Mode:**
+
+| Input           | Required | Description                                                                              |
+| --------------- | -------- | ---------------------------------------------------------------------------------------- |
+| inputMode       | Yes      | `uniform` (default) or `mixed`                                                           |
+| network         | Yes      | EVM chain to execute on                                                                  |
+| contractAddress | Yes      | Target contract address (`0x...` or template variable)                                   |
+| abi             | Yes      | Contract ABI (auto-fetched from block explorer or pasted manually)                       |
+| abiFunction     | Yes      | Function to call (selected from ABI)                                                     |
+| argsList        | No       | Argument sets for each call (see Args List Builder below)                                |
+| batchSize       | No       | Max calls per Multicall3 request (default: 100, range: 1-500)                            |
+
+**Args List Builder (Uniform Mode):**
+
+The Args List field uses a dynamic builder instead of raw JSON. After selecting a function, the UI shows labeled inputs for each parameter based on the ABI signature. For example, selecting `allowance(address owner, address spender)` shows two labeled inputs per row: "owner (address)" and "spender (address)". Click "Add Arg Set" to add more rows, each representing one call. Template variables like `{{NodeName.value}}` are supported in all inputs.
+
+**Mixed Mode:**
+
+| Input     | Required | Description                                                                                    |
+| --------- | -------- | ---------------------------------------------------------------------------------------------- |
+| inputMode | Yes      | Must be `mixed`                                                                                |
+| calls     | Yes      | List of call objects, each with its own network, contract address, ABI, function, and arguments |
+| batchSize | No       | Max calls per Multicall3 request per network (default: 100, range: 1-500)                      |
+
+Each call in mixed mode is fully self-contained with:
+- **Network** -- can mix calls across different chains (grouped and batched per network)
+- **Contract Address** -- with address book integration for saved addresses
+- **ABI** -- auto-fetched from block explorer per contract
+- **Function** -- selected from the contract's ABI
+- **Arguments** -- auto-populated input fields based on function signature
+
+### Outputs
+
+| Output     | Description                                                                  |
+| ---------- | ---------------------------------------------------------------------------- |
+| success    | Whether the batch operation succeeded overall                                |
+| results    | Array of `{ success, result, error? }` in original call order                |
+| totalCalls | Total number of calls executed                                               |
+| error      | Error message if the entire batch failed (validation, RPC, or encoding error)|
+
+Each entry in `results` has:
+- `success` -- whether this specific call succeeded
+- `result` -- decoded return value (structured with named fields when ABI provides output names)
+- `error` -- revert reason if the call failed (decoded from revert data when possible)
+
+### Partial Failure Handling
+
+Uses Multicall3's `aggregate3` with `allowFailure: true`. If one call reverts, the others still return successfully. Each result has its own `success` flag. Revert reasons are decoded when possible (custom errors, `Error(string)` pattern, or raw bytes).
+
+### Cross-Chain Execution (Mixed Mode)
+
+When mixed mode calls target different networks, calls are automatically grouped by network. Each network group is executed in parallel via `Promise.all`, and results are merged back in the original call order. This means you can batch reads across Ethereum, Polygon, and Arbitrum in a single node with minimal latency overhead.
+
+### Batch Size
+
+The `batchSize` parameter (default: 100, max: 500) controls how many calls are included in each Multicall3 RPC request. If you have 250 calls with a batch size of 100, the node sends 3 sequential RPC requests (100 + 100 + 50). Lower values reduce payload size and are useful when RPC providers have response size limits. Maximum total calls per execution is 5000.
+
+### Result Structure
+
+Return values are structured based on ABI output definitions:
+
+- **Single unnamed output**: Returns the value directly (e.g., `"1000000000000000000"`)
+- **Single named output**: Returns `{ outputName: value }` (e.g., `{ "balance": "1000000000000000000" }`)
+- **Multiple outputs**: Returns an object with all named fields (e.g., `{ "reserve0": "...", "reserve1": "...", "blockTimestamp": "..." }`)
+- **BigInt values**: Serialized as strings to preserve precision
+
+---
+
+## Example Workflows
+
+### DEX Pool Liquidity Monitor (Uniform Mode)
+
+Monitor a token's balance across multiple DEX pool contracts. One function (`balanceOf`), many addresses. Each arg set shows a labeled "account (address)" input.
+
+```
+Schedule (every 5 min)
+  -> Batch Read Contract:
+       inputMode: uniform
+       network: ethereum
+       contractAddress: 0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2 (MKR)
+       function: balanceOf(address)
+       argsList:
+         Call 1: account = 0xPool1
+         Call 2: account = 0xPool2
+         Call 3: account = 0xPool3
+         ...
+         Call 14: account = 0xPool14
+  -> Aggregate:
+       operation: sum
+       inputMode: array
+       arrayInput: {{@batch:Batch Read Contract.results}}
+       fieldPath: result.balance
+  -> Condition: {{@total:Aggregate.result}} < 1000000000000000000000
+  -> Discord: "Low MKR liquidity: {{@total:Aggregate.result}} across {{@batch:Batch Read Contract.totalCalls}} pools"
+```
+
+### Multi-Contract Governance Dashboard (Mixed Mode)
+
+Read different parameters from multiple governance contracts on the same chain.
+
+```
+Schedule (every hour)
+  -> Batch Read Contract:
+       inputMode: mixed
+       calls: [
+         { network: "ethereum", contractAddress: "0xGovA", abiFunction: "hat", args: [] },
+         { network: "ethereum", contractAddress: "0xGovA", abiFunction: "approvals", args: ["0xSpell1"] },
+         { network: "ethereum", contractAddress: "0xGovB", abiFunction: "proposalCount", args: [] },
+         { network: "ethereum", contractAddress: "0xGovB", abiFunction: "state", args: [42] }
+       ]
+  -> Discord: "hat={{@batch.results[0].result}}, approvals={{@batch.results[1].result}}, proposals={{@batch.results[2].result}}"
+```
+
+### Cross-Chain Balance Check (Mixed Mode)
+
+Check the same token's balance on multiple chains in a single node.
+
+```
+Schedule (every 15 min)
+  -> Batch Read Contract:
+       inputMode: mixed
+       calls: [
+         { network: "ethereum", contractAddress: "0xUSDC_ETH", abiFunction: "balanceOf", args: ["0xTreasury"], abi: "..." },
+         { network: "polygon", contractAddress: "0xUSDC_POLY", abiFunction: "balanceOf", args: ["0xTreasury"], abi: "..." },
+         { network: "arbitrum", contractAddress: "0xUSDC_ARB", abiFunction: "balanceOf", args: ["0xTreasury"], abi: "..." }
+       ]
+  -> Aggregate:
+       operation: sum
+       inputMode: array
+       arrayInput: {{@batch:Batch Read Contract.results}}
+       fieldPath: result
+  -> Discord: "Total USDC across 3 chains: {{@total:Aggregate.result}}"
+```
+
+### Keeper Network Job Scanner (Uniform Mode)
+
+Check which jobs are workable across a keeper network using a single batched read. Each arg set shows a labeled "keeper (address)" input.
+
+```
+Schedule (every block)
+  -> Batch Read Contract:
+       inputMode: uniform
+       network: ethereum
+       contractAddress: 0xKeeperRegistry
+       function: workable(address)
+       argsList:
+         Call 1: keeper = 0xJob1
+         Call 2: keeper = 0xJob2
+         Call 3: keeper = 0xJob3
+         Call 4: keeper = 0xJob4
+  -> Condition: any result.success && result.result == true
+  -> Write Contract: execute the workable job
+```
+
+### Uniswap V2 Pair Reserves (Uniform Mode)
+
+Read reserves from multiple Uniswap V2 pairs. `getReserves()` takes no parameters, so each arg set is empty -- just click "Add Arg Set" for each pair contract you want to query. Returns `(reserve0, reserve1, blockTimestampLast)` per call.
+
+```
+Schedule (every 5 min)
+  -> Batch Read Contract:
+       inputMode: uniform
+       network: ethereum
+       contractAddress: 0xPairAddress
+       function: getReserves()
+       argsList: (no parameters -- function has no inputs, single arg set added)
+  -> Discord: "Pair reserves: {{@batch:Batch Read Contract.results}}"
+```
+
+### Multi-Param Function: Allowance Check (Uniform Mode)
+
+Check token allowances for multiple owner/spender pairs. The `allowance(address,address)` function has two parameters, so each arg set shows labeled inputs for both "owner" and "spender".
+
+```
+Schedule (every hour)
+  -> Batch Read Contract:
+       inputMode: uniform
+       network: ethereum
+       contractAddress: 0xUSDC
+       function: allowance(address,address)
+       argsList:
+         Call 1: owner = 0xTreasury, spender = 0xRouter
+         Call 2: owner = 0xTreasury, spender = 0xBridge
+         Call 3: owner = 0xVault,    spender = 0xRouter
+  -> Condition: any result where result < threshold
+  -> Discord: "Low allowance detected"
+```
+
+### Loop + Batch Read (Dynamic Address List)
+
+Use a database query to get a dynamic list of addresses, then batch-read their balances. Each arg set's "account" field uses a template variable.
+
+```
+Schedule (daily)
+  -> Database Query: SELECT address FROM monitored_wallets
+  -> Batch Read Contract:
+       inputMode: uniform
+       network: ethereum
+       contractAddress: 0xUSDC
+       function: balanceOf(address)
+       argsList:
+         Call 1: account = {{@db:Database Query.rows[0].address}}
+         Call 2: account = {{@db:Database Query.rows[1].address}}
+         ...
+  -> Aggregate:
+       operation: sum
+       inputMode: array
+       arrayInput: {{@batch:Batch Read Contract.results}}
+       fieldPath: result
+  -> Discord: "Total USDC across {{@batch:Batch Read Contract.totalCalls}} wallets: {{@total:Aggregate.result}}"
+```
+
+### Partial Failure Detection
+
+Handle calls where some succeed and some revert, such as checking allowances on contracts that may not implement the interface.
+
+```
+Schedule (every hour)
+  -> Batch Read Contract:
+       inputMode: mixed
+       calls: [
+         { network: "ethereum", contractAddress: "0xTokenA", abiFunction: "allowance", args: ["0xOwner", "0xSpender"], abi: "..." },
+         { network: "ethereum", contractAddress: "0xTokenB", abiFunction: "allowance", args: ["0xOwner", "0xSpender"], abi: "..." },
+         { network: "ethereum", contractAddress: "0xNonERC20", abiFunction: "allowance", args: ["0xOwner", "0xSpender"], abi: "..." }
+       ]
+  -> Condition: any result where success == false
+  -> Discord: "Failed calls: {{failed results with error messages}}"
 ```
 
 ---
