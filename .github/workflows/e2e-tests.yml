@@ -169,6 +169,29 @@ jobs:
           TEST_PARA_USER_SHARE: ${{ secrets.TEST_PARA_USER_SHARE }}
           WALLET_ENCRYPTION_KEY: ${{ secrets.TEST_WALLET_ENCRYPTION_KEY }}
 
+      - name: Build application
+        run: pnpm build
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/keeperhub_test
+
+      - name: Start application
+        run: |
+          pnpm start &
+          # Wait for app to be ready (max 60s)
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000 > /dev/null 2>&1; then
+              echo "App is ready"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "App did not start in 60s"
+              exit 1
+            fi
+            sleep 2
+          done
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/keeperhub_test
+
       - name: Run E2E Vitest tests
         run: pnpm test:e2e:vitest
         env:
