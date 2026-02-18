@@ -78,9 +78,12 @@ function isPgQueryError(error: Error): error is PgQueryError {
   return typeof severity === "string" && PG_SEVERITIES.has(severity);
 }
 
-/** Format a PostgreSQL query error with optional detail/hint context. */
+/** Format a PostgreSQL query error with code, detail and hint context. */
 function formatPgQueryError(error: PgQueryError): string {
   let message = error.message;
+  if (error.code) {
+    message += ` (code: ${error.code})`;
+  }
   if (error.detail) {
     message += ` Detail: ${error.detail}`;
   }
