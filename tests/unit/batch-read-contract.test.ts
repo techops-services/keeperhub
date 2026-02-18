@@ -126,13 +126,11 @@ function encodeRevertResult(): [boolean, string] {
 
 // Mock the Contract constructor to return our mock
 vi.mock("ethers", async () => {
-  const actual =
-    await vi.importActual<typeof import("ethers")>("ethers");
+  const actual = await vi.importActual<typeof import("ethers")>("ethers");
   return {
     ...actual,
     ethers: {
       ...actual.ethers,
-      // biome-ignore lint/complexity/noStaticOnlyClass: vi.mock requires class for constructor mock
       JsonRpcProvider: class MockProvider {},
       Contract: class MockContract {
         aggregate3 = { staticCall: mockStaticCall };
@@ -433,7 +431,7 @@ describe("batch-read-contract - uniform mode execution", () => {
       encodeSuccessResult(multiOutputIface, "getReserves", [
         BigInt("1000"),
         BigInt("2000"),
-        1700000000,
+        1_700_000_000,
       ]),
     ]);
 
@@ -489,7 +487,7 @@ describe("batch-read-contract - uniform mode execution", () => {
   });
 
   it("fails when RPC config is not found", async () => {
-    mockGetChainIdFromNetwork.mockReturnValue(99999);
+    mockGetChainIdFromNetwork.mockReturnValue(99_999);
     mockResolveRpcConfig.mockResolvedValue(null);
 
     const result = await expectFailure({
@@ -815,8 +813,12 @@ describe("batch-read-contract - mixed mode execution", () => {
     // Results should come back in original order [0,1,2]
 
     mockGetChainIdFromNetwork.mockImplementation((network: string) => {
-      if (network === "ethereum") return 1;
-      if (network === "polygon") return 137;
+      if (network === "ethereum") {
+        return 1;
+      }
+      if (network === "polygon") {
+        return 137;
+      }
       throw new Error(`Unknown network: ${network}`);
     });
     mockResolveRpcConfig.mockResolvedValue({
