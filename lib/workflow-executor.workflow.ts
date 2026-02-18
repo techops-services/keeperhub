@@ -605,12 +605,12 @@ function processCodeTemplates(code: string, outputs: NodeOutputs): string {
   const storedPattern = /\{\{@([^:]+):([^}]+)\}\}/g;
   const displayPattern = /\{\{([^@}][^}]*)\}\}/g;
 
-  let result = code.replace(storedPattern, (_match, nodeId, rest) => {
+  let result = code.replace(storedPattern, (full, nodeId, rest) => {
     const trimmedNodeId = (nodeId as string).trim();
     const sanitizedNodeId = trimmedNodeId.replace(/[^a-zA-Z0-9]/g, "_");
     const output = outputs[sanitizedNodeId] ?? outputs[trimmedNodeId];
     if (!output) {
-      return "null";
+      return full;
     }
     const data = output.data;
     if (data === null || data === undefined) {
@@ -1078,8 +1078,6 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
     // start custom keeperhub code //
     if (actionType === "code/run-code" && typeof originalCode === "string") {
       processedConfig.code = processCodeTemplates(originalCode, currentOutputs);
-    } else if (actionType === "code/run-code" && originalCode !== undefined) {
-      processedConfig.code = originalCode;
     }
     // end keeperhub code //
 

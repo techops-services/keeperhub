@@ -38,7 +38,9 @@ function extractLineNumber(error: unknown): number | undefined {
 
   const match = error.stack.match(VM_LINE_REGEX);
   if (match?.[1]) {
-    return Number.parseInt(match[1], 10);
+    // Subtract 1 to account for the async IIFE wrapper line prepended to user code
+    const rawLine = Number.parseInt(match[1], 10);
+    return Math.max(1, rawLine - 1);
   }
 
   return undefined;
