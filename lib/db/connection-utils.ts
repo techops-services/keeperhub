@@ -83,6 +83,10 @@ function formatPgQueryError(error: PgQueryError): string {
  * Returns a safe, user-facing message for database errors.
  * Shows query errors from PostgreSQL directly (they don't contain credentials).
  * Sanitizes connection errors to avoid leaking internal details.
+ *
+ * NOTE: This function is only used for user-provided external database connections
+ * (Database Query step and test-connection). Do not use it for KeeperHub's internal
+ * database errors, as PG query messages can expose schema/table/column names.
  */
 export function getDatabaseErrorMessage(error: unknown): string {
   if (!(error instanceof Error)) {
