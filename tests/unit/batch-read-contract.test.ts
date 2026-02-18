@@ -131,7 +131,9 @@ vi.mock("ethers", async () => {
     ...actual,
     ethers: {
       ...actual.ethers,
-      JsonRpcProvider: class MockProvider {},
+      JsonRpcProvider: class MockProvider {
+        destroy(): void {}
+      },
       Contract: class MockContract {
         aggregate3 = { staticCall: mockStaticCall };
       },
@@ -945,6 +947,57 @@ describe("batch-read-contract - mixed mode execution", () => {
     expect(result.results[0].success).toBe(true);
     expect(result.results[1].success).toBe(false);
     expect(result.results[1].error).toContain("reverted");
+  });
+
+  it("returns partial results when one network group fails", async () => {
+    mockGetChainIdFromNetwork.mockImplementation((network: string) => {
+      if (network === "ethereum") {
+        return 1;
+      }
+      if (network === "polygon") {
+        return 137;
+      }
+      throw new Error(`Unknown network: ${network}`);
+    });
+    mockResolveRpcConfig.mockImplementation(
+      async (chainId: number) => {
+        if (chainId === 1) {
+          return { primaryRpcUrl: "https://eth.example.com" };
+        }
+        return null;
+      }
+    );
+
+    // Ethereum batch succeeds
+    mockStaticCall.mockResolvedValueOnce([
+      encodeSuccessResult(erc20Iface, "balanceOf", [BigInt("100")]),
+    ]);
+
+    const result = await expectSuccess({
+      inputMode: "mixed",
+      calls: JSON.stringify([
+        {
+          network: "ethereum",
+          contractAddress: VALID_ADDRESS,
+          abiFunction: "balanceOf",
+          abi: JSON.stringify(ERC20_ABI),
+          args: [VALID_ADDRESS],
+        },
+        {
+          network: "polygon",
+          contractAddress: VALID_ADDRESS,
+          abiFunction: "balanceOf",
+          abi: JSON.stringify(ERC20_ABI),
+          args: [VALID_ADDRESS],
+        },
+      ]),
+    });
+
+    expect(result.totalCalls).toBe(2);
+    expect(result.results[0].success).toBe(true);
+    expect(result.results[0].result).toEqual({ balance: "100" });
+    expect(result.results[1].success).toBe(false);
+    expect(result.results[1].error).toContain("not found or not enabled");
   });
 
   it("treats missing args as empty array", async () => {
