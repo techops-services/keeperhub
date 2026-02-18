@@ -9,6 +9,8 @@ import {
   logUserError,
 } from "@/keeperhub/lib/logging";
 
+const isTestEnv = !!process.env.CI || process.env.NODE_ENV === "test";
+
 const SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send";
 
 type SendEmailOptions = {
@@ -40,15 +42,21 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
   const toAddress = normalizeEmail(options.to);
 
   if (!apiKey) {
-    logSystemError(
-      ErrorCategory.INFRASTRUCTURE,
-      "[Email] SENDGRID_API_KEY not configured",
-      new Error("SENDGRID_API_KEY environment variable is not configured"),
-      {
-        component: "email-service",
-        service: "sendgrid",
-      }
-    );
+    if (isTestEnv) {
+      console.warn(
+        "[Email] SENDGRID_API_KEY not configured — skipping email send"
+      );
+    } else {
+      logSystemError(
+        ErrorCategory.INFRASTRUCTURE,
+        "[Email] SENDGRID_API_KEY not configured",
+        new Error("SENDGRID_API_KEY environment variable is not configured"),
+        {
+          component: "email-service",
+          service: "sendgrid",
+        }
+      );
+    }
     return false;
   }
 
@@ -219,6 +227,10 @@ KeeperHub - Blockchain Workflow Automation
 
   if (success) {
     console.log(`[Email] OTP sent to ${email} for ${type}`);
+  } else if (isTestEnv) {
+    console.warn(
+      `[Email] Failed to send OTP to ${email} — OTP is stored in DB`
+    );
   } else {
     logUserError(
       ErrorCategory.EXTERNAL_SERVICE,

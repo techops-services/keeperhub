@@ -132,9 +132,12 @@ const plugins = [
         type,
       });
       if (!success) {
-        console.error(
-          `[Auth] Failed to send verification email to ${email} — OTP is stored in DB`
-        );
+        const msg = `[Auth] Failed to send verification email to ${email} — OTP is stored in DB`;
+        if (process.env.CI || process.env.NODE_ENV === "test") {
+          console.warn(msg);
+        } else {
+          console.error(msg);
+        }
       }
     },
     otpLength: 6,

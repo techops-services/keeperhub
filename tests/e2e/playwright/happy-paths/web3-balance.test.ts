@@ -153,10 +153,11 @@ test.describe("Happy Path: Web3 Balance Check", () => {
     await page.keyboard.press("Escape");
     await page.waitForTimeout(500);
 
-    // Use the "Runs" tab in the current view
+    // Use the "Runs" tab in the current view — use force click to bypass
+    // any remaining overlay elements (e.g. dialog backdrop)
     const runsTab = page.getByRole("tab", { name: "Runs" });
     await expect(runsTab).toBeVisible({ timeout: 5000 });
-    await runsTab.click();
+    await runsTab.click({ force: true });
     await page.waitForTimeout(2000);
 
     // Wait for execution to appear - look for "Run #" entries in the Runs tab

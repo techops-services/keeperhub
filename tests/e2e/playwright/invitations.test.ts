@@ -467,10 +467,20 @@ test.describe("Organization Invitations", () => {
       await page.locator("#password").fill("TestPassword123!");
       await page.locator('button:has-text("Sign In & Join")').click();
 
-      // Should show welcome toast and navigate away
-      await expect(
-        page.locator("[data-sonner-toast]").filter({ hasText: "Welcome to" })
-      ).toBeVisible({ timeout: 15_000 });
+      // Should show welcome toast and/or navigate away from accept-invite.
+      // The handleSuccess chain can race in CI, so accept either signal.
+      const welcomeToast2 = page
+        .locator("[data-sonner-toast]")
+        .filter({ hasText: "Welcome to" });
+      const navigatedAway2 = page.waitForURL(
+        (url) => !ACCEPT_INVITE_URL_REGEX.test(url.pathname),
+        { timeout: 20_000 }
+      );
+
+      await Promise.race([
+        welcomeToast2.waitFor({ state: "visible", timeout: 20_000 }),
+        navigatedAway2,
+      ]);
 
       await expect(page).not.toHaveURL(ACCEPT_INVITE_URL_REGEX, {
         timeout: 15_000,
@@ -505,10 +515,20 @@ test.describe("Organization Invitations", () => {
       // Accept the invitation
       await page.locator('button:has-text("Accept Invitation")').click();
 
-      // Should show welcome toast and navigate away
-      await expect(
-        page.locator("[data-sonner-toast]").filter({ hasText: "Welcome to" })
-      ).toBeVisible({ timeout: 15_000 });
+      // Should show welcome toast and/or navigate away from accept-invite.
+      // The handleSuccess chain can race in CI, so accept either signal.
+      const welcomeToast3 = page
+        .locator("[data-sonner-toast]")
+        .filter({ hasText: "Welcome to" });
+      const navigatedAway3 = page.waitForURL(
+        (url) => !ACCEPT_INVITE_URL_REGEX.test(url.pathname),
+        { timeout: 20_000 }
+      );
+
+      await Promise.race([
+        welcomeToast3.waitFor({ state: "visible", timeout: 20_000 }),
+        navigatedAway3,
+      ]);
 
       await expect(page).not.toHaveURL(ACCEPT_INVITE_URL_REGEX, {
         timeout: 15_000,

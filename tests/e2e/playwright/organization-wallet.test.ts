@@ -187,6 +187,10 @@ test.describe("Para Wallet Management", () => {
   });
 
   test.describe("Wallet Creation", () => {
+    // Para beta environment has a max user limit that CI always hits
+    // since each test run creates fresh users. Skip in CI.
+    test.skip(!!process.env.CI, "Para beta user limit exceeded in CI");
+
     test("WALLET-CREATE-1: admin can create organization wallet", async ({
       page,
     }) => {
