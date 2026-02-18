@@ -5,7 +5,7 @@ import {
   deleteApiKey,
   deleteTestWorkflow,
   getWorkflowWebhookUrl,
-  signUpAndVerify,
+  PERSISTENT_TEST_USER_EMAIL,
   waitForWorkflowExecution,
 } from "../utils";
 
@@ -16,10 +16,6 @@ test.describe("Happy Path: Webhook Workflow", () => {
   // Track resources to clean up after tests
   const createdWorkflows: string[] = [];
   const createdApiKeys: string[] = [];
-
-  test.beforeEach(async ({ context }) => {
-    await context.clearCookies();
-  });
 
   test.afterAll(async () => {
     // Cleanup workflows
@@ -45,29 +41,26 @@ test.describe("Happy Path: Webhook Workflow", () => {
     request,
     baseURL,
   }) => {
-    // Step 1: Sign up and verify
-    const { email } = await signUpAndVerify(page);
-
-    // Step 2: Create API key for webhook authentication
-    const apiKey = await createApiKey(email);
+    // Step 1: Create API key for webhook authentication
+    const apiKey = await createApiKey(PERSISTENT_TEST_USER_EMAIL);
     createdApiKeys.push(apiKey);
 
-    // Step 3: Create workflow directly in database with connected nodes
-    const workflow = await createTestWorkflow(email, {
+    // Step 2: Create workflow directly in database with connected nodes
+    const workflow = await createTestWorkflow(PERSISTENT_TEST_USER_EMAIL, {
       name: "Webhook Execution Test",
       triggerType: "webhook",
       enabled: true,
     });
     createdWorkflows.push(workflow.id);
 
-    // Step 4: Get webhook URL
+    // Step 3: Get webhook URL
     const webhookUrl = getWorkflowWebhookUrl(workflow.id, baseURL);
 
     // Verify URL format
     expect(webhookUrl).toContain("/api/workflows/");
     expect(webhookUrl).toContain("/webhook");
 
-    // Step 5: Trigger webhook via API with API key
+    // Step 4: Trigger webhook via API with API key
     const response = await request.post(webhookUrl, {
       data: { test: true, timestamp: Date.now() },
       headers: {
@@ -83,7 +76,7 @@ test.describe("Happy Path: Webhook Workflow", () => {
     }
     expect(response.ok()).toBe(true);
 
-    // Step 6: Wait for execution to complete via database polling
+    // Step 5: Wait for execution to complete via database polling
     const execution = await waitForWorkflowExecution(workflow.id, 60_000);
     expect(execution).not.toBeNull();
     if (execution?.status === "error") {
@@ -93,18 +86,15 @@ test.describe("Happy Path: Webhook Workflow", () => {
   });
 
   test("webhook URL is unique per workflow", async ({ page, baseURL }) => {
-    // Sign up and verify
-    const { email } = await signUpAndVerify(page);
-
     // Create first workflow
-    const workflow1 = await createTestWorkflow(email, {
+    const workflow1 = await createTestWorkflow(PERSISTENT_TEST_USER_EMAIL, {
       name: "Webhook Workflow 1",
       triggerType: "webhook",
     });
     createdWorkflows.push(workflow1.id);
 
     // Create second workflow
-    const workflow2 = await createTestWorkflow(email, {
+    const workflow2 = await createTestWorkflow(PERSISTENT_TEST_USER_EMAIL, {
       name: "Webhook Workflow 2",
       triggerType: "webhook",
     });
@@ -127,15 +117,12 @@ test.describe("Happy Path: Webhook Workflow", () => {
     request,
     baseURL,
   }) => {
-    // Sign up and verify
-    const { email } = await signUpAndVerify(page);
-
     // Create API key
-    const apiKey = await createApiKey(email);
+    const apiKey = await createApiKey(PERSISTENT_TEST_USER_EMAIL);
     createdApiKeys.push(apiKey);
 
     // Create workflow
-    const workflow = await createTestWorkflow(email, {
+    const workflow = await createTestWorkflow(PERSISTENT_TEST_USER_EMAIL, {
       name: "Multi-trigger Test",
       triggerType: "webhook",
       enabled: true,

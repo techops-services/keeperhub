@@ -4,7 +4,6 @@ import {
   configureAction,
   createWorkflow,
   saveWorkflow,
-  signUpAndVerify,
   triggerWorkflowManually,
   waitForCanvas,
 } from "../utils";
@@ -20,35 +19,28 @@ test.describe("Happy Path: Web3 Balance Check", () => {
   const TEST_ADDRESS = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
   const TEST_NETWORK = "mainnet";
 
-  test.beforeEach(async ({ context }) => {
-    await context.clearCookies();
-  });
-
   test("create workflow with Web3 check-balance action", async ({ page }) => {
-    // Step 1: Sign up and verify
-    await signUpAndVerify(page);
-
-    // Step 2: Create a new workflow
+    // Step 1: Create a new workflow
     const workflowId = await createWorkflow(page, "Web3 Balance Workflow");
     expect(workflowId).toBeTruthy();
 
-    // Step 3: Add Web3 Get Native Token Balance action
+    // Step 2: Add Web3 Get Native Token Balance action
     await addActionNode(page, "Get Native Token Balance");
 
-    // Step 4: Verify action node exists
+    // Step 3: Verify action node exists
     const actionNode = page.locator(".react-flow__node-action");
     await expect(actionNode).toBeVisible({ timeout: 5000 });
 
-    // Step 5: Configure the action
+    // Step 4: Configure the action
     await configureAction(page, {
       network: TEST_NETWORK,
       address: TEST_ADDRESS,
     });
 
-    // Step 6: Save the workflow
+    // Step 5: Save the workflow
     await saveWorkflow(page);
 
-    // Step 7: Verify save succeeded
+    // Step 6: Verify save succeeded
     await page.reload();
     await waitForCanvas(page);
 
@@ -57,9 +49,6 @@ test.describe("Happy Path: Web3 Balance Check", () => {
   });
 
   test("configure Web3 action with network selection", async ({ page }) => {
-    // Sign up and verify
-    await signUpAndVerify(page);
-
     // Create workflow
     await createWorkflow(page, "Web3 Network Test");
 
@@ -88,9 +77,6 @@ test.describe("Happy Path: Web3 Balance Check", () => {
   });
 
   test("Web3 action configuration persists after save", async ({ page }) => {
-    // Sign up and verify
-    await signUpAndVerify(page);
-
     // Create workflow
     await createWorkflow(page, "Web3 Persistence Test");
 
@@ -134,9 +120,6 @@ test.describe("Happy Path: Web3 Balance Check", () => {
   test("trigger Web3 workflow and verify execution output", async ({
     page,
   }) => {
-    // Sign up and verify
-    await signUpAndVerify(page);
-
     // Create and configure workflow
     await createWorkflow(page, "Web3 Execution Test");
     await addActionNode(page, "Get Native Token Balance");
@@ -153,7 +136,7 @@ test.describe("Happy Path: Web3 Balance Check", () => {
     await page.keyboard.press("Escape");
     await page.waitForTimeout(500);
 
-    // Use the "Runs" tab in the current view — use force click to bypass
+    // Use the "Runs" tab in the current view -- use force click to bypass
     // any remaining overlay elements (e.g. dialog backdrop)
     const runsTab = page.getByRole("tab", { name: "Runs" });
     await expect(runsTab).toBeVisible({ timeout: 5000 });

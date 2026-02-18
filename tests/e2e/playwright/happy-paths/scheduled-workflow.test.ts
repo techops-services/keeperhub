@@ -4,7 +4,6 @@ import {
   configureScheduleTrigger,
   createWorkflow,
   saveWorkflow,
-  signUpAndVerify,
   waitForCanvas,
 } from "../utils";
 
@@ -15,34 +14,27 @@ const WORKFLOW_URL_REGEX = /workflow/;
 test.describe.configure({ mode: "serial" });
 
 test.describe("Happy Path: Scheduled Workflow", () => {
-  test.beforeEach(async ({ context }) => {
-    await context.clearCookies();
-  });
-
   test("create and save a scheduled workflow with webhook action", async ({
     page,
   }) => {
-    // Step 1: Sign up and verify
-    await signUpAndVerify(page);
-
-    // Step 2: Create a new workflow
+    // Step 1: Create a new workflow
     const workflowId = await createWorkflow(page, "Test Scheduled Workflow");
     expect(workflowId).toBeTruthy();
 
-    // Step 3: Configure schedule trigger (every hour)
+    // Step 2: Configure schedule trigger (every hour)
     await configureScheduleTrigger(page, "0 * * * *");
 
-    // Step 4: Add Send Webhook action
+    // Step 3: Add Send Webhook action
     await addActionNode(page, "Send Webhook");
 
-    // Step 5: Verify action node exists
+    // Step 4: Verify action node exists
     const actionNode = page.locator(".react-flow__node-action");
     await expect(actionNode).toBeVisible({ timeout: 5000 });
 
-    // Step 6: Save the workflow
+    // Step 5: Save the workflow
     await saveWorkflow(page);
 
-    // Step 7: Verify save succeeded (workflow persisted)
+    // Step 6: Verify save succeeded (workflow persisted)
     await page.reload();
     await waitForCanvas(page);
 
@@ -54,9 +46,6 @@ test.describe("Happy Path: Scheduled Workflow", () => {
   test("schedule trigger configuration persists after save", async ({
     page,
   }) => {
-    // Sign up and verify
-    await signUpAndVerify(page);
-
     // Create workflow
     await createWorkflow(page, "Persistence Test Workflow");
 
@@ -85,9 +74,6 @@ test.describe("Happy Path: Scheduled Workflow", () => {
   });
 
   test("saved workflow can be reloaded", async ({ page }) => {
-    // Sign up and verify
-    await signUpAndVerify(page);
-
     // Create and save workflow
     await createWorkflow(page);
     await saveWorkflow(page);

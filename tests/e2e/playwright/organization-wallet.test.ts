@@ -9,7 +9,7 @@ const WALLET_CREATED_PATTERN = /wallet created/i;
 const ADDRESS_PATTERN = /0x.*\.\.\./;
 const COPIED_PATTERN = /copied/i;
 
-// Sign up and wait for org switcher to appear
+// Sign up a fresh user and wait for org switcher (used by wallet tests that need a new org)
 async function signUpAndVerify(
   page: Page,
   opts?: { email?: string }
@@ -75,15 +75,15 @@ async function openWalletOverlay(page: Page): Promise<void> {
 test.describe.configure({ mode: "serial" });
 
 test.describe("Organization Management", () => {
-  test.beforeEach(async ({ context }) => {
-    await context.clearCookies();
-  });
-
   test.describe("Organization Creation", () => {
     test("ORG-CREATE-1: user can create a new organization", async ({
       page,
     }) => {
-      await signUpAndVerify(page);
+      // Navigate to app (storageState provides auth)
+      await page.goto("/", { waitUntil: "domcontentloaded" });
+      await expect(page.locator('button[role="combobox"]')).toBeVisible({
+        timeout: 15_000,
+      });
 
       // Open create organization form
       await openCreateOrgForm(page);
@@ -108,7 +108,10 @@ test.describe("Organization Management", () => {
     });
 
     test("ORG-CREATE-2: slug is auto-generated from name", async ({ page }) => {
-      await signUpAndVerify(page);
+      await page.goto("/", { waitUntil: "domcontentloaded" });
+      await expect(page.locator('button[role="combobox"]')).toBeVisible({
+        timeout: 15_000,
+      });
       await openCreateOrgForm(page);
 
       const dialog = page.locator('[role="dialog"]');
@@ -122,7 +125,10 @@ test.describe("Organization Management", () => {
     });
 
     test("ORG-CREATE-3: user can manually edit slug", async ({ page }) => {
-      await signUpAndVerify(page);
+      await page.goto("/", { waitUntil: "domcontentloaded" });
+      await expect(page.locator('button[role="combobox"]')).toBeVisible({
+        timeout: 15_000,
+      });
       await openCreateOrgForm(page);
 
       const dialog = page.locator('[role="dialog"]');
@@ -149,7 +155,10 @@ test.describe("Organization Management", () => {
     test("ORG-CREATE-4: new organization appears in org switcher", async ({
       page,
     }) => {
-      await signUpAndVerify(page);
+      await page.goto("/", { waitUntil: "domcontentloaded" });
+      await expect(page.locator('button[role="combobox"]')).toBeVisible({
+        timeout: 15_000,
+      });
 
       // Create a new organization
       await openCreateOrgForm(page);

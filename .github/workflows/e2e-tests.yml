@@ -279,6 +279,15 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/keeperhub_test
 
+      - name: Seed database
+        run: |
+          pnpm db:seed
+          pnpm db:seed-test-wallet
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/keeperhub_test
+          TEST_PARA_USER_SHARE: ${{ secrets.TEST_PARA_USER_SHARE }}
+          WALLET_ENCRYPTION_KEY: ${{ secrets.TEST_WALLET_ENCRYPTION_KEY }}
+
       - name: Build application
         run: pnpm build
         env:

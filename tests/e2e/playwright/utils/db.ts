@@ -19,5 +19,8 @@ export {
   getUserIdByEmail,
   getUserOrganizationId,
   getWorkflowWebhookUrl,
+  PERSISTENT_TEST_USER_EMAIL,
   waitForWorkflowExecution,
 } from "../../../utils/db";
+
+export const PERSISTENT_TEST_PASSWORD = "TestPassword123!";
