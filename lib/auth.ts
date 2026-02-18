@@ -132,7 +132,9 @@ const plugins = [
         type,
       });
       if (!success) {
-        throw new Error("Failed to send verification email");
+        console.error(
+          `[Auth] Failed to send verification email to ${email} — OTP is stored in DB`
+        );
       }
     },
     otpLength: 6,
