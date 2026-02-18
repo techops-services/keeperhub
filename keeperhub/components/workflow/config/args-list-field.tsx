@@ -1,7 +1,7 @@
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { TemplateBadgeInput } from "@/components/ui/template-badge-input";
 import type { ActionConfigFieldBase } from "@/plugins/registry";
@@ -120,13 +120,16 @@ export function ArgsListField({
   );
 
   // Reset entries when function changes
-  const lastFunctionRef = useRef(functionValue);
-  if (functionValue !== lastFunctionRef.current) {
-    lastFunctionRef.current = functionValue;
+  const isInitialMount = useRef(true);
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     const newEntries = parseArgsListValue("", paramCount, nextId);
     setEntries(newEntries);
     onChange("");
-  }
+  }, [functionValue]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function updateEntries(updated: ArgSetEntry[]): void {
     setEntries(updated);
