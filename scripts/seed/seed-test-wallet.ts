@@ -1,13 +1,22 @@
 /**
  * Seed script for persistent E2E test account
  *
- * Provisions a test user (with login credentials) + organization + Para wallet
+ * Seeds a test user (with login credentials) + organization + Para wallet
  * for write-contract E2E tests and Playwright tests.
  * Idempotent: skips records that already exist.
  *
+ * The wallet data is hardcoded from the pre-provisioned Para wallet
+ * (same wallet used by keeper-app). This avoids calling the Para API
+ * at seed time and ensures deterministic wallet addresses across CI runs.
+ *
  * Test credentials:
- *   Email:    e2e-test@keeperhub.test
+ *   Email:    PR-TEST-DO-NOT-DELETE@techops.services
  *   Password: TestPassword123!
+ *
+ * Environment variables:
+ *   DATABASE_URL                - PostgreSQL connection string (required)
+ *   TEST_WALLET_ENCRYPTION_KEY  - 32-byte hex key for encrypting user share (required for wallet)
+ *   TEST_PARA_USER_SHARE        - Raw Para user share base64 string (required for wallet)
  *
  * Run with: pnpm db:seed-test-wallet
  */
@@ -17,7 +26,6 @@ import { expand } from "dotenv-expand";
 
 expand(dotenv.config());
 
-import { Environment, Para as ParaServer } from "@getpara/server-sdk";
 import { hashPassword } from "better-auth/crypto";
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
@@ -34,8 +42,13 @@ import {
 import { generateId } from "../../lib/utils/id";
 
 const TEST_ORG_SLUG = "e2e-test-org";
-const TEST_USER_EMAIL = "e2e-test@keeperhub.test";
+const TEST_USER_EMAIL = "PR-TEST-DO-NOT-DELETE@techops.services";
 const TEST_PASSWORD = "TestPassword123!";
+
+// Hardcoded wallet data from pre-provisioned Para wallet
+// Same wallet used by keeper-app (KeeperHub Staging partner)
+const TEST_WALLET_ID = "d932b702-0436-438f-ae97-2975f35bcf1c";
+const TEST_WALLET_ADDRESS = "0x673e3ff5342422b8a2ddc90f78afac9d7e37dbb1";
 
 type Db = ReturnType<typeof drizzle>;
 
@@ -140,47 +153,36 @@ async function ensureParaWallet(
     return;
   }
 
-  const PARA_API_KEY = process.env.PARA_API_KEY;
-  const PARA_ENV = process.env.PARA_ENVIRONMENT || "beta";
-
-  if (!PARA_API_KEY) {
-    throw new Error("PARA_API_KEY is required");
+  const rawUserShare = process.env.TEST_PARA_USER_SHARE;
+  if (!rawUserShare) {
+    console.log(
+      "TEST_PARA_USER_SHARE not set, skipping wallet seed. " +
+        "Wallet-dependent tests will be skipped."
+    );
+    return;
   }
+
   if (!process.env.WALLET_ENCRYPTION_KEY) {
-    throw new Error("WALLET_ENCRYPTION_KEY is required");
+    console.log(
+      "WALLET_ENCRYPTION_KEY not set, skipping wallet seed. " +
+        "Wallet-dependent tests will be skipped."
+    );
+    return;
   }
 
-  console.log("Creating Para pregenerated wallet...");
-  const environment = PARA_ENV === "prod" ? Environment.PROD : Environment.BETA;
-  const paraClient = new ParaServer(environment, PARA_API_KEY);
-
-  const wallet = await paraClient.createPregenWallet({
-    type: "EVM",
-    pregenId: { email: TEST_USER_EMAIL },
-  });
-
-  const userShare = await paraClient.getUserShare();
-
-  if (!userShare) {
-    throw new Error("Failed to get user share from Para");
-  }
-  if (!(wallet.id && wallet.address)) {
-    throw new Error("Invalid wallet data from Para");
-  }
-
-  const encryptedShare = encryptUserShare(userShare);
+  const encryptedShare = encryptUserShare(rawUserShare);
 
   await db.insert(paraWallets).values({
     id: generateId(),
     userId,
     organizationId: orgId,
     email: TEST_USER_EMAIL,
-    walletId: wallet.id,
-    walletAddress: wallet.address,
+    walletId: TEST_WALLET_ID,
+    walletAddress: TEST_WALLET_ADDRESS,
     userShare: encryptedShare,
   });
 
-  console.log(`Created wallet: ${wallet.address}`);
+  console.log(`Created wallet: ${TEST_WALLET_ADDRESS}`);
 }
 
 function assertNotProduction(): void {

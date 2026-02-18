@@ -23,7 +23,7 @@ import {
 // Persistent test account constants (seeded by scripts/seed/seed-test-wallet.ts)
 // ============================================================================
 
-export const PERSISTENT_TEST_USER_EMAIL = "e2e-test@keeperhub.test";
+export const PERSISTENT_TEST_USER_EMAIL = "PR-TEST-DO-NOT-DELETE@techops.services";
 export const PERSISTENT_TEST_ORG_SLUG = "e2e-test-org";
 
 /**

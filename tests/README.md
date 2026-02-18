@@ -36,24 +36,23 @@ pnpm db:seed-test-wallet
 
 | Field | Value |
 |-------|-------|
-| Email | `e2e-test@keeperhub.test` |
+| Email | `PR-TEST-DO-NOT-DELETE@techops.services` |
 | Password | `TestPassword123!` |
 | Org Slug | `e2e-test-org` |
 | Org Name | `E2E Test Organization` |
 | Role | `owner` |
 
-The script also provisions a **Para wallet** (EVM) linked to the test organization, required for `write-contract-workflow.test.ts` and any test that needs on-chain signing.
+The script also seeds a **Para wallet** (EVM) linked to the test organization, required for `write-contract-workflow.test.ts` and any test that needs on-chain signing. The wallet data is hardcoded from the pre-provisioned Para wallet (same wallet used by keeper-app). No Para API calls are made at seed time.
 
-**Environment variables required for wallet provisioning:**
+**Environment variables required for wallet seeding:**
 
 | Variable | Purpose |
 |----------|---------|
 | `DATABASE_URL` | PostgreSQL connection |
-| `PARA_API_KEY` | Para SDK key |
-| `PARA_ENVIRONMENT` | `beta` or `prod` (default: `beta`) |
+| `TEST_PARA_USER_SHARE` | Raw Para user share (base64) |
 | `WALLET_ENCRYPTION_KEY` | Encrypts user share at rest |
 
-If these env vars are missing, the user + org are still created but the wallet step will fail.
+If these env vars are missing, the user + org are still created but the wallet step is skipped.
 
 ---
 

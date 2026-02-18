@@ -147,23 +147,6 @@ jobs:
           done
           echo "LocalStack SQS is ready"
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-2
-
-      - name: Fetch secrets from SSM
-        id: ssm
-        run: |
-          PARA_KEY=$(aws ssm get-parameter --name /eks/maker-staging/keeperhub/para-api-key --with-decryption --query Parameter.Value --output text)
-          WALLET_KEY=$(aws ssm get-parameter --name /eks/maker-staging/keeperhub/wallet-encryption-key --with-decryption --query Parameter.Value --output text)
-          echo "::add-mask::$PARA_KEY"
-          echo "::add-mask::$WALLET_KEY"
-          echo "PARA_API_KEY=$PARA_KEY" >> $GITHUB_OUTPUT
-          echo "WALLET_ENCRYPTION_KEY=$WALLET_KEY" >> $GITHUB_OUTPUT
-
       - name: Create SQS queue
         run: |
           aws --endpoint-url=http://localhost:4566 sqs create-queue \
@@ -183,17 +166,14 @@ jobs:
           pnpm db:seed-test-wallet
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/keeperhub_test
-          PARA_API_KEY: ${{ steps.ssm.outputs.PARA_API_KEY }}
-          PARA_ENVIRONMENT: beta
-          WALLET_ENCRYPTION_KEY: ${{ steps.ssm.outputs.WALLET_ENCRYPTION_KEY }}
+          TEST_PARA_USER_SHARE: ${{ secrets.TEST_PARA_USER_SHARE }}
+          WALLET_ENCRYPTION_KEY: ${{ secrets.TEST_WALLET_ENCRYPTION_KEY }}
 
       - name: Run E2E Vitest tests
         run: pnpm test:e2e:vitest
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/keeperhub_test
-          PARA_API_KEY: ${{ steps.ssm.outputs.PARA_API_KEY }}
-          PARA_ENVIRONMENT: beta
-          WALLET_ENCRYPTION_KEY: ${{ steps.ssm.outputs.WALLET_ENCRYPTION_KEY }}
+          WALLET_ENCRYPTION_KEY: ${{ secrets.TEST_WALLET_ENCRYPTION_KEY }}
           WORKFLOW_TARGET_WORLD: "@workflow/world-postgres"
           AWS_ENDPOINT_URL: http://localhost:4566
           AWS_ACCESS_KEY_ID: test
