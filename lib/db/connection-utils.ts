@@ -51,6 +51,7 @@ export function ensureEncodedConnectionString(
   return `${protocol}${encodeURIComponent(username)}:${encodeURIComponent(password)}@${hostAndDb}`;
 }
 
+// start custom keeperhub code //
 interface PgQueryError extends Error {
   severity: string;
   code?: string;
@@ -76,6 +77,7 @@ function formatPgQueryError(error: PgQueryError): string {
   }
   return message;
 }
+// end keeperhub code //
 
 /**
  * Returns a safe, user-facing message for database errors.
@@ -87,6 +89,7 @@ export function getDatabaseErrorMessage(error: unknown): string {
     return "Unknown database error";
   }
 
+  // start custom keeperhub code //
   // PostgreSQL query errors (syntax errors, constraint violations, etc.)
   // are safe to show -- they describe the SQL problem, not credentials.
   // Drizzle ORM wraps PostgresError in error.cause, so check both levels.
@@ -97,6 +100,7 @@ export function getDatabaseErrorMessage(error: unknown): string {
   if (cause instanceof Error && isPgQueryError(cause)) {
     return formatPgQueryError(cause);
   }
+  // end keeperhub code //
 
   // Connection-level errors -- sanitize to avoid leaking credentials
   const errorMessage = error.message;
