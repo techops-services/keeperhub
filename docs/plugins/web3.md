@@ -18,6 +18,7 @@ Interact with EVM-compatible blockchain networks. Read-only actions work without
 | Write Contract | Web3 | Wallet | Execute state-changing contract functions |
 | Transfer Native Token | Web3 | Wallet | Send ETH/MATIC/etc. to a recipient |
 | Transfer ERC20 Token | Web3 | Wallet | Send ERC20 tokens to a recipient |
+| Query Contract Events | Web3 | No | Query historical smart contract events across a block range |
 | Decode Calldata | Security | No | Decode raw calldata into human-readable function calls |
 | Assess Transaction Risk | Security | No | AI-powered risk scoring with built-in DeFi rules |
 
@@ -94,6 +95,47 @@ Event (new transaction on monitored contract)
   -> Assess Transaction Risk: calldata={{GetTransaction.input}}, value={{GetTransaction.value}}
   -> Condition: riskScore >= 51
   -> Discord: "HIGH RISK TX from {{GetTransaction.from}}: {{AssessRisk.reasoning}}"
+```
+
+---
+
+## Query Contract Events
+
+Query historical smart contract events (logs) across a block range with automatic batching. Supports any EVM-compatible chain. The step internally batches queries in 2,000-block chunks to stay within RPC provider limits.
+
+**Inputs:**
+- Network (required)
+- Contract Address (required)
+- Contract ABI (required, auto-fetched from block explorer)
+- Event Name (required, selected from ABI)
+- Block Lookback -- number of blocks to scan back from To Block (default: 6500, ~1 day on Ethereum). Ignored if From Block is set
+- From Block -- explicit start block (overrides Block Lookback)
+- To Block -- end block number (default: latest)
+
+**Outputs:** `success`, `events` (array of decoded event objects with `blockNumber`, `transactionHash`, `logIndex`, `args`), `fromBlock`, `toBlock`, `eventCount`, `error`
+
+**How it works:**
+
+1. Resolves the block range from inputs (either explicit From/To or lookback from latest)
+2. Splits the range into 2,000-block batches to avoid RPC provider limits
+3. Queries each batch via `eth_getLogs` and decodes events using the ABI
+4. Concatenates all results and returns the full event list
+
+**When to use:** Index historical events, monitor contract activity over time, aggregate on-chain data for analytics, trigger downstream actions based on past events.
+
+**Example workflow -- DEX Swap Monitor:**
+```
+Schedule (every hour)
+  -> Query Contract Events: Uniswap Router, event "Swap", blockCount 300
+  -> Condition: eventCount > 0
+  -> Discord: "{{QueryEvents.eventCount}} swaps in the last hour"
+```
+
+**Example workflow -- Governance Vote Tracker:**
+```
+Schedule (daily)
+  -> Query Contract Events: Governor contract, event "VoteCast", blockCount 7200
+  -> SendGrid: "{{QueryEvents.eventCount}} votes cast today"
 ```
 
 ---

@@ -54,7 +54,6 @@ export type QueryEventsCoreInput = {
   fromBlock?: string;
   toBlock?: string;
   blockCount?: number | string;
-  batchSize?: number | string;
 };
 
 export type QueryEventsInput = StepInput & QueryEventsCoreInput;
@@ -99,32 +98,6 @@ function parseAbi(
   }
 
   return { success: true, parsed: parsedAbi as AbiEntry[] };
-}
-
-function parseBatchSize(
-  batchSizeInput: number | string | undefined
-): { success: true; value: number } | { success: false; error: string } {
-  if (batchSizeInput === undefined || batchSizeInput === null) {
-    return { success: true, value: DEFAULT_BATCH_SIZE };
-  }
-
-  if (typeof batchSizeInput === "string" && batchSizeInput.trim() === "") {
-    return { success: true, value: DEFAULT_BATCH_SIZE };
-  }
-
-  const batchSize =
-    typeof batchSizeInput === "string"
-      ? Number.parseInt(batchSizeInput, 10)
-      : batchSizeInput;
-
-  if (Number.isNaN(batchSize) || batchSize <= 0) {
-    return {
-      success: false,
-      error: `Invalid batchSize value: ${batchSizeInput}`,
-    };
-  }
-
-  return { success: true, value: batchSize };
 }
 
 function parseBlockCount(
@@ -272,7 +245,6 @@ async function stepHandler(
     fromBlock: input.fromBlock,
     toBlock: input.toBlock,
     blockCount: input.blockCount,
-    batchSize: input.batchSize,
     executionId: input._context?.executionId,
   });
 
@@ -356,18 +328,13 @@ async function stepHandler(
     };
   }
 
-  const batchSizeResult = parseBatchSize(input.batchSize);
-  if (!batchSizeResult.success) {
-    return { success: false, error: batchSizeResult.error };
-  }
-
   try {
     const events = await queryEventBatches(
       contract,
       eventName,
       eventFragment,
       range,
-      batchSizeResult.value
+      DEFAULT_BATCH_SIZE
     );
 
     console.log("[Query Events] Query complete. Events found:", events.length);
