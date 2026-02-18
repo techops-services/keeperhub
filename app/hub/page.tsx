@@ -143,12 +143,12 @@ export default function HubPage() {
         ) : (
           <>
             <div className="relative">
-            <div className="container mx-auto px-4 pt-28">
-              <HubHero />
+              <div className="container mx-auto px-4 pt-28">
+                <HubHero />
+              </div>
             </div>
-            </div>              
             <div className="bg-white/[0.03] py-12 relative">
-            <div className="absolute top-0 h-full bg-[#171f2e] w-full" />
+              <div className="absolute top-0 h-full bg-[#171f2e] w-full" />
               <div className="container mx-auto px-4">
                 <FeaturedCarousel workflows={featuredWorkflows} />
               </div>
