@@ -70,10 +70,12 @@ export type ActionConfigFieldBase = {
   required?: boolean;
 
   // Conditional rendering: only show if another field has a specific value
-  showWhen?: {
-    field: string;
-    equals: string;
-  };
+  // start custom keeperhub code //
+  // Use `equals` for single value match, `oneOf` for multiple value match
+  showWhen?:
+    | { field: string; equals: string }
+    | { field: string; oneOf: string[] };
+  // end keeperhub code //
 
   // For abi-function-select and abi-event-select: which field contains the ABI JSON
   abiField?: string;
@@ -92,6 +94,11 @@ export type ActionConfigFieldBase = {
 
   // For abi-with-auto-fetch: "read" or "write" so the node shows the right proxy option label (Read as Proxy / Write as Proxy)
   contractInteractionType?: "read" | "write";
+
+  // start custom keeperhub code //
+  // Tooltip text shown next to the label via an info icon
+  helpTip?: string;
+  // end keeperhub code //
 };
 
 /**
