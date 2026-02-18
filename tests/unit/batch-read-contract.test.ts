@@ -573,6 +573,52 @@ describe("batch-read-contract - batch size", () => {
     expect(result.totalCalls).toBe(1);
   });
 
+  it("clamps batchSize to maximum 500", async () => {
+    setupRpcMocks();
+    mockStaticCall.mockResolvedValueOnce([
+      encodeSuccessResult(erc20Iface, "balanceOf", [BigInt("100")]),
+    ]);
+
+    const result = await expectSuccess({
+      inputMode: "uniform",
+      network: "ethereum",
+      abi: JSON.stringify(ERC20_ABI),
+      contractAddress: VALID_ADDRESS,
+      abiFunction: "balanceOf",
+      argsList: JSON.stringify([[VALID_ADDRESS]]),
+      batchSize: "99999",
+    });
+
+    // Should succeed (clamped to 500, single batch for 1 call)
+    expect(result.totalCalls).toBe(1);
+    expect(mockStaticCall).toHaveBeenCalledTimes(1);
+  });
+
+  it("clamps negative batchSize to 1", async () => {
+    setupRpcMocks();
+    // batchSize clamped to 1 means 2 calls = 2 batches
+    mockStaticCall
+      .mockResolvedValueOnce([
+        encodeSuccessResult(erc20Iface, "balanceOf", [BigInt("100")]),
+      ])
+      .mockResolvedValueOnce([
+        encodeSuccessResult(erc20Iface, "balanceOf", [BigInt("200")]),
+      ]);
+
+    const result = await expectSuccess({
+      inputMode: "uniform",
+      network: "ethereum",
+      abi: JSON.stringify(ERC20_ABI),
+      contractAddress: VALID_ADDRESS,
+      abiFunction: "balanceOf",
+      argsList: JSON.stringify([[VALID_ADDRESS], [VALID_ADDRESS_2]]),
+      batchSize: "-5",
+    });
+
+    expect(result.totalCalls).toBe(2);
+    expect(mockStaticCall).toHaveBeenCalledTimes(2);
+  });
+
   it("clamps batchSize to minimum 1", async () => {
     setupRpcMocks();
     mockStaticCall.mockResolvedValueOnce([
@@ -950,5 +996,186 @@ describe("batch-read-contract - input mode routing", () => {
   it("uses mixed mode when inputMode is 'mixed'", async () => {
     const result = await expectFailure({ inputMode: "mixed" });
     expect(result.error).toContain("Calls JSON is required");
+  });
+});
+
+// ─── Mixed Mode - Batch Splitting ────────────────────────────────────────────
+
+describe("batch-read-contract - mixed mode batch splitting", () => {
+  it("splits same-network calls into batches in mixed mode", async () => {
+    setupRpcMocks();
+
+    // 3 calls on same network, batchSize=1 -> 3 batches
+    mockStaticCall
+      .mockResolvedValueOnce([
+        encodeSuccessResult(erc20Iface, "balanceOf", [BigInt("100")]),
+      ])
+      .mockResolvedValueOnce([
+        encodeSuccessResult(erc20Iface, "balanceOf", [BigInt("200")]),
+      ])
+      .mockResolvedValueOnce([
+        encodeSuccessResult(erc20Iface, "balanceOf", [BigInt("300")]),
+      ]);
+
+    const result = await expectSuccess({
+      inputMode: "mixed",
+      batchSize: "1",
+      calls: JSON.stringify([
+        {
+          network: "ethereum",
+          contractAddress: VALID_ADDRESS,
+          abiFunction: "balanceOf",
+          abi: JSON.stringify(ERC20_ABI),
+          args: [VALID_ADDRESS],
+        },
+        {
+          network: "ethereum",
+          contractAddress: VALID_ADDRESS,
+          abiFunction: "balanceOf",
+          abi: JSON.stringify(ERC20_ABI),
+          args: [VALID_ADDRESS_2],
+        },
+        {
+          network: "ethereum",
+          contractAddress: VALID_ADDRESS_2,
+          abiFunction: "balanceOf",
+          abi: JSON.stringify(ERC20_ABI),
+          args: [VALID_ADDRESS],
+        },
+      ]),
+    });
+
+    expect(result.totalCalls).toBe(3);
+    expect(mockStaticCall).toHaveBeenCalledTimes(3);
+    expect(result.results[0].result).toEqual({ balance: "100" });
+    expect(result.results[1].result).toEqual({ balance: "200" });
+    expect(result.results[2].result).toEqual({ balance: "300" });
+  });
+});
+
+// ─── Array-Type Outputs ─────────────────────────────────────────────────────
+
+describe("batch-read-contract - array-type outputs", () => {
+  const ARRAY_OUTPUT_ABI = [
+    {
+      name: "getHolders",
+      type: "function",
+      stateMutability: "view",
+      inputs: [],
+      outputs: [{ name: "holders", type: "address[]" }],
+    },
+  ];
+
+  it("preserves array output without unwrapping single-output arrays", async () => {
+    setupRpcMocks();
+
+    const arrayIface = new ethers.Interface(ARRAY_OUTPUT_ABI);
+    mockStaticCall.mockResolvedValueOnce([
+      encodeSuccessResult(arrayIface, "getHolders", [
+        [VALID_ADDRESS, VALID_ADDRESS_2],
+      ]),
+    ]);
+
+    const result = await expectSuccess({
+      inputMode: "uniform",
+      network: "ethereum",
+      abi: JSON.stringify(ARRAY_OUTPUT_ABI),
+      contractAddress: VALID_ADDRESS,
+      abiFunction: "getHolders",
+    });
+
+    // Single array-type output: isArrayType=true prevents unwrapping the Result tuple,
+    // so holders is [[addr1, addr2]] (the full Result preserved as-is).
+    const resultValue = result.results[0].result as { holders: string[][] };
+    expect(resultValue).toHaveProperty("holders");
+    expect(Array.isArray(resultValue.holders)).toBe(true);
+    // The inner array should contain the 2 addresses
+    expect(resultValue.holders[0]).toHaveLength(2);
+  });
+});
+
+// ─── Revert Reason Decoding ──────────────────────────────────────────────────
+
+describe("batch-read-contract - revert reason decoding", () => {
+  it("decodes Error(string) revert reason", async () => {
+    setupRpcMocks();
+
+    // Encode Error(string) revert data: selector 0x08c379a0 + abi-encoded string
+    const errorData = ethers.AbiCoder.defaultAbiCoder().encode(
+      ["string"],
+      ["Insufficient balance"]
+    );
+    const revertData = `0x08c379a0${errorData.slice(2)}`;
+
+    mockStaticCall.mockResolvedValueOnce([[false, revertData]]);
+
+    const result = await expectSuccess({
+      inputMode: "uniform",
+      network: "ethereum",
+      abi: JSON.stringify(ERC20_ABI),
+      contractAddress: VALID_ADDRESS,
+      abiFunction: "balanceOf",
+      argsList: JSON.stringify([[VALID_ADDRESS]]),
+    });
+
+    expect(result.results[0].success).toBe(false);
+    expect(result.results[0].error).toContain("Insufficient balance");
+  });
+
+  it("falls back to generic message for undecodable revert data", async () => {
+    setupRpcMocks();
+
+    mockStaticCall.mockResolvedValueOnce([[false, "0xdeadbeef"]]);
+
+    const result = await expectSuccess({
+      inputMode: "uniform",
+      network: "ethereum",
+      abi: JSON.stringify(ERC20_ABI),
+      contractAddress: VALID_ADDRESS,
+      abiFunction: "balanceOf",
+      argsList: JSON.stringify([[VALID_ADDRESS]]),
+    });
+
+    expect(result.results[0].success).toBe(false);
+    expect(result.results[0].error).toContain("reverted");
+  });
+});
+
+// ─── Total Call Limit ────────────────────────────────────────────────────────
+
+describe("batch-read-contract - total call limit", () => {
+  it("rejects when uniform mode exceeds max total calls", async () => {
+    // Build argsList with 5001 entries
+    const argsList = Array.from({ length: 5001 }, () => [VALID_ADDRESS]);
+
+    const result = await expectFailure({
+      inputMode: "uniform",
+      network: "ethereum",
+      abi: JSON.stringify(ERC20_ABI),
+      contractAddress: VALID_ADDRESS,
+      abiFunction: "balanceOf",
+      argsList: JSON.stringify(argsList),
+    });
+
+    expect(result.error).toContain("Too many calls");
+    expect(result.error).toContain("5001");
+  });
+
+  it("rejects when mixed mode exceeds max total calls", async () => {
+    const calls = Array.from({ length: 5001 }, () => ({
+      network: "ethereum",
+      contractAddress: VALID_ADDRESS,
+      abiFunction: "balanceOf",
+      abi: JSON.stringify(ERC20_ABI),
+      args: [VALID_ADDRESS],
+    }));
+
+    const result = await expectFailure({
+      inputMode: "mixed",
+      calls: JSON.stringify(calls),
+    });
+
+    expect(result.error).toContain("Too many calls");
+    expect(result.error).toContain("5001");
   });
 });

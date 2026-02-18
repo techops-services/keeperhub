@@ -244,6 +244,24 @@ function buildMixedCalls(callsJson: string | undefined): {
   return { calls: normalizedCalls };
 }
 
+/** Recursively convert BigInt values to strings without JSON round-trip. */
+function serializeBigInts(value: unknown): unknown {
+  if (typeof value === "bigint") {
+    return value.toString();
+  }
+  if (Array.isArray(value)) {
+    return value.map(serializeBigInts);
+  }
+  if (typeof value === "object" && value !== null) {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) {
+      out[k] = serializeBigInts(v);
+    }
+    return out;
+  }
+  return value;
+}
+
 /**
  * Structure a decoded result based on ABI function outputs
  */
@@ -251,11 +269,7 @@ function structureDecodedResult(
   decodedResult: ethers.Result,
   functionAbi: { outputs?: { name?: string; type?: string }[] }
 ): unknown {
-  const serialized = JSON.parse(
-    JSON.stringify(decodedResult, (_, value) =>
-      typeof value === "bigint" ? value.toString() : value
-    )
-  );
+  const serialized = serializeBigInts(decodedResult);
 
   const outputs = functionAbi.outputs;
   if (!outputs || outputs.length === 0) {
@@ -725,28 +739,45 @@ async function executeMixedMode(
     normalizedCalls
   );
 
-  // Execute each network group
+  type GroupSuccess = {
+    ok: true;
+    results: CallResult[];
+    group: IndexedEncodedCall[];
+  };
+  type GroupFailure = { ok: false; error: string };
+  type GroupOutcome = GroupSuccess | GroupFailure;
+
+  // Execute all network groups in parallel
   const allResults: CallResult[] = new Array(normalizedCalls.length);
+  const groupEntries = [...networkGroups.entries()];
 
-  for (const [networkKey, group] of networkGroups) {
-    const chainRpc = await resolveChainRpc(networkKey, userId);
-    if (chainRpc.error !== undefined) {
-      return { success: false, error: chainRpc.error };
+  const groupOutcomes: GroupOutcome[] = await Promise.all(
+    groupEntries.map(async ([networkKey, group]): Promise<GroupOutcome> => {
+      const chainRpc = await resolveChainRpc(networkKey, userId);
+      if (chainRpc.error !== undefined) {
+        return { ok: false, error: chainRpc.error };
+      }
+
+      const batchResult = await executeMulticallBatches(
+        group,
+        chainRpc.rpcUrl,
+        batchSize,
+        chainRpc.chainId
+      );
+      if (batchResult.error !== undefined) {
+        return { ok: false, error: batchResult.error };
+      }
+
+      return { ok: true, results: batchResult.results, group };
+    })
+  );
+
+  for (const outcome of groupOutcomes) {
+    if (!outcome.ok) {
+      return { success: false, error: outcome.error };
     }
-
-    const { results, error: batchError } = await executeMulticallBatches(
-      group,
-      chainRpc.rpcUrl,
-      batchSize,
-      chainRpc.chainId
-    );
-    if (batchError) {
-      return { success: false, error: batchError };
-    }
-
-    // Place results back in original order
-    for (const [resultIdx, groupCall] of group.entries()) {
-      allResults[groupCall.originalIndex] = results[resultIdx];
+    for (const [resultIdx, groupCall] of outcome.group.entries()) {
+      allResults[groupCall.originalIndex] = outcome.results[resultIdx];
     }
   }
 
