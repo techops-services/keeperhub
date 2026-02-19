@@ -9,7 +9,7 @@
  * 2. Add a system integration to SYSTEM_INTEGRATION_TYPES in discover-plugins.ts
  * 3. Run: pnpm discover-plugins
  *
- * Generated types: ai-gateway, clerk, code, database, discord, linear, resend, sendgrid, slack, telegram, v0, web3, webflow, webhook
+ * Generated types: ai-gateway, clerk, code, database, discord, linear, math, resend, sendgrid, slack, telegram, v0, web3, webflow, webhook
  */
 
 // Integration type union - plugins + system integrations
