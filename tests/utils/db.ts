@@ -24,7 +24,7 @@ import {
 // ============================================================================
 
 export const PERSISTENT_TEST_USER_EMAIL =
-  "PR-TEST-DO-NOT-DELETE@techops.services";
+  "pr-test-do-not-delete@techops.services";
 export const PERSISTENT_TEST_ORG_SLUG = "e2e-test-org";
 
 /**
