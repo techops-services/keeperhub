@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-20)
 
 **Core value:** Users can build and deploy Web3 automation workflows through a visual builder without writing code
-**Current focus:** v1.2 Protocol Registry - Phase 8 complete, ready for Phase 9
+**Current focus:** v1.2 Protocol Registry - Phase 9: Hub UI
 
 ## Current Position
 
-Phase: 8 of 9 (ABI Resolution + Example Protocol) -- COMPLETE
-Plan: 2 of 2 in current phase
-Status: Complete
-Last activity: 2026-02-20 -- completed 08-02 (WETH protocol definition with multi-chain support)
+Phase: 9 of 9 (Hub UI)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-02-20 -- Phase 8 complete, transitioning to Phase 9
 
 Progress: [████████░░] ~75% (v1.2)
 
@@ -70,7 +70,7 @@ None
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed Phase 8 -- all plans executed and verified
+Stopped at: Phase 8 complete, ready to plan Phase 9
 Resume file: None
 
-**Next action:** Phase 8 verification, then Phase 9 (Hub UI)
+**Next action:** Plan Phase 9 (Hub UI) -- phase directory not yet created, needs discuss-phase first
