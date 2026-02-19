@@ -35,7 +35,7 @@ See: `.planning/milestones/v1.1-ROADMAP.md` for full details.
 
 **Milestone Goal:** Build a declarative protocol definition system where adding a new DeFi protocol requires only a TypeScript definition file -- no step code, no plugin boilerplate.
 
-- [ ] **Phase 6: Foundations** - Protocol types, defineProtocol() function, read/write-contract core extraction
+- [x] **Phase 6: Foundations** - Protocol types, defineProtocol() function, read/write-contract core extraction (completed 2026-02-19)
 - [ ] **Phase 7: Plugin Auto-Generation** - protocolToPlugin(), generic protocol steps, discover-plugins extension
 - [ ] **Phase 8: ABI Resolution + Example Protocol** - ABI auto-fetch with caching, WETH example definition
 - [ ] **Phase 9: Hub UI** - Protocols tab, protocol grid, inline detail view, action rows
@@ -51,7 +51,7 @@ See: `.planning/milestones/v1.1-ROADMAP.md` for full details.
   2. Protocol files live in `keeperhub/protocols/{slug}.ts` following the declared convention
   3. Protocol definition declares contracts with per-chain addresses and actions with inputs, outputs, and contract references
   4. Original read-contract and write-contract steps continue to pass all existing tests after core extraction
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 Plans:
 - [ ] 06-01-PLAN.md -- Protocol definition types and defineProtocol() function with runtime validation
 - [ ] 06-02-PLAN.md -- Core logic extraction from read-contract and write-contract steps
@@ -65,7 +65,11 @@ Plans:
   2. Protocol actions appear in the workflow builder node palette (e.g., "WETH: Wrap", "WETH: Unwrap")
   3. Protocol actions appear in the `/api/mcp/schemas` response
   4. Generic protocol-read and protocol-write steps resolve the correct contract address for the selected network at runtime
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 07-01-PLAN.md -- protocolToPlugin() conversion, runtime protocol registry, protocol plugin shell + icon
+- [ ] 07-02-PLAN.md -- Generic protocol-read and protocol-write step files
+- [ ] 07-03-PLAN.md -- Extend discover-plugins to scan protocols and auto-register
 
 ### Phase 8: ABI Resolution + Example Protocol
 **Goal**: Protocols without an ABI in their definition resolve one automatically, and WETH demonstrates the full system end-to-end
@@ -92,7 +96,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 6 → 7 → 8 → 9
+Phases execute in numeric order: 6 -> 7 -> 8 -> 9
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -101,7 +105,7 @@ Phases execute in numeric order: 6 → 7 → 8 → 9
 | 3. Scheduler Extraction | v1.0 | 4/4 | Complete | 2026-01-26 |
 | 4. Cleanup | v1.0 | 3/3 | Complete | 2026-02-12 |
 | 5. Build & Local Validation | v1.1 | 2/2 | Complete | 2026-02-12 |
-| 6. Foundations | 1/2 | In Progress|  | - |
-| 7. Plugin Auto-Generation | v1.2 | 0/TBD | Not started | - |
+| 6. Foundations | v1.2 | 2/2 | Complete | 2026-02-19 |
+| 7. Plugin Auto-Generation | v1.2 | 0/3 | Not started | - |
 | 8. ABI Resolution + Example Protocol | v1.2 | 0/TBD | Not started | - |
 | 9. Hub UI | v1.2 | 0/TBD | Not started | - |

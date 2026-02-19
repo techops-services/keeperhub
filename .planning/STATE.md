@@ -36,6 +36,8 @@ Progress: [██░░░░░░░░] ~10% (v1.2)
 - Generic protocol icon for MVP -- custom icons per-protocol deferred to future
 - Core logic files (read-contract-core.ts, write-contract-core.ts) have no "use step" -- only way to share step logic across multiple step files without breaking workflow bundler
 - _context type inlined in core input types (no StepInput import) -- step-handler is step-only infrastructure
+- defineProtocol() is an identity function (returns def unchanged) -- TypeScript enforces shape at compile time, runtime validates correctness
+- Module-level KEBAB_CASE_REGEX and HEX_ADDRESS_REGEX constants used to satisfy Biome useTopLevelRegex rule
 
 ### Pending Todos
 
@@ -51,7 +53,7 @@ None
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 06-02-PLAN.md -- core extraction for read/write contract
+Stopped at: Completed 06-01-PLAN.md -- protocol type definitions and defineProtocol() function
 Resume file: None
 
 **Next action:** Continue Phase 6 plans
