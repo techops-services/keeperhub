@@ -95,7 +95,10 @@ Plans:
   2. The Protocols tab shows a grid of protocol cards matching the workflow template grid styling, each showing icon, name, description, chain badges, and action count
   3. Clicking a protocol card reveals an inline detail view listing each action with name, type badge (READ/WRITE), chain badges, and description
   4. Each action row has a "Use in Workflow" button that navigates to the workflow builder
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 09-01-PLAN.md -- Protocol API endpoint, chain utility, tab switcher, protocol grid with cards
+- [ ] 09-02-PLAN.md -- Protocol detail view with action list and "Use in Workflow" navigation
 
 ## Progress
 
@@ -112,4 +115,4 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9
 | 6. Foundations | v1.2 | 2/2 | Complete | 2026-02-19 |
 | 7. Plugin Auto-Generation | v1.2 | 4/4 | Complete | 2026-02-20 |
 | 8. ABI Resolution + Example Protocol | v1.2 | 2/2 | Complete | 2026-02-20 |
-| 9. Hub UI | v1.2 | 0/TBD | Not started | - |
+| 9. Hub UI | v1.2 | 0/2 | Not started | - |
