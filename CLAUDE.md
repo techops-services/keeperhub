@@ -236,3 +236,110 @@ curl http://localhost:3000/api/mcp/schemas?category=web3
 # Without chains
 curl http://localhost:3000/api/mcp/schemas?includeChains=false
 ```
+
+---
+
+## Writing Playwright Tests: Discovery-First Workflow
+
+Writing E2E tests requires understanding page structure before writing selectors. This project provides three complementary tools for page discovery.
+
+### Tool 1: Discovery CLI (`pnpm discover`)
+
+Quick recon of any page. Produces structured reports Claude can read.
+
+```bash
+# Unauthenticated page
+pnpm discover /
+
+# Authenticated (uses persistent test user)
+pnpm discover / --auth
+
+# With numbered element overlays on screenshot
+pnpm discover / --auth --highlight
+
+# Multi-step exploration
+pnpm discover / --auth --steps "click:button:has-text('New Workflow')" "probe:after-click"
+```
+
+Output goes to `tests/e2e/playwright/.probes/<label>-<timestamp>/`:
+- `screenshot.png` - full page screenshot
+- `screenshot-highlighted.png` - elements with numbered overlays (if --highlight)
+- `elements.md` - interactive elements table grouped by region (optimized for Claude)
+- `report.json` - full structured data
+- `summary.txt` - compact overview
+
+### Tool 2: Probe Function (in-test)
+
+Drop `probe()` calls into any test to capture state at specific points:
+
+```typescript
+import { probe, highlightElements } from "./utils/discover";
+
+test("my test", async ({ page }) => {
+  await page.goto("/");
+  await probe(page, "initial");        // captures screenshot + element map
+
+  await page.click('button:has-text("Sign In")');
+  await probe(page, "dialog-open");    // captures new state after click
+
+  // Read .probes/ output to understand what's on screen
+});
+```
+
+### Tool 3: Playwright MCP (direct browser control)
+
+The Playwright MCP server (`.mcp.json`) gives Claude direct browser access. Use it for interactive exploration when the CLI isn't enough:
+- Navigate pages, click elements, fill forms
+- Take screenshots and read them
+- Evaluate JavaScript in the page
+
+Combine with the discovery utilities: use MCP to navigate, then call `getInteractiveElements()` or `getPageStructure()` via page.evaluate for structured data.
+
+### Tool 4: Exploration Test Harness
+
+`tests/e2e/playwright/explore.test.ts` is a scratchpad test designed for iterative exploration:
+
+1. Edit the exploration steps
+2. Run: `pnpm test:e2e --grep "explore"`
+3. Read probe outputs from `.probes/`
+4. Edit steps again based on findings
+5. Once page structure is understood, write the real test in a new file
+
+### Recommended Workflow for Writing New Tests
+
+1. **Recon**: Run `pnpm discover <path> --auth --highlight` to understand the page
+2. **Read**: Read the `elements.md` output to see available selectors
+3. **Explore**: If you need to interact (open dialogs, expand menus), use the explore harness or Playwright MCP
+4. **Write**: Create the real test file using the selectors and interaction patterns discovered
+5. **Verify**: Run the test, use `probe()` at failure points if it breaks
+
+### Key Selectors Reference
+
+| Element | Selector |
+|---|---|
+| Sign In button | `button:has-text("Sign In")` (first) |
+| Auth dialog | `[role="dialog"]` |
+| Signup email | `#signup-email` |
+| Signup password | `#signup-password` |
+| OTP input | `#otp` |
+| User menu | `[data-testid="user-menu"]` |
+| Workflow canvas | `[data-testid="workflow-canvas"]` |
+| Trigger node | `.react-flow__node-trigger` |
+| Action grid | `[data-testid="action-grid"]` |
+| Add Step button | `button[name="Add Step"]` |
+| Toasts | `[data-sonner-toast]` |
+| Org switcher | `button[role="combobox"]` |
+
+### Existing Test Utilities
+
+| Utility | Import | Purpose |
+|---|---|---|
+| `signUpAndVerify(page)` | `./utils/auth` | Full signup + OTP verification flow |
+| `signIn(page, email, pw)` | `./utils/auth` | Sign in with credentials |
+| `createWorkflow(page)` | `./utils/workflow` | Navigate + create new workflow |
+| `addActionNode(page, label)` | `./utils/workflow` | Add action to canvas |
+| `probe(page, label)` | `./utils/discover` | Capture page state for analysis |
+| `highlightElements(page)` | `./utils/discover` | Add numbered overlays |
+| `getInteractiveElements(page)` | `./utils/discover` | Get structured element list |
+| `getPageStructure(page)` | `./utils/discover` | Get page headings, landmarks, forms |
+| `createTestWorkflow(email)` | `./utils/db` | Inject workflow directly into DB |

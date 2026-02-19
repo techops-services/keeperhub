@@ -231,3 +231,68 @@ act push --job e2e-vitest \
 | `tests/e2e/playwright/utils/auth.ts` | `signUpAndVerify()` for Playwright browser auth |
 | `tests/e2e/playwright/utils/db.ts` | Playwright-specific DB utilities |
 | `tests/e2e/playwright/utils/workflow.ts` | `waitForWorkflowSave()` and other Playwright workflow helpers |
+| `tests/e2e/playwright/utils/discover.ts` | Page discovery: `probe()`, `diffReports()`, `autoProbe()`, `highlightElements()` |
+
+---
+
+## Playwright Discovery Framework
+
+Tools for understanding page structure before writing E2E tests. Solves the problem of guessing selectors blind, running the test, failing, and repeating.
+
+### Commands
+
+```bash
+pnpm discover /                        # Discover unauthenticated page
+pnpm discover / --auth --highlight     # Authenticated with numbered element overlays
+pnpm discover / --steps "click:button:has-text('Sign In')" "wait:500" "probe:dialog"
+pnpm discover / --json                 # JSON to stdout
+```
+
+### Output
+
+Each probe writes to `tests/e2e/playwright/.probes/<label>-<timestamp>/`:
+
+| File | Purpose |
+|------|---------|
+| `screenshot.png` | Full page screenshot |
+| `screenshot-highlighted.png` | Interactive elements with numbered red overlays |
+| `elements.md` | Interactive elements table grouped by page region |
+| `accessibility.md` | Parsed accessibility tree (roles, names, states) |
+| `aria-snapshot.yaml` | Raw Playwright ARIA snapshot for writing `getByRole` locators |
+| `diff.md` | What changed between two probes (new/removed elements, dialogs, toasts) |
+| `report.json` | Full structured data |
+
+### In-Test Usage
+
+```typescript
+import { probe, diffReports, autoProbe } from "./utils/discover";
+
+// Manual probe at specific points
+const before = await probe(page, "before-click");
+await page.click('button:has-text("Sign In")');
+const after = await probe(page, "after-click");
+const diff = diffReports(before, after);
+
+// Auto-probe on every URL change (only when PW_DISCOVER=1)
+const handle = await autoProbe(page);
+// ... test interactions ...
+handle.stop();
+```
+
+### Environment Variables
+
+| Variable | Purpose |
+|----------|---------|
+| `PW_DISCOVER=1` | Enable auto-probing on navigation in tests |
+| `CI` | When set, disables auto-probing regardless of `PW_DISCOVER` |
+
+### Explore Harness
+
+`tests/e2e/playwright/explore.test.ts` is a scratchpad for iterative exploration:
+
+```bash
+pnpm test:e2e --grep "explore"              # Run exploration
+PW_DISCOVER=1 pnpm test:e2e --grep "explore"  # With auto-probing
+```
+
+Edit the steps in the file, run, read `.probes/` output, edit again, repeat until you understand the page structure. Then write the real test in a new file.
