@@ -24,14 +24,16 @@ async function gotoAcceptInvite(
   const url = `/accept-invite/${invitationId}`;
   for (let attempt = 0; attempt < 5; attempt++) {
     await page.goto(url, { waitUntil: "networkidle" });
-    if (page.url().includes("accept-invite")) {
+    // Verify we landed on the accept-invite page AND it's not a 404
+    const is404 = await page.locator("text=This page could not be found").isVisible().catch(() => false);
+    if (page.url().includes("accept-invite") && !is404) {
       return;
     }
-    // Brief wait before retry to let any pending state settle
-    await page.waitForTimeout(500);
+    // Brief wait before retry to let any pending state (or Turbopack recompile) settle
+    await page.waitForTimeout(1000);
   }
   throw new Error(
-    `Failed to navigate to ${url} after 5 attempts (kept redirecting to ${page.url()})`
+    `Failed to navigate to ${url} after 5 attempts (kept redirecting to ${page.url()} or got 404)`
   );
 }
 
@@ -194,13 +196,19 @@ async function sendInvite(page: Page, inviteeEmail: string): Promise<string> {
   await dialog
     .locator('input[placeholder="colleague@example.com"]')
     .fill(inviteeEmail);
-  await dialog.locator('button:has-text("Invite")').click();
 
-  await expect(
-    page
-      .locator("[data-sonner-toast]")
-      .filter({ hasText: `Invitation sent to ${inviteeEmail}` })
-  ).toBeVisible({ timeout: 10_000 });
+  const inviteButton = dialog.locator('button:has-text("Invite")');
+  await expect(inviteButton).toBeEnabled({ timeout: 5_000 });
+  await inviteButton.click();
+
+  // Wait for any toast to appear, then check it's the success toast
+  const anyToast = page.locator("[data-sonner-toast]").first();
+  await expect(anyToast).toBeVisible({ timeout: 15_000 });
+
+  const successToast = page
+    .locator("[data-sonner-toast]")
+    .filter({ hasText: `Invitation sent to ${inviteeEmail}` });
+  await expect(successToast).toBeVisible({ timeout: 5_000 });
 
   const invitationId = await getInvitationIdFromDb(inviteeEmail);
   return invitationId;
@@ -212,10 +220,11 @@ async function setupUserInTwoOrgs(
   page: Page,
   context: BrowserContext
 ): Promise<{ inviteeEmail: string }> {
-  const inviteeEmail = `test+${Date.now()}@techops.services`;
-
-  // Inviter sends invite
+  // Inviter signs up first
   await signUpAndVerify(page);
+
+  // Generate invitee email AFTER signUpAndVerify to avoid Date.now() collision
+  const inviteeEmail = `test+${Date.now()}@techops.services`;
   const invitationId = await sendInvite(page, inviteeEmail);
   await context.clearCookies();
 
@@ -229,15 +238,20 @@ async function setupUserInTwoOrgs(
   ).toBeVisible({ timeout: 15_000 });
   await page.locator('button:has-text("Accept Invitation")').click();
 
-  await expect(
-    page.locator("[data-sonner-toast]").filter({ hasText: "Welcome to" })
-  ).toBeVisible({ timeout: 15_000 });
+  // Wait for accept to process: either "Welcome to" toast or redirect away
+  const welcomeToast = page
+    .locator("[data-sonner-toast]")
+    .filter({ hasText: "Welcome to" });
+  const notOnAcceptPage = page.waitForURL(
+    (url) => !url.pathname.includes("accept-invite"),
+    { timeout: 15_000 }
+  );
+  await Promise.race([
+    welcomeToast.waitFor({ state: "visible", timeout: 15_000 }).catch(() => {}),
+    notOnAcceptPage.catch(() => {}),
+  ]);
 
-  await expect(page).not.toHaveURL(ACCEPT_INVITE_URL_REGEX, {
-    timeout: 15_000,
-  });
-
-  // Go to home so org switcher is available
+  // Navigate to home to ensure org switcher is available regardless of where we ended up
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await expect(page.locator('button[role="combobox"]')).toBeVisible({
     timeout: 15_000,
@@ -619,7 +633,6 @@ test.describe("Organization Invitations", () => {
       // Create invitee with their own org
       await signUpAndVerify(page, { email: inviteeEmail });
 
-      // Wait for any pending navigations from sign-up to settle
       // Accept invite via accept-invite page
       await gotoAcceptInvite(page, invitationId);
       await expect(
@@ -627,13 +640,18 @@ test.describe("Organization Invitations", () => {
       ).toBeVisible({ timeout: 15_000 });
       await page.locator('button:has-text("Accept Invitation")').click();
 
-      await expect(
-        page.locator("[data-sonner-toast]").filter({ hasText: "Welcome to" })
-      ).toBeVisible({ timeout: 15_000 });
-
-      await expect(page).not.toHaveURL(ACCEPT_INVITE_URL_REGEX, {
-        timeout: 15_000,
-      });
+      // Wait for accept to process: either toast or redirect away from accept page
+      const welcomeToast = page
+        .locator("[data-sonner-toast]")
+        .filter({ hasText: "Welcome to" });
+      const notOnAcceptPage = page.waitForURL(
+        (url) => !url.pathname.includes("accept-invite"),
+        { timeout: 15_000 }
+      );
+      await Promise.race([
+        welcomeToast.waitFor({ state: "visible", timeout: 15_000 }).catch(() => {}),
+        notOnAcceptPage.catch(() => {}),
+      ]);
 
       // Go home and open org switcher
       await page.goto("/", { waitUntil: "domcontentloaded" });

@@ -1018,9 +1018,15 @@ export async function autoProbe(
   let probeInProgress = false;
   let navigationCount = 0;
 
+  // Declared here so `stop()` can reference it; assigned after definition below
+  let onNavigation: ((frame: { url: () => string }) => Promise<void>) | null =
+    null;
+
   const handle: AutoProbeHandle = {
     stop: () => {
-      page.removeListener("framenavigated", onNavigation);
+      if (onNavigation) {
+        page.removeListener("framenavigated", onNavigation);
+      }
       return probes;
     },
     lastProbe: () => lastReport,
@@ -1068,7 +1074,7 @@ export async function autoProbe(
     }
   };
 
-  const onNavigation = async (frame: { url: () => string }): Promise<void> => {
+  onNavigation = async (frame: { url: () => string }): Promise<void> => {
     // Only probe main frame navigations
     if (frame !== page.mainFrame()) return;
 
