@@ -38,7 +38,9 @@ export type ActionConfigFieldBase = {
     // start custom keeperhub code //
     | "gas-limit-multiplier" // Gas limit multiplier with chain default display
     | "code-editor" // Monaco-based JavaScript code editor
-    | "json-editor"; // Monaco-based JSON editor
+    | "json-editor" // Monaco-based JSON editor
+    | "call-list-builder" // Dynamic list of contract calls for batch operations
+    | "args-list-builder"; // Dynamic list of argument sets for batch uniform mode
   // end keeperhub code //
 
   // For chain-select: filter by chain type (e.g., "evm" or "solana")

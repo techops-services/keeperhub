@@ -51,15 +51,77 @@ export function ensureEncodedConnectionString(
   return `${protocol}${encodeURIComponent(username)}:${encodeURIComponent(password)}@${hostAndDb}`;
 }
 
+// start custom keeperhub code //
+interface PgQueryError extends Error {
+  severity: string;
+  code?: string;
+  detail?: string;
+  hint?: string;
+}
+
+const PG_SEVERITIES = new Set([
+  "ERROR",
+  "FATAL",
+  "PANIC",
+  "WARNING",
+  "NOTICE",
+  "DEBUG",
+  "INFO",
+  "LOG",
+]);
+
+function isPgQueryError(error: Error): error is PgQueryError {
+  if (!("severity" in error)) {
+    return false;
+  }
+  const severity = (error as { severity: unknown }).severity;
+  return typeof severity === "string" && PG_SEVERITIES.has(severity);
+}
+
+/** Format a PostgreSQL query error with code, detail and hint context. */
+function formatPgQueryError(error: PgQueryError): string {
+  let message = error.message;
+  if (error.code) {
+    message += ` (code: ${error.code})`;
+  }
+  if (error.detail) {
+    message += ` Detail: ${error.detail}`;
+  }
+  if (error.hint) {
+    message += ` Hint: ${error.hint}`;
+  }
+  return message;
+}
+// end keeperhub code //
+
 /**
- * Returns a safe, user-facing message for database connection errors.
- * Avoids leaking credentials or internal details.
+ * Returns a safe, user-facing message for database errors.
+ * Shows query errors from PostgreSQL directly (they don't contain credentials).
+ * Sanitizes connection errors to avoid leaking internal details.
+ *
+ * NOTE: This function is only used for user-provided external database connections
+ * (Database Query step and test-connection). Do not use it for KeeperHub's internal
+ * database errors, as PG query messages can expose schema/table/column names.
  */
 export function getDatabaseErrorMessage(error: unknown): string {
   if (!(error instanceof Error)) {
     return "Unknown database error";
   }
 
+  // start custom keeperhub code //
+  // PostgreSQL query errors (syntax errors, constraint violations, etc.)
+  // are safe to show -- they describe the SQL problem, not credentials.
+  // Drizzle ORM wraps PostgresError in error.cause, so check both levels.
+  if (isPgQueryError(error)) {
+    return formatPgQueryError(error);
+  }
+  const cause = error.cause;
+  if (cause instanceof Error && isPgQueryError(cause)) {
+    return formatPgQueryError(cause);
+  }
+  // end keeperhub code //
+
+  // Connection-level errors -- sanitize to avoid leaking credentials
   const errorMessage = error.message;
 
   if (errorMessage.includes("ECONNREFUSED")) {

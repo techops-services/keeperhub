@@ -6,6 +6,7 @@ import { AccountSettings } from "@/components/settings/account-settings";
 import { Spinner } from "@/components/ui/spinner";
 // start custom keeperhub code //
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AppearanceSection } from "@/keeperhub/components/settings/appearance-section";
 import { ChangePasswordSection } from "@/keeperhub/components/settings/change-password-section";
 import { DeactivateAccountSection } from "@/keeperhub/components/settings/delete-account-section";
 // end keeperhub code //
@@ -98,6 +99,7 @@ export function SettingsOverlay({ overlayId }: SettingsOverlayProps) {
           <TabsList className="mb-4 w-full">
             <TabsTrigger value="account">Account</TabsTrigger>
             <TabsTrigger value="security">Security</TabsTrigger>
+            <TabsTrigger value="appearance">Appearance</TabsTrigger>
           </TabsList>
 
           <TabsContent className="space-y-6" value="account">
@@ -112,6 +114,10 @@ export function SettingsOverlay({ overlayId }: SettingsOverlayProps) {
 
           <TabsContent value="security">
             <ChangePasswordSection providerId={providerId} />
+          </TabsContent>
+
+          <TabsContent value="appearance">
+            <AppearanceSection />
           </TabsContent>
         </Tabs>
         // end keeperhub code //

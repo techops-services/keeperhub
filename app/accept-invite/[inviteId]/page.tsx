@@ -277,7 +277,7 @@ function EmailMismatchState({
   };
 
   const handleDecline = () => {
-    router.push("/workflows");
+    router.push("/");
   };
 
   return (
@@ -806,7 +806,7 @@ export default function AcceptInvitePage() {
     refetchOrganizations();
     refetchSidebar();
     toast.success(`Welcome to ${invitation?.organizationName}!`);
-    router.push("/workflows");
+    router.push("/");
   };
 
   // Show verification form before any other state checks so that session

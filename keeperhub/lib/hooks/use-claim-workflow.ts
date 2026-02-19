@@ -98,7 +98,7 @@ export function useClaimWorkflow(
       onCancel: () => {
         clearPendingClaim();
         setClaimPending(false);
-        router.push("/workflows");
+        router.push("/");
       },
     });
   }, [session, workflowId, open, loadExistingWorkflow, router]);
