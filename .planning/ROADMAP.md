@@ -4,7 +4,7 @@
 
 - ✅ **v1.0 Service Extraction** - Phases 1-4 (shipped 2026-02-12)
 - ✅ **v1.1 OG Image Generation** - Phase 5 (shipped 2026-02-12)
-- 🚧 **v1.2 Protocol Registry** - Phases 6-9 (in progress)
+- **v1.2 Protocol Registry** - Phases 6-9 (shipped 2026-02-20)
 
 ## Phases
 
@@ -31,14 +31,14 @@ See: `.planning/milestones/v1.1-ROADMAP.md` for full details.
 
 </details>
 
-### v1.2 Protocol Registry (In Progress)
+### v1.2 Protocol Registry (Complete)
 
 **Milestone Goal:** Build a declarative protocol definition system where adding a new DeFi protocol requires only a TypeScript definition file -- no step code, no plugin boilerplate.
 
 - [x] **Phase 6: Foundations** - Protocol types, defineProtocol() function, read/write-contract core extraction (completed 2026-02-19)
 - [x] **Phase 7: Plugin Auto-Generation** - protocolToPlugin(), generic protocol steps, discover-plugins extension (2/3 plans complete) (completed 2026-02-19)
 - [x] **Phase 8: ABI Resolution + Example Protocol** - ABI auto-fetch with caching, WETH example definition (completed 2026-02-20)
-- [ ] **Phase 9: Hub UI** - Protocols tab, protocol grid, inline detail view, action rows
+- [x] **Phase 9: Hub UI** - Protocols tab, protocol grid, inline detail view, action rows (completed 2026-02-20)
 
 ## Phase Details
 
@@ -97,8 +97,8 @@ Plans:
   4. Each action row has a "Use in Workflow" button that navigates to the workflow builder
 **Plans:** 2 plans
 Plans:
-- [ ] 09-01-PLAN.md -- Protocol API endpoint, chain utility, tab switcher, protocol grid with cards
-- [ ] 09-02-PLAN.md -- Protocol detail view with action list and "Use in Workflow" navigation
+- [x] 09-01-PLAN.md -- Protocol API endpoint, chain utility, tab switcher, protocol grid with cards
+- [x] 09-02-PLAN.md -- Protocol detail view with action list and "Use in Workflow" navigation
 
 ## Progress
 
@@ -115,4 +115,4 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9
 | 6. Foundations | v1.2 | 2/2 | Complete | 2026-02-19 |
 | 7. Plugin Auto-Generation | v1.2 | 4/4 | Complete | 2026-02-20 |
 | 8. ABI Resolution + Example Protocol | v1.2 | 2/2 | Complete | 2026-02-20 |
-| 9. Hub UI | v1.2 | 0/2 | Not started | - |
+| 9. Hub UI | v1.2 | 2/2 | Complete | 2026-02-20 |
