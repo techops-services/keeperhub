@@ -9,7 +9,14 @@ export default defineConfig({
     globals: true,
     environment: "node",
     include: ["**/*.test.ts", "**/*.test.tsx"],
-    exclude: ["node_modules", ".next", "tests/e2e/playwright", ".pnpm-store"],
+    exclude: [
+      "node_modules",
+      ".next",
+      "tests/e2e/playwright",
+      ".pnpm-store",
+      ".worktrees",
+      "**/.worktrees/**",
+    ],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
@@ -18,6 +25,7 @@ export default defineConfig({
     },
     setupFiles: ["./tests/setup.ts"],
     testTimeout: 10_000,
+    fileParallelism: false,
   },
   resolve: {
     alias: {

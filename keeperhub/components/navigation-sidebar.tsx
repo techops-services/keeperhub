@@ -356,7 +356,9 @@ export function NavigationSidebar(): React.ReactNode {
   }, []);
 
   useEffect(() => {
-    fetchData().catch(() => undefined);
+    fetchData().catch(() => {
+      /* intentional noop */
+    });
   }, [fetchData]);
 
   useEffect(
@@ -365,7 +367,9 @@ export function NavigationSidebar(): React.ReactNode {
         if (options?.closeFlyout) {
           navState.closeAll();
         }
-        fetchData().catch(() => undefined);
+        fetchData().catch(() => {
+          /* intentional noop */
+        });
       }),
     [fetchData, navState.closeAll]
   );
@@ -568,10 +572,12 @@ export function NavigationSidebar(): React.ReactNode {
         <Tooltip key={item.id}>
           <TooltipTrigger asChild>
             <button
+              aria-label={item.label}
               className={cn(
                 "flex h-9 w-full cursor-default items-center rounded-md text-muted-foreground transition-colors",
                 layoutClass
               )}
+              data-testid={`nav-${item.id}`}
               key={item.id}
               type="button"
             >
@@ -590,11 +596,13 @@ export function NavigationSidebar(): React.ReactNode {
 
     const button = (
       <button
+        aria-label={item.label}
         className={cn(
           "flex h-9 w-full items-center rounded-md transition-colors hover:bg-muted",
           layoutClass,
           active && "bg-muted"
         )}
+        data-testid={`nav-${item.id}`}
         key={item.id}
         onClick={() => handleNavClick(item.id, item.href)}
         type="button"
@@ -643,7 +651,11 @@ export function NavigationSidebar(): React.ReactNode {
         ref={sidebarRef}
         style={{ width: currentWidth }}
       >
-        <nav className="flex flex-1 flex-col gap-1 overflow-hidden px-2.5 pt-3">
+        <nav
+          aria-label="Main navigation"
+          className="flex flex-1 flex-col gap-1 overflow-hidden px-2.5 pt-3"
+          data-testid="navigation-sidebar"
+        >
           {navItems.map(renderNavItem)}
         </nav>
 
@@ -660,7 +672,8 @@ export function NavigationSidebar(): React.ReactNode {
           <div className="absolute inset-y-0 right-0 w-px bg-border transition-colors group-hover:w-1 group-hover:bg-blue-500 group-active:w-1 group-active:bg-blue-600" />
           {dragWidth === null && (
             <button
-              className="absolute top-1/2 right-0 flex size-6 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border bg-background opacity-0 shadow-sm transition-opacity hover:bg-muted group-hover:opacity-100"
+              aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
+              className="-translate-y-1/2 absolute top-1/2 right-0 flex size-6 translate-x-1/2 items-center justify-center rounded-full border bg-background opacity-0 shadow-sm transition-opacity hover:bg-muted group-hover:opacity-100"
               onClick={(e) => {
                 e.stopPropagation();
                 setExpanded(!expanded);

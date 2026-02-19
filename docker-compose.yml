@@ -178,6 +178,7 @@ services:
     image: keeperhub-dispatcher:latest
     container_name: keeperhub-dispatcher
     restart: unless-stopped
+    working_dir: /app
     environment:
       <<: *env_db_connection
       AWS_REGION: us-east-1
@@ -185,8 +186,50 @@ services:
       AWS_SECRET_ACCESS_KEY: test
       AWS_ENDPOINT_URL: http://localstack:4566
       SQS_QUEUE_URL: http://localstack:4566/000000000000/keeperhub-workflow-queue
-      KEEPERHUB_API_URL: http://keeperhub:3000
-      KEEPERHUB_API_KEY: local-scheduler-key-for-dev
+      KEEPERHUB_URL: http://app-dev:3000
+      KEEPERHUB_API_KEY: ${KEEPERHUB_API_KEY:-local-scheduler-key-for-dev}
+    depends_on:
+      db:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+      app-dev:
+        condition: service_started
+    # Run dispatcher every minute using a simple loop
+    # (Docker doesn't have native cron, so we simulate it)
+    command: |
+      sh -c 'while true; do
+        echo "[Dispatcher] Running at $$(date)"
+        tsx scripts/scheduler/schedule-dispatcher.ts
+        echo "[Dispatcher] Sleeping 60s..."
+        sleep 60
+      done'
+    profiles:
+      - dev # Only in dev profile (not minikube - uses K8s CronJob)
+
+  # ===========================================================================
+  # Schedule Executor (Direct execution for dev profile)
+  # Polls SQS and executes workflows directly (no K8s Jobs)
+  # NOTE: In minikube profile, job-spawner runs in K8s instead
+  # ===========================================================================
+  executor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: scheduler
+    image: keeperhub-scheduler:latest
+    container_name: keeperhub-executor
+    restart: unless-stopped
+    working_dir: /app
+    environment:
+      <<: *env_db_connection
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_ENDPOINT_URL: http://localstack:4566
+      SQS_QUEUE_URL: http://localstack:4566/000000000000/keeperhub-workflow-queue
+      KEEPERHUB_URL: http://app-dev:3000
+      KEEPERHUB_API_KEY: ${KEEPERHUB_API_KEY:-local-scheduler-key-for-dev}
     depends_on:
       db:
         condition: service_healthy
@@ -223,7 +266,7 @@ services:
       PORT: 3010
       TIMEOUT_BETWEEN_SYNC: 30000
       KEEPERHUB_API_URL: http://keeperhub:3000
-      KEEPERHUB_API_KEY: local-events-key-for-dev
+      KEEPERHUB_API_KEY: ${KEEPERHUB_API_KEY:-local-events-key-for-dev}
       JWT_TOKEN_USERNAME: ${JWT_TOKEN_USERNAME:-}
       JWT_TOKEN_PASSWORD: ${JWT_TOKEN_PASSWORD:-}
       NODE_ENV: development
@@ -258,7 +301,7 @@ services:
       REDIS_PORT: 6379
       JWT_TOKEN_USERNAME: ${JWT_TOKEN_USERNAME:-}
       JWT_TOKEN_PASSWORD: ${JWT_TOKEN_PASSWORD:-}
-      KEEPERHUB_API_KEY: local-events-key-for-dev
+      KEEPERHUB_API_KEY: ${KEEPERHUB_API_KEY:-local-events-key-for-dev}
       ETHERSCAN_API_KEY: ${ETHERSCAN_API_KEY:-}
       NODE_ENV: development
     depends_on:
@@ -295,7 +338,7 @@ services:
 
   # JS Sandbox for WASM fuel calibration
   # Uses Spidermonkey compiled to WASM for deterministic instruction counting
-  # See: scripts/workflow_runtime_analysis/calibrate-wasm-fuel.ts
+  # See: scripts/runtime/workflow_runtime_analysis/calibrate-wasm-fuel.ts
   js-sandbox:
     image: forbeslindesay/secure-js-sandbox:latest
     container_name: keeperhub-js-sandbox

@@ -207,7 +207,9 @@ export function AddStepButton({
   return (
     <>
       <button
-        className="add-step-button group nopan nodrag absolute -translate-y-1/2"
+        aria-label={hasNoTargets ? "Add step" : "Add branch"}
+        className="add-step-button group nopan nodrag -translate-y-1/2 absolute"
+        data-testid="add-step-button"
         onClick={handleClick}
         style={{
           left: `calc(100% + ${BUTTON_DISTANCE}px)`,

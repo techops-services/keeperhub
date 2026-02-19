@@ -4,6 +4,7 @@
   "files": {
     "includes": [
       "**/*",
+      "!.worktrees",
       "!components/ui",
       "!components/ai-elements",
       "!lib/utils.ts",
@@ -26,6 +27,8 @@
       "!components/settings",
       "!components/workflow",
       "!lib/atoms",
+      "!keeperhub-events",
+      "!keeperhub-scheduler",
       "!.history"
     ]
   },

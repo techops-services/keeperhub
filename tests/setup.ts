@@ -1,9 +1,10 @@
+import "dotenv/config";
 import { vi } from "vitest";
 
 // Set default environment variables (only if not already set)
-// This allows E2E tests to override with real infrastructure
+// dotenv/config loads .env first, these are fallbacks for CI or missing .env
 process.env.DATABASE_URL ??=
-  "postgresql://postgres:postgres@localhost:5432/workflow_builder";
+  "postgresql://postgres:postgres@localhost:5433/keeperhub";
 process.env.AWS_ENDPOINT_URL ??= "http://localhost:4566";
 process.env.AWS_REGION ??= "us-east-1";
 process.env.AWS_ACCESS_KEY_ID ??= "test";

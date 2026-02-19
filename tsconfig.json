@@ -40,6 +40,7 @@
     "lib/next-boilerplate/**/*.tsx",
     "tmp/**/*",
     "docs-site/**/*",
+    "keeperhub-events/**/*",
     "keeperhub-scheduler/**/*"
   ]
 }

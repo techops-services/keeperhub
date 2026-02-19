@@ -659,7 +659,9 @@ export function ActionConfig({
           data.email?.startsWith("temp-");
         setIsAnonymous(anon);
       })
-      .catch(() => undefined);
+      .catch(() => {
+        /* intentional noop */
+      });
     return () => {
       cancelled = true;
     };

@@ -59,14 +59,28 @@ deployment:
       args:
         - |
           echo "Setting up workflow postgres tables..."
-          export WORKFLOW_POSTGRES_URL=$(node scripts/encode-pg-url.mjs)
+          export WORKFLOW_POSTGRES_URL=$(tsx scripts/encode-pg-url.ts)
           pnpm exec workflow-postgres-setup
           echo "Running database migrations..."
           pnpm db:migrate
-          echo "Seeding chains..."
+          echo "Seeding chains and tokens..."
           pnpm db:seed
+          echo "Seeding persistent test account..."
+          pnpm db:seed-test-wallet
           echo "Migrations and seeding completed successfully"
-      env: *shared_env
+      env:
+        <<: *shared_env
+        PARA_API_KEY:
+          type: parameterStore
+          name: para-api-key
+          parameter_name: /eks/maker-staging/keeperhub/para-api-key
+        PARA_ENVIRONMENT:
+          type: kv
+          value: "beta"
+        WALLET_ENCRYPTION_KEY:
+          type: parameterStore
+          name: wallet-encryption-key
+          parameter_name: /eks/maker-staging/keeperhub/wallet-encryption-key
 
 serviceAccount:
   create: true

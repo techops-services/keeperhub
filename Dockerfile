@@ -100,8 +100,8 @@ ENV NODE_ENV=production
 # - Job spawner (Deployment): polls SQS, creates K8s Jobs
 #
 # Build with: docker build --target scheduler -t keeperhub-scheduler .
-# Run dispatcher: docker run keeperhub-scheduler tsx scripts/schedule-dispatcher.ts
-# Run job spawner: docker run keeperhub-scheduler tsx scripts/job-spawner.ts
+# Run dispatcher: docker run keeperhub-scheduler tsx scripts/scheduler/schedule-dispatcher.ts
+# Run job spawner: docker run keeperhub-scheduler tsx scripts/scheduler/job-spawner.ts
 
 # Stage 2.8: Workflow Runner stage (for executing workflows in K8s Jobs)
 FROM node:25-alpine AS workflow-runner
@@ -111,7 +111,7 @@ COPY --from=deps /etc/ssl/certs/rds-combined-ca-bundle.pem /etc/ssl/certs/rds-co
 
 # Copy dependencies and workflow execution files
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=source /app/scripts/workflow-runner.ts ./scripts/workflow-runner.ts
+COPY --from=source /app/scripts/runtime/workflow-runner.ts ./scripts/runtime/workflow-runner.ts
 COPY --from=source /app/lib ./lib
 COPY --from=source /app/plugins ./plugins
 COPY --from=source /app/keeperhub ./keeperhub
@@ -138,7 +138,7 @@ ENV NODE_ENV=production
 #   WORKFLOW_ID, EXECUTION_ID, SCHEDULE_ID, WORKFLOW_INPUT, DATABASE_URL
 #
 # Build with: docker build --target workflow-runner -t keeperhub-runner .
-CMD ["tsx", "scripts/workflow-runner.ts"]
+CMD ["tsx", "scripts/runtime/workflow-runner.ts"]
 
 # Stage 3: Runner (main Next.js app)
 FROM node:25-alpine AS runner
