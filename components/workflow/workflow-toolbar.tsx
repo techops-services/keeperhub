@@ -1647,8 +1647,7 @@ function WorkflowMenuComponent({
 }) {
   // start custom KeeperHub code
   const pathname = usePathname();
-  const isWorkflowRoute =
-    pathname === "/workflows" || pathname.startsWith("/workflows/");
+  const isWorkflowRoute = pathname.startsWith("/workflows/");
   // end custom KeeperHub code
 
   return (
@@ -1672,8 +1671,7 @@ export const WorkflowToolbar = ({
     workflowId ?? state.currentWorkflowId ?? undefined;
 
   const pathname = usePathname();
-  const isWorkflowRoute =
-    pathname === "/workflows" || pathname.startsWith("/workflows/");
+  const isWorkflowRoute = pathname.startsWith("/workflows/");
 
   // If persistent mode, use fixed positioning
   const containerClassName = persistent
