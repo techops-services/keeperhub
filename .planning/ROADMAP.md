@@ -65,12 +65,12 @@ Plans:
   2. Protocol actions appear in the workflow builder node palette (e.g., "WETH: Wrap", "WETH: Unwrap")
   3. Protocol actions appear in the `/api/mcp/schemas` response
   4. Generic protocol-read and protocol-write steps resolve the correct contract address for the selected network at runtime
-**Plans:** 4 plans (3 complete, 1 gap closure)
+**Plans:** 4 plans (4 complete)
 Plans:
 - [x] 07-01-PLAN.md -- protocolToPlugin() conversion, runtime protocol registry, protocol plugin shell + icon
 - [x] 07-02-PLAN.md -- Generic protocol-read and protocol-write step files
 - [x] 07-03-PLAN.md -- Extend discover-plugins to scan protocols and auto-register
-- [ ] 07-04-PLAN.md -- Gap closure: server-side protocol bootstrap via generated barrel file
+- [x] 07-04-PLAN.md -- Gap closure: server-side protocol bootstrap via generated barrel file
 
 ### Phase 8: ABI Resolution + Example Protocol
 **Goal**: Protocols without an ABI in their definition resolve one automatically, and WETH demonstrates the full system end-to-end
@@ -81,7 +81,10 @@ Plans:
   2. Proxy contracts (EIP-1967, EIP-1822, EIP-2535) resolve to the implementation ABI automatically
   3. Fetched ABIs are not re-fetched within 24 hours (cache hit observable via logs or reduced network calls)
   4. The WETH protocol definition exists and its wrap/unwrap actions are available in the workflow builder
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 08-01-PLAN.md -- ABI resolution with in-memory caching and proxy-aware fetching, wired into protocol steps
+- [ ] 08-02-PLAN.md -- Production WETH protocol definition with multi-chain support
 
 ### Phase 9: Hub UI
 **Goal**: Users can browse all registered protocols from the Hub, inspect their actions, and navigate to the workflow builder to use them
@@ -108,5 +111,5 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9
 | 5. Build & Local Validation | v1.1 | 2/2 | Complete | 2026-02-12 |
 | 6. Foundations | v1.2 | 2/2 | Complete | 2026-02-19 |
 | 7. Plugin Auto-Generation | v1.2 | 3/4 | Gap closure | - |
-| 8. ABI Resolution + Example Protocol | v1.2 | 0/TBD | Not started | - |
+| 8. ABI Resolution + Example Protocol | v1.2 | 0/2 | Planned | - |
 | 9. Hub UI | v1.2 | 0/TBD | Not started | - |
