@@ -82,6 +82,7 @@ function createCapturedConsole(logs: LogEntry[]): {
  * escape via .constructor.constructor. This is acceptable for a self-hosted
  * platform where users are authenticated team members.
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: single cohesive handler with sandbox setup, timeout, and error handling
 async function stepHandler(input: RunCodeCoreInput): Promise<RunCodeResult> {
   const { code } = input;
 
