@@ -456,6 +456,34 @@ describe("code/run-code - error handling", () => {
     expect(result.error).toContain("Unresolved template variables");
   });
 
+  it("allows {{...}} inside double-quoted strings", async () => {
+    const result = await expectSuccess({
+      code: 'return "Use {{name}} for templates";',
+    });
+    expect(result.result).toBe("Use {{name}} for templates");
+  });
+
+  it("allows {{...}} inside single-quoted strings", async () => {
+    const result = await expectSuccess({
+      code: "return 'Value is {{placeholder}}';",
+    });
+    expect(result.result).toBe("Value is {{placeholder}}");
+  });
+
+  it("allows {{...}} inside backtick strings", async () => {
+    const result = await expectSuccess({
+      code: "return `template: {{var}}`;",
+    });
+    expect(result.result).toBe("template: {{var}}");
+  });
+
+  it("still detects unresolved templates outside strings", async () => {
+    const result = await expectFailure({
+      code: 'const s = "safe {{inside}}"; return {{Outside.field}};',
+    });
+    expect(result.error).toContain("Unresolved template variables");
+  });
+
   it("preserves console logs even on error", async () => {
     const code = [
       'console.log("before error");',

@@ -74,10 +74,6 @@ The sandbox uses `node:vm` which prevents accidental access to Node.js internals
 
 `fetch` is wrapped with an `AbortController` deadline matching the configured timeout, so network requests cannot hang indefinitely. A wall-clock `Promise.race` timeout also guards the entire execution, covering any async operation (not just fetch). Only `crypto.randomUUID` is exposed (`crypto.subtle` and other methods are not available).
 
-### Known Limitations
-
-- **Template detection in string literals:** The unresolved template check uses a regex that cannot distinguish `{{...}}` patterns inside JavaScript string literals from actual template variables. Code like `const s = "Use {{name}} here"` will be rejected with an "unresolved template variables" error. To work around this, build such strings dynamically (e.g. `"Use " + "{{" + "name}}" + " here"`).
-
 ## Example Workflows
 
 ### Filter and Aggregate Transfer Events

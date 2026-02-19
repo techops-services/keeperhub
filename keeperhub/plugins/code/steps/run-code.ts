@@ -29,6 +29,19 @@ const VM_LINE_REGEX = /user-code\.js:(\d+)/;
 const UNRESOLVED_TEMPLATE_REGEX = /\{\{@?[^}]+\}\}/g;
 
 /**
+ * Strip JS string literals (single, double, backtick) so that {{...}}
+ * patterns inside strings are not mistaken for unresolved templates.
+ * Handles escaped quotes. Does not handle nested template literal
+ * expressions (${...}) but that is sufficient for this use case.
+ */
+const JS_STRING_LITERAL_REGEX =
+  /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`/g;
+
+function stripStringLiterals(code: string): string {
+  return code.replace(JS_STRING_LITERAL_REGEX, "");
+}
+
+/**
  * Extract a line number from a VM error stack trace if available.
  */
 function extractLineNumber(error: unknown): number | undefined {
@@ -91,9 +104,10 @@ async function stepHandler(input: RunCodeCoreInput): Promise<RunCodeResult> {
   }
 
   // Check for unresolved template variables that would cause syntax errors.
-  // Known limitation: this regex also matches {{...}} inside JS string literals,
-  // e.g. const s = "Use {{name}} here" will be flagged as unresolved.
-  const unresolvedTemplates = code.match(UNRESOLVED_TEMPLATE_REGEX);
+  // Strip string literals first so {{...}} inside quotes is not flagged.
+  const unresolvedTemplates = stripStringLiterals(code).match(
+    UNRESOLVED_TEMPLATE_REGEX
+  );
   if (unresolvedTemplates) {
     const unique = [...new Set(unresolvedTemplates)];
     return {
