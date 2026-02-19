@@ -108,7 +108,7 @@ async function stepHandler(input: RunCodeCoreInput): Promise<RunCodeResult> {
   // Wrap fetch with an AbortController deadline so network requests respect
   // the configured timeout and cannot hang indefinitely.
   function sandboxedFetch(
-    input: RequestInfo | URL,
+    resource: RequestInfo | URL,
     init?: RequestInit
   ): Promise<Response> {
     const controller = new AbortController();
@@ -124,7 +124,7 @@ async function stepHandler(input: RunCodeCoreInput): Promise<RunCodeResult> {
       });
     }
 
-    return fetch(input, { ...init, signal: controller.signal }).finally(() =>
+    return fetch(resource, { ...init, signal: controller.signal }).finally(() =>
       clearTimeout(timer)
     );
   }

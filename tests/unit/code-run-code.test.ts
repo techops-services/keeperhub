@@ -22,6 +22,9 @@ import {
   runCodeStep,
 } from "@/keeperhub/plugins/code/steps/run-code";
 
+const UUID_V4_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
 type SuccessResult = {
   success: true;
   result: unknown;
@@ -318,9 +321,7 @@ describe("code/run-code - sandbox globals", () => {
     const result = await expectSuccess({
       code: "return crypto.randomUUID();",
     });
-    expect(result.result).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
-    );
+    expect(result.result).toMatch(UUID_V4_REGEX);
   });
 
   it("crypto.randomUUID returns unique values on each call", async () => {
