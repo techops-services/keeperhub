@@ -712,7 +712,7 @@ describe("code/run-code - timeout", () => {
       code: "await new Promise(() => {});",
       timeout: 1,
     });
-    expect(result.error).toContain("timed out after 1 seconds");
+    expect(result.error).toContain("timed out after 1 second");
   }, 10_000);
 
   it("clamps timeout to min 1 second", async () => {
