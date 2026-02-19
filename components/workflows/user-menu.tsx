@@ -12,7 +12,7 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   AuthDialog,
   isSingleProviderSignInInitiated,
@@ -40,43 +40,21 @@ import { TagsOverlay } from "@/keeperhub/components/overlays/tags-overlay";
 import { WalletOverlay } from "@/keeperhub/components/overlays/wallet-overlay";
 import { useOrganization } from "@/keeperhub/lib/hooks/use-organization";
 // end keeperhub code //
-import { api } from "@/lib/api-client";
 import { signOut, useSession } from "@/lib/auth-client";
 
 export const UserMenu = () => {
   const { data: session, isPending } = useSession();
   const { open: openOverlay } = useOverlay();
-  const [providerId, setProviderId] = useState<string | null>(null);
   const [orgModalOpen, setOrgModalOpen] = useState(false);
   // start custom keeperhub code //
   const { organization } = useOrganization();
   // end keeperhub code //
-
-  // Fetch provider info when session is available
-  useEffect(() => {
-    if (session?.user && !session.user.name?.startsWith("Anonymous")) {
-      api.user
-        .get()
-        .then((user) => {
-          setProviderId(user.providerId);
-        })
-        .catch(() => {
-          setProviderId(null);
-        });
-    }
-  }, [session?.user]);
 
   const handleLogout = async () => {
     await signOut();
     // Full page refresh to clear all React/jotai state
     window.location.href = "/";
   };
-
-  // OAuth users can't edit their profile
-  const isOAuthUser =
-    providerId === "vercel" ||
-    providerId === "github" ||
-    providerId === "google";
 
   const getUserInitials = () => {
     if (session?.user?.name) {
@@ -174,12 +152,10 @@ export const UserMenu = () => {
             <span>Report an issue</span>
           </DropdownMenuItem>
           {/* end keeperhub code */}
-          {!isOAuthUser && (
-            <DropdownMenuItem onClick={() => openOverlay(SettingsOverlay)}>
-              <Settings className="size-4" />
-              <span>Settings</span>
-            </DropdownMenuItem>
-          )}
+          <DropdownMenuItem onClick={() => openOverlay(SettingsOverlay)}>
+            <Settings className="size-4" />
+            <span>Settings</span>
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => openOverlay(IntegrationsOverlay)}>
             <Plug className="size-4" />
             <span>Connections</span>
