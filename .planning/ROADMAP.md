@@ -37,7 +37,7 @@ See: `.planning/milestones/v1.1-ROADMAP.md` for full details.
 
 - [x] **Phase 6: Foundations** - Protocol types, defineProtocol() function, read/write-contract core extraction (completed 2026-02-19)
 - [x] **Phase 7: Plugin Auto-Generation** - protocolToPlugin(), generic protocol steps, discover-plugins extension (2/3 plans complete) (completed 2026-02-19)
-- [ ] **Phase 8: ABI Resolution + Example Protocol** - ABI auto-fetch with caching, WETH example definition
+- [x] **Phase 8: ABI Resolution + Example Protocol** - ABI auto-fetch with caching, WETH example definition (completed 2026-02-20)
 - [ ] **Phase 9: Hub UI** - Protocols tab, protocol grid, inline detail view, action rows
 
 ## Phase Details
@@ -81,10 +81,10 @@ Plans:
   2. Proxy contracts (EIP-1967, EIP-1822, EIP-2535) resolve to the implementation ABI automatically
   3. Fetched ABIs are not re-fetched within 24 hours (cache hit observable via logs or reduced network calls)
   4. The WETH protocol definition exists and its wrap/unwrap actions are available in the workflow builder
-**Plans:** 2 plans
+**Plans:** 2 plans (2 complete)
 Plans:
-- [ ] 08-01-PLAN.md -- ABI resolution with in-memory caching and proxy-aware fetching, wired into protocol steps
-- [ ] 08-02-PLAN.md -- Production WETH protocol definition with multi-chain support
+- [x] 08-01-PLAN.md -- ABI resolution with in-memory caching and proxy-aware fetching, wired into protocol steps
+- [x] 08-02-PLAN.md -- Production WETH protocol definition with multi-chain support
 
 ### Phase 9: Hub UI
 **Goal**: Users can browse all registered protocols from the Hub, inspect their actions, and navigate to the workflow builder to use them
@@ -110,6 +110,6 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9
 | 4. Cleanup | v1.0 | 3/3 | Complete | 2026-02-12 |
 | 5. Build & Local Validation | v1.1 | 2/2 | Complete | 2026-02-12 |
 | 6. Foundations | v1.2 | 2/2 | Complete | 2026-02-19 |
-| 7. Plugin Auto-Generation | v1.2 | 3/4 | Gap closure | - |
-| 8. ABI Resolution + Example Protocol | v1.2 | 0/2 | Planned | - |
+| 7. Plugin Auto-Generation | v1.2 | 4/4 | Complete | 2026-02-20 |
+| 8. ABI Resolution + Example Protocol | v1.2 | 2/2 | Complete | 2026-02-20 |
 | 9. Hub UI | v1.2 | 0/TBD | Not started | - |
