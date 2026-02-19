@@ -90,7 +90,9 @@ async function stepHandler(input: RunCodeCoreInput): Promise<RunCodeResult> {
     return { success: false, error: "No code provided", logs: [] };
   }
 
-  // Check for unresolved template variables that would cause syntax errors
+  // Check for unresolved template variables that would cause syntax errors.
+  // Known limitation: this regex also matches {{...}} inside JS string literals,
+  // e.g. const s = "Use {{name}} here" will be flagged as unresolved.
   const unresolvedTemplates = code.match(UNRESOLVED_TEMPLATE_REGEX);
   if (unresolvedTemplates) {
     const unique = [...new Set(unresolvedTemplates)];
