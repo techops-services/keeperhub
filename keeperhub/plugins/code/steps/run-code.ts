@@ -77,8 +77,10 @@ function createCapturedConsole(logs: LogEntry[]): {
  * contains the actual values at execution time.
  *
  * Security model: node:vm prevents accidental access to Node.js internals.
- * It is NOT a security boundary against malicious code. This is acceptable
- * for a self-hosted platform where users are authenticated team members.
+ * It is NOT a security boundary against malicious code -- native constructors
+ * (Error, TypeError, etc.) expose the host prototype chain, allowing sandbox
+ * escape via .constructor.constructor. This is acceptable for a self-hosted
+ * platform where users are authenticated team members.
  */
 async function stepHandler(input: RunCodeCoreInput): Promise<RunCodeResult> {
   const { code } = input;
@@ -255,7 +257,7 @@ async function stepHandler(input: RunCodeCoreInput): Promise<RunCodeResult> {
       (error instanceof Error && error.message === "WALL_CLOCK_TIMEOUT");
 
     const errorMessage = isTimeout
-      ? `Code execution timed out after ${String(timeoutSeconds)} seconds`
+      ? `Code execution timed out after ${String(timeoutSeconds)} second${timeoutSeconds === 1 ? "" : "s"}`
       : `Code execution failed: ${message}`;
 
     logUserError(ErrorCategory.VALIDATION, "[Code] Execution error:", error, {
