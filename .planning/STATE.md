@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 ## Current Position
 
 Phase: 9 of 9 (Hub UI)
-Plan: 09-01 complete, executing 09-02
-Status: Executing
-Last activity: 2026-02-20 -- Plan 09-01 complete (protocol API, tab switcher, protocol grid)
+Plan: 09-02 complete (all plans done)
+Status: Verifying
+Last activity: 2026-02-20 -- Plan 09-02 complete (protocol detail view with action list)
 
-Progress: [█████████░] ~88% (v1.2)
+Progress: [██████████] ~95% (v1.2) -- awaiting verification
 
 ## Performance Metrics
 
@@ -60,6 +60,10 @@ Progress: [█████████░] ~88% (v1.2)
 - _selectedProtocol underscore prefix for unused destructured state -- Plan 02 will consume it
 - Tab switcher uses underline variant via className overrides on shadcn Tabs components
 - Protocol search is a standalone inline input (not reusing WorkflowSearchFilter) to avoid over-complicating the existing component
+- selectedProtocolDef derived variable for safe protocol lookup (avoids crash if slug not found)
+- ProtocolDetail uses useRouter for "Use in Workflow" navigation to "/" (pre-adding node deferred)
+- ActionTypeBadge and ActionChainBadges kept as non-exported module-level components in protocol-detail.tsx
+- Per-action chain badges show only chains where that action's contract is deployed (not all protocol chains)
 
 ### Pending Todos
 
@@ -75,7 +79,7 @@ None
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Plan 09-01 complete, executing Plan 09-02
+Stopped at: All Phase 9 plans complete, awaiting verification
 Resume file: None
 
-**Next action:** Complete Plan 09-02 (protocol detail view)
+**Next action:** Verify Phase 9 goal achievement
