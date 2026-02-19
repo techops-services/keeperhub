@@ -184,7 +184,6 @@ async function stepHandler(input: RunCodeCoreInput): Promise<RunCodeResult> {
 
     // Binary / typed arrays
     ArrayBuffer,
-    SharedArrayBuffer,
     DataView,
     Uint8Array,
     Uint16Array,
@@ -210,6 +209,9 @@ async function stepHandler(input: RunCodeCoreInput): Promise<RunCodeResult> {
     structuredClone,
     Intl,
     crypto: { randomUUID: crypto.randomUUID.bind(crypto) },
+
+    // Explicitly block globals that node:vm leaks from the host context
+    SharedArrayBuffer: undefined,
   });
 
   // Wrap code in an async IIFE so users can use `return` and `await`

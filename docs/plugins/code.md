@@ -62,7 +62,7 @@ const events = {{QueryEvents.events}};
 - **URI encoding:** `encodeURIComponent`, `decodeURIComponent`, `encodeURI`, `decodeURI`
 - **Base64:** `atob`, `btoa`
 - **Text encoding:** `TextEncoder`, `TextDecoder`
-- **Binary/typed arrays:** `ArrayBuffer`, `SharedArrayBuffer`, `DataView`, `Uint8Array`, `Uint16Array`, `Uint32Array`, `Int8Array`, `Int16Array`, `Int32Array`, `Float32Array`, `Float64Array`, `BigInt64Array`, `BigUint64Array`
+- **Binary/typed arrays:** `ArrayBuffer`, `DataView`, `Uint8Array`, `Uint16Array`, `Uint32Array`, `Int8Array`, `Int16Array`, `Int32Array`, `Float32Array`, `Float64Array`, `BigInt64Array`, `BigUint64Array`
 - **Fetch API:** `URL`, `URLSearchParams`, `Headers`, `Request`, `Response`, `AbortController`, `AbortSignal`
 - **Utilities:** `structuredClone`, `Intl`, `crypto.randomUUID`
 

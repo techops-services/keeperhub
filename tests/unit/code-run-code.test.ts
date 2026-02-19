@@ -383,6 +383,13 @@ describe("code/run-code - sandbox globals", () => {
     expect(result.error).toContain("process is not defined");
   });
 
+  it("does not expose SharedArrayBuffer in sandbox context", async () => {
+    const result = await expectSuccess({
+      code: "return typeof SharedArrayBuffer;",
+    });
+    expect(result.result).toBe("undefined");
+  });
+
   it("does not have access to setTimeout", async () => {
     const result = await expectFailure({
       code: "setTimeout(() => {}, 100);",
