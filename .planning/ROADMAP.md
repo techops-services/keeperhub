@@ -36,7 +36,7 @@ See: `.planning/milestones/v1.1-ROADMAP.md` for full details.
 **Milestone Goal:** Build a declarative protocol definition system where adding a new DeFi protocol requires only a TypeScript definition file -- no step code, no plugin boilerplate.
 
 - [x] **Phase 6: Foundations** - Protocol types, defineProtocol() function, read/write-contract core extraction (completed 2026-02-19)
-- [ ] **Phase 7: Plugin Auto-Generation** - protocolToPlugin(), generic protocol steps, discover-plugins extension
+- [ ] **Phase 7: Plugin Auto-Generation** - protocolToPlugin(), generic protocol steps, discover-plugins extension (1/3 plans complete)
 - [ ] **Phase 8: ABI Resolution + Example Protocol** - ABI auto-fetch with caching, WETH example definition
 - [ ] **Phase 9: Hub UI** - Protocols tab, protocol grid, inline detail view, action rows
 
@@ -67,7 +67,7 @@ Plans:
   4. Generic protocol-read and protocol-write steps resolve the correct contract address for the selected network at runtime
 **Plans:** 3 plans
 Plans:
-- [ ] 07-01-PLAN.md -- protocolToPlugin() conversion, runtime protocol registry, protocol plugin shell + icon
+- [x] 07-01-PLAN.md -- protocolToPlugin() conversion, runtime protocol registry, protocol plugin shell + icon
 - [ ] 07-02-PLAN.md -- Generic protocol-read and protocol-write step files
 - [ ] 07-03-PLAN.md -- Extend discover-plugins to scan protocols and auto-register
 
@@ -106,6 +106,6 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9
 | 4. Cleanup | v1.0 | 3/3 | Complete | 2026-02-12 |
 | 5. Build & Local Validation | v1.1 | 2/2 | Complete | 2026-02-12 |
 | 6. Foundations | v1.2 | 2/2 | Complete | 2026-02-19 |
-| 7. Plugin Auto-Generation | v1.2 | 0/3 | Not started | - |
+| 7. Plugin Auto-Generation | v1.2 | 1/3 | In progress | - |
 | 8. ABI Resolution + Example Protocol | v1.2 | 0/TBD | Not started | - |
 | 9. Hub UI | v1.2 | 0/TBD | Not started | - |

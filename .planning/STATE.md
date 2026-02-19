@@ -5,25 +5,25 @@
 See: .planning/PROJECT.md (updated 2026-02-20)
 
 **Core value:** Users can build and deploy Web3 automation workflows through a visual builder without writing code
-**Current focus:** v1.2 Protocol Registry - Phase 6: Foundations
+**Current focus:** v1.2 Protocol Registry - Phase 7: Plugin Auto-Generation
 
 ## Current Position
 
-Phase: 6 of 9 (Foundations)
-Plan: 2 of TBD in current phase
+Phase: 7 of 9 (Plugin Auto-Generation)
+Plan: 1 of TBD in current phase
 Status: In progress
-Last activity: 2026-02-20 -- completed 06-01 (protocol type definitions) and 06-02 (core extraction)
+Last activity: 2026-02-20 -- completed 07-01 (protocolToPlugin conversion + runtime registry + protocol plugin shell)
 
-Progress: [██░░░░░░░░] ~10% (v1.2)
+Progress: [███░░░░░░░] ~15% (v1.2)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 16 (v1.0: 12, v1.1: 2, v1.2: 2)
+- Total plans completed: 17 (v1.0: 12, v1.1: 2, v1.2: 3)
 - Average duration: 4 min
 - v1.0 total: ~40 min
 - v1.1 total: ~10 min
-- v1.2 so far: ~8 min (2 plans)
+- v1.2 so far: ~10 min (3 plans)
 
 ## Accumulated Context
 
@@ -38,6 +38,9 @@ Progress: [██░░░░░░░░] ~10% (v1.2)
 - _context type inlined in core input types (no StepInput import) -- step-handler is step-only infrastructure
 - defineProtocol() is an identity function (returns def unchanged) -- TypeScript enforces shape at compile time, runtime validates correctness
 - Module-level KEBAB_CASE_REGEX and HEX_ADDRESS_REGEX constants used to satisfy Biome useTopLevelRegex rule
+- protocolToPlugin imports ProtocolIcon directly (no icon parameter) -- single canonical icon for all protocol plugins at MVP
+- Plugin shell index.ts does not call registerIntegration() -- registration handled by discover-plugins (Plan 03)
+- _protocolMeta field uses type=text with JSON defaultValue -- UI hides underscore-prefixed fields automatically
 
 ### Pending Todos
 
@@ -53,7 +56,7 @@ None
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 06-01-PLAN.md -- protocol type definitions and defineProtocol() function
+Stopped at: Completed 07-01-PLAN.md -- protocolToPlugin conversion, runtime registry, protocol plugin shell
 Resume file: None
 
-**Next action:** Continue Phase 6 plans
+**Next action:** Continue Phase 7 plans (07-02: protocol step files)
