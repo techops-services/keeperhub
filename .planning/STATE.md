@@ -5,25 +5,25 @@
 See: .planning/PROJECT.md (updated 2026-02-20)
 
 **Core value:** Users can build and deploy Web3 automation workflows through a visual builder without writing code
-**Current focus:** v1.2 Protocol Registry - Phase 8: ABI Resolution + Example Protocol
+**Current focus:** v1.2 Protocol Registry - Phase 8 complete, ready for Phase 9
 
 ## Current Position
 
-Phase: 8 of 9 (ABI Resolution + Example Protocol)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-02-20 -- completed 08-01 (ABI resolution with caching and proxy-aware fetching)
+Phase: 8 of 9 (ABI Resolution + Example Protocol) -- COMPLETE
+Plan: 2 of 2 in current phase
+Status: Complete
+Last activity: 2026-02-20 -- completed 08-02 (WETH protocol definition with multi-chain support)
 
-Progress: [██████░░░░] ~60% (v1.2)
+Progress: [████████░░] ~75% (v1.2)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 20 (v1.0: 12, v1.1: 2, v1.2: 6)
+- Total plans completed: 21 (v1.0: 12, v1.1: 2, v1.2: 7)
 - Average duration: 4 min
 - v1.0 total: ~40 min
 - v1.1 total: ~10 min
-- v1.2 so far: ~26 min (7 plans)
+- v1.2 so far: ~29 min (8 plans)
 
 ## Accumulated Context
 
@@ -53,6 +53,8 @@ Progress: [██████░░░░] ~60% (v1.2)
 - fetchAbiFromExplorer extracted as non-exported module-level function to keep resolveAbi cognitive complexity under 15
 - ABI cache key format: chainId:lowercaseAddress for deterministic lookups
 - resolveAbi uses shared lib/explorer modules directly, does not call fetch-abi API route
+- Protocol address keys use numeric chain ID strings (e.g., "1", "8453") matching chain-select stored values
+- Omitted Polygon from WETH -- that address is WMATIC, semantically different
 
 ### Pending Todos
 
@@ -68,7 +70,7 @@ None
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 08-01-PLAN.md -- ABI resolution with caching and proxy-aware fetching
+Stopped at: Completed Phase 8 -- all plans executed and verified
 Resume file: None
 
-**Next action:** Execute Plan 08-02 (WETH protocol definition)
+**Next action:** Phase 8 verification, then Phase 9 (Hub UI)
