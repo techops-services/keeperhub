@@ -12,6 +12,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { getChainName } from "@/keeperhub/lib/chain-utils";
 import type { ProtocolDefinition } from "@/keeperhub/lib/protocol-registry";
 
 type ProtocolCardProps = {
@@ -64,10 +65,10 @@ function ChainBadges({
     <div className="flex flex-wrap gap-1">
       {visible.map((chain) => (
         <span
-          className="rounded-full bg-[#09fd671a] px-2 py-0.5 font-medium text-[#09fd67] text-[10px] capitalize"
+          className="rounded-full bg-[#09fd671a] px-2 py-0.5 font-medium text-[#09fd67] text-[10px]"
           key={chain}
         >
-          {chain}
+          {getChainName(chain)}
         </span>
       ))}
       {remaining > 0 && (
@@ -80,7 +81,7 @@ function ChainBadges({
           <TooltipContent>
             {chains
               .slice(3)
-              .map((c) => c)
+              .map((c) => getChainName(c))
               .join(", ")}
           </TooltipContent>
         </Tooltip>
