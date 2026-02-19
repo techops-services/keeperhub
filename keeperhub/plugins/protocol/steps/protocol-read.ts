@@ -1,5 +1,6 @@
 import "server-only";
 
+import { resolveAbi } from "@/keeperhub/lib/abi-cache";
 import { getProtocol } from "@/keeperhub/lib/protocol-registry";
 import {
   type ReadContractCoreInput,
@@ -87,11 +88,19 @@ export async function protocolReadStep(
     };
   }
 
-  // 4. Resolve ABI from definition (ABI auto-fetch is Phase 8)
-  if (!contract.abi) {
+  // 4. Resolve ABI (from definition or auto-fetch from explorer)
+  let resolvedAbi: string;
+  try {
+    const abiResult = await resolveAbi({
+      contractAddress,
+      network: input.network,
+      abi: contract.abi,
+    });
+    resolvedAbi = abiResult.abi;
+  } catch (error) {
     return {
       success: false,
-      error: `No ABI available for contract "${meta.contractKey}" in protocol "${meta.protocolSlug}". ABI auto-fetch is not yet supported.`,
+      error: `Failed to resolve ABI for contract "${meta.contractKey}" in protocol "${meta.protocolSlug}": ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 
@@ -107,7 +116,7 @@ export async function protocolReadStep(
   const coreInput: ReadContractCoreInput = {
     contractAddress,
     network: input.network,
-    abi: contract.abi,
+    abi: resolvedAbi,
     abiFunction: meta.functionName,
     functionArgs,
     _context: input._context
