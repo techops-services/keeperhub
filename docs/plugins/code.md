@@ -24,7 +24,7 @@ Template variables like `{{NodeName.field}}` are resolved by the workflow engine
 | Field     | Type   | Required | Default | Description                       |
 | --------- | ------ | -------- | ------- | --------------------------------- |
 | `code`    | string | yes      | --      | JavaScript code to execute        |
-| `timeout` | number | no       | 30      | Execution timeout in seconds (1-120) |
+| `timeout` | number | no       | 60      | Execution timeout in seconds (1-120) |
 
 ### Outputs
 
@@ -64,7 +64,7 @@ const events = {{QueryEvents.events}};
 - **Text encoding:** `TextEncoder`, `TextDecoder`
 - **Binary/typed arrays:** `ArrayBuffer`, `SharedArrayBuffer`, `DataView`, `Uint8Array`, `Uint16Array`, `Uint32Array`, `Int8Array`, `Int16Array`, `Int32Array`, `Float32Array`, `Float64Array`, `BigInt64Array`, `BigUint64Array`
 - **Fetch API:** `URL`, `URLSearchParams`, `Headers`, `Request`, `Response`, `AbortController`, `AbortSignal`
-- **Utilities:** `structuredClone`, `Intl`, `crypto`
+- **Utilities:** `structuredClone`, `Intl`, `crypto.randomUUID`
 
 **Not available:** `require`, `import`, `process`, `fs`, `eval`, `Function` constructor, `setTimeout`, `setInterval`, or any Node.js built-in modules.
 
@@ -72,7 +72,7 @@ const events = {{QueryEvents.events}};
 
 The sandbox uses `node:vm` which prevents accidental access to Node.js internals but is not a security boundary against determined attackers. This is appropriate for a self-hosted platform where users are authenticated team members. `maxRetries` is set to 0 (fail-safe).
 
-Note: `fetch` requests are not constrained by the vm timeout (which only covers synchronous CPU time). Use `AbortController` with a timeout signal if you need to limit fetch duration.
+`fetch` is wrapped with an `AbortController` deadline matching the configured timeout, so network requests cannot hang indefinitely. Only `crypto.randomUUID` is exposed (`crypto.subtle` and other methods are not available).
 
 ## Example Workflows
 

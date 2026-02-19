@@ -314,11 +314,42 @@ describe("code/run-code - sandbox globals", () => {
     expect(result.result).toBe(3);
   });
 
-  it("has access to crypto.randomUUID", async () => {
+  it("crypto.randomUUID returns a valid UUID string", async () => {
     const result = await expectSuccess({
-      code: "return typeof crypto.randomUUID();",
+      code: "return crypto.randomUUID();",
     });
-    expect(result.result).toBe("string");
+    expect(result.result).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
+  });
+
+  it("crypto.randomUUID returns unique values on each call", async () => {
+    const result = await expectSuccess({
+      code: "const a = crypto.randomUUID(); const b = crypto.randomUUID(); return { a, b, different: a !== b };",
+    });
+    const r = result.result as { a: string; b: string; different: boolean };
+    expect(r.different).toBe(true);
+  });
+
+  it("crypto only exposes randomUUID", async () => {
+    const result = await expectSuccess({
+      code: "return Object.keys(crypto);",
+    });
+    expect(result.result).toEqual(["randomUUID"]);
+  });
+
+  it("crypto.subtle is not available", async () => {
+    const result = await expectSuccess({
+      code: "return typeof crypto.subtle;",
+    });
+    expect(result.result).toBe("undefined");
+  });
+
+  it("crypto.getRandomValues is not available", async () => {
+    const result = await expectSuccess({
+      code: "return typeof crypto.getRandomValues;",
+    });
+    expect(result.result).toBe("undefined");
   });
 
   it("has access to AbortController", async () => {

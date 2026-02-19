@@ -209,7 +209,7 @@ async function stepHandler(input: RunCodeCoreInput): Promise<RunCodeResult> {
     // Utilities
     structuredClone,
     Intl,
-    crypto,
+    crypto: { randomUUID: crypto.randomUUID.bind(crypto) },
   });
 
   // Wrap code in an async IIFE so users can use `return` and `await`
