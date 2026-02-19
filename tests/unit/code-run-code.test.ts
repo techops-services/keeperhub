@@ -707,6 +707,14 @@ describe("code/run-code - timeout", () => {
     expect(result.result).toBe(true);
   });
 
+  it("wall-clock timeout catches hanging async operations", async () => {
+    const result = await expectFailure({
+      code: "await new Promise(() => {});",
+      timeout: 1,
+    });
+    expect(result.error).toContain("timed out after 1 seconds");
+  }, 10000);
+
   it("clamps timeout to min 1 second", async () => {
     const result = await expectSuccess({
       code: "return true;",

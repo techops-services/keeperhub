@@ -72,7 +72,7 @@ const events = {{QueryEvents.events}};
 
 The sandbox uses `node:vm` which prevents accidental access to Node.js internals but is not a security boundary against determined attackers. This is appropriate for a self-hosted platform where users are authenticated team members. `maxRetries` is set to 0 (fail-safe).
 
-`fetch` is wrapped with an `AbortController` deadline matching the configured timeout, so network requests cannot hang indefinitely. Only `crypto.randomUUID` is exposed (`crypto.subtle` and other methods are not available).
+`fetch` is wrapped with an `AbortController` deadline matching the configured timeout, so network requests cannot hang indefinitely. A wall-clock `Promise.race` timeout also guards the entire execution, covering any async operation (not just fetch). Only `crypto.randomUUID` is exposed (`crypto.subtle` and other methods are not available).
 
 ## Example Workflows
 

@@ -217,21 +217,42 @@ async function stepHandler(input: RunCodeCoreInput): Promise<RunCodeResult> {
   // Wrap code in an async IIFE so users can use `return` and `await`
   const wrappedCode = `(async () => {\n${code}\n})()`;
 
+  // Wall-clock timeout that covers async operations (fetch, Promise, etc.)
+  // The vm `timeout` option only covers synchronous CPU time.
+  function createWallClockTimeout(): {
+    promise: Promise<never>;
+    clear: () => void;
+  } {
+    let timer: ReturnType<typeof setTimeout>;
+    const promise = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error("WALL_CLOCK_TIMEOUT")),
+        timeoutMs
+      );
+    });
+    return { promise, clear: () => clearTimeout(timer) };
+  }
+
+  const wallClock = createWallClockTimeout();
+
   try {
-    const result: unknown = await runInContext(wrappedCode, sandbox, {
+    const execution: Promise<unknown> = runInContext(wrappedCode, sandbox, {
       timeout: timeoutMs,
       filename: "user-code.js",
     });
+
+    const result: unknown = await Promise.race([execution, wallClock.promise]);
 
     return { success: true, result, logs };
   } catch (error) {
     const line = extractLineNumber(error);
     const message = getErrorMessage(error);
 
-    // Detect timeout errors from vm
+    // Detect timeout errors from both vm (sync) and wall-clock (async)
     const isTimeout =
-      error instanceof Error &&
-      error.message.includes("Script execution timed out");
+      (error instanceof Error &&
+        error.message.includes("Script execution timed out")) ||
+      (error instanceof Error && error.message === "WALL_CLOCK_TIMEOUT");
 
     const errorMessage = isTimeout
       ? `Code execution timed out after ${String(timeoutSeconds)} seconds`
@@ -248,6 +269,8 @@ async function stepHandler(input: RunCodeCoreInput): Promise<RunCodeResult> {
       logs,
       ...(line !== undefined ? { line } : {}),
     };
+  } finally {
+    wallClock.clear();
   }
 }
 
