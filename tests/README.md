@@ -296,3 +296,40 @@ PW_DISCOVER=1 pnpm test:e2e --grep "explore"  # With auto-probing
 ```
 
 Edit the steps in the file, run, read `.probes/` output, edit again, repeat until you understand the page structure. Then write the real test in a new file.
+
+### Future: React Component State Capture
+
+The discovery framework currently captures the DOM layer (ARIA snapshots, interactive elements, screenshots). A potential enhancement is capturing **React component state** from the virtual DOM at failure points, giving both the "what the user sees" and "why it looks that way".
+
+**What it would add beyond ARIA snapshots:**
+
+| Signal | ARIA Snapshot | React VDOM |
+|--------|--------------|------------|
+| Rendered output | Yes | No |
+| Component hierarchy | No | Yes (`<WalletOverlay>` > `<Button>`) |
+| Component props | No | Yes (`isLoading={true}`, `address="0x..."`) |
+| Hook/atom state | No | Yes (jotai atoms, useState values) |
+| Root cause of disabled state | Partial (sees `[disabled]`) | Yes (which prop/state caused it) |
+
+**Concrete example from test debugging:**
+
+When the Para wallet creation timed out, ARIA showed `button "Loading Creating..." [disabled]` -- enough to know it was stuck, but not why. React state would have shown `paraStatus: "pending"`, `apiError: null`, immediately confirming an API timeout vs an error state.
+
+**Implementation approach:**
+
+React exposes fiber nodes via `__REACT_DEVTOOLS_GLOBAL_HOOK__` (dev builds) and `_reactFiber$` properties on DOM elements. A `probeReactState(page, selector)` function could:
+
+1. Find the DOM element matching the selector
+2. Walk up the fiber tree to find the nearest meaningful component boundary
+3. Extract props, state, and hook values
+4. Serialize and write to `.probes/` alongside the existing outputs
+
+**Risks and constraints:**
+
+- React fiber internals are **not a public API** and change between React versions (currently React 19)
+- Full tree serialization is expensive and noisy -- should be **scoped to a subtree** around the failure point
+- Only available in dev builds (production strips `__REACT_DEVTOOLS_GLOBAL_HOOK__`)
+- Circular references in state/props require careful serialization
+- Jotai atoms may need special handling to extract readable values
+
+**Recommended scope:** Targeted state capture at failure points (not full-tree analysis). Integrate into `probe()` as an optional `{ includeReactState: true }` flag that captures component state for the nearest React boundary around each interactive element.
