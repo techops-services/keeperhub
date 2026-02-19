@@ -605,30 +605,27 @@ function processCodeTemplates(code: string, outputs: NodeOutputs): string {
   const storedPattern = /\{\{@([^:]+):([^}]+)\}\}/g;
   const displayPattern = /\{\{([^@}][^}]*)\}\}/g;
 
-  let result = code.replace(storedPattern, (full, nodeId, rest) => {
-    const trimmedNodeId = (nodeId as string).trim();
+  let result = code.replace(storedPattern, (full, nodeId: string, rest: string) => {
+    const trimmedNodeId = nodeId.trim();
     const sanitizedNodeId = trimmedNodeId.replace(/[^a-zA-Z0-9]/g, "_");
     const output = outputs[sanitizedNodeId] ?? outputs[trimmedNodeId];
     if (!output) {
       return full;
     }
-    const data = output.data;
+    const { data } = output;
     if (data === null || data === undefined) {
       return "null";
     }
-    const fieldPath = (rest as string).includes(".")
-      ? (rest as string).substring((rest as string).indexOf(".") + 1).trim()
+    const fieldPath = rest.includes(".")
+      ? rest.substring(rest.indexOf(".") + 1).trim()
       : "";
     const resolved = resolveFromOutputData(data, fieldPath);
     return formatCodeValue(resolved ?? null);
   });
 
-  result = result.replace(displayPattern, (full, displayRef) => {
-    const resolved = resolveDisplayTemplate(displayRef as string, outputs);
-    if (resolved === null || resolved === undefined) {
-      return full;
-    }
-    return formatCodeValue(resolved);
+  result = result.replace(displayPattern, (_full, displayRef: string) => {
+    const resolved = resolveDisplayTemplate(displayRef, outputs);
+    return formatCodeValue(resolved ?? null);
   });
 
   return result;
