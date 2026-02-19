@@ -3,6 +3,9 @@ import postgres from "postgres";
 const TEST_EMAIL_PATTERN = "test+%@techops.services";
 const TEST_VERIFICATION_PATTERN = "%test+%@techops.services%";
 
+// Persistent test account with testnet ETH - NEVER delete
+const PROTECTED_EMAIL = "pr-test-do-not-delete@techops.services";
+
 const PARA_API_BASE = "https://api.getpara.com";
 
 function getDbConnection(): ReturnType<typeof postgres> {
@@ -47,6 +50,7 @@ async function deleteParaPregenWallet(
     method: "DELETE",
     headers: {
       accept: "application/json",
+      origin: "https://developer.getpara.com",
       "x-external-api-key": config.apiKey,
     },
   });
@@ -83,7 +87,9 @@ export async function cleanupTestUsers(): Promise<number> {
   const sql = getDbConnection();
   try {
     const testUsers = await sql`
-      SELECT id FROM users WHERE email LIKE ${TEST_EMAIL_PATTERN}
+      SELECT id FROM users
+      WHERE email LIKE ${TEST_EMAIL_PATTERN}
+        AND email != ${PROTECTED_EMAIL}
     `;
     if (testUsers.length === 0) {
       return 0;
