@@ -460,11 +460,13 @@ async function updateReadme(): Promise<void> {
 
 /**
  * Generate the lib/types/integration.ts file with dynamic types
- * Takes discovered plugin names from both base and KeeperHub directories
+ * Takes discovered plugin names from both base and KeeperHub directories,
+ * plus protocol slugs registered via registerProtocolPlugins()
  */
 function generateTypesFile(
   basePlugins: string[],
-  keeperhubPlugins: string[]
+  keeperhubPlugins: string[],
+  protocolSlugs: string[] = []
 ): void {
   // Ensure the types directory exists
   const typesDir = dirname(TYPES_FILE);
@@ -477,6 +479,7 @@ function generateTypesFile(
     ...new Set([
       ...basePlugins,
       ...keeperhubPlugins,
+      ...protocolSlugs,
       ...SYSTEM_INTEGRATION_TYPES,
     ]),
   ].sort();
@@ -771,8 +774,14 @@ async function processStepFilesForCodegen(): Promise<void> {
   // Determine which plugins are in KeeperHub vs base
   const keeperhubPluginNames = discoverPluginsFromDir(KEEPERHUB_PLUGINS_DIR);
   const keeperhubPluginSet = new Set(keeperhubPluginNames);
+  const protocolSlugSet = new Set(registeredProtocolSlugs);
 
   for (const integration of integrations) {
+    // Protocol plugins delegate to shared core step files -- no codegen templates needed
+    if (protocolSlugSet.has(integration.type)) {
+      continue;
+    }
+
     // Determine the correct plugins directory
     const pluginsDir = keeperhubPluginSet.has(integration.type)
       ? KEEPERHUB_PLUGINS_DIR
@@ -928,24 +937,32 @@ async function generateStepRegistry(): Promise<void> {
 
   // Generate the step importer map with static imports
   // Include both namespaced IDs and legacy label-based IDs for backward compatibility
+  const protocolSlugSet = new Set(registeredProtocolSlugs);
   const importerEntries = stepEntries
     .flatMap(({ actionId, integration, stepImportPath, stepFunction }) => {
-      // Determine import path based on whether plugin is in keeperhub/ or plugins/
-      const importBase = keeperhubPluginSet.has(integration)
-        ? "@/keeperhub/plugins"
-        : "@/plugins";
+      // Protocol plugins are virtual -- step files live in keeperhub/plugins/protocol/steps/
+      // regardless of which protocol they serve (e.g. weth, aave, etc.)
+      let importPath: string;
+      if (protocolSlugSet.has(integration)) {
+        importPath = `@/keeperhub/plugins/protocol/steps/${stepImportPath}`;
+      } else {
+        const importBase = keeperhubPluginSet.has(integration)
+          ? "@/keeperhub/plugins"
+          : "@/plugins";
+        importPath = `${importBase}/${integration}/steps/${stepImportPath}`;
+      }
       const entries = [
         `  "${actionId}": {
-    importer: () => import("${importBase}/${integration}/steps/${stepImportPath}"),
+    importer: () => import("${importPath}"),
     stepFunction: "${stepFunction}",
   },`,
       ];
       // Add entries for all legacy labels that map to this action
-      const legacyLabels = legacyLabelsForAction[actionId] || [];
+      const legacyLabels = legacyLabelsForAction[actionId] ?? [];
       for (const legacyLabel of legacyLabels) {
         entries.push(
           `  "${legacyLabel}": {
-    importer: () => import("${importBase}/${integration}/steps/${stepImportPath}"),
+    importer: () => import("${importPath}"),
     stepFunction: "${stepFunction}",
   },`
         );
@@ -1150,10 +1167,6 @@ async function main(): Promise<void> {
     }
   }
 
-  console.log("\nGenerating lib/types/integration.ts...");
-  // Use all plugins for types (both base and keeperhub)
-  generateTypesFile(base.all, keeperhub.all);
-
   console.log("Generating plugins/index.ts...");
   generateIndexFile(base.enabled); // Only import enabled base plugins
 
@@ -1162,6 +1175,14 @@ async function main(): Promise<void> {
 
   console.log("Updating README.md...");
   await updateReadme();
+
+  console.log("Registering protocol plugins...");
+  const protocolSlugs = await registerProtocolPlugins();
+  console.log(`Registered ${protocolSlugs.length} protocol(s)`);
+
+  console.log("\nGenerating lib/types/integration.ts...");
+  // Use all plugins for types (both base, keeperhub, and protocol slugs)
+  generateTypesFile(base.all, keeperhub.all, protocolSlugs);
 
   console.log("Generating lib/step-registry.ts...");
   await generateStepRegistry();
