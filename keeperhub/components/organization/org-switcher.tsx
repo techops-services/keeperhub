@@ -113,7 +113,9 @@ export function OrgSwitcher() {
         <PopoverTrigger asChild>
           <Button
             aria-expanded={open}
+            aria-label="Switch organization"
             className="w-[200px] justify-between"
+            data-testid="org-switcher"
             role="combobox"
             variant="outline"
           >

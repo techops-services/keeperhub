@@ -1,4 +1,5 @@
 #!/usr/bin/env npx tsx
+
 /**
  * Standalone page discovery CLI.
  *
@@ -12,25 +13,25 @@
  * Output: tests/e2e/playwright/.probes/<label>-<timestamp>/
  */
 
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { chromium, type Page } from "@playwright/test";
 import * as dotenv from "dotenv";
 import { expand } from "dotenv-expand";
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { signIn } from "./utils/auth";
+import {
+  PERSISTENT_TEST_PASSWORD,
+  PERSISTENT_TEST_USER_EMAIL,
+} from "./utils/db";
 import {
   clearHighlights,
+  type DiscoveryReport,
   diffReports,
   formatDiff,
   highlightElements,
   printReport,
   probe,
-  type DiscoveryReport,
 } from "./utils/discover";
-import { signIn } from "./utils/auth";
-import {
-  PERSISTENT_TEST_USER_EMAIL,
-  PERSISTENT_TEST_PASSWORD,
-} from "./utils/db";
 
 expand(dotenv.config());
 
@@ -248,10 +249,7 @@ Examples:
         .sort()
         .reverse();
       if (dirs[0]) {
-        writeFileSync(
-          join(probeDir, dirs[0], "diff.md"),
-          formatDiff(diff)
-        );
+        writeFileSync(join(probeDir, dirs[0], "diff.md"), formatDiff(diff));
       }
     }
 

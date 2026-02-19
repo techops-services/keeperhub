@@ -1,6 +1,6 @@
-import type { Page } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import type { Page } from "@playwright/test";
 
 // ------------------------------------------------------------------
 // Types
@@ -114,9 +114,7 @@ export async function getInteractiveElements(
     // (function declarations get decorated, which breaks page.evaluate)
     const truncate = (str: string, max: number): string => {
       const cleaned = str.replace(/\s+/g, " ").trim();
-      return cleaned.length > max
-        ? `${cleaned.substring(0, max)}...`
-        : cleaned;
+      return cleaned.length > max ? `${cleaned.substring(0, max)}...` : cleaned;
     };
 
     const getParentContext = (el: Element): string | null => {
@@ -235,7 +233,7 @@ export async function getInteractiveElements(
     }
 
     results.sort((a, b) => {
-      if (!a.bounds || !b.bounds) return 0;
+      if (!(a.bounds && b.bounds)) return 0;
       const yDiff = a.bounds.y - b.bounds.y;
       if (Math.abs(yDiff) > 10) return yDiff;
       return a.bounds.x - b.bounds.x;
@@ -267,9 +265,7 @@ export async function getPageStructure(page: Page): Promise<PageStructure> {
 
     const truncate = (str: string, max: number): string => {
       const cleaned = str.replace(/\s+/g, " ").trim();
-      return cleaned.length > max
-        ? `${cleaned.substring(0, max)}...`
-        : cleaned;
+      return cleaned.length > max ? `${cleaned.substring(0, max)}...` : cleaned;
     };
 
     const headings: Array<{ level: number; text: string }> = [];
@@ -312,9 +308,7 @@ export async function getPageStructure(page: Page): Promise<PageStructure> {
 
     const dialogs: Array<{ title: string | null; visible: boolean }> = [];
     const dialogEls = Array.from(
-      document.querySelectorAll(
-        '[role="dialog"], [role="alertdialog"], dialog'
-      )
+      document.querySelectorAll('[role="dialog"], [role="alertdialog"], dialog')
     );
     for (let i = 0; i < dialogEls.length; i++) {
       const d = dialogEls[i];
@@ -463,9 +457,7 @@ function parseAriaSnapshot(snapshot: string): AccessibilityNode {
  * Get the raw ARIA snapshot string from Playwright.
  * This is the most compact, directly useful format for writing tests.
  */
-export async function getAriaSnapshotRaw(
-  page: Page
-): Promise<string | null> {
+export async function getAriaSnapshotRaw(page: Page): Promise<string | null> {
   try {
     return await page.locator("body").ariaSnapshot();
   } catch {
@@ -664,13 +656,7 @@ export function formatDiff(diff: StateDiff): string {
 // Core: probe
 // ------------------------------------------------------------------
 
-const PROBE_DIR = join(
-  process.cwd(),
-  "tests",
-  "e2e",
-  "playwright",
-  ".probes"
-);
+const PROBE_DIR = join(process.cwd(), "tests", "e2e", "playwright", ".probes");
 
 /**
  * Capture current page state: screenshot + element map + structure.
@@ -708,11 +694,12 @@ export async function probe(
     `Elements with data-testid: ${withTestId}`,
     `Headings: ${structure.headings.map((h) => `${"#".repeat(h.level)} ${h.text}`).join(", ")}`,
     structure.dialogs.length > 0
-      ? `Open dialogs: ${structure.dialogs.filter((d) => d.visible).map((d) => d.title).join(", ")}`
+      ? `Open dialogs: ${structure.dialogs
+          .filter((d) => d.visible)
+          .map((d) => d.title)
+          .join(", ")}`
       : "No open dialogs",
-    structure.toasts.length > 0
-      ? `Toasts: ${structure.toasts.join(", ")}`
-      : "",
+    structure.toasts.length > 0 ? `Toasts: ${structure.toasts.join(", ")}` : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -767,7 +754,11 @@ export async function highlightElements(
   });
 
   await page.evaluate(
-    (els: Array<{ bounds: { x: number; y: number; width: number; height: number } | null }>) => {
+    (
+      els: Array<{
+        bounds: { x: number; y: number; width: number; height: number } | null;
+      }>
+    ) => {
       const existing = Array.from(
         document.querySelectorAll("[data-pw-highlight]")
       );
@@ -845,10 +836,7 @@ export async function clearHighlights(page: Page): Promise<void> {
  * Shows role, name, and relevant states. This is the best data source
  * for writing getByRole/getByLabel locators.
  */
-function formatAccessibilityTree(
-  node: AccessibilityNode,
-  depth = 0
-): string {
+function formatAccessibilityTree(node: AccessibilityNode, depth = 0): string {
   const indent = "  ".repeat(depth);
   const parts: string[] = [];
 
@@ -858,8 +846,10 @@ function formatAccessibilityTree(
 
   const states: string[] = [];
   if (node.disabled) states.push("disabled");
-  if (node.checked !== undefined) states.push(`checked=${String(node.checked)}`);
-  if (node.pressed !== undefined) states.push(`pressed=${String(node.pressed)}`);
+  if (node.checked !== undefined)
+    states.push(`checked=${String(node.checked)}`);
+  if (node.pressed !== undefined)
+    states.push(`pressed=${String(node.pressed)}`);
   if (node.expanded !== undefined)
     states.push(`expanded=${String(node.expanded)}`);
   if (node.level) states.push(`level=${node.level}`);
@@ -957,10 +947,8 @@ function formatForClaude(report: DiscoveryReport): string {
     lines.push("");
     lines.push("## Accessibility Tree");
     lines.push("");
-    lines.push(
-      "Use this to write `getByRole` / `getByLabel` locators."
-    );
-    lines.push("Each line shows: **role** \"accessible name\" (states)");
+    lines.push("Use this to write `getByRole` / `getByLabel` locators.");
+    lines.push('Each line shows: **role** "accessible name" (states)');
     lines.push("");
     lines.push(formatAccessibilityTree(report.accessibility));
   }
@@ -1080,7 +1068,8 @@ export async function autoProbe(
 
     navigationCount++;
     const url = new URL(frame.url());
-    const pathLabel = url.pathname.replace(/\//g, "-").replace(/^-/, "") || "root";
+    const pathLabel =
+      url.pathname.replace(/\//g, "-").replace(/^-/, "") || "root";
     await captureProbe(`auto-nav-${navigationCount}-${pathLabel}`);
   };
 
@@ -1144,10 +1133,7 @@ export function printReport(report: DiscoveryReport): void {
       "searchbox",
       "spinbutton",
     ]);
-    const printA11yNode = (
-      node: AccessibilityNode,
-      depth: number
-    ): void => {
+    const printA11yNode = (node: AccessibilityNode, depth: number): void => {
       const indent = "  ".repeat(depth);
       if (interactiveRoles.has(node.role)) {
         const states: string[] = [];
@@ -1157,13 +1143,14 @@ export function printReport(report: DiscoveryReport): void {
         if (node.expanded !== undefined)
           states.push(`expanded=${String(node.expanded)}`);
         const stateStr = states.length > 0 ? ` [${states.join(", ")}]` : "";
-        console.log(
-          `${indent}${node.role}: "${node.name}"${stateStr}`
-        );
+        console.log(`${indent}${node.role}: "${node.name}"${stateStr}`);
       }
       if (node.children) {
         for (let i = 0; i < node.children.length; i++) {
-          printA11yNode(node.children[i], depth + (interactiveRoles.has(node.role) ? 1 : 0));
+          printA11yNode(
+            node.children[i],
+            depth + (interactiveRoles.has(node.role) ? 1 : 0)
+          );
         }
       }
     };

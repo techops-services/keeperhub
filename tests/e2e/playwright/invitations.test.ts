@@ -25,7 +25,10 @@ async function gotoAcceptInvite(
   for (let attempt = 0; attempt < 5; attempt++) {
     await page.goto(url, { waitUntil: "networkidle" });
     // Verify we landed on the accept-invite page AND it's not a 404
-    const is404 = await page.locator("text=This page could not be found").isVisible().catch(() => false);
+    const is404 = await page
+      .locator("text=This page could not be found")
+      .isVisible()
+      .catch(() => false);
     if (page.url().includes("accept-invite") && !is404) {
       return;
     }
@@ -198,7 +201,7 @@ async function sendInvite(page: Page, inviteeEmail: string): Promise<string> {
     .fill(inviteeEmail);
 
   const inviteButton = dialog.locator('button:has-text("Invite")');
-  await expect(inviteButton).toBeEnabled({ timeout: 5_000 });
+  await expect(inviteButton).toBeEnabled({ timeout: 5000 });
   await inviteButton.click();
 
   // Wait for any toast to appear, then check it's the success toast
@@ -208,7 +211,7 @@ async function sendInvite(page: Page, inviteeEmail: string): Promise<string> {
   const successToast = page
     .locator("[data-sonner-toast]")
     .filter({ hasText: `Invitation sent to ${inviteeEmail}` });
-  await expect(successToast).toBeVisible({ timeout: 5_000 });
+  await expect(successToast).toBeVisible({ timeout: 5000 });
 
   const invitationId = await getInvitationIdFromDb(inviteeEmail);
   return invitationId;
@@ -649,7 +652,9 @@ test.describe("Organization Invitations", () => {
         { timeout: 15_000 }
       );
       await Promise.race([
-        welcomeToast.waitFor({ state: "visible", timeout: 15_000 }).catch(() => {}),
+        welcomeToast
+          .waitFor({ state: "visible", timeout: 15_000 })
+          .catch(() => {}),
         notOnAcceptPage.catch(() => {}),
       ]);
 

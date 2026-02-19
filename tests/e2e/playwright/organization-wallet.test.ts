@@ -73,12 +73,10 @@ async function openWalletOverlay(page: Page): Promise<void> {
 
 // Create a wallet via the overlay form and wait for the success toast
 async function createWalletViaOverlay(page: Page): Promise<void> {
-  await page
-    .locator('button:has-text("Create Organization Wallet")')
-    .click();
+  await page.locator('button:has-text("Create Organization Wallet")').click();
 
   const createBtn = page.locator('button:has-text("Create Wallet")');
-  await expect(createBtn).toBeEnabled({ timeout: 5_000 });
+  await expect(createBtn).toBeEnabled({ timeout: 5000 });
   await createBtn.click();
 
   // Wait for any toast to appear, then verify success
@@ -88,7 +86,7 @@ async function createWalletViaOverlay(page: Page): Promise<void> {
     page
       .locator("[data-sonner-toast]")
       .filter({ hasText: WALLET_CREATED_PATTERN })
-  ).toBeVisible({ timeout: 5_000 });
+  ).toBeVisible({ timeout: 5000 });
 }
 
 // Run tests serially to avoid session state conflicts
@@ -248,7 +246,7 @@ test.describe("Para Wallet Management", () => {
 
       // Submit the form
       const createBtn = overlay.locator('button:has-text("Create Wallet")');
-      await expect(createBtn).toBeEnabled({ timeout: 5_000 });
+      await expect(createBtn).toBeEnabled({ timeout: 5000 });
       await createBtn.click();
 
       // Wait for any toast (success or error) to understand outcome
@@ -260,7 +258,7 @@ test.describe("Para Wallet Management", () => {
         page
           .locator("[data-sonner-toast]")
           .filter({ hasText: WALLET_CREATED_PATTERN })
-      ).toBeVisible({ timeout: 5_000 });
+      ).toBeVisible({ timeout: 5000 });
 
       // Verify wallet details are shown
       await expect(overlay.locator("text=Account details")).toBeVisible({
@@ -351,12 +349,8 @@ test.describe("Para Wallet Management", () => {
       });
 
       // Verify mainnet/testnet toggle exists
-      await expect(
-        page.locator('button:has-text("Mainnets")')
-      ).toBeVisible();
-      await expect(
-        page.locator('button:has-text("Testnets")')
-      ).toBeVisible();
+      await expect(page.locator('button:has-text("Mainnets")')).toBeVisible();
+      await expect(page.locator('button:has-text("Testnets")')).toBeVisible();
     });
 
     test("WALLET-DISPLAY-2: user can toggle between mainnets and testnets", async ({
@@ -403,9 +397,7 @@ test.describe("Para Wallet Management", () => {
       });
 
       // Find and click refresh button (has RefreshCw icon)
-      const refreshButton = overlay.locator(
-        "button:has(svg.lucide-refresh-cw)"
-      );
+      const refreshButton = page.locator("button:has(svg.lucide-refresh-cw)");
       await expect(refreshButton).toBeVisible();
       await refreshButton.click();
 
@@ -429,7 +421,7 @@ test.describe("Para Wallet Management", () => {
       });
 
       // Click copy button (near the address)
-      const copyButton = overlay
+      const copyButton = page
         .locator("button")
         .filter({ has: page.locator("svg.lucide-copy") })
         .first();

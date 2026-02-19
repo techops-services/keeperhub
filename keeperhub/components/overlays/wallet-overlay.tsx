@@ -148,9 +148,9 @@ function TokenItemWithActions({
       {!isUnavailable && tokenAddress && (
         <div className="flex items-center gap-1">
           <button
+            aria-label="Copy token address"
             className="text-muted-foreground hover:text-foreground"
             onClick={copyTokenAddress}
-            title="Copy token address"
             type="button"
           >
             <Copy className="h-3 w-3" />
@@ -649,6 +649,8 @@ function BalanceListSection({
             </Button>
           </div>
           <Button
+            aria-label="Refresh balances"
+            data-testid="wallet-refresh-button"
             disabled={refreshing}
             onClick={onRefresh}
             size="sm"
@@ -884,7 +886,9 @@ function AccountDetailsSection({
               {truncateAddress(walletAddress)}
             </code>
             <button
+              aria-label="Copy wallet address"
               className="text-muted-foreground hover:text-foreground"
+              data-testid="wallet-copy-address"
               onClick={copyAddress}
               type="button"
             >
