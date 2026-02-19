@@ -1,12 +1,16 @@
 "use client";
 
+import { Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FeaturedCarousel } from "@/keeperhub/components/hub/featured-carousel";
 import { getWorkflowTrigger } from "@/keeperhub/components/hub/get-workflow-trigger";
 import { HubHero } from "@/keeperhub/components/hub/hub-hero";
 import { HubResults } from "@/keeperhub/components/hub/hub-results";
+import { ProtocolGrid } from "@/keeperhub/components/hub/protocol-grid";
 import { WorkflowSearchFilter } from "@/keeperhub/components/hub/workflow-search-filter";
 import { useDebounce } from "@/keeperhub/lib/hooks/use-debounce";
+import type { ProtocolDefinition } from "@/keeperhub/lib/protocol-registry";
 import { api, type PublicTag, type SavedWorkflow } from "@/lib/api-client";
 
 export default function HubPage() {
@@ -23,6 +27,13 @@ export default function HubPage() {
   const [selectedTrigger, setSelectedTrigger] = useState<string | null>(null);
   const [selectedTagSlugs, setSelectedTagSlugs] = useState<string[]>([]);
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
+
+  const [protocols, setProtocols] = useState<ProtocolDefinition[]>([]);
+  const [activeTab, setActiveTab] = useState<string>("workflows");
+  const [protocolSearch, setProtocolSearch] = useState("");
+  const [_selectedProtocol, setSelectedProtocol] = useState<string | null>(
+    null
+  );
 
   const triggers = useMemo(() => {
     const unique = new Set<string>();
@@ -86,6 +97,13 @@ export default function HubPage() {
     );
   };
 
+  const handleTabChange = (val: string): void => {
+    setActiveTab(val);
+    if (val !== "protocols") {
+      setSelectedProtocol(null);
+    }
+  };
+
   useEffect(() => {
     const fetchWorkflows = async (): Promise<void> => {
       try {
@@ -105,6 +123,22 @@ export default function HubPage() {
     };
 
     fetchWorkflows();
+  }, []);
+
+  useEffect(() => {
+    const fetchProtocols = async (): Promise<void> => {
+      try {
+        const res = await fetch("/api/protocols");
+        if (res.ok) {
+          const data: ProtocolDefinition[] = await res.json();
+          setProtocols(data);
+        }
+      } catch {
+        // Protocol fetch failure should not block the Hub
+      }
+    };
+
+    fetchProtocols();
   }, []);
   // end custom KeeperHub code
 
@@ -154,31 +188,96 @@ export default function HubPage() {
               </div>
             </div>
 
-            <div className="bg-sidebar px-4 pt-8 pb-12">
-              <div className="container mx-auto">
-                <h2 className="mb-8 font-bold text-2xl">Community Workflows</h2>
+            <Tabs
+              defaultValue="workflows"
+              onValueChange={handleTabChange}
+              value={activeTab}
+            >
+              <div className="bg-sidebar px-4 pt-8">
+                <div className="container mx-auto">
+                  <TabsList className="h-auto w-full justify-start gap-8 rounded-none border-b border-border/30 bg-transparent p-0">
+                    <TabsTrigger
+                      className="rounded-none border-transparent border-b-2 bg-transparent px-0 pt-0 pb-3 font-semibold text-base text-muted-foreground data-[state=active]:border-[#09fd67] data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                      value="workflows"
+                    >
+                      Workflows
+                    </TabsTrigger>
+                    <TabsTrigger
+                      className="rounded-none border-transparent border-b-2 bg-transparent px-0 pt-0 pb-3 font-semibold text-base text-muted-foreground data-[state=active]:border-[#09fd67] data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                      value="protocols"
+                    >
+                      Protocols
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
               </div>
-              <div className="container mx-auto grid grid-cols-[1fr_3fr] items-start gap-8">
-                <div className="sticky top-28">
-                  <WorkflowSearchFilter
-                    onSearchChange={setSearchQuery}
-                    onTagToggle={handleToggleTag}
-                    onTriggerChange={setSelectedTrigger}
-                    publicTags={publicTags}
-                    searchQuery={searchQuery}
-                    selectedTagSlugs={selectedTagSlugs}
-                    selectedTrigger={selectedTrigger}
-                    triggers={triggers}
+
+              <TabsContent
+                className="bg-sidebar px-4 pt-8 pb-12"
+                value="workflows"
+              >
+                <div className="container mx-auto">
+                  <h2 className="mb-8 font-bold text-2xl">
+                    Community Workflows
+                  </h2>
+                </div>
+                <div className="container mx-auto grid grid-cols-[1fr_3fr] items-start gap-8">
+                  <div className="sticky top-28">
+                    <WorkflowSearchFilter
+                      onSearchChange={setSearchQuery}
+                      onTagToggle={handleToggleTag}
+                      onTriggerChange={setSelectedTrigger}
+                      publicTags={publicTags}
+                      searchQuery={searchQuery}
+                      selectedTagSlugs={selectedTagSlugs}
+                      selectedTrigger={selectedTrigger}
+                      triggers={triggers}
+                    />
+                  </div>
+
+                  <HubResults
+                    communityWorkflows={communityWorkflows}
+                    isSearchActive={isSearchActive}
+                    searchResults={searchResults}
                   />
                 </div>
+              </TabsContent>
 
-                <HubResults
-                  communityWorkflows={communityWorkflows}
-                  isSearchActive={isSearchActive}
-                  searchResults={searchResults}
-                />
-              </div>
-            </div>
+              <TabsContent
+                className="bg-sidebar px-4 pt-8 pb-12"
+                value="protocols"
+              >
+                <div className="container mx-auto grid grid-cols-[1fr_3fr] items-start gap-8">
+                  <div className="sticky top-28">
+                    <div className="flex w-full items-center gap-2 rounded-md border border-input bg-transparent shadow-xs transition-colors focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 min-h-10 px-3 py-1 text-sm">
+                      <Search className="size-4 shrink-0 text-muted-foreground" />
+                      <input
+                        className="flex-1 bg-transparent placeholder:text-muted-foreground focus:outline-none"
+                        onChange={(e) => setProtocolSearch(e.target.value)}
+                        placeholder="Search protocols..."
+                        type="text"
+                        value={protocolSearch}
+                      />
+                      {protocolSearch && (
+                        <button
+                          className="shrink-0 text-muted-foreground hover:text-foreground"
+                          onClick={() => setProtocolSearch("")}
+                          type="button"
+                        >
+                          <X className="size-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <ProtocolGrid
+                    onSelect={setSelectedProtocol}
+                    protocols={protocols}
+                    searchQuery={protocolSearch}
+                  />
+                </div>
+              </TabsContent>
+            </Tabs>
           </>
         )}
       </div>
