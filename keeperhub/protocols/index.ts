@@ -17,7 +17,7 @@ import {
 } from "@/keeperhub/lib/protocol-registry";
 import { registerIntegration } from "@/plugins/registry";
 
-import wethDef from "./test-weth";
+import wethDef from "./weth";
 
 registerProtocol(wethDef);
 registerIntegration(protocolToPlugin(wethDef));
