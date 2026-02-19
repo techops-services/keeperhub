@@ -36,7 +36,7 @@ pnpm db:seed-test-wallet
 
 | Field | Value |
 |-------|-------|
-| Email | `PR-TEST-DO-NOT-DELETE@techops.services` |
+| Email | `pr-test-do-not-delete@techops.services` |
 | Password | `TestPassword123!` |
 | Org Slug | `e2e-test-org` |
 | Org Name | `E2E Test Organization` |

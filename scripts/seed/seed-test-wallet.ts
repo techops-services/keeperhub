@@ -10,7 +10,7 @@
  * at seed time and ensures deterministic wallet addresses across CI runs.
  *
  * Test credentials:
- *   Email:    PR-TEST-DO-NOT-DELETE@techops.services
+ *   Email:    pr-test-do-not-delete@techops.services
  *   Password: TestPassword123!
  *
  * Environment variables:
@@ -27,7 +27,7 @@ import { expand } from "dotenv-expand";
 expand(dotenv.config());
 
 import { hashPassword } from "better-auth/crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { encryptUserShare } from "../../keeperhub/lib/encryption";
@@ -42,7 +42,7 @@ import {
 import { generateId } from "../../lib/utils/id";
 
 const TEST_ORG_SLUG = "e2e-test-org";
-const TEST_USER_EMAIL = "PR-TEST-DO-NOT-DELETE@techops.services";
+const TEST_USER_EMAIL = "pr-test-do-not-delete@techops.services";
 const TEST_PASSWORD = "TestPassword123!";
 
 // Hardcoded wallet data from pre-provisioned Para wallet
@@ -53,14 +53,24 @@ const TEST_WALLET_ADDRESS = "0x673e3ff5342422b8a2ddc90f78afac9d7e37dbb1";
 type Db = ReturnType<typeof drizzle>;
 
 async function ensureUser(db: Db): Promise<string> {
+  // Case-insensitive lookup: the email was previously seeded as uppercase
   const existing = await db
     .select()
     .from(users)
-    .where(eq(users.email, TEST_USER_EMAIL))
+    .where(sql`lower(${users.email}) = ${TEST_USER_EMAIL}`)
     .limit(1);
 
   if (existing.length > 0) {
-    console.log(`Test user already exists (id: ${existing[0].id})`);
+    // Normalize to lowercase if stored as uppercase
+    if (existing[0].email !== TEST_USER_EMAIL) {
+      await db
+        .update(users)
+        .set({ email: TEST_USER_EMAIL })
+        .where(eq(users.id, existing[0].id));
+      console.log(`Normalized test user email to lowercase (id: ${existing[0].id})`);
+    } else {
+      console.log(`Test user already exists (id: ${existing[0].id})`);
+    }
     return existing[0].id;
   }
 
@@ -112,8 +122,29 @@ async function ensureOrganization(db: Db, userId: string): Promise<string> {
     .limit(1);
 
   if (existing.length > 0) {
-    console.log(`Test org already exists (id: ${existing[0].id})`);
-    return existing[0].id;
+    const orgId = existing[0].id;
+    console.log(`Test org already exists (id: ${orgId})`);
+
+    // Ensure member record exists for this user (may be missing if user was re-created)
+    const existingMember = await db
+      .select()
+      .from(member)
+      .where(and(eq(member.organizationId, orgId), eq(member.userId, userId)))
+      .limit(1);
+
+    if (existingMember.length === 0) {
+      const memberId = generateId();
+      await db.insert(member).values({
+        id: memberId,
+        organizationId: orgId,
+        userId,
+        role: "owner",
+        createdAt: new Date(),
+      });
+      console.log(`Created missing member record (id: ${memberId})`);
+    }
+
+    return orgId;
   }
 
   const orgId = generateId();

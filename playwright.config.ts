@@ -10,16 +10,10 @@ const baseURL = process.env.BASE_URL || "http://localhost:3000";
 const isDeployedEnv = !!process.env.BASE_URL;
 
 // Default DATABASE_URL for local docker-compose setup
-// When reusing an existing server (non-CI local dev), always use 'keeperhub' database
-// since the existing server is typically the main keeperhub instance
 const DEFAULT_DB_URL =
   "postgresql://postgres:postgres@localhost:5433/keeperhub";
-const isReusingServer = !(process.env.CI || isDeployedEnv);
 
 function getDatabaseUrl(): string {
-  if (isReusingServer) {
-    return DEFAULT_DB_URL;
-  }
   const envDbUrl = process.env.DATABASE_URL;
   const hasUnexpandedVars = envDbUrl?.includes("${");
   if (!envDbUrl || hasUnexpandedVars) {
