@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 ## Current Position
 
 Phase: 7 of 9 (Plugin Auto-Generation)
-Plan: 2 of TBD in current phase
+Plan: 3 of TBD in current phase
 Status: In progress
-Last activity: 2026-02-20 -- completed 07-02 (protocol-read and protocol-write step files)
+Last activity: 2026-02-20 -- completed 07-03 (protocol auto-discovery in discover-plugins)
 
 Progress: [████░░░░░░] ~20% (v1.2)
 
@@ -23,7 +23,7 @@ Progress: [████░░░░░░] ~20% (v1.2)
 - Average duration: 4 min
 - v1.0 total: ~40 min
 - v1.1 total: ~10 min
-- v1.2 so far: ~12 min (4 plans)
+- v1.2 so far: ~19 min (5 plans)
 
 ## Accumulated Context
 
@@ -43,6 +43,9 @@ Progress: [████░░░░░░] ~20% (v1.2)
 - _protocolMeta field uses type=text with JSON defaultValue -- UI hides underscore-prefixed fields automatically
 - buildFunctionArgs extracted as non-exported module-level function per step file -- cannot be shared due to "use step" bundler constraints; intentional duplication
 - protocol-write passes _context.triggerType to writeContractCore for gas strategy (manual vs automated trigger pricing)
+- registeredProtocolSlugs module-level variable in discover-plugins for cross-function communication (populated by registerProtocolPlugins, consumed by generateStepRegistry and processStepFilesForCodegen)
+- generateTypesFile() called once after registerProtocolPlugins() in main() -- ordering required for correct IntegrationType union generation
+- Protocol steps skipped in processStepFilesForCodegen() -- no stepHandler function, delegate to shared core files
 
 ### Pending Todos
 
@@ -58,7 +61,7 @@ None
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 07-02-PLAN.md -- protocol-read and protocol-write step files
+Stopped at: Completed 07-03-PLAN.md -- protocol auto-discovery in discover-plugins
 Resume file: None
 
-**Next action:** Continue Phase 7 plans (07-03: discover-plugins registration)
+**Next action:** Continue Phase 7 plans (07-04: first protocol definition file)

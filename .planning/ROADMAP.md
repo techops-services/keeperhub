@@ -36,7 +36,7 @@ See: `.planning/milestones/v1.1-ROADMAP.md` for full details.
 **Milestone Goal:** Build a declarative protocol definition system where adding a new DeFi protocol requires only a TypeScript definition file -- no step code, no plugin boilerplate.
 
 - [x] **Phase 6: Foundations** - Protocol types, defineProtocol() function, read/write-contract core extraction (completed 2026-02-19)
-- [ ] **Phase 7: Plugin Auto-Generation** - protocolToPlugin(), generic protocol steps, discover-plugins extension (2/3 plans complete)
+- [x] **Phase 7: Plugin Auto-Generation** - protocolToPlugin(), generic protocol steps, discover-plugins extension (2/3 plans complete) (completed 2026-02-19)
 - [ ] **Phase 8: ABI Resolution + Example Protocol** - ABI auto-fetch with caching, WETH example definition
 - [ ] **Phase 9: Hub UI** - Protocols tab, protocol grid, inline detail view, action rows
 
@@ -65,11 +65,12 @@ Plans:
   2. Protocol actions appear in the workflow builder node palette (e.g., "WETH: Wrap", "WETH: Unwrap")
   3. Protocol actions appear in the `/api/mcp/schemas` response
   4. Generic protocol-read and protocol-write steps resolve the correct contract address for the selected network at runtime
-**Plans:** 3 plans
+**Plans:** 4 plans (3 complete, 1 gap closure)
 Plans:
 - [x] 07-01-PLAN.md -- protocolToPlugin() conversion, runtime protocol registry, protocol plugin shell + icon
 - [x] 07-02-PLAN.md -- Generic protocol-read and protocol-write step files
-- [ ] 07-03-PLAN.md -- Extend discover-plugins to scan protocols and auto-register
+- [x] 07-03-PLAN.md -- Extend discover-plugins to scan protocols and auto-register
+- [ ] 07-04-PLAN.md -- Gap closure: server-side protocol bootstrap via generated barrel file
 
 ### Phase 8: ABI Resolution + Example Protocol
 **Goal**: Protocols without an ABI in their definition resolve one automatically, and WETH demonstrates the full system end-to-end
@@ -106,6 +107,6 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9
 | 4. Cleanup | v1.0 | 3/3 | Complete | 2026-02-12 |
 | 5. Build & Local Validation | v1.1 | 2/2 | Complete | 2026-02-12 |
 | 6. Foundations | v1.2 | 2/2 | Complete | 2026-02-19 |
-| 7. Plugin Auto-Generation | v1.2 | 2/3 | In progress | - |
+| 7. Plugin Auto-Generation | v1.2 | 3/4 | Gap closure | - |
 | 8. ABI Resolution + Example Protocol | v1.2 | 0/TBD | Not started | - |
 | 9. Hub UI | v1.2 | 0/TBD | Not started | - |
