@@ -6,7 +6,7 @@ const codePlugin: IntegrationPlugin = {
   type: "code",
   label: "Code",
   description:
-    "Execute custom JavaScript code for data transformation and analysis",
+    "Execute custom JavaScript code server-side in a sandboxed VM. Code can make outbound HTTP requests via fetch (subject to the configured timeout). Not a security boundary -- intended for authenticated team members only.",
 
   icon: CodeIcon,
 
@@ -84,8 +84,8 @@ const codePlugin: IntegrationPlugin = {
               key: "timeout",
               label: "Timeout (seconds)",
               type: "number",
-              placeholder: "30",
-              defaultValue: "30",
+              placeholder: "60",
+              defaultValue: "60",
               min: 1,
               max: 120,
               step: 1,

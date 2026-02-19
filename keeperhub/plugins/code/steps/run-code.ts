@@ -22,7 +22,7 @@ export type RunCodeCoreInput = {
 
 export type RunCodeInput = StepInput & RunCodeCoreInput;
 
-const DEFAULT_TIMEOUT_SECONDS = 30;
+const DEFAULT_TIMEOUT_SECONDS = 60;
 const MAX_TIMEOUT_SECONDS = 120;
 const MAX_LOG_ENTRIES = 200;
 const VM_LINE_REGEX = /evalmachine\.<anonymous>:(\d+)/;
@@ -105,10 +105,34 @@ async function stepHandler(input: RunCodeCoreInput): Promise<RunCodeResult> {
   const timeoutSeconds = Math.min(Math.max(1, rawTimeout), MAX_TIMEOUT_SECONDS);
   const timeoutMs = timeoutSeconds * 1000;
 
+  // Wrap fetch with an AbortController deadline so network requests respect
+  // the configured timeout and cannot hang indefinitely.
+  function sandboxedFetch(
+    input: RequestInfo | URL,
+    init?: RequestInit
+  ): Promise<Response> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    // If the caller already provided a signal, abort when either fires
+    const callerSignal = init?.signal;
+    if (callerSignal?.aborted) {
+      controller.abort();
+    } else {
+      callerSignal?.addEventListener("abort", () => controller.abort(), {
+        once: true,
+      });
+    }
+
+    return fetch(input, { ...init, signal: controller.signal }).finally(() =>
+      clearTimeout(timer)
+    );
+  }
+
   const sandbox = createContext({
     // I/O
     console: capturedConsole,
-    fetch,
+    fetch: sandboxedFetch,
 
     // Core types
     BigInt,
