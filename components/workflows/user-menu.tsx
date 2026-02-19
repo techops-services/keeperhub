@@ -135,7 +135,9 @@ export const UserMenu = () => {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
+            aria-label="User menu"
             className="relative h-9 w-9 rounded-full border p-0"
+            data-testid="user-menu"
             variant="ghost"
           >
             <Avatar className="h-9 w-9">

@@ -231,3 +231,105 @@ act push --job e2e-vitest \
 | `tests/e2e/playwright/utils/auth.ts` | `signUpAndVerify()` for Playwright browser auth |
 | `tests/e2e/playwright/utils/db.ts` | Playwright-specific DB utilities |
 | `tests/e2e/playwright/utils/workflow.ts` | `waitForWorkflowSave()` and other Playwright workflow helpers |
+| `tests/e2e/playwright/utils/discover.ts` | Page discovery: `probe()`, `diffReports()`, `autoProbe()`, `highlightElements()` |
+
+---
+
+## Playwright Discovery Framework
+
+Tools for understanding page structure before writing E2E tests. Solves the problem of guessing selectors blind, running the test, failing, and repeating.
+
+### Commands
+
+```bash
+pnpm discover /                        # Discover unauthenticated page
+pnpm discover / --auth --highlight     # Authenticated with numbered element overlays
+pnpm discover / --steps "click:button:has-text('Sign In')" "wait:500" "probe:dialog"
+pnpm discover / --json                 # JSON to stdout
+```
+
+### Output
+
+Each probe writes to `tests/e2e/playwright/.probes/<label>-<timestamp>/`:
+
+| File | Purpose |
+|------|---------|
+| `screenshot.png` | Full page screenshot |
+| `screenshot-highlighted.png` | Interactive elements with numbered red overlays |
+| `elements.md` | Interactive elements table grouped by page region |
+| `accessibility.md` | Parsed accessibility tree (roles, names, states) |
+| `aria-snapshot.yaml` | Raw Playwright ARIA snapshot for writing `getByRole` locators |
+| `diff.md` | What changed between two probes (new/removed elements, dialogs, toasts) |
+| `report.json` | Full structured data |
+
+### In-Test Usage
+
+```typescript
+import { probe, diffReports, autoProbe } from "./utils/discover";
+
+// Manual probe at specific points
+const before = await probe(page, "before-click");
+await page.click('button:has-text("Sign In")');
+const after = await probe(page, "after-click");
+const diff = diffReports(before, after);
+
+// Auto-probe on every URL change (only when PW_DISCOVER=1)
+const handle = await autoProbe(page);
+// ... test interactions ...
+handle.stop();
+```
+
+### Environment Variables
+
+| Variable | Purpose |
+|----------|---------|
+| `PW_DISCOVER=1` | Enable auto-probing on navigation in tests |
+| `CI` | When set, disables auto-probing regardless of `PW_DISCOVER` |
+
+### Explore Harness
+
+`tests/e2e/playwright/explore.test.ts` is a scratchpad for iterative exploration:
+
+```bash
+pnpm test:e2e --grep "explore"              # Run exploration
+PW_DISCOVER=1 pnpm test:e2e --grep "explore"  # With auto-probing
+```
+
+Edit the steps in the file, run, read `.probes/` output, edit again, repeat until you understand the page structure. Then write the real test in a new file.
+
+### Future: React Component State Capture
+
+The discovery framework currently captures the DOM layer (ARIA snapshots, interactive elements, screenshots). A potential enhancement is capturing **React component state** from the virtual DOM at failure points, giving both the "what the user sees" and "why it looks that way".
+
+**What it would add beyond ARIA snapshots:**
+
+| Signal | ARIA Snapshot | React VDOM |
+|--------|--------------|------------|
+| Rendered output | Yes | No |
+| Component hierarchy | No | Yes (`<WalletOverlay>` > `<Button>`) |
+| Component props | No | Yes (`isLoading={true}`, `address="0x..."`) |
+| Hook/atom state | No | Yes (jotai atoms, useState values) |
+| Root cause of disabled state | Partial (sees `[disabled]`) | Yes (which prop/state caused it) |
+
+**Concrete example from test debugging:**
+
+When the Para wallet creation timed out, ARIA showed `button "Loading Creating..." [disabled]` -- enough to know it was stuck, but not why. React state would have shown `paraStatus: "pending"`, `apiError: null`, immediately confirming an API timeout vs an error state.
+
+**Implementation approach:**
+
+React exposes fiber nodes via `__REACT_DEVTOOLS_GLOBAL_HOOK__` (dev builds) and `_reactFiber$` properties on DOM elements. A `probeReactState(page, selector)` function could:
+
+1. Find the DOM element matching the selector
+2. Walk up the fiber tree to find the nearest meaningful component boundary
+3. Extract props, state, and hook values
+4. Serialize and write to `.probes/` alongside the existing outputs
+
+**Risks and constraints:**
+
+- React fiber internals are **not a public API** and change between React versions (currently React 19)
+- Full tree serialization is expensive and noisy -- should be **scoped to a subtree** around the failure point
+- Only available in dev builds (production strips `__REACT_DEVTOOLS_GLOBAL_HOOK__`)
+- Circular references in state/props require careful serialization
+- Jotai atoms may need special handling to extract readable values
+
+**Recommended scope:** Targeted state capture at failure points (not full-tree analysis). Integrate into `probe()` as an optional `{ includeReactState: true }` flag that captures component state for the nearest React boundary around each interactive element.
