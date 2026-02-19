@@ -260,7 +260,7 @@
   stroke: var(--primary);
 }
 
-.sql-template-badge {
+.template-badge {
   background-color: rgba(59, 130, 246, 0.1);
   color: rgb(37, 99, 235) !important;
   border: 1px solid rgba(59, 130, 246, 0.2);
@@ -268,7 +268,7 @@
   padding: 1px 4px;
 }
 
-.dark .sql-template-badge {
+.dark .template-badge {
   color: rgb(96, 165, 250) !important;
 }
 /* end keeperhub code */

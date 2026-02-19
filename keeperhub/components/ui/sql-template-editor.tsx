@@ -327,7 +327,7 @@ export function SqlTemplateEditor({
           endColumn: end.column,
         },
         options: {
-          inlineClassName: "sql-template-badge",
+          inlineClassName: "template-badge",
           hoverMessage: { value: `Template: ${match[1]}` },
         },
       });
