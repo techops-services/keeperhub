@@ -37,7 +37,6 @@ test.describe("Happy Path: Webhook Workflow", () => {
   });
 
   test("trigger webhook and verify execution completes successfully", async ({
-    page,
     request,
     baseURL,
   }) => {
@@ -85,7 +84,7 @@ test.describe("Happy Path: Webhook Workflow", () => {
     expect(execution?.status).toBe("success");
   });
 
-  test("webhook URL is unique per workflow", async ({ page, baseURL }) => {
+  test("webhook URL is unique per workflow", async ({ baseURL }) => {
     // Create first workflow
     const workflow1 = await createTestWorkflow(PERSISTENT_TEST_USER_EMAIL, {
       name: "Webhook Workflow 1",

@@ -22,8 +22,6 @@ function getDatabaseUrl(): string {
   return envDbUrl;
 }
 
-const isReusingServer = !(process.env.CI || isDeployedEnv);
-
 const databaseUrl = getDatabaseUrl();
 
 // Set DATABASE_URL for tests that need direct DB access (e.g., OTP retrieval)
