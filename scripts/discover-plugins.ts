@@ -33,6 +33,7 @@ import ts from "typescript";
 
 const PLUGINS_DIR = join(process.cwd(), "plugins");
 const KEEPERHUB_PLUGINS_DIR = join(process.cwd(), "keeperhub", "plugins");
+const PROTOCOLS_DIR = join(process.cwd(), "keeperhub", "protocols");
 const OUTPUT_FILE = join(PLUGINS_DIR, "index.ts");
 const KEEPERHUB_OUTPUT_FILE = join(KEEPERHUB_PLUGINS_DIR, "index.ts");
 const TYPES_FILE = join(process.cwd(), "lib", "types", "integration.ts");
@@ -55,8 +56,112 @@ const PLUGINS_MARKER_REGEX =
 // System integrations that don't have plugins
 const SYSTEM_INTEGRATION_TYPES = ["database"] as const;
 
+// Protocol slugs registered during this run, used by generateStepRegistry()
+let registeredProtocolSlugs: string[] = [];
+
 // Regex patterns for codegen template generation
 const LEADING_WHITESPACE_PATTERN = /^\s*/;
+
+/**
+ * Discover protocol definition files in keeperhub/protocols/
+ * Returns absolute file paths for all .ts files (excludes .d.ts, index.ts, _-prefixed, .-prefixed)
+ */
+function discoverProtocols(): string[] {
+  if (!existsSync(PROTOCOLS_DIR)) {
+    return [];
+  }
+
+  const files = readdirSync(PROTOCOLS_DIR);
+  const result: string[] = [];
+
+  for (const file of files) {
+    if (
+      file.endsWith(".d.ts") ||
+      file === "index.ts" ||
+      file.startsWith("_") ||
+      file.startsWith(".")
+    ) {
+      continue;
+    }
+
+    if (!file.endsWith(".ts")) {
+      continue;
+    }
+
+    result.push(join(PROTOCOLS_DIR, file));
+  }
+
+  return result;
+}
+
+type ProtocolEntry = {
+  slug: string;
+  definition: import("../keeperhub/lib/protocol-registry").ProtocolDefinition;
+};
+
+/**
+ * Load protocol definitions from discovered files
+ * Each file must have a default export that is a ProtocolDefinition
+ */
+async function loadProtocolDefinitions(): Promise<ProtocolEntry[]> {
+  const filePaths = discoverProtocols();
+
+  if (filePaths.length === 0) {
+    console.log("   No protocol definitions found in keeperhub/protocols/");
+    return [];
+  }
+
+  const results: ProtocolEntry[] = [];
+
+  for (const filePath of filePaths) {
+    try {
+      const mod = await import(filePath);
+      const definition =
+        mod.default as import("../keeperhub/lib/protocol-registry").ProtocolDefinition;
+
+      if (!definition?.slug) {
+        console.warn(
+          `   Warning: ${filePath} has no default export with a slug, skipping`
+        );
+        continue;
+      }
+
+      console.log(
+        `   Discovered protocol: ${definition.slug} (${definition.name})`
+      );
+      results.push({ slug: definition.slug, definition });
+    } catch (error) {
+      console.warn(
+        `   Warning: Failed to import protocol from ${filePath}:`,
+        error
+      );
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Register all discovered protocols as IntegrationPlugins
+ * Populates registeredProtocolSlugs for use by generateStepRegistry()
+ */
+async function registerProtocolPlugins(): Promise<string[]> {
+  const { protocolToPlugin, registerProtocol } = await import("../keeperhub/lib/protocol-registry");
+  const { registerIntegration } = await import("../plugins/registry");
+
+  const definitions = await loadProtocolDefinitions();
+  const slugs: string[] = [];
+
+  for (const { slug, definition } of definitions) {
+    registerProtocol(definition);
+    const plugin = protocolToPlugin(definition);
+    registerIntegration(plugin);
+    slugs.push(slug);
+  }
+
+  registeredProtocolSlugs = slugs;
+  return slugs;
+}
 
 /**
  * Format TypeScript code using Prettier

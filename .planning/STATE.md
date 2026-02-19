@@ -10,20 +10,20 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 ## Current Position
 
 Phase: 7 of 9 (Plugin Auto-Generation)
-Plan: 1 of TBD in current phase
+Plan: 2 of TBD in current phase
 Status: In progress
-Last activity: 2026-02-20 -- completed 07-01 (protocolToPlugin conversion + runtime registry + protocol plugin shell)
+Last activity: 2026-02-20 -- completed 07-02 (protocol-read and protocol-write step files)
 
-Progress: [███░░░░░░░] ~15% (v1.2)
+Progress: [████░░░░░░] ~20% (v1.2)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 17 (v1.0: 12, v1.1: 2, v1.2: 3)
+- Total plans completed: 18 (v1.0: 12, v1.1: 2, v1.2: 4)
 - Average duration: 4 min
 - v1.0 total: ~40 min
 - v1.1 total: ~10 min
-- v1.2 so far: ~10 min (3 plans)
+- v1.2 so far: ~12 min (4 plans)
 
 ## Accumulated Context
 
@@ -41,6 +41,8 @@ Progress: [███░░░░░░░] ~15% (v1.2)
 - protocolToPlugin imports ProtocolIcon directly (no icon parameter) -- single canonical icon for all protocol plugins at MVP
 - Plugin shell index.ts does not call registerIntegration() -- registration handled by discover-plugins (Plan 03)
 - _protocolMeta field uses type=text with JSON defaultValue -- UI hides underscore-prefixed fields automatically
+- buildFunctionArgs extracted as non-exported module-level function per step file -- cannot be shared due to "use step" bundler constraints; intentional duplication
+- protocol-write passes _context.triggerType to writeContractCore for gas strategy (manual vs automated trigger pricing)
 
 ### Pending Todos
 
@@ -56,7 +58,7 @@ None
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 07-01-PLAN.md -- protocolToPlugin conversion, runtime registry, protocol plugin shell
+Stopped at: Completed 07-02-PLAN.md -- protocol-read and protocol-write step files
 Resume file: None
 
-**Next action:** Continue Phase 7 plans (07-02: protocol step files)
+**Next action:** Continue Phase 7 plans (07-03: discover-plugins registration)
