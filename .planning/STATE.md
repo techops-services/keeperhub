@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 ## Current Position
 
 Phase: 9 of 9 (Hub UI)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-02-20 -- Phase 8 complete, transitioning to Phase 9
+Plan: 09-01 complete, executing 09-02
+Status: Executing
+Last activity: 2026-02-20 -- Plan 09-01 complete (protocol API, tab switcher, protocol grid)
 
-Progress: [████████░░] ~75% (v1.2)
+Progress: [█████████░] ~88% (v1.2)
 
 ## Performance Metrics
 
@@ -55,6 +55,11 @@ Progress: [████████░░] ~75% (v1.2)
 - resolveAbi uses shared lib/explorer modules directly, does not call fetch-abi API route
 - Protocol address keys use numeric chain ID strings (e.g., "1", "8453") matching chain-select stored values
 - Omitted Polygon from WETH -- that address is WMATIC, semantically different
+- chain-utils.ts is client-safe (no server imports) -- maps numeric chain ID strings to human-readable names
+- Protocol API endpoint is synchronous (no async) -- registry is populated at import time via side-effect import
+- _selectedProtocol underscore prefix for unused destructured state -- Plan 02 will consume it
+- Tab switcher uses underline variant via className overrides on shadcn Tabs components
+- Protocol search is a standalone inline input (not reusing WorkflowSearchFilter) to avoid over-complicating the existing component
 
 ### Pending Todos
 
@@ -70,7 +75,7 @@ None
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Phase 8 complete, ready to plan Phase 9
+Stopped at: Plan 09-01 complete, executing Plan 09-02
 Resume file: None
 
-**Next action:** Plan Phase 9 (Hub UI) -- phase directory not yet created, needs discuss-phase first
+**Next action:** Complete Plan 09-02 (protocol detail view)
