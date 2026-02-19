@@ -427,6 +427,21 @@ describe("code/run-code - error handling", () => {
     expect(result.error).toContain("oops");
   });
 
+  it("extracts line number from runtime error", async () => {
+    const code = [
+      "const x = 1;",
+      "const y = 2;",
+      "throw new Error('line 3');",
+    ].join("\n");
+    const result = await expectFailure({ code });
+    expect(result.line).toBe(3);
+  });
+
+  it("extracts line 1 for error on first line", async () => {
+    const result = await expectFailure({ code: "throw new Error('first');" });
+    expect(result.line).toBe(1);
+  });
+
   it("detects unresolved stored-format templates", async () => {
     const result = await expectFailure({
       code: "return {{@node1:Label.field}};",

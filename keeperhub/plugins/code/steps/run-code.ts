@@ -25,7 +25,7 @@ export type RunCodeInput = StepInput & RunCodeCoreInput;
 const DEFAULT_TIMEOUT_SECONDS = 60;
 const MAX_TIMEOUT_SECONDS = 120;
 const MAX_LOG_ENTRIES = 200;
-const VM_LINE_REGEX = /evalmachine\.<anonymous>:(\d+)/;
+const VM_LINE_REGEX = /user-code\.js:(\d+)/;
 const UNRESOLVED_TEMPLATE_REGEX = /\{\{@?[^}]+\}\}/g;
 
 /**
