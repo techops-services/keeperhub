@@ -12,6 +12,7 @@ Plugins provide the actions available in your workflows. Each plugin adds one or
 | Plugin | Category | Actions | Credentials Required |
 |--------|----------|---------|---------------------|
 | [Web3](/plugins/web3) | Blockchain | Balance checks, contract reads/writes, transfers, calldata decoding, risk assessment | Wallet (for writes) |
+| [Math](/plugins/math) | Math | Aggregation operations (sum, count, average, median, min, max, product) | None |
 | [Discord](/plugins/discord) | Notifications | Send messages to channels | Webhook URL |
 | [Telegram](/plugins/telegram) | Notifications | Send messages to chats | Bot token |
 | [SendGrid](/plugins/sendgrid) | Notifications | Send emails | API key |
@@ -29,6 +30,10 @@ Plugins provide the actions available in your workflows. Each plugin adds one or
 ### Blockchain (Web3)
 
 Core on-chain operations: reading balances, calling smart contracts, transferring tokens, and security analysis. Read-only actions work without a wallet. Write actions require a connected Para wallet.
+
+### Math
+
+Pure computation nodes for aggregating numeric values from upstream nodes. Supports sum, count, average, median, min, max, and product operations with optional post-aggregation arithmetic. Automatically handles large integers using BigInt arithmetic to preserve precision.
 
 ### Security
 
