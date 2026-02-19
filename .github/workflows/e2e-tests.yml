@@ -299,6 +299,10 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/keeperhub_test
           PARA_API_KEY: ${{ secrets.TEST_PARA_API_KEY }}
           PARA_ENVIRONMENT: beta
+          PARA_PORTAL_ORG_ID: ${{ secrets.PARA_PORTAL_ORG_ID }}
+          PARA_PORTAL_PROJECT_ID: ${{ secrets.PARA_PORTAL_PROJECT_ID }}
+          PARA_PORTAL_KEY_ID: ${{ secrets.PARA_PORTAL_KEY_ID }}
+          PARA_PORTAL_API_KEY: ${{ secrets.PARA_PORTAL_API_KEY }}
           CI: true
 
       - name: Upload Playwright report

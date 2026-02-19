@@ -109,8 +109,10 @@ export async function signUpAndVerify(
   // Wait for dialog to close (successful verification)
   await expect(dialog).not.toBeVisible({ timeout: 15_000 });
 
-  // Wait for any post-auth redirects to settle
-  await page.waitForLoadState("networkidle");
+  // Wait for org switcher to appear (org auto-created after first sign-in)
+  await expect(page.locator('button[role="combobox"]')).toBeVisible({
+    timeout: 15_000,
+  });
 
   return { email, password };
 }
@@ -138,6 +140,9 @@ export async function signIn(
 
   // Wait for dialog to close (successful sign in)
   await expect(dialog).not.toBeVisible({ timeout: 15_000 });
+
+  // Wait for post-auth redirects to settle
+  await page.waitForLoadState("networkidle");
 }
 
 /**

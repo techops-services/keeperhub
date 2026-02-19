@@ -28,6 +28,8 @@ const databaseUrl = getDatabaseUrl();
 process.env.DATABASE_URL = databaseUrl;
 
 export default defineConfig({
+  globalSetup: "./tests/e2e/playwright/global-setup.ts",
+  globalTeardown: "./tests/e2e/playwright/global-teardown.ts",
   testDir: "./tests/e2e/playwright",
   testMatch: "**/*.test.ts",
   fullyParallel: true,

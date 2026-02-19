@@ -3,6 +3,17 @@ import { join } from "node:path";
 import type { Page } from "@playwright/test";
 
 // ------------------------------------------------------------------
+// Top-level regex constants (useTopLevelRegex)
+// ------------------------------------------------------------------
+
+const RE_LIST_ITEM_PREFIX = /^(\s*)- /;
+const RE_NON_WHITESPACE = /\S/;
+const RE_ARIA_NODE = /^(\w+)(?:\s+"([^"]*)")?(?:\s+\[([^\]]+)\])?:?\s*$/;
+const RE_COMMA_SEPARATED = /,\s*/;
+const RE_SLASH = /\//g;
+const RE_LEADING_DASH = /^-/;
+
+// ------------------------------------------------------------------
 // Types
 // ------------------------------------------------------------------
 
@@ -146,29 +157,46 @@ export async function getInteractiveElements(
       return null;
     };
 
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: DOM element classification requires extensive branching
     const suggestLocator = (el: Element): string => {
       const testId = el.getAttribute("data-testid");
-      if (testId) return `[data-testid="${testId}"]`;
+      if (testId) {
+        return `[data-testid="${testId}"]`;
+      }
 
       const role = el.getAttribute("role");
       const ariaLabel = el.getAttribute("aria-label");
-      if (role && ariaLabel) return `role=${role}[name="${ariaLabel}"]`;
+      if (role && ariaLabel) {
+        return `role=${role}[name="${ariaLabel}"]`;
+      }
 
       const elId = el.getAttribute("id");
-      if (elId) return `#${elId}`;
+      if (elId) {
+        return `#${elId}`;
+      }
 
       const text = truncate(el.textContent || "", 40);
       const tag = el.tagName.toLowerCase();
-      if (tag === "button" && text) return `button:has-text("${text}")`;
-      if (tag === "a" && text) return `a:has-text("${text}")`;
+      if (tag === "button" && text) {
+        return `button:has-text("${text}")`;
+      }
+      if (tag === "a" && text) {
+        return `a:has-text("${text}")`;
+      }
 
-      if (role) return `[role="${role}"]`;
+      if (role) {
+        return `[role="${role}"]`;
+      }
 
       const name = el.getAttribute("name");
-      if (name) return `[name="${name}"]`;
+      if (name) {
+        return `[name="${name}"]`;
+      }
 
       const ph = el.getAttribute("placeholder");
-      if (ph) return `[placeholder="${ph}"]`;
+      if (ph) {
+        return `[placeholder="${ph}"]`;
+      }
 
       return tag;
     };
@@ -194,8 +222,7 @@ export async function getInteractiveElements(
       parentContext: string | null;
     }> = [];
 
-    for (let idx = 0; idx < interactive.length; idx++) {
-      const el = interactive[idx];
+    for (const el of interactive) {
       const rect = el.getBoundingClientRect();
       const style = window.getComputedStyle(el);
       const isVisible =
@@ -233,9 +260,13 @@ export async function getInteractiveElements(
     }
 
     results.sort((a, b) => {
-      if (!(a.bounds && b.bounds)) return 0;
+      if (!(a.bounds && b.bounds)) {
+        return 0;
+      }
       const yDiff = a.bounds.y - b.bounds.y;
-      if (Math.abs(yDiff) > 10) return yDiff;
+      if (Math.abs(yDiff) > 10) {
+        return yDiff;
+      }
       return a.bounds.x - b.bounds.x;
     });
 
@@ -256,6 +287,7 @@ export async function getPageStructure(page: Page): Promise<PageStructure> {
   const title = await page.title();
   const url = page.url();
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: accessibility tree traversal with many node types
   const structure = await page.evaluate(() => {
     // biome-ignore lint/suspicious/noExplicitAny: polyfill for esbuild decorator
     if (typeof (globalThis as any).__name === "undefined") {
@@ -272,10 +304,9 @@ export async function getPageStructure(page: Page): Promise<PageStructure> {
     const headingEls = Array.from(
       document.querySelectorAll("h1, h2, h3, h4, h5, h6")
     );
-    for (let i = 0; i < headingEls.length; i++) {
-      const h = headingEls[i];
+    for (const h of headingEls) {
       headings.push({
-        level: Number.parseInt(h.tagName[1]),
+        level: Number.parseInt(h.tagName[1], 10),
         text: truncate(h.textContent || "", 60),
       });
     }
@@ -298,8 +329,7 @@ export async function getPageStructure(page: Page): Promise<PageStructure> {
         ].join(", ")
       )
     );
-    for (let i = 0; i < landmarkEls.length; i++) {
-      const el = landmarkEls[i];
+    for (const el of landmarkEls) {
       landmarks.push({
         role: el.getAttribute("role") || el.tagName.toLowerCase(),
         label: el.getAttribute("aria-label"),
@@ -310,8 +340,7 @@ export async function getPageStructure(page: Page): Promise<PageStructure> {
     const dialogEls = Array.from(
       document.querySelectorAll('[role="dialog"], [role="alertdialog"], dialog')
     );
-    for (let i = 0; i < dialogEls.length; i++) {
-      const d = dialogEls[i];
+    for (const d of dialogEls) {
       const titleEl = d.querySelector("h1, h2, h3, [class*=title]");
       const style = window.getComputedStyle(d);
       dialogs.push({
@@ -326,8 +355,7 @@ export async function getPageStructure(page: Page): Promise<PageStructure> {
       fields: number;
     }> = [];
     const formEls = Array.from(document.querySelectorAll("form"));
-    for (let i = 0; i < formEls.length; i++) {
-      const f = formEls[i];
+    for (const f of formEls) {
       forms.push({
         id: f.getAttribute("id"),
         action: f.getAttribute("action"),
@@ -339,11 +367,13 @@ export async function getPageStructure(page: Page): Promise<PageStructure> {
     const navEls = Array.from(
       document.querySelectorAll("nav, [role=navigation]")
     );
-    for (let i = 0; i < navEls.length; i++) {
-      const links = Array.from(navEls[i].querySelectorAll("a"));
-      for (let j = 0; j < links.length; j++) {
-        const text = truncate(links[j].textContent || "", 40);
-        if (text) navItems.push(text);
+    for (const navEl of navEls) {
+      const links = Array.from(navEl.querySelectorAll("a"));
+      for (const link of links) {
+        const text = truncate(link.textContent || "", 40);
+        if (text) {
+          navItems.push(text);
+        }
       }
     }
 
@@ -353,9 +383,11 @@ export async function getPageStructure(page: Page): Promise<PageStructure> {
         "[data-sonner-toast], [role=status], [role=alert]"
       )
     );
-    for (let i = 0; i < toastEls.length; i++) {
-      const text = truncate(toastEls[i].textContent || "", 80);
-      if (text) toasts.push(text);
+    for (const toastEl of toastEls) {
+      const text = truncate(toastEl.textContent || "", 80);
+      if (text) {
+        toasts.push(text);
+      }
     }
 
     return { headings, landmarks, dialogs, forms, navItems, toasts };
@@ -379,7 +411,9 @@ export async function getAccessibilityTree(
 ): Promise<AccessibilityNode | null> {
   try {
     const snapshot = await page.locator("body").ariaSnapshot();
-    if (!snapshot) return null;
+    if (!snapshot) {
+      return null;
+    }
 
     // Parse the YAML-like aria snapshot into our AccessibilityNode structure
     return parseAriaSnapshot(snapshot);
@@ -398,6 +432,7 @@ export async function getAccessibilityTree(
  *   - main:
  *     - button "Start building"
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: element grouping logic with multiple region detection heuristics
 function parseAriaSnapshot(snapshot: string): AccessibilityNode {
   const lines = snapshot.split("\n").filter((l) => l.trim().length > 0);
   const root: AccessibilityNode = { role: "page", name: "", children: [] };
@@ -405,17 +440,16 @@ function parseAriaSnapshot(snapshot: string): AccessibilityNode {
     { node: root, indent: -2 },
   ];
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const stripped = line.replace(/^(\s*)- /, "$1");
-    const indent = line.search(/\S/);
+  for (const line of lines) {
+    const stripped = line.replace(RE_LIST_ITEM_PREFIX, "$1");
+    const indent = line.search(RE_NON_WHITESPACE);
     const content = stripped.trim();
 
     // Parse role and name: "button "Sign In"" or "banner:" or "link "Home" [disabled]"
-    const match = content.match(
-      /^(\w+)(?:\s+"([^"]*)")?(?:\s+\[([^\]]+)\])?:?\s*$/
-    );
-    if (!match) continue;
+    const match = content.match(RE_ARIA_NODE);
+    if (!match) {
+      continue;
+    }
 
     const role = match[1];
     const name = match[2] || "";
@@ -424,26 +458,41 @@ function parseAriaSnapshot(snapshot: string): AccessibilityNode {
 
     const node: AccessibilityNode = { role, name };
     if (stateStr) {
-      const states = stateStr.split(/,\s*/);
-      for (let s = 0; s < states.length; s++) {
-        const state = states[s].trim();
-        if (state === "disabled") node.disabled = true;
-        if (state === "checked") node.checked = true;
-        if (state === "pressed") node.pressed = true;
-        if (state === "expanded") node.expanded = true;
-        if (state.startsWith("level="))
-          node.level = Number.parseInt(state.split("=")[1]);
+      const states = stateStr.split(RE_COMMA_SEPARATED);
+      for (const rawState of states) {
+        const state = rawState.trim();
+        if (state === "disabled") {
+          node.disabled = true;
+        }
+        if (state === "checked") {
+          node.checked = true;
+        }
+        if (state === "pressed") {
+          node.pressed = true;
+        }
+        if (state === "expanded") {
+          node.expanded = true;
+        }
+        if (state.startsWith("level=")) {
+          node.level = Number.parseInt(state.split("=")[1], 10);
+        }
       }
     }
-    if (hasChildren) node.children = [];
+    if (hasChildren) {
+      node.children = [];
+    }
 
     // Find parent based on indentation
-    while (stack.length > 1 && stack[stack.length - 1].indent >= indent) {
+    while (stack.length > 1 && (stack.at(-1)?.indent ?? -1) >= indent) {
       stack.pop();
     }
-    const parent = stack[stack.length - 1].node;
-    if (!parent.children) parent.children = [];
-    parent.children.push(node);
+    const parentEntry = stack.at(-1);
+    if (parentEntry) {
+      if (!parentEntry.node.children) {
+        parentEntry.node.children = [];
+      }
+      parentEntry.node.children.push(node);
+    }
 
     if (hasChildren) {
       stack.push({ node, indent });
@@ -577,6 +626,7 @@ export function diffReports(
 /**
  * Format a state diff as readable markdown.
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: markdown report generation with many section types
 export function formatDiff(diff: StateDiff): string {
   const lines: string[] = [];
   lines.push("# State Diff");
@@ -762,13 +812,14 @@ export async function highlightElements(
       const existing = Array.from(
         document.querySelectorAll("[data-pw-highlight]")
       );
-      for (let i = 0; i < existing.length; i++) {
-        existing[i].remove();
+      for (const item of existing) {
+        item.remove();
       }
 
-      for (let i = 0; i < els.length; i++) {
-        const el = els[i];
-        if (!el.bounds) continue;
+      for (const [i, el] of els.entries()) {
+        if (!el.bounds) {
+          continue;
+        }
 
         const overlay = document.createElement("div");
         overlay.setAttribute("data-pw-highlight", String(i));
@@ -821,8 +872,8 @@ export async function clearHighlights(page: Page): Promise<void> {
     const highlights = Array.from(
       document.querySelectorAll("[data-pw-highlight]")
     );
-    for (let i = 0; i < highlights.length; i++) {
-      highlights[i].remove();
+    for (const highlight of highlights) {
+      highlight.remove();
     }
   });
 }
@@ -841,31 +892,45 @@ function formatAccessibilityTree(node: AccessibilityNode, depth = 0): string {
   const parts: string[] = [];
 
   let line = `${indent}- **${node.role}**`;
-  if (node.name) line += ` "${node.name}"`;
-  if (node.value) line += ` = "${node.value}"`;
+  if (node.name) {
+    line += ` "${node.name}"`;
+  }
+  if (node.value) {
+    line += ` = "${node.value}"`;
+  }
 
   const states: string[] = [];
-  if (node.disabled) states.push("disabled");
-  if (node.checked !== undefined)
+  if (node.disabled) {
+    states.push("disabled");
+  }
+  if (node.checked !== undefined) {
     states.push(`checked=${String(node.checked)}`);
-  if (node.pressed !== undefined)
+  }
+  if (node.pressed !== undefined) {
     states.push(`pressed=${String(node.pressed)}`);
-  if (node.expanded !== undefined)
+  }
+  if (node.expanded !== undefined) {
     states.push(`expanded=${String(node.expanded)}`);
-  if (node.level) states.push(`level=${node.level}`);
-  if (states.length > 0) line += ` (${states.join(", ")})`;
+  }
+  if (node.level) {
+    states.push(`level=${node.level}`);
+  }
+  if (states.length > 0) {
+    line += ` (${states.join(", ")})`;
+  }
 
   parts.push(line);
 
   if (node.children) {
-    for (let i = 0; i < node.children.length; i++) {
-      parts.push(formatAccessibilityTree(node.children[i], depth + 1));
+    for (const child of node.children) {
+      parts.push(formatAccessibilityTree(child, depth + 1));
     }
   }
 
   return parts.join("\n");
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: multi-step discovery orchestration
 function formatForClaude(report: DiscoveryReport): string {
   const lines: string[] = [];
 
@@ -884,7 +949,9 @@ function formatForClaude(report: DiscoveryReport): string {
 
   if (report.structure.dialogs.some((d) => d.visible)) {
     lines.push("## Open Dialogs");
-    for (const d of report.structure.dialogs.filter((d) => d.visible)) {
+    for (const d of report.structure.dialogs.filter(
+      (dialog) => dialog.visible
+    )) {
       lines.push(`- ${d.title || "(untitled)"}`);
     }
     lines.push("");
@@ -902,7 +969,9 @@ function formatForClaude(report: DiscoveryReport): string {
   const groupedObj: Record<string, ElementInfo[]> = {};
   for (const el of visible) {
     const ctx = el.parentContext || "(page root)";
-    if (!groupedObj[ctx]) groupedObj[ctx] = [];
+    if (!groupedObj[ctx]) {
+      groupedObj[ctx] = [];
+    }
     groupedObj[ctx].push(el);
   }
 
@@ -910,15 +979,13 @@ function formatForClaude(report: DiscoveryReport): string {
   lines.push("");
 
   const contexts = Object.keys(groupedObj);
-  for (let c = 0; c < contexts.length; c++) {
-    const context = contexts[c];
+  for (const context of contexts) {
     const elements = groupedObj[context];
     lines.push(`### ${context}`);
     lines.push("");
     lines.push("| # | Locator | Tag | Text | Disabled |");
     lines.push("|---|---------|-----|------|----------|");
-    for (let i = 0; i < elements.length; i++) {
-      const el = elements[i];
+    for (const [i, el] of elements.entries()) {
       const text = el.text || el.ariaLabel || el.placeholder || "-";
       lines.push(
         `| ${i} | \`${el.locator}\` | ${el.tag} | ${text.substring(0, 40)} | ${el.disabled ? "yes" : "-"} |`
@@ -966,7 +1033,9 @@ function formatForClaude(report: DiscoveryReport): string {
  * Off by default, and always off in CI.
  */
 export function isDiscoveryMode(): boolean {
-  if (process.env.CI) return false;
+  if (process.env.CI) {
+    return false;
+  }
   return process.env.PW_DISCOVER === "1" || process.env.PW_DISCOVER === "true";
 }
 
@@ -1020,14 +1089,20 @@ export async function autoProbe(
     lastProbe: () => lastReport,
   };
 
-  if (!active) return handle;
+  if (!active) {
+    return handle;
+  }
 
   const captureProbe = async (label: string): Promise<void> => {
-    if (probeInProgress) return;
+    if (probeInProgress) {
+      return;
+    }
     probeInProgress = true;
     try {
       // Small delay to let the page settle after navigation
-      await page.waitForLoadState("domcontentloaded").catch(() => {});
+      await page.waitForLoadState("domcontentloaded").catch(() => {
+        /* intentional noop */
+      });
       await page.waitForTimeout(300);
 
       const before = lastReport;
@@ -1064,12 +1139,15 @@ export async function autoProbe(
 
   onNavigation = async (frame: { url: () => string }): Promise<void> => {
     // Only probe main frame navigations
-    if (frame !== page.mainFrame()) return;
+    if (frame !== page.mainFrame()) {
+      return;
+    }
 
     navigationCount++;
     const url = new URL(frame.url());
     const pathLabel =
-      url.pathname.replace(/\//g, "-").replace(/^-/, "") || "root";
+      url.pathname.replace(RE_SLASH, "-").replace(RE_LEADING_DASH, "") ||
+      "root";
     await captureProbe(`auto-nav-${navigationCount}-${pathLabel}`);
   };
 
@@ -1093,8 +1171,7 @@ export function printReport(report: DiscoveryReport): void {
   console.log("\nVisible interactive elements:");
   console.log("-".repeat(60));
 
-  for (let i = 0; i < visible.length; i++) {
-    const el = visible[i];
+  for (const [i, el] of visible.entries()) {
     const text = el.text || el.ariaLabel || el.placeholder || "";
     const extra = [
       el.disabled ? "DISABLED" : "",
@@ -1133,22 +1210,27 @@ export function printReport(report: DiscoveryReport): void {
       "searchbox",
       "spinbutton",
     ]);
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: accessibility tree printing with recursive node handling
     const printA11yNode = (node: AccessibilityNode, depth: number): void => {
       const indent = "  ".repeat(depth);
       if (interactiveRoles.has(node.role)) {
         const states: string[] = [];
-        if (node.disabled) states.push("disabled");
-        if (node.checked !== undefined)
+        if (node.disabled) {
+          states.push("disabled");
+        }
+        if (node.checked !== undefined) {
           states.push(`checked=${String(node.checked)}`);
-        if (node.expanded !== undefined)
+        }
+        if (node.expanded !== undefined) {
           states.push(`expanded=${String(node.expanded)}`);
+        }
         const stateStr = states.length > 0 ? ` [${states.join(", ")}]` : "";
         console.log(`${indent}${node.role}: "${node.name}"${stateStr}`);
       }
       if (node.children) {
-        for (let i = 0; i < node.children.length; i++) {
+        for (const child of node.children) {
           printA11yNode(
-            node.children[i],
+            child,
             depth + (interactiveRoles.has(node.role) ? 1 : 0)
           );
         }

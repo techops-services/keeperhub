@@ -16,7 +16,7 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { chromium, type Page } from "@playwright/test";
-import * as dotenv from "dotenv";
+import { config } from "dotenv";
 import { expand } from "dotenv-expand";
 import { signIn } from "./utils/auth";
 import {
@@ -33,7 +33,7 @@ import {
   probe,
 } from "./utils/discover";
 
-expand(dotenv.config());
+expand(config());
 
 interface CliOptions {
   path: string;
@@ -45,6 +45,7 @@ interface CliOptions {
   baseUrl: string;
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: CLI entry point with inherent branching for argument parsing
 function parseArgs(args: string[]): CliOptions {
   const options: CliOptions = {
     path: "/",
@@ -106,7 +107,7 @@ async function executeStep(page: Page, step: string): Promise<void> {
       break;
     }
     case "wait":
-      await page.waitForTimeout(Number.parseInt(value) || 1000);
+      await page.waitForTimeout(Number.parseInt(value, 10) || 1000);
       break;
     case "goto":
       await page.goto(value, { waitUntil: "domcontentloaded" });
@@ -119,6 +120,7 @@ async function executeStep(page: Page, step: string): Promise<void> {
   }
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: multi-step page discovery requires sequential branching
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
@@ -191,8 +193,7 @@ Examples:
       lastProbe = await probe(page, `${options.label}-before`);
     }
 
-    for (let s = 0; s < options.steps.length; s++) {
-      const step = options.steps[s];
+    for (const step of options.steps) {
       console.log(`Step: ${step}`);
 
       const colonIdx = step.indexOf(":");
