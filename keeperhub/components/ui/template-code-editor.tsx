@@ -1,7 +1,7 @@
 "use client";
 
 import type { Monaco, OnMount } from "@monaco-editor/react";
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { AlertTriangle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { CodeEditor } from "@/components/ui/code-editor";
@@ -48,9 +48,9 @@ export function TemplateCodeEditor({
   height = "320px",
   placeholder,
 }: TemplateCodeEditorProps): React.ReactElement {
-  const [nodes] = useAtom(nodesAtom);
-  const [edges] = useAtom(edgesAtom);
-  const [selectedNodeId] = useAtom(selectedNodeAtom);
+  const nodes = useAtomValue(nodesAtom);
+  const edges = useAtomValue(edgesAtom);
+  const selectedNodeId = useAtomValue(selectedNodeAtom);
   const executionLogs = useAtomValue(executionLogsAtom);
   const currentWorkflowId = useAtomValue(currentWorkflowIdAtom);
   const lastExecutionLogs = useAtomValue(lastExecutionLogsAtom);
@@ -318,7 +318,7 @@ export function TemplateCodeEditor({
           endColumn: end.column,
         },
         options: {
-          inlineClassName: "sql-template-badge",
+          inlineClassName: "template-badge",
           hoverMessage: { value: `Template: ${match[1]}` },
         },
       });
