@@ -5,16 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-02-20)
 
 **Core value:** Users can build and deploy Web3 automation workflows through a visual builder without writing code
-**Current focus:** v1.2 Protocol Registry -- COMPLETE
+**Current focus:** v1.3 Direct Execution API
 
 ## Current Position
 
-Milestone: v1.2 Protocol Registry -- COMPLETE
-Phase: 9 of 9 (Hub UI) -- COMPLETE
-Status: All phases verified and complete
-Last activity: 2026-02-20 - Completed quick task 1: adjust the hub ui from F-048 on pr 380
+Milestone: v1.3 Direct Execution API
+Phase: Not started (defining requirements)
+Plan: --
+Status: Defining requirements
+Last activity: 2026-02-20 -- Milestone v1.3 started
 
-Progress: [██████████] 100% (v1.2)
+Progress: [░░░░░░░░░░] 0% (v1.3)
 
 ## Performance Metrics
 
@@ -64,6 +65,7 @@ Progress: [██████████] 100% (v1.2)
 - ProtocolDetail uses useRouter for "Use in Workflow" navigation to "/" (pre-adding node deferred)
 - ActionTypeBadge and ActionChainBadges kept as non-exported module-level components in protocol-detail.tsx
 - Per-action chain badges show only chains where that action's contract is deployed (not all protocol chains)
+- Protocol step files import @/keeperhub/protocols as side-effect -- step files are dynamically imported at runtime independent of server startup plugin chain, so registry must be populated within the step file's own import graph
 
 ### Pending Todos
 
@@ -82,11 +84,12 @@ None
 |---|-------------|------|--------|-----------|
 | 1 | adjust the hub ui from F-048 on pr 380 | 2026-02-20 | 520f00c | [1-adjust-the-hub-ui-from-f-048-on-pr-380](./quick/1-adjust-the-hub-ui-from-f-048-on-pr-380/) |
 | 2 | protocol detail routes with OG image gen | 2026-02-20 | c8818db | [2-protocol-detail-routes-with-og-image-gen](./quick/2-protocol-detail-routes-with-og-image-gen/) |
+| 4 | fix unknown protocol weth error in workflow execution | 2026-02-20 | a292c8563 | [4-fix-unknown-protocol-weth-error-in-workf](./quick/4-fix-unknown-protocol-weth-error-in-workf/) |
 
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed quick task 2 - protocol detail routes with OG image generation
+Stopped at: Completed quick task 4 (fix unknown protocol weth error)
 Resume file: None
 
-**Next action:** None -- milestone complete. Define next milestone if needed.
+**Next action:** Define requirements and create roadmap for v1.3
