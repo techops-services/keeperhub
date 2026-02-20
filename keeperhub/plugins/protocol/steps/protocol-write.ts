@@ -1,4 +1,5 @@
 import "server-only";
+import "@/keeperhub/protocols";
 
 import { resolveAbi } from "@/keeperhub/lib/abi-cache";
 import { getProtocol } from "@/keeperhub/lib/protocol-registry";
@@ -7,7 +8,7 @@ import {
   type WriteContractResult,
   writeContractCore,
 } from "@/keeperhub/plugins/web3/steps/write-contract-core";
-import type { StepInput } from "@/lib/steps/step-handler";
+import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 
 type ProtocolMeta = {
   protocolSlug: string;
@@ -127,7 +128,7 @@ export async function protocolWriteStep(
       : undefined,
   };
 
-  return await writeContractCore(coreInput);
+  return await withStepLogging(input, () => writeContractCore(coreInput));
 }
 
 export const _integrationType = "protocol";

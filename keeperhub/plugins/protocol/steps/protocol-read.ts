@@ -1,4 +1,5 @@
 import "server-only";
+import "@/keeperhub/protocols";
 
 import { resolveAbi } from "@/keeperhub/lib/abi-cache";
 import { getProtocol } from "@/keeperhub/lib/protocol-registry";
@@ -7,7 +8,7 @@ import {
   type ReadContractResult,
   readContractCore,
 } from "@/keeperhub/plugins/web3/steps/read-contract-core";
-import type { StepInput } from "@/lib/steps/step-handler";
+import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
 
 type ProtocolMeta = {
   protocolSlug: string;
@@ -124,7 +125,7 @@ export async function protocolReadStep(
       : undefined,
   };
 
-  return await readContractCore(coreInput);
+  return await withStepLogging(input, () => readContractCore(coreInput));
 }
 
 export const _integrationType = "protocol";
