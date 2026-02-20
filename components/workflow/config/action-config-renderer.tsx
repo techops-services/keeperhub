@@ -55,6 +55,7 @@ function TemplateInputField({
 }: FieldProps) {
   // start custom keeperhub code //
   const isAddressField =
+    field.isAddressField === true ||
     field.key === "contractAddress" ||
     field.key === "recipientAddress" ||
     field.key === "address" ||
