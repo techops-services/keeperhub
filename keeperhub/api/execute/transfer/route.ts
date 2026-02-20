@@ -13,7 +13,7 @@ import {
 } from "../_lib/execution-service";
 import { checkRateLimit } from "../_lib/rate-limit";
 import { checkSpendingCap } from "../_lib/spending-cap";
-import { validateTransferInput } from "../_lib/validate";
+import { validateTokenFields, validateTransferInput } from "../_lib/validate";
 
 export async function POST(request: Request): Promise<NextResponse> {
   // 1. Auth
@@ -43,6 +43,11 @@ export async function POST(request: Request): Promise<NextResponse> {
   const validation = validateTransferInput(body);
   if (!validation.valid) {
     return NextResponse.json(validation.error, { status: 400 });
+  }
+
+  const tokenValidation = validateTokenFields(body);
+  if (!tokenValidation.valid) {
+    return NextResponse.json(tokenValidation.error, { status: 400 });
   }
 
   const { network, recipientAddress, amount } = body as {

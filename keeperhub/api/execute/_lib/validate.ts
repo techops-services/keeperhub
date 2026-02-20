@@ -1,6 +1,8 @@
 import { isValidOperator, VALID_OPERATORS } from "./condition";
 import type { ExecuteErrorResponse } from "./types";
 
+const HEX_ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
+
 export type ValidationResult =
   | { valid: true }
   | { valid: false; error: ExecuteErrorResponse };
@@ -144,6 +146,43 @@ function validateActionField(action: unknown): ValidationResult | null {
   }
 
   return null;
+}
+
+export function validateTokenFields(
+  body: Record<string, unknown>
+): ValidationResult {
+  if (
+    "tokenAddress" in body &&
+    (typeof body.tokenAddress !== "string" ||
+      !HEX_ADDRESS_REGEX.test(body.tokenAddress))
+  ) {
+    return {
+      valid: false,
+      error: {
+        error: "Invalid field type",
+        field: "tokenAddress",
+        details: "tokenAddress must be a valid hex address (0x + 40 hex chars)",
+      },
+    };
+  }
+
+  if ("tokenConfig" in body) {
+    const isValidString =
+      typeof body.tokenConfig === "string" && body.tokenConfig.trim() !== "";
+    const isValidObject = isNonNullObject(body.tokenConfig);
+    if (!(isValidString || isValidObject)) {
+      return {
+        valid: false,
+        error: {
+          error: "Invalid field type",
+          field: "tokenConfig",
+          details: "tokenConfig must be a string or a plain object",
+        },
+      };
+    }
+  }
+
+  return { valid: true };
 }
 
 export function validateCheckAndExecuteInput(body: unknown): ValidationResult {

@@ -322,6 +322,34 @@ describe("Direct Execution API", () => {
         "Insufficient funds"
       );
     });
+
+    it("returns 400 for invalid tokenAddress format", async () => {
+      mocks.validateApiKey.mockResolvedValue(AUTH_CONTEXT);
+      mocks.checkRateLimit.mockReturnValue({ allowed: true });
+
+      const response = await transferPOST(
+        postRequest("/transfer", { ...validBody, tokenAddress: "not-hex" })
+      );
+
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.error).toBe("Invalid field type");
+      expect(data.field).toBe("tokenAddress");
+    });
+
+    it("returns 400 for invalid tokenConfig type", async () => {
+      mocks.validateApiKey.mockResolvedValue(AUTH_CONTEXT);
+      mocks.checkRateLimit.mockReturnValue({ allowed: true });
+
+      const response = await transferPOST(
+        postRequest("/transfer", { ...validBody, tokenConfig: 12_345 })
+      );
+
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.error).toBe("Invalid field type");
+      expect(data.field).toBe("tokenConfig");
+    });
   });
 
   // ==========================================================================
@@ -660,7 +688,7 @@ describe("Direct Execution API", () => {
   // ==========================================================================
   describe("POST /api/execute/swap", () => {
     it("returns 501 not implemented with valid auth", async () => {
-      setupPassingGuards();
+      mocks.validateApiKey.mockResolvedValue(AUTH_CONTEXT);
 
       const response = await swapPOST(
         postRequest("/swap", { fromToken: "ETH", toToken: "USDC" })
