@@ -177,17 +177,17 @@ function HubPageContent(): React.ReactElement {
       {/* start custom KeeperHub code */}
       <div className="transition-[margin-left] duration-200 ease-out md:ml-[var(--nav-sidebar-width,60px)]">
         {isLoading ? (
-          <div className="px-4 pt-28 pb-12">
+          <div className="px-4 pt-20 pb-8">
             <p className="text-muted-foreground">Loading workflows...</p>
           </div>
         ) : (
           <>
             <div className="relative">
-              <div className="container mx-auto px-4 pt-28">
+              <div className="container mx-auto px-4 pt-20">
                 <HubHero />
               </div>
             </div>
-            <div className="bg-white/[0.03] py-12 relative">
+            <div className="bg-white/[0.03] py-6 relative">
               <div className="absolute top-0 h-full bg-[#171f2e] w-full" />
               <div className="container mx-auto px-4">
                 <FeaturedCarousel workflows={featuredWorkflows} />
@@ -200,7 +200,7 @@ function HubPageContent(): React.ReactElement {
               value={activeTab}
             >
               {/* start custom keeperhub code */}
-              <div className="bg-sidebar px-4 pt-8">
+              <div className="bg-sidebar px-4 pt-4">
                 <div className="container mx-auto max-w-sm">
                   <TabsList className="w-full">
                     <TabsTrigger className="flex-1" value="workflows">
@@ -215,11 +215,11 @@ function HubPageContent(): React.ReactElement {
               {/* end keeperhub code */}
 
               <TabsContent
-                className="bg-sidebar px-4 pt-8 pb-12"
+                className="bg-sidebar px-4 pt-4 pb-8"
                 value="workflows"
               >
                 <div className="container mx-auto">
-                  <h2 className="mb-8 font-bold text-2xl">
+                  <h2 className="mb-4 font-bold text-2xl">
                     Community Workflows
                   </h2>
                 </div>
@@ -246,7 +246,7 @@ function HubPageContent(): React.ReactElement {
               </TabsContent>
 
               <TabsContent
-                className="bg-sidebar px-4 pt-8 pb-12"
+                className="bg-sidebar px-4 pt-4 pb-8"
                 value="protocols"
               >
                 <div className="container mx-auto">
