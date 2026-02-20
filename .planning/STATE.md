@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 Milestone: v1.2 Protocol Registry -- COMPLETE
 Phase: 9 of 9 (Hub UI) -- COMPLETE
 Status: All phases verified and complete
-Last activity: 2026-02-20 - Completed quick task 1: adjust the hub ui from F-048 on pr 380
+Last activity: 2026-02-20 - Completed quick task 7: Create slash command for adding new protocol plugins to KeeperHub
 
 Progress: [██████████] 100% (v1.2)
 
@@ -82,11 +82,12 @@ None
 |---|-------------|------|--------|-----------|
 | 1 | adjust the hub ui from F-048 on pr 380 | 2026-02-20 | 520f00c | [1-adjust-the-hub-ui-from-f-048-on-pr-380](./quick/1-adjust-the-hub-ui-from-f-048-on-pr-380/) |
 | 2 | protocol detail routes with OG image gen | 2026-02-20 | c8818db | [2-protocol-detail-routes-with-og-image-gen](./quick/2-protocol-detail-routes-with-og-image-gen/) |
+| 7 | create /add-protocol slash command | 2026-02-20 | 2c890bc3b | [7-create-slash-command-for-adding-new-prot](./quick/7-create-slash-command-for-adding-new-prot/) |
 
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed quick task 2 - protocol detail routes with OG image generation
+Stopped at: Completed quick task 7 - /add-protocol slash command
 Resume file: None
 
 **Next action:** None -- milestone complete. Define next milestone if needed.
