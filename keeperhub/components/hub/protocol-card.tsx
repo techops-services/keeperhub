@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, ChevronRight, Eye, Pencil } from "lucide-react";
+import { Box, ChevronRight, ExternalLink, Eye, Pencil } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -12,7 +12,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { getChainName } from "@/keeperhub/lib/chain-utils";
+import { getChainName, getExplorerUrl } from "@/keeperhub/lib/chain-utils";
 import type { ProtocolDefinition } from "@/keeperhub/lib/protocol-registry";
 
 type ProtocolCardProps = {
@@ -110,6 +110,13 @@ export function ProtocolCard({
 }: ProtocolCardProps): React.ReactElement {
   const allChains = collectChains(protocol.contracts);
 
+  const chainEntries = Object.entries(allChains);
+  const firstChainEntry = chainEntries[0];
+  const explorerUrl =
+    firstChainEntry?.[0] && firstChainEntry[1]
+      ? getExplorerUrl(firstChainEntry[0], firstChainEntry[1])
+      : null;
+
   return (
     <Card
       className="group cursor-pointer border border-border/50 bg-sidebar py-0 transition-colors hover:brightness-125"
@@ -125,18 +132,31 @@ export function ProtocolCard({
               <h3 className="font-semibold text-sm leading-tight">
                 {protocol.name}
               </h3>
-              <p className="text-muted-foreground text-xs mt-0.5 line-clamp-1">
-                {protocol.description}
-              </p>
             </div>
           </div>
           <ChevronRight className="size-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
         </div>
       </CardHeader>
 
-      <CardContent className="pb-3">
-        <ChainBadges addresses={allChains} />
+      <CardContent className="pb-3 pt-0">
+        <p className="text-muted-foreground text-xs">{protocol.description}</p>
       </CardContent>
+
+      <div className="flex items-center justify-between px-6 pb-3">
+        <ChainBadges addresses={allChains} />
+        {explorerUrl && (
+          <a
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            href={explorerUrl}
+            onClick={(e) => e.stopPropagation()}
+            rel="noopener noreferrer"
+            target="_blank"
+            title="View on explorer"
+          >
+            <ExternalLink className="size-3.5" />
+          </a>
+        )}
+      </div>
 
       <CardFooter className="border-t border-border/30 pb-4 pt-3">
         <ActionTypeCounts actions={protocol.actions} />
