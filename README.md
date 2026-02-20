@@ -4,7 +4,7 @@ A Web3 workflow automation platform (forked from vercel-labs/workflow-builder-te
 
 ## Core Value
 
-Users and Agents can build and deploy Web3 automation workflows through a visual builder or with (KeeperHub MCP)[https://github.com/techops-services/keeperhub-mcp] without writing code.
+Users and Agents can build and deploy Web3 automation workflows through a visual builder or with [KeeperHub MCP](https://github.com/techops-services/keeperhub-mcp) without writing code.
 
 ## Add KeeperHub to your Agent
 
@@ -14,6 +14,9 @@ Users and Agents can build and deploy Web3 automation workflows through a visual
 /plugin marketplace add techops-services/claude-plugins
 /plugin install keeperhub@techops-plugins
 ```
+
+You can view the plugin source code here https://github.com/techops-services/claude-plugins/tree/main/plugins/keeperhub
+
 
 **2. Run setup**
 
