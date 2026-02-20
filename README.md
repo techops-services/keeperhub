@@ -1,6 +1,34 @@
 # KeeperHub
 
-KeeperHub is a no-code blockchain automation platform - "Zapier for Web3". Create and manage custom blockchain automations without coding knowledge, infrastructure management, or deep blockchain expertise.
+A Web3 workflow automation platform (forked from vercel-labs/workflow-builder-template) that enables users **and Agents** to create, manage, and execute blockchain automation workflows and tasks. Supports smart contract monitoring, token transfers, DeFi operations, and integrations with Discord, SendGrid, webhooks and more.
+
+## Core Value
+
+Users and Agents can build and deploy Web3 automation workflows through a visual builder or with (KeeperHub MCP)[https://github.com/techops-services/keeperhub-mcp] without writing code.
+
+## Add KeeperHub to your Agent
+
+**1. Install the plugin**
+
+```
+/plugin marketplace add techops-services/claude-plugins
+/plugin install keeperhub@techops-plugins
+```
+
+**2. Run setup**
+
+```
+/keeperhub:login
+```
+
+This walks you through:
+- Creating an organization API key (`kh_` prefix) at app.keeperhub.com
+- Auto-installing the keeperhub-mcp server
+- Saving config to `~/.claude/keeperhub/config.json`
+
+**3. Restart Claude Code** for the MCP tools to become available.
+
+That's it. Try asking Claude to "create a workflow that monitors a wallet" or run `/keeperhub:status` to verify.
 
 ## What KeeperHub Does
 
