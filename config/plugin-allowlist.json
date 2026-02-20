@@ -5,6 +5,7 @@
     "discord",
     "math",
     "protocol",
+    "safe",
     "sendgrid",
     "slack",
     "telegram",

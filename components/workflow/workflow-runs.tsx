@@ -245,7 +245,7 @@ function JsonWithLinks({ data }: { data: unknown }) {
 
   return (
     <>
-      {parts.map((part) => {
+      {parts.map((part, partIndex) => {
         if (part.startsWith('"') && part.endsWith('"')) {
           const innerValue = part.slice(1, -1);
 
@@ -290,7 +290,7 @@ function JsonWithLinks({ data }: { data: unknown }) {
             return (
               <span
                 className="inline-flex items-center"
-                key={`h-${innerValue}`}
+                key={`h-${innerValue}-${partIndex}`}
               >
                 {`"${truncated}"`}
                 <InlineCopyButton text={displayValue} />

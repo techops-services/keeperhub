@@ -270,7 +270,7 @@ function mapFieldType(field: ActionConfigFieldBase): string {
     case "chain-select":
       return "string (chain ID)";
     case "token-select":
-      return "object ({ address: string, symbol: string, decimals: number } or 'native')";
+      return 'string (JSON) - Token selection config. Use: {"mode":"custom","customToken":{"address":"0x...","symbol":"USDC"}} for a known token address';
     case "abi-function-select":
       return "string (function name from ABI)";
     case "abi-function-args":
@@ -578,6 +578,7 @@ export async function GET(request: Request) {
       "integrationId is required for actions that need credentials (discord, sendgrid, database)",
       "web3 read actions (check-balance, read-contract) don't require wallet integration",
       "web3 write actions (transfer-funds, write-contract) require wallet integration",
+      'tokenConfig must be a JSON string with format: {"mode":"custom","customToken":{"address":"0x...","symbol":"USDC"}} -- do NOT use a flat {address, symbol, decimals} object',
       "Use projectId to organize related workflows into a project (e.g., all Sky ESM workflows in one project)",
       `Use {{@${BUILTIN_NODE_ID}:${BUILTIN_NODE_LABEL}.unixTimestamp}} for current time comparisons in conditions (e.g., checking if a contract timestamp has passed)`,
       "All trigger types expose a 'triggeredAt' output field (ISO timestamp). Reference it with {{@triggerId:TriggerLabel.data.triggeredAt}} to include when the workflow fired.",
