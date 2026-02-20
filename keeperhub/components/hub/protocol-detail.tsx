@@ -1,11 +1,19 @@
 "use client";
 
 import { ArrowLeft, Box, ExternalLink } from "lucide-react";
+import { nanoid } from "nanoid";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { getChainName, getExplorerUrl } from "@/keeperhub/lib/chain-utils";
-import type { ProtocolDefinition } from "@/keeperhub/lib/protocol-registry";
+import type {
+  ProtocolAction,
+  ProtocolDefinition,
+} from "@/keeperhub/lib/protocol-registry";
+import { api } from "@/lib/api-client";
+import { authClient, useSession } from "@/lib/auth-client";
 
 type ProtocolDetailProps = {
   protocol: ProtocolDefinition;
@@ -49,7 +57,77 @@ export function ProtocolDetail({
   onBack,
 }: ProtocolDetailProps): React.ReactElement {
   const router = useRouter();
+  const { data: session } = useSession();
+  const [creatingActionSlug, setCreatingActionSlug] = useState<string | null>(
+    null
+  );
   const allChains = collectAllChains(protocol.contracts);
+
+  async function handleUseInWorkflow(
+    protocolDef: ProtocolDefinition,
+    action: ProtocolAction
+  ): Promise<void> {
+    setCreatingActionSlug(action.slug);
+
+    try {
+      if (!session) {
+        await authClient.signIn.anonymous();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      const actionTypeId = `${protocolDef.slug}/${action.slug}`;
+      const actionLabel = `${protocolDef.name}: ${action.label}`;
+
+      const triggerId = nanoid();
+      const actionId = nanoid();
+      const edgeId = nanoid();
+
+      const nodes = [
+        {
+          id: triggerId,
+          type: "trigger" as const,
+          position: { x: 0, y: 0 },
+          data: {
+            label: "",
+            description: "",
+            type: "trigger" as const,
+            config: { triggerType: "Manual" },
+            status: "idle" as const,
+          },
+        },
+        {
+          id: actionId,
+          type: "action" as const,
+          position: { x: 272, y: 0 },
+          selected: true,
+          data: {
+            label: actionLabel,
+            description: "",
+            type: "action" as const,
+            config: { actionType: actionTypeId },
+            status: "idle" as const,
+          },
+        },
+      ];
+
+      const edges = [
+        { id: edgeId, source: triggerId, target: actionId, type: "animated" },
+      ];
+
+      const newWorkflow = await api.workflow.create({
+        name: "Untitled Workflow",
+        description: "",
+        nodes,
+        edges,
+      });
+
+      sessionStorage.setItem("animate-sidebar", "true");
+      router.push(`/workflows/${newWorkflow.id}`);
+    } catch {
+      toast.error("Failed to create workflow");
+      setCreatingActionSlug(null);
+    }
+  }
 
   const firstContract = Object.values(protocol.contracts)[0];
   const firstChainEntry = firstContract
@@ -168,11 +246,14 @@ export function ProtocolDetail({
               </div>
               <Button
                 className="ml-4 shrink-0"
-                onClick={() => router.push("/")}
+                disabled={creatingActionSlug === action.slug}
+                onClick={() => handleUseInWorkflow(protocol, action)}
                 size="sm"
                 variant="outline"
               >
-                Use in Workflow
+                {creatingActionSlug === action.slug
+                  ? "Creating..."
+                  : "Use in Workflow"}
               </Button>
             </div>
           );
