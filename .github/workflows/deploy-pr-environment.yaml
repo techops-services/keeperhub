@@ -243,6 +243,13 @@ jobs:
           envsubst < deploy/pr-environment/sc-event-tracker.template.yaml > ${{ github.workspace }}/sc-event-tracker-pr-${{ env.PR_NUMBER }}.yaml
           envsubst < deploy/pr-environment/sc-event-worker.template.yaml > ${{ github.workspace }}/sc-event-worker-pr-${{ env.PR_NUMBER }}.yaml
 
+      - name: Clean up stale Helm releases
+        run: |
+          for release in $(helm list -n ${{ env.NAMESPACE }} --pending --failed -q 2>/dev/null); do
+            echo "Cleaning up stale release: $release"
+            helm uninstall "$release" -n ${{ env.NAMESPACE }} --no-hooks 2>/dev/null || true
+          done
+
       - name: Deploy Keeperhub application with Helm
         uses: bitovi/github-actions-deploy-eks-helm@v1.2.10
         with:
