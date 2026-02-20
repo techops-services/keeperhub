@@ -1,4 +1,7 @@
-import { ProtocolIcon } from "@/keeperhub/plugins/protocol/icon";
+import {
+  createProtocolIconComponent,
+  ProtocolIcon,
+} from "@/keeperhub/plugins/protocol/icon";
 import type { IntegrationType } from "@/lib/types/integration";
 import type {
   ActionConfigFieldBase,
@@ -201,11 +204,12 @@ export function protocolActionToPluginAction(
     slug: action.slug,
     label: `${def.name}: ${action.label}`,
     description: action.description,
-    category: "Protocol",
+    category: def.name,
     stepFunction:
       action.type === "read" ? "protocolReadStep" : "protocolWriteStep",
     stepImportPath: action.type === "read" ? "protocol-read" : "protocol-write",
     requiresCredentials: action.type === "write",
+    ...(action.type === "write" ? { credentialIntegrationType: "web3" } : {}),
     configFields: buildConfigFieldsFromAction(def, action),
     outputFields: buildOutputFieldsFromAction(action),
   };
@@ -216,7 +220,9 @@ export function protocolToPlugin(def: ProtocolDefinition): IntegrationPlugin {
     type: def.slug as IntegrationType,
     label: def.name,
     description: def.description,
-    icon: ProtocolIcon,
+    icon: def.icon
+      ? createProtocolIconComponent(def.icon, def.name)
+      : ProtocolIcon,
     requiresCredentials: false,
     singleConnection: true,
     formFields: [],
