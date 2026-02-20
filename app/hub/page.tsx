@@ -2,7 +2,7 @@
 
 import { Search, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FeaturedCarousel } from "@/keeperhub/components/hub/featured-carousel";
 import { getWorkflowTrigger } from "@/keeperhub/components/hub/get-workflow-trigger";
@@ -14,7 +14,15 @@ import { useDebounce } from "@/keeperhub/lib/hooks/use-debounce";
 import type { ProtocolDefinition } from "@/keeperhub/lib/protocol-registry";
 import { api, type PublicTag, type SavedWorkflow } from "@/lib/api-client";
 
-export default function HubPage() {
+export default function HubPage(): React.ReactElement {
+  return (
+    <Suspense>
+      <HubPageContent />
+    </Suspense>
+  );
+}
+
+function HubPageContent(): React.ReactElement {
   // start custom KeeperHub code
   const router = useRouter();
   const [featuredWorkflows, setFeaturedWorkflows] = useState<SavedWorkflow[]>(
