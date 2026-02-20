@@ -12,7 +12,9 @@ Plugins provide the actions available in your workflows. Each plugin adds one or
 | Plugin | Category | Actions | Credentials Required |
 |--------|----------|---------|---------------------|
 | [Web3](/plugins/web3) | Blockchain | Balance checks, contract reads/writes, transfers, calldata decoding, risk assessment | Wallet (for writes) |
+| [Code](/plugins/code) | Code | Execute custom JavaScript in a sandboxed VM | None |
 | [Math](/plugins/math) | Math | Aggregation operations (sum, count, average, median, min, max, product) | None |
+| [Safe](/plugins/safe) | Security | Monitor pending Safe multisig transactions | API key |
 | [Discord](/plugins/discord) | Notifications | Send messages to channels | Webhook URL |
 | [Telegram](/plugins/telegram) | Notifications | Send messages to chats | Bot token |
 | [SendGrid](/plugins/sendgrid) | Notifications | Send emails | API key |
@@ -31,13 +33,17 @@ Plugins provide the actions available in your workflows. Each plugin adds one or
 
 Core on-chain operations: reading balances, calling smart contracts, transferring tokens, and security analysis. Read-only actions work without a wallet. Write actions require a connected Para wallet.
 
+### Code
+
+Execute custom JavaScript in a sandboxed VM environment with access to workflow data via template variables. Use for data transformation, aggregation, external API calls, and complex conditional logic. No credentials required.
+
 ### Math
 
 Pure computation nodes for aggregating numeric values from upstream nodes. Supports sum, count, average, median, min, max, and product operations with optional post-aggregation arithmetic. Automatically handles large integers using BigInt arithmetic to preserve precision.
 
 ### Security
 
-Security-focused actions for transaction analysis and risk assessment. These actions use `maxRetries = 0` (fail-safe behavior) to ensure errors block execution rather than silently retrying.
+Security-focused actions for transaction analysis, risk assessment, and Safe multisig monitoring. These actions use `maxRetries = 0` (fail-safe behavior) to ensure errors block execution rather than silently retrying.
 
 ### Notifications
 
