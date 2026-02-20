@@ -1,0 +1,5 @@
+Looked into it properly - Safe's Events Service does push webhooks for PENDING_MULTISIG_TRANSACTION events, which is exactly what we want. The problem is there's no self-service API to register a webhook URL. Their webhook destinations are managed through an internal admin panel and stored in their database - you'd need to contact their team to get added. The FAQ also says "you get webhooks for all Safes, it currently cannot be configured" per-address, so even if we got registered we'd be firehosing every pending tx across the entire chain and filtering client-side.
+
+They do have an SSE endpoint (`/events/sse/{SAFE_ADDRESS}`) which is per-address and potentially self-service, but that needs a persistent connection - different architecture from our webhook trigger.
+
+So for now: polling the Safe Transaction Service API every 5 minutes with a schedule trigger. It works, it's self-service, and the workflow deduplicates by safeTxHash so it won't repeat alerts. We can revisit the push model later if Safe opens up webhook registration or we want to build an SSE bridge.
