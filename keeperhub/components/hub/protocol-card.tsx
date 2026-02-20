@@ -128,34 +128,36 @@ export function ProtocolCard({
             <div className="flex size-10 items-center justify-center rounded-lg bg-[#2a3342]">
               <Box className="size-4 text-[#09fd67]" />
             </div>
-            <div>
+            <div className="flex items-center gap-2">
               <h3 className="font-semibold text-sm leading-tight">
                 {protocol.name}
               </h3>
+              {explorerUrl && (
+                <a
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  href={explorerUrl}
+                  onClick={(e) => e.stopPropagation()}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                  title="View on explorer"
+                >
+                  <ExternalLink className="size-3" />
+                </a>
+              )}
             </div>
           </div>
           <ChevronRight className="size-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
         </div>
       </CardHeader>
 
-      <CardContent className="pb-3 pt-0">
-        <p className="text-muted-foreground text-xs">{protocol.description}</p>
+      <CardContent className="flex-1 pb-3 pt-0">
+        <p className="text-muted-foreground text-xs">
+          {protocol.description.replace(/ -- /g, ". ")}
+        </p>
       </CardContent>
 
-      <div className="flex items-center justify-between px-6 pb-3">
+      <div className="px-6 pb-3">
         <ChainBadges addresses={allChains} />
-        {explorerUrl && (
-          <a
-            className="text-muted-foreground hover:text-foreground transition-colors"
-            href={explorerUrl}
-            onClick={(e) => e.stopPropagation()}
-            rel="noopener noreferrer"
-            target="_blank"
-            title="View on explorer"
-          >
-            <ExternalLink className="size-3.5" />
-          </a>
-        )}
       </div>
 
       <CardFooter className="border-t border-border/30 pb-4 pt-3">
