@@ -201,11 +201,12 @@ export function protocolActionToPluginAction(
     slug: action.slug,
     label: `${def.name}: ${action.label}`,
     description: action.description,
-    category: "Protocol",
+    category: def.name,
     stepFunction:
       action.type === "read" ? "protocolReadStep" : "protocolWriteStep",
     stepImportPath: action.type === "read" ? "protocol-read" : "protocol-write",
     requiresCredentials: action.type === "write",
+    ...(action.type === "write" ? { credentialIntegrationType: "web3" } : {}),
     configFields: buildConfigFieldsFromAction(def, action),
     outputFields: buildOutputFieldsFromAction(action),
   };
