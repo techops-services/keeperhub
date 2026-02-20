@@ -82,11 +82,12 @@ None
 |---|-------------|------|--------|-----------|
 | 1 | adjust the hub ui from F-048 on pr 380 | 2026-02-20 | 520f00c | [1-adjust-the-hub-ui-from-f-048-on-pr-380](./quick/1-adjust-the-hub-ui-from-f-048-on-pr-380/) |
 | 2 | protocol detail routes with OG image gen | 2026-02-20 | c8818db | [2-protocol-detail-routes-with-og-image-gen](./quick/2-protocol-detail-routes-with-og-image-gen/) |
+| 3 | tighten hub vertical spacing and add CTA buttons | 2026-02-20 | 670d3a6 | [3-tighten-hub-vertical-spacing-cta-buttons](./quick/3-tighten-hub-vertical-spacing-cta-buttons/) |
 
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed quick task 2 - protocol detail routes with OG image generation
+Stopped at: Completed quick task 3 - tighten hub vertical spacing and add CTA buttons
 Resume file: None
 
 **Next action:** None -- milestone complete. Define next milestone if needed.

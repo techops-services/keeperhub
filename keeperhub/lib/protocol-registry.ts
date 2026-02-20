@@ -1,3 +1,5 @@
+import Image from "next/image";
+import { createElement } from "react";
 import { ProtocolIcon } from "@/keeperhub/plugins/protocol/icon";
 import type { IntegrationType } from "@/lib/types/integration";
 import type {
@@ -212,12 +214,31 @@ export function protocolActionToPluginAction(
   };
 }
 
+function createProtocolIconComponent(
+  iconPath: string,
+  name: string
+): React.ComponentType<{ className?: string }> {
+  function Icon({ className }: { className?: string }): React.ReactElement {
+    return createElement(Image, {
+      alt: name,
+      className,
+      height: 16,
+      src: iconPath,
+      width: 16,
+    });
+  }
+  Icon.displayName = `${name}Icon`;
+  return Icon;
+}
+
 export function protocolToPlugin(def: ProtocolDefinition): IntegrationPlugin {
   return {
     type: def.slug as IntegrationType,
     label: def.name,
     description: def.description,
-    icon: ProtocolIcon,
+    icon: def.icon
+      ? createProtocolIconComponent(def.icon, def.name)
+      : ProtocolIcon,
     requiresCredentials: false,
     singleConnection: true,
     formFields: [],
