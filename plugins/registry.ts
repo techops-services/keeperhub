@@ -37,6 +37,8 @@ export type ActionConfigFieldBase = {
     | "abi-event-select" // Dynamic dropdown that parses ABI and shows events
     // start custom keeperhub code //
     | "gas-limit-multiplier" // Gas limit multiplier with chain default display
+    | "code-editor" // Monaco-based JavaScript code editor
+    | "json-editor" // Monaco-based JSON editor
     | "call-list-builder" // Dynamic list of contract calls for batch operations
     | "args-list-builder"; // Dynamic list of argument sets for batch uniform mode
   // end keeperhub code //
@@ -182,6 +184,10 @@ export type PluginAction = {
   // Overrides the plugin-level requiresCredentials if set
   // Useful for plugins with mixed read/write actions (e.g., web3)
   requiresCredentials?: boolean;
+
+  // Override the integration type used for credential/connection checks
+  // Useful for protocol actions that use web3 wallet instead of their own credentials
+  credentialIntegrationType?: string;
 
   // Code generation template (the actual template string, not a path)
   // Optional - if not provided, will fall back to auto-generated template

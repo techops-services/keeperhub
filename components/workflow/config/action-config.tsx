@@ -707,9 +707,9 @@ export function ActionConfig({
       return SYSTEM_ACTION_INTEGRATIONS[actionType];
     }
 
-    // Check plugin actions
+    // Check plugin actions - prefer credentialIntegrationType for connection UI
     const action = findActionById(actionType);
-    return action?.integration as IntegrationType | undefined;
+    return (action?.credentialIntegrationType ?? action?.integration) as IntegrationType | undefined;
   }, [actionType]);
 
   // start keeperhub

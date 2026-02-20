@@ -534,13 +534,28 @@ function processTemplates(
   outputs: NodeOutputs
 ): Record<string, unknown> {
   const processed: Record<string, unknown> = {};
-  const templatePattern = /\{\{@([^:]+):([^}]+)\}\}/g;
+  const storedPattern = /\{\{@([^:]+):([^}]+)\}\}/g;
+  // start custom keeperhub code //
+  // Fallback: resolve display-format templates {{Label.field}} that were not
+  // converted to stored format by the editor (mirrors extractTemplateParameters).
+  const displayPattern = /\{\{([^@}][^}]*)\}\}/g;
+  // end keeperhub code //
 
   for (const [key, value] of Object.entries(config)) {
     if (typeof value === "string") {
-      processed[key] = value.replace(templatePattern, (m, nodeId, rest) =>
+      let result = value.replace(storedPattern, (m, nodeId, rest) =>
         replaceConfigTemplate(m, nodeId, rest, outputs)
       );
+      // start custom keeperhub code //
+      result = result.replace(displayPattern, (full, displayRef) => {
+        const resolved = resolveDisplayTemplate(displayRef, outputs);
+        if (resolved === null || resolved === undefined) {
+          return full;
+        }
+        return formatConfigValue(resolved);
+      });
+      // end keeperhub code //
+      processed[key] = result;
     } else if (
       typeof value === "object" &&
       value !== null &&
@@ -557,6 +572,65 @@ function processTemplates(
 
   return processed;
 }
+
+// start custom keeperhub code //
+/**
+ * Format a resolved value as a valid JavaScript expression for code context.
+ * Strings are JSON-quoted so they stay valid when inlined into user code.
+ * Numbers, booleans, arrays, and objects serialize to valid JS literals.
+ * null/undefined become "null".
+ */
+function formatCodeValue(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "null";
+  }
+  if (typeof value === "string") {
+    return JSON.stringify(value);
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return JSON.stringify(value);
+}
+
+/**
+ * Resolve template variables in a code string, producing valid JS expressions.
+ * Unlike processTemplates (which inlines raw strings), this function
+ * JSON-stringifies string values so they remain valid JS when inlined.
+ *
+ * Handles both stored format {{@nodeId:Label.field}} and display format
+ * {{Label.field}} (fallback).
+ */
+function processCodeTemplates(code: string, outputs: NodeOutputs): string {
+  const storedPattern = /\{\{@([^:]+):([^}]+)\}\}/g;
+  const displayPattern = /\{\{([^@}][^}]*)\}\}/g;
+
+  let result = code.replace(storedPattern, (full, nodeId: string, rest: string) => {
+    const trimmedNodeId = nodeId.trim();
+    const sanitizedNodeId = trimmedNodeId.replace(/[^a-zA-Z0-9]/g, "_");
+    const output = outputs[sanitizedNodeId] ?? outputs[trimmedNodeId];
+    if (!output) {
+      return full;
+    }
+    const { data } = output;
+    if (data === null || data === undefined) {
+      return "null";
+    }
+    const fieldPath = rest.includes(".")
+      ? rest.substring(rest.indexOf(".") + 1).trim()
+      : "";
+    const resolved = resolveFromOutputData(data, fieldPath);
+    return formatCodeValue(resolved ?? null);
+  });
+
+  result = result.replace(displayPattern, (_full, displayRef: string) => {
+    const resolved = resolveDisplayTemplate(displayRef, outputs);
+    return formatCodeValue(resolved ?? null);
+  });
+
+  return result;
+}
+// end keeperhub code //
 
 /**
  * Resolve a display-format template (e.g. "Label.field") by searching outputs
@@ -965,6 +1039,12 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
     if (actionType === "Database Query") {
       configWithoutSpecial.dbQuery = undefined;
     }
+    // start custom keeperhub code //
+    const originalCode = config.code;
+    if (actionType === "code/run-code") {
+      configWithoutSpecial.code = undefined;
+    }
+    // end keeperhub code //
 
     const processedConfig = processTemplates(
       configWithoutSpecial,
@@ -991,6 +1071,12 @@ export async function executeWorkflow(input: WorkflowExecutionInput) {
     ) {
       processedConfig.dbQuery = originalDbQuery;
     }
+
+    // start custom keeperhub code //
+    if (actionType === "code/run-code" && typeof originalCode === "string") {
+      processedConfig.code = processCodeTemplates(originalCode, currentOutputs);
+    }
+    // end keeperhub code //
 
     return processedConfig;
   }

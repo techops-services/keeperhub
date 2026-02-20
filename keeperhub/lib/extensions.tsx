@@ -17,6 +17,7 @@ import { AbiWithAutoFetchField } from "@/keeperhub/components/workflow/config/ab
 import { ArgsListField } from "@/keeperhub/components/workflow/config/args-list-field";
 import { CallListField } from "@/keeperhub/components/workflow/config/call-list-field";
 import { ChainSelectField } from "@/keeperhub/components/workflow/config/chain-select-field";
+import { CodeEditorField } from "@/keeperhub/components/workflow/config/code-editor-field";
 import { GasLimitMultiplierField } from "@/keeperhub/components/workflow/config/gas-limit-multiplier-field";
 import { TokenSelectField } from "@/keeperhub/components/workflow/config/token-select-field";
 import {
@@ -171,6 +172,62 @@ registerFieldRenderer(
           disabled={disabled}
           field={field}
           onChange={(val: unknown) => onUpdateConfig(field.key, val)}
+          value={value}
+        />
+      </div>
+    );
+  }
+);
+
+/**
+ * Code Editor Field
+ * Monaco-based JavaScript editor for the Code plugin
+ */
+registerFieldRenderer(
+  "code-editor",
+  ({ field, config, onUpdateConfig, disabled }) => {
+    const value =
+      (config[field.key] as string | undefined) || field.defaultValue || "";
+
+    return (
+      <div className="space-y-2" key={field.key}>
+        <Label className="ml-1" htmlFor={field.key}>
+          {field.label}
+          {field.required && <span className="text-red-500">*</span>}
+        </Label>
+        <CodeEditorField
+          disabled={disabled}
+          onChange={(val: unknown) => onUpdateConfig(field.key, val)}
+          placeholder={field.placeholder}
+          value={value}
+        />
+      </div>
+    );
+  }
+);
+
+/**
+ * JSON Editor Field
+ * Monaco-based JSON editor for structured data input
+ */
+registerFieldRenderer(
+  "json-editor",
+  ({ field, config, onUpdateConfig, disabled }) => {
+    const value =
+      (config[field.key] as string | undefined) || field.defaultValue || "";
+
+    return (
+      <div className="space-y-2" key={field.key}>
+        <Label className="ml-1" htmlFor={field.key}>
+          {field.label}
+          {field.required && <span className="text-red-500">*</span>}
+        </Label>
+        <CodeEditorField
+          disabled={disabled}
+          height="160px"
+          language="json"
+          onChange={(val: unknown) => onUpdateConfig(field.key, val)}
+          placeholder={field.placeholder}
           value={value}
         />
       </div>

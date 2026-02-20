@@ -824,6 +824,148 @@ export async function generateWorkflowOGImage(
 }
 
 // ---------------------------------------------------------------------------
+// Protocol OG
+// ---------------------------------------------------------------------------
+
+export async function generateProtocolOGImage(slug: string): Promise<Response> {
+  await import("@/keeperhub/protocols");
+  const { getProtocol } = await import("@/keeperhub/lib/protocol-registry");
+  const { getChainName } = await import("@/keeperhub/lib/chain-utils");
+
+  const protocol = getProtocol(slug);
+
+  if (!protocol) {
+    return new Response("Protocol not found", { status: 404 });
+  }
+
+  const allChains = new Set<string>();
+  for (const contract of Object.values(protocol.contracts)) {
+    for (const chain of Object.keys(contract.addresses)) {
+      allChains.add(chain);
+    }
+  }
+  const chains = Array.from(allChains);
+
+  const writeActions = protocol.actions.filter(
+    (a) => a.type === "write"
+  ).length;
+  const readActions = protocol.actions.filter((a) => a.type === "read").length;
+
+  const cleanDescription = protocol.description.replace(/ -- /g, ". ");
+
+  return await renderOGImage(
+    <OGBase>
+      {/* Top content */}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: "60%",
+          display: "flex",
+          flexDirection: "column",
+          padding: "40px 56px 0",
+        }}
+      >
+        <Header />
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 16,
+            marginTop: 36,
+          }}
+        >
+          {/* biome-ignore lint/a11y/useAltText: OG image render context */}
+          {/* biome-ignore lint/performance/noImgElement: Satori requires img */}
+          <img
+            height={58}
+            src={ICON_GLOBE}
+            style={{ width: 58, height: 58 }}
+            width={58}
+          />
+          <div
+            style={{
+              display: "flex",
+              fontSize: 58,
+              fontWeight: 600,
+              color: "#ffffff",
+              lineHeight: 1.15,
+            }}
+          >
+            {protocol.name}
+          </div>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            fontSize: 24,
+            fontWeight: 400,
+            color: "rgba(255,255,255,0.5)",
+            marginTop: 14,
+            lineHeight: 1.4,
+          }}
+        >
+          {truncate(cleanDescription, 120)}
+        </div>
+      </div>
+
+      {/* Chain badges */}
+      <div
+        style={{
+          position: "absolute",
+          top: 330,
+          left: 56,
+          right: 56,
+          display: "flex",
+          flexDirection: "row",
+          flexWrap: "wrap",
+          gap: 12,
+        }}
+      >
+        {chains.map((chainId) => (
+          <div
+            key={chainId}
+            style={{
+              display: "flex",
+              padding: "12px 24px",
+              borderRadius: 12,
+              backgroundColor: CARD_COLOR,
+              border: `1.5px solid ${NODE_BORDER_GREEN}`,
+              fontSize: 18,
+              fontWeight: 400,
+              color: "rgba(255,255,255,0.7)",
+            }}
+          >
+            {getChainName(chainId)}
+          </div>
+        ))}
+      </div>
+
+      <Footer>
+        <div style={{ display: "flex" }}>
+          {protocol.actions.length}{" "}
+          {protocol.actions.length === 1 ? "action" : "actions"}
+        </div>
+        {writeActions > 0 && (
+          <div style={{ display: "flex" }}>
+            {writeActions} {writeActions === 1 ? "write" : "writes"}
+          </div>
+        )}
+        {readActions > 0 && (
+          <div style={{ display: "flex" }}>
+            {readActions} {readActions === 1 ? "read" : "reads"}
+          </div>
+        )}
+      </Footer>
+    </OGBase>,
+    3600
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Shared layout components
 // ---------------------------------------------------------------------------
 

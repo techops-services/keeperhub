@@ -81,12 +81,12 @@ export function WorkflowTemplateGrid({ workflows }: WorkflowTemplateGridProps) {
             className="flex flex-col gap-0 overflow-hidden border border-border/50 bg-sidebar py-0 transition-colors hover:brightness-125"
             key={workflow.id}
           >
-            <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden px-8">
+            <div className="relative flex h-[140px] w-full items-center justify-center overflow-hidden px-8">
               <WorkflowMiniMap
                 edges={workflow.edges}
-                height={160}
+                height={130}
                 nodes={workflow.nodes}
-                width={280}
+                width={240}
               />
               {workflow.publicTags && workflow.publicTags.length > 0 && (
                 <div className="absolute top-3 right-3 flex flex-wrap justify-end gap-1">
@@ -118,7 +118,7 @@ export function WorkflowTemplateGrid({ workflows }: WorkflowTemplateGridProps) {
                 </div>
               )}
             </div>
-            <CardHeader className="pb-4">
+            <CardHeader className="pb-2">
               <CardTitle className="line-clamp-2">{workflow.name}</CardTitle>
               {workflow.description && (
                 <CardDescription className="line-clamp-2">
@@ -128,7 +128,7 @@ export function WorkflowTemplateGrid({ workflows }: WorkflowTemplateGridProps) {
               <WorkflowNodeIcons nodes={workflow.nodes} />
             </CardHeader>
             <div className="flex-1" />
-            <CardFooter className="gap-2 pb-4">
+            <CardFooter className="gap-2 pb-3">
               <Button
                 className="flex-1"
                 disabled={isDuplicating}

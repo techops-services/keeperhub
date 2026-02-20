@@ -2,8 +2,11 @@
   "$schema": "./plugin-allowlist.schema.json",
   "description": "Plugin allowlist - only plugins listed here will be enabled",
   "plugins": [
+    "code",
     "discord",
     "math",
+    "protocol",
+    "safe",
     "sendgrid",
     "slack",
     "telegram",

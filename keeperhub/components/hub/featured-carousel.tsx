@@ -54,7 +54,7 @@ export function FeaturedCarousel({ workflows }: FeaturedCarouselProps) {
     if (!container) {
       return;
     }
-    const cardWidth = 320;
+    const cardWidth = 280;
     const gap = 16;
     const scrollAmount = cardWidth + gap;
     container.scrollBy({
@@ -99,8 +99,8 @@ export function FeaturedCarousel({ workflows }: FeaturedCarouselProps) {
 
   return (
     <section className="relative z-10">
-      <div className="mb-6 flex items-center justify-between">
-        <h2 className="font-bold text-3xl">Featured</h2>
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="font-bold text-2xl">Featured</h2>
         <div className={`gap-2 ${arrowVisibility}`}>
           <Button
             aria-label="Scroll left"
@@ -130,18 +130,18 @@ export function FeaturedCarousel({ workflows }: FeaturedCarouselProps) {
 
           return (
             <Card
-              className="flex w-[320px] shrink-0 flex-col gap-0 overflow-hidden border-none bg-sidebar py-0"
+              className="flex w-[280px] shrink-0 flex-col gap-0 overflow-hidden border-none bg-sidebar py-0"
               key={workflow.id}
             >
-              <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden px-8">
+              <div className="relative flex h-[140px] w-full items-center justify-center overflow-hidden px-8">
                 <WorkflowMiniMap
                   edges={workflow.edges}
-                  height={160}
+                  height={130}
                   nodes={workflow.nodes}
-                  width={280}
+                  width={240}
                 />
               </div>
-              <CardHeader className="pb-4">
+              <CardHeader className="pb-2">
                 <CardTitle className="line-clamp-2">{workflow.name}</CardTitle>
                 {workflow.description && (
                   <CardDescription className="line-clamp-2">
@@ -151,7 +151,7 @@ export function FeaturedCarousel({ workflows }: FeaturedCarouselProps) {
                 <WorkflowNodeIcons nodes={workflow.nodes} />
               </CardHeader>
               <div className="flex-1" />
-              <CardFooter className="gap-2 pb-4">
+              <CardFooter className="gap-2 pb-3">
                 <Button
                   className="flex-1"
                   disabled={isDuplicating}
