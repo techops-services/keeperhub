@@ -6,6 +6,7 @@ export default defineProtocol({
   description:
     "Wrapped Ether -- wrap ETH to WETH (ERC-20) and unwrap back to ETH",
   website: "https://weth.io",
+  icon: "/protocols/weth.png",
 
   contracts: {
     weth: {

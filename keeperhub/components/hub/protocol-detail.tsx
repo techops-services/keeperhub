@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowLeft, Box, ExternalLink } from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { getChainName, getExplorerUrl } from "@/keeperhub/lib/chain-utils";
@@ -72,7 +73,17 @@ export function ProtocolDetail({
 
       <div className="flex items-start gap-4">
         <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-[#2a3342]">
-          <Box className="size-5 text-[#09fd67]" />
+          {protocol.icon ? (
+            <Image
+              alt={protocol.name}
+              className="rounded"
+              height={32}
+              src={protocol.icon}
+              width={32}
+            />
+          ) : (
+            <Box className="size-5 text-[#09fd67]" />
+          )}
         </div>
         <div>
           <div className="flex items-center gap-2">

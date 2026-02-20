@@ -1,6 +1,7 @@
 "use client";
 
 import { Box, ChevronRight, ExternalLink, Eye, Pencil } from "lucide-react";
+import Image from "next/image";
 import {
   Card,
   CardContent,
@@ -126,7 +127,17 @@ export function ProtocolCard({
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-lg bg-[#2a3342]">
-              <Box className="size-4 text-[#09fd67]" />
+              {protocol.icon ? (
+                <Image
+                  alt={protocol.name}
+                  className="rounded"
+                  height={24}
+                  src={protocol.icon}
+                  width={24}
+                />
+              ) : (
+                <Box className="size-4 text-[#09fd67]" />
+              )}
             </div>
             <div className="flex items-center gap-2">
               <h3 className="font-semibold text-sm leading-tight">

@@ -46,6 +46,7 @@ export type ProtocolDefinition = {
   slug: string;
   description: string;
   website?: string;
+  icon?: string;
   contracts: Record<string, ProtocolContract>;
   actions: ProtocolAction[];
 };
