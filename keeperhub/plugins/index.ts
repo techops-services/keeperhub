@@ -13,6 +13,8 @@
 import "./code";
 import "./discord";
 import "./math";
+import "./protocol";
+import "./safe";
 import "./sendgrid";
 import "./telegram";
 import "./web3";

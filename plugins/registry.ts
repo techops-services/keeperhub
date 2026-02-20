@@ -185,6 +185,10 @@ export type PluginAction = {
   // Useful for plugins with mixed read/write actions (e.g., web3)
   requiresCredentials?: boolean;
 
+  // Override the integration type used for credential/connection checks
+  // Useful for protocol actions that use web3 wallet instead of their own credentials
+  credentialIntegrationType?: string;
+
   // Code generation template (the actual template string, not a path)
   // Optional - if not provided, will fall back to auto-generated template
   // from steps that export _exportCore
