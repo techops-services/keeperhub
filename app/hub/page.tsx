@@ -1,7 +1,7 @@
 "use client";
 
 import { Search, X } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FeaturedCarousel } from "@/keeperhub/components/hub/featured-carousel";
@@ -31,7 +31,9 @@ export default function HubPage() {
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   const [protocols, setProtocols] = useState<ProtocolDefinition[]>([]);
-  const [activeTab, setActiveTab] = useState<string>("workflows");
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab") ?? "workflows";
+  const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [protocolSearch, setProtocolSearch] = useState("");
 
   const triggers = useMemo(() => {
