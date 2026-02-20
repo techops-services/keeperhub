@@ -145,6 +145,7 @@ function buildConfigFieldsFromAction(
       type: "template-input",
       placeholder: input.default ?? "",
       required: true,
+      ...(input.type === "address" ? { isAddressField: true } : {}),
     });
   }
 
