@@ -1,6 +1,7 @@
-import Image from "next/image";
-import { createElement } from "react";
-import { ProtocolIcon } from "@/keeperhub/plugins/protocol/icon";
+import {
+  createProtocolIconComponent,
+  ProtocolIcon,
+} from "@/keeperhub/plugins/protocol/icon";
 import type { IntegrationType } from "@/lib/types/integration";
 import type {
   ActionConfigFieldBase,
@@ -212,23 +213,6 @@ export function protocolActionToPluginAction(
     configFields: buildConfigFieldsFromAction(def, action),
     outputFields: buildOutputFieldsFromAction(action),
   };
-}
-
-function createProtocolIconComponent(
-  iconPath: string,
-  name: string
-): React.ComponentType<{ className?: string }> {
-  function Icon({ className }: { className?: string }): React.ReactElement {
-    return createElement(Image, {
-      alt: name,
-      className,
-      height: 16,
-      src: iconPath,
-      width: 16,
-    });
-  }
-  Icon.displayName = `${name}Icon`;
-  return Icon;
 }
 
 export function protocolToPlugin(def: ProtocolDefinition): IntegrationPlugin {
