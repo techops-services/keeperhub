@@ -16,7 +16,10 @@ This command has deep knowledge of the KeeperHub protocol plugin system and crea
 Reference implementation (WETH): @keeperhub/protocols/weth.ts
 Type definitions and defineProtocol API: @keeperhub/lib/protocol-registry.ts
 Project conventions: @CLAUDE.md
-Existing protocols: !`ls /Users/skp/Dev/TechOps\ Services/keeperhub/keeperhub/protocols/`
+Existing protocols: !`ls keeperhub/protocols/`
+Docs plugin format reference: @docs/plugins/web3.md
+Docs plugin nav: @docs/plugins/_meta.ts
+Docs plugin overview: @docs/plugins/overview.md
 </context>
 
 <architecture>
@@ -34,6 +37,11 @@ EXPORT (exact):
 export default defineProtocol({...})
 ```
 
+HOW IT WORKS (registration chain):
+Protocol plugins are "meta-plugins" -- each .ts file in `keeperhub/protocols/` defines one protocol, and `pnpm discover-plugins` generates a barrel (`keeperhub/protocols/index.ts`) that imports + registers all of them. The barrel calls `registerProtocol(def)` and `registerIntegration(protocolToPlugin(def))` for each protocol. At server startup, `keeperhub/plugins/protocol/index.ts` imports this barrel as a side effect, which triggers registration. Each protocol slug becomes its own `IntegrationType` entry (e.g., `"weth"`, `"sky"`). The generic `protocol-read` and `protocol-write` step handlers route to the correct contract/function at runtime via a hidden `_protocolMeta` JSON field that's auto-injected into each action's config.
+
+If ANY protocol definition fails validation, the entire import chain fails and the server won't start. This makes correct definitions critical.
+
 COMPLETE defineProtocol() SHAPE:
 ```typescript
 defineProtocol({
@@ -41,7 +49,7 @@ defineProtocol({
   slug: string,           // kebab-case (e.g., "sky") -- matches filename without .ts
   description: string,    // One-line description of the protocol
   website?: string,       // Protocol website URL (optional)
-  icon?: string,          // Path like "/protocols/sky.png" -- OMIT if no custom icon
+  icon?: string,          // Path like "/protocols/sky.png" -- optional, default square icon shown if omitted
 
   contracts: Record<string, {
     label: string,
@@ -58,12 +66,12 @@ defineProtocol({
     function: string,       // Exact Solidity function name (e.g., "deposit", "balanceOf")
     inputs: Array<{
       name: string,         // Exact Solidity parameter name
-      type: string,         // Solidity type (address, uint256, bytes32, bool, etc.)
+      type: string,         // MUST be a valid Solidity type: address, uint256, int256, bytes32, bool, string, bytes, uint8, etc.
       label: string,        // User-facing label shown in workflow builder
       default?: string,     // Default value as string (optional)
       decimals?: boolean | number,  // true = 18 decimals, number = specific decimals
     }>,
-    outputs?: Array<{
+    outputs?: Array<{       // REQUIRED for read actions that return values. Omit for write actions.
       name: string,         // Output field name (used as {{NodeId.fieldName}} in templates)
       type: string,         // Solidity return type
       label: string,        // User-facing label
@@ -96,18 +104,29 @@ ABI HANDLING:
 - Add a comment noting proxy status: `// Proxy -- ABI auto-resolved via abi-cache`
 
 ICON HANDLING:
+- Icon is fully optional -- if omitted, a default square protocol icon (`ProtocolIcon`) is displayed everywhere (Hub, workflow builder, etc.)
 - If user provides an icon URL: download to `public/protocols/{slug}.png`, set `icon: "/protocols/{slug}.png"`
 - If user provides a local image path: copy to `public/protocols/{slug}.png`, set `icon: "/protocols/{slug}.png"`
-- If no icon: OMIT the `icon` field entirely -- a generic protocol icon is used automatically
+- If no icon provided: OMIT the `icon` field entirely from the definition -- do not set it to an empty string or null
 
 ACTION GROUPING:
 - Group related actions with comment headers in the actions array (improves readability)
 - Examples: `// Savings`, `// Token Balances`, `// Approvals`, `// Converters`
 
-OUTPUT FIELDS (automatic -- do NOT define in protocol):
-- All actions automatically have: `success` (boolean), `error` (string)
-- Write actions automatically have: `transactionHash`, `transactionLink`
-- Read actions: add `outputs` array for return values (e.g., balances, previews)
+OUTPUT FIELDS:
+- All actions automatically get: `success` (boolean), `error` (string) -- do NOT define these
+- Write actions automatically get: `transactionHash`, `transactionLink` -- do NOT define these
+- Read actions: MUST define `outputs` array if the function returns values (e.g., balances, previews). Without outputs, return values are lost
+- Write actions: NEVER define outputs for tx hash/link -- they are auto-added
+
+INPUT FIELD AUTO-BEHAVIOR:
+- Inputs with `type: "address"` automatically get address book UI support (popover with saved addresses)
+- This is handled by `buildConfigFieldsFromAction()` setting `isAddressField: true` -- no manual config needed
+
+CHAIN-ACTION AVAILABILITY:
+- An action is only available on chains where its contract has an address
+- For multi-contract protocols: verify each action's contract is deployed on all intended chains
+- Example: Sky's DAI-USDS Converter exists only on Ethereum ("1"), so `convert-dai-to-usds` is Ethereum-only even if other Sky contracts exist on Base and Arbitrum
 
 POST-CREATION STEPS (run in this exact order):
 1. `pnpm discover-plugins` -- scans keeperhub/protocols/, generates keeperhub/protocols/index.ts, adds to lib/types/integration.ts
@@ -183,7 +202,15 @@ export default defineProtocol({
 ```
 
 F-049 SKY SPEC AS EXAMPLE (what a spec file looks like):
-The spec at `specs/F-049-sky-protocol-plugin.md` defines 7 contracts (sUSDS, USDS, DAI, SKY, DAI-USDS Converter, MKR-SKY Converter) and 14 actions across Ethereum, Base, and Arbitrum. It shows how to handle multi-contract, multi-chain protocols with proxy contracts.
+The spec at `specs/F-049-sky-protocol-plugin.md` defines 7 contracts (sUSDS, USDS, DAI, SKY, DAI-USDS Converter, MKR-SKY Converter) and 14 actions across Ethereum, Base, and Arbitrum. It shows how to handle multi-contract, multi-chain protocols with proxy contracts. Use this as the gold standard for complex, multi-contract, multi-chain protocol specs.
+
+WHAT HAPPENS AUTOMATICALLY AFTER REGISTRATION (no manual work needed):
+- Protocol card appears in the Hub Protocols tab (`/hub`)
+- Shareable detail page at `/hub/protocol/{slug}` with OG image generation
+- Protocol actions appear in the workflow builder node palette
+- API endpoint at `/api/protocols/{slug}` returns protocol JSON
+- Protocol actions appear in `/api/mcp/schemas` for AI workflow generation
+- Address-type input fields get address book popover in the UI
 </architecture>
 
 <process>
@@ -219,6 +246,10 @@ The spec at `specs/F-049-sky-protocol-plugin.md` defines 7 contracts (sUSDS, USD
    - Every action.contract value matches an existing contract key
    - No duplicate action slugs
    - At least 1 contract and 1 action
+   - All input types are valid Solidity types (address, uint256, int256, bytes32, bool, string, bytes, uint8, uint16, etc.) -- invalid types cause runtime ABI encoding failures
+   - For multi-chain protocols: verify each action's contract has addresses on all intended chains (actions are only available on chains where their contract is deployed)
+   - Read actions that return values MUST have an `outputs` array defined
+   - Protocol slug must not collide with existing plugin type names (check `lib/types/integration.ts`)
 
 4. HANDLE ICON (if provided)
    - If URL: `curl -o public/protocols/{slug}.png "{url}"`
@@ -239,9 +270,28 @@ The spec at `specs/F-049-sky-protocol-plugin.md` defines 7 contracts (sUSDS, USD
    - Run `pnpm type-check` -- if type errors appear, fix them
    - If errors persist after fixing, re-run the relevant check (not all checks)
 
-7. VERIFY REGISTRATION
+7. CREATE DOCUMENTATION PAGE
+   - Create `docs/plugins/{slug}.md` following the same structure as existing plugin docs (see `docs/plugins/web3.md` for format)
+   - Frontmatter: `title: "{name} Protocol"`, `description: "..."` summarizing the protocol's purpose and supported chains
+   - Content structure:
+     a. H1 heading: `# {name} Protocol`
+     b. One-paragraph overview: what the protocol does, which chains it supports, whether credentials are needed (write actions require wallet)
+     c. Actions table: columns for Action, Type (Read/Write), Credentials, Description
+     d. For EACH action: an H2 section with:
+        - **Inputs:** list of input fields with types
+        - **Outputs:** list of output fields (for read actions; write actions auto-include success/transactionHash/transactionLink/error)
+        - **When to use:** one-sentence guidance
+        - Optional example workflow snippet showing the action in a realistic pipeline
+     e. A "Supported Chains" section listing each chain with the contracts deployed on it
+   - Add the protocol to `docs/plugins/_meta.ts` nav (insert alphabetically among existing entries, using format `{slug}: "{name}"`)
+   - Add a row to the plugins overview table in `docs/plugins/overview.md` under Available Plugins (category: "Protocol", credentials: "Wallet (for writes)")
+
+8. VERIFY REGISTRATION
    - Confirm `{slug}` appears as an import in `keeperhub/protocols/index.ts`
    - Confirm `{slug}` appears in the `IntegrationType` union in `lib/types/integration.ts`
+   - Confirm `docs/plugins/{slug}.md` exists with correct frontmatter and action sections
+   - Confirm `docs/plugins/_meta.ts` includes the `{slug}` entry
+   - Confirm `docs/plugins/overview.md` table includes the protocol row
    - Report: protocol name, slug, number of contracts, number of actions, chains supported
 </process>
 
@@ -253,6 +303,9 @@ Before completing, verify:
 - Protocol type appears in `lib/types/integration.ts` IntegrationType union
 - `pnpm check` passes with zero lint errors
 - `pnpm type-check` passes with zero type errors
+- `docs/plugins/{slug}.md` exists with frontmatter, actions table, per-action sections, and supported chains
+- `docs/plugins/_meta.ts` includes the `{slug}` entry
+- `docs/plugins/overview.md` plugins table includes the protocol row
 - No emojis in any created files
 </verification>
 
@@ -264,4 +317,6 @@ Before completing, verify:
 - Protocol appears in both `keeperhub/protocols/index.ts` and `lib/types/integration.ts`
 - Protocol card appears in the Hub Protocols tab (visible in UI)
 - Protocol actions appear in workflow builder node palette
+- Documentation page at `docs/plugins/{slug}.md` with actions table and per-action details
+- Protocol listed in `docs/plugins/overview.md` table and `docs/plugins/_meta.ts` nav
 </success_criteria>
