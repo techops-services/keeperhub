@@ -196,24 +196,20 @@ export default function HubPage() {
               onValueChange={handleTabChange}
               value={activeTab}
             >
+              {/* start custom keeperhub code */}
               <div className="bg-sidebar px-4 pt-8">
-                <div className="container mx-auto">
-                  <TabsList className="h-auto w-full justify-start gap-8 rounded-none border-b border-border/30 bg-transparent p-0">
-                    <TabsTrigger
-                      className="rounded-none border-transparent border-b-2 bg-transparent px-0 pt-0 pb-3 font-semibold text-base text-muted-foreground data-[state=active]:border-[#09fd67] data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
-                      value="workflows"
-                    >
+                <div className="container mx-auto max-w-sm">
+                  <TabsList className="w-full">
+                    <TabsTrigger className="flex-1" value="workflows">
                       Workflows
                     </TabsTrigger>
-                    <TabsTrigger
-                      className="rounded-none border-transparent border-b-2 bg-transparent px-0 pt-0 pb-3 font-semibold text-base text-muted-foreground data-[state=active]:border-[#09fd67] data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
-                      value="protocols"
-                    >
+                    <TabsTrigger className="flex-1" value="protocols">
                       Protocols
                     </TabsTrigger>
                   </TabsList>
                 </div>
               </div>
+              {/* end keeperhub code */}
 
               <TabsContent
                 className="bg-sidebar px-4 pt-8 pb-12"
