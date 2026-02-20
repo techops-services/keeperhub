@@ -177,8 +177,41 @@ function HubPageContent(): React.ReactElement {
       {/* start custom KeeperHub code */}
       <div className="transition-[margin-left] duration-200 ease-out md:ml-[var(--nav-sidebar-width,60px)]">
         {isLoading ? (
-          <div className="px-4 pt-20 pb-8">
-            <p className="text-muted-foreground">Loading workflows...</p>
+          <div className="container mx-auto px-4 pt-20 pb-8 animate-pulse">
+            {/* Hero skeleton */}
+            <div className="grid items-center gap-8 lg:grid-cols-2">
+              <div>
+                <div className="mb-4 h-10 w-3/4 rounded bg-muted/30" />
+                <div className="mb-2 h-4 w-full max-w-lg rounded bg-muted/20" />
+                <div className="mb-6 h-4 w-2/3 max-w-lg rounded bg-muted/20" />
+                <div className="flex gap-3">
+                  <div className="h-10 w-36 rounded-md bg-muted/20" />
+                  <div className="h-10 w-32 rounded-md bg-muted/20" />
+                </div>
+              </div>
+              <div className="hidden h-[200px] rounded-lg bg-muted/10 lg:block" />
+            </div>
+            {/* Featured skeleton */}
+            <div className="mt-10 flex gap-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  className="h-[240px] w-[280px] shrink-0 rounded-lg bg-muted/10"
+                  key={`feat-${String(i)}`}
+                />
+              ))}
+            </div>
+            {/* Content skeleton */}
+            <div className="mt-10">
+              <div className="mx-auto mb-4 h-8 w-48 rounded bg-muted/20" />
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    className="h-[200px] rounded-lg bg-muted/10"
+                    key={`card-${String(i)}`}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
         ) : (
           <>
@@ -200,8 +233,8 @@ function HubPageContent(): React.ReactElement {
               value={activeTab}
             >
               {/* start custom keeperhub code */}
-              <div className="bg-sidebar px-4 pt-4">
-                <div className="container mx-auto max-w-sm">
+              <div className="bg-sidebar pt-4">
+                <div className="container mx-auto px-4 max-w-sm">
                   <TabsList className="w-full">
                     <TabsTrigger className="flex-1" value="workflows">
                       Workflows
@@ -214,42 +247,36 @@ function HubPageContent(): React.ReactElement {
               </div>
               {/* end keeperhub code */}
 
-              <TabsContent
-                className="bg-sidebar px-4 pt-4 pb-8"
-                value="workflows"
-              >
-                <div className="container mx-auto">
+              <TabsContent className="bg-sidebar pt-4 pb-8" value="workflows">
+                <div className="container mx-auto px-4">
                   <h2 className="mb-4 font-bold text-2xl">
                     Community Workflows
                   </h2>
-                </div>
-                <div className="container mx-auto grid grid-cols-[1fr_3fr] items-start gap-8">
-                  <div className="sticky top-28">
-                    <WorkflowSearchFilter
-                      onSearchChange={setSearchQuery}
-                      onTagToggle={handleToggleTag}
-                      onTriggerChange={setSelectedTrigger}
-                      publicTags={publicTags}
-                      searchQuery={searchQuery}
-                      selectedTagSlugs={selectedTagSlugs}
-                      selectedTrigger={selectedTrigger}
-                      triggers={triggers}
+                  <div className="grid grid-cols-[1fr_3fr] items-start gap-8">
+                    <div className="sticky top-28">
+                      <WorkflowSearchFilter
+                        onSearchChange={setSearchQuery}
+                        onTagToggle={handleToggleTag}
+                        onTriggerChange={setSelectedTrigger}
+                        publicTags={publicTags}
+                        searchQuery={searchQuery}
+                        selectedTagSlugs={selectedTagSlugs}
+                        selectedTrigger={selectedTrigger}
+                        triggers={triggers}
+                      />
+                    </div>
+
+                    <HubResults
+                      communityWorkflows={communityWorkflows}
+                      isSearchActive={isSearchActive}
+                      searchResults={searchResults}
                     />
                   </div>
-
-                  <HubResults
-                    communityWorkflows={communityWorkflows}
-                    isSearchActive={isSearchActive}
-                    searchResults={searchResults}
-                  />
                 </div>
               </TabsContent>
 
-              <TabsContent
-                className="bg-sidebar px-4 pt-4 pb-8"
-                value="protocols"
-              >
-                <div className="container mx-auto">
+              <TabsContent className="bg-sidebar pt-4 pb-8" value="protocols">
+                <div className="container mx-auto px-4">
                   <div className="grid grid-cols-[1fr_3fr] items-start gap-8">
                     <div className="sticky top-28">
                       <div className="flex w-full items-center gap-2 rounded-md border border-input bg-transparent shadow-xs transition-colors focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 min-h-10 px-3 py-1 text-sm">
