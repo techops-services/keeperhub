@@ -16,6 +16,7 @@ Manage integrations for notifications and external services.
 | `telegram` | Telegram bot messaging |
 | `sendgrid` | Email via SendGrid |
 | `resend` | Email via Resend |
+| `safe` | Safe multisig API integration |
 | `webhook` | Custom HTTP webhooks |
 | `web3` | Web3 wallet connections |
 | `ai-gateway` | AI service integrations |
