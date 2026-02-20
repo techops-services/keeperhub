@@ -102,6 +102,9 @@ export type ActionConfigFieldBase = {
   // start custom keeperhub code //
   // Tooltip text shown next to the label via an info icon
   helpTip?: string;
+
+  // Whether this field represents an Ethereum address (enables address book support)
+  isAddressField?: boolean;
   // end keeperhub code //
 };
 
