@@ -1,4 +1,5 @@
 import "server-only";
+import "@/keeperhub/protocols";
 
 import { resolveAbi } from "@/keeperhub/lib/abi-cache";
 import { getProtocol } from "@/keeperhub/lib/protocol-registry";
