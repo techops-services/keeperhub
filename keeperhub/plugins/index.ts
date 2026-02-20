@@ -7,7 +7,7 @@
  * KeeperHub-specific plugins that extend the base workflow builder.
  * These plugins are loaded in addition to the base plugins.
  *
- * Discovered plugins: code, discord, math, sendgrid, telegram, web3, webhook
+ * Discovered plugins: code, discord, math, protocol, safe, sendgrid, telegram, web3, webhook
  */
 
 import "./code";
