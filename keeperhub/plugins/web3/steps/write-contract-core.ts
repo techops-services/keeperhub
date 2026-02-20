@@ -17,11 +17,11 @@ import {
 import { resolveGasLimitOverrides } from "@/keeperhub/lib/web3/gas-defaults";
 import { getGasStrategy } from "@/keeperhub/lib/web3/gas-strategy";
 import { getNonceManager } from "@/keeperhub/lib/web3/nonce-manager";
+import { resolveOrganizationContext } from "@/keeperhub/lib/web3/resolve-org-context";
 import {
   type TransactionContext,
   withNonceSession,
 } from "@/keeperhub/lib/web3/transaction-manager";
-import { getOrganizationIdFromExecution } from "@/keeperhub/lib/workflow-helpers";
 import { db } from "@/lib/db";
 import { explorerConfigs, workflowExecutions } from "@/lib/db/schema";
 import { getTransactionUrl } from "@/lib/explorer";
@@ -142,73 +142,15 @@ export async function writeContractCore(
   }
 
   // Get organizationId from _context (direct execution provides it, workflow execution derives it)
-  if (!(_context?.executionId || _context?.organizationId)) {
-    return {
-      success: false,
-      error: "Execution ID or organization ID is required",
-    };
+  const orgCtx = await resolveOrganizationContext(
+    _context ?? {},
+    "[Write Contract]",
+    "write-contract"
+  );
+  if (!orgCtx.success) {
+    return { success: false, error: orgCtx.error };
   }
-
-  let organizationId: string;
-  let userId: string | undefined;
-
-  if (_context.organizationId) {
-    // Direct execution: organizationId provided, no userId needed (use chain default RPC)
-    organizationId = _context.organizationId;
-  } else {
-    // Workflow execution: derive organizationId and userId from executionId
-    const executionId = _context.executionId;
-    if (!executionId) {
-      return {
-        success: false,
-        error: "Execution ID is required to identify the organization",
-      };
-    }
-
-    try {
-      organizationId = await getOrganizationIdFromExecution(executionId);
-    } catch (error) {
-      logUserError(
-        ErrorCategory.VALIDATION,
-        "[Write Contract] Failed to get organization ID",
-        error,
-        {
-          plugin_name: "web3",
-          action_name: "write-contract",
-        }
-      );
-      return {
-        success: false,
-        error: `Failed to get organization ID: ${getErrorMessage(error)}`,
-      };
-    }
-
-    try {
-      const execution = await db
-        .select({ userId: workflowExecutions.userId })
-        .from(workflowExecutions)
-        .where(eq(workflowExecutions.id, executionId))
-        .then((rows) => rows[0]);
-      if (!execution) {
-        throw new Error("Execution not found");
-      }
-      userId = execution.userId;
-    } catch (error) {
-      logUserError(
-        ErrorCategory.VALIDATION,
-        "[Write Contract] Failed to get user ID",
-        error,
-        {
-          plugin_name: "web3",
-          action_name: "write-contract",
-        }
-      );
-      return {
-        success: false,
-        error: `Failed to get user ID: ${getErrorMessage(error)}`,
-      };
-    }
-  }
+  const { organizationId, userId } = orgCtx;
 
   // Get chain ID and resolve RPC config (with user preferences)
   let chainId: number;
@@ -259,7 +201,7 @@ export async function writeContractCore(
 
   // Get workflow ID for transaction tracking (only for workflow executions)
   let workflowId: string | undefined;
-  if (_context.executionId && !_context.organizationId) {
+  if (_context?.executionId && !_context?.organizationId) {
     try {
       const execution = await db
         .select({ workflowId: workflowExecutions.workflowId })
@@ -275,11 +217,11 @@ export async function writeContractCore(
   // Build transaction context
   const txContext: TransactionContext = {
     organizationId,
-    executionId: _context.executionId ?? "direct-execution",
+    executionId: _context?.executionId ?? "direct-execution",
     workflowId,
     chainId,
     rpcUrl,
-    triggerType: _context.triggerType as TransactionContext["triggerType"],
+    triggerType: _context?.triggerType as TransactionContext["triggerType"],
   };
 
   // Execute transaction with nonce management and gas strategy

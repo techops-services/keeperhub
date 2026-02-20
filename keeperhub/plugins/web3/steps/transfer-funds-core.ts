@@ -17,11 +17,11 @@ import {
 import { resolveGasLimitOverrides } from "@/keeperhub/lib/web3/gas-defaults";
 import { getGasStrategy } from "@/keeperhub/lib/web3/gas-strategy";
 import { getNonceManager } from "@/keeperhub/lib/web3/nonce-manager";
+import { resolveOrganizationContext } from "@/keeperhub/lib/web3/resolve-org-context";
 import {
   type TransactionContext,
   withNonceSession,
 } from "@/keeperhub/lib/web3/transaction-manager";
-import { getOrganizationIdFromExecution } from "@/keeperhub/lib/workflow-helpers";
 import { db } from "@/lib/db";
 import { explorerConfigs, workflowExecutions } from "@/lib/db/schema";
 import { getTransactionUrl } from "@/lib/explorer";
@@ -43,83 +43,6 @@ export type TransferFundsCoreInput = {
 export type TransferFundsResult =
   | { success: true; transactionHash: string; transactionLink: string }
   | { success: false; error: string };
-
-/**
- * Resolve organizationId and userId from context.
- * When _context.organizationId is provided (direct execution), skip workflowExecutions lookup.
- */
-async function resolveOrganizationContext(
-  _context: NonNullable<TransferFundsCoreInput["_context"]>
-): Promise<
-  | { success: true; organizationId: string; userId: string | undefined }
-  | { success: false; error: string }
-> {
-  let organizationId: string;
-
-  if (_context.organizationId) {
-    organizationId = _context.organizationId;
-  } else {
-    if (!_context.executionId) {
-      return {
-        success: false,
-        error: "Execution ID is required to identify the organization",
-      };
-    }
-    try {
-      organizationId = await getOrganizationIdFromExecution(
-        _context.executionId
-      );
-    } catch (error) {
-      logUserError(
-        ErrorCategory.VALIDATION,
-        "[Transfer Funds] Failed to get organization ID",
-        error,
-        { plugin_name: "web3", action_name: "transfer-funds" }
-      );
-      return {
-        success: false,
-        error: `Failed to get organization ID: ${getErrorMessage(error)}`,
-      };
-    }
-  }
-
-  // Direct execution: no userId, use chain default RPC
-  if (_context.organizationId) {
-    return { success: true, organizationId, userId: undefined };
-  }
-
-  // Workflow execution: look up userId for RPC preferences
-  const executionId = _context.executionId;
-  if (!executionId) {
-    return {
-      success: false,
-      error: "Execution ID is required for workflow execution context",
-    };
-  }
-
-  try {
-    const execution = await db
-      .select({ userId: workflowExecutions.userId })
-      .from(workflowExecutions)
-      .where(eq(workflowExecutions.id, executionId))
-      .then((rows) => rows[0]);
-    if (!execution) {
-      throw new Error("Execution not found");
-    }
-    return { success: true, organizationId, userId: execution.userId };
-  } catch (error) {
-    logUserError(
-      ErrorCategory.VALIDATION,
-      "[Transfer Funds] Failed to get user ID",
-      error,
-      { plugin_name: "web3", action_name: "transfer-funds" }
-    );
-    return {
-      success: false,
-      error: `Failed to get user ID: ${getErrorMessage(error)}`,
-    };
-  }
-}
 
 /**
  * Core transfer funds logic
@@ -168,7 +91,11 @@ export async function transferFundsCore(
     };
   }
 
-  const orgCtx = await resolveOrganizationContext(_context);
+  const orgCtx = await resolveOrganizationContext(
+    _context,
+    "[Transfer Funds]",
+    "transfer-funds"
+  );
   if (!orgCtx.success) {
     return orgCtx;
   }
