@@ -1,9 +1,9 @@
 "use client";
 
-import { ArrowLeft, Box } from "lucide-react";
+import { ArrowLeft, Box, ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { getChainName } from "@/keeperhub/lib/chain-utils";
+import { getChainName, getExplorerUrl } from "@/keeperhub/lib/chain-utils";
 import type { ProtocolDefinition } from "@/keeperhub/lib/protocol-registry";
 
 type ProtocolDetailProps = {
@@ -31,27 +31,6 @@ function ActionTypeBadge({
   );
 }
 
-function ActionChainBadges({
-  addresses,
-}: {
-  addresses: Record<string, string>;
-}): React.ReactElement {
-  const chains = Object.keys(addresses);
-
-  return (
-    <div className="flex flex-wrap gap-1">
-      {chains.map((chain) => (
-        <span
-          className="rounded-full bg-[#09fd671a] px-2 py-0.5 font-medium text-[#09fd67] text-[10px]"
-          key={chain}
-        >
-          {getChainName(chain)}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 function collectAllChains(
   contracts: ProtocolDefinition["contracts"]
 ): string[] {
@@ -71,6 +50,15 @@ export function ProtocolDetail({
   const router = useRouter();
   const allChains = collectAllChains(protocol.contracts);
 
+  const firstContract = Object.values(protocol.contracts)[0];
+  const firstChainEntry = firstContract
+    ? Object.entries(firstContract.addresses)[0]
+    : undefined;
+  const explorerUrl =
+    firstChainEntry?.[0] && firstChainEntry[1]
+      ? getExplorerUrl(firstChainEntry[0], firstChainEntry[1])
+      : null;
+
   return (
     <div>
       <Button
@@ -87,9 +75,22 @@ export function ProtocolDetail({
           <Box className="size-5 text-[#09fd67]" />
         </div>
         <div>
-          <h2 className="font-bold text-xl">{protocol.name}</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="font-bold text-xl">{protocol.name}</h2>
+            {explorerUrl && (
+              <a
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                href={explorerUrl}
+                rel="noopener noreferrer"
+                target="_blank"
+                title="View on explorer"
+              >
+                <ExternalLink className="size-4" />
+              </a>
+            )}
+          </div>
           <p className="mt-1 text-muted-foreground text-sm">
-            {protocol.description}
+            {protocol.description.replace(/ -- /g, ". ")}
           </p>
           <div className="mt-3 flex flex-wrap gap-1">
             {allChains.map((chain) => (
@@ -112,7 +113,6 @@ export function ProtocolDetail({
 
       <div>
         {protocol.actions.map((action, index) => {
-          const contract = protocol.contracts[action.contract];
           const isLast = index === protocol.actions.length - 1;
 
           return (
@@ -128,11 +128,32 @@ export function ProtocolDetail({
                 <p className="mt-0.5 text-muted-foreground text-xs">
                   {action.description}
                 </p>
-                {contract && (
-                  <div className="mt-2">
-                    <ActionChainBadges addresses={contract.addresses} />
-                  </div>
+                {action.inputs.length > 0 ? (
+                  <p className="mt-1 text-muted-foreground text-xs">
+                    Inputs:{" "}
+                    {action.inputs
+                      .map((inp) => `${inp.name} (${inp.type})`)
+                      .join(", ")}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-muted-foreground text-xs">
+                    No inputs required
+                  </p>
                 )}
+                {action.outputs && action.outputs.length > 0 && (
+                  <p className="mt-0.5 text-muted-foreground text-xs">
+                    Outputs:{" "}
+                    {action.outputs
+                      .map((out) => `${out.name} (${out.type})`)
+                      .join(", ")}
+                  </p>
+                )}
+                {(!action.outputs || action.outputs.length === 0) &&
+                  action.type === "read" && (
+                    <p className="mt-0.5 text-muted-foreground text-xs">
+                      Returns: success status
+                    </p>
+                  )}
               </div>
               <Button
                 className="ml-4 shrink-0"
