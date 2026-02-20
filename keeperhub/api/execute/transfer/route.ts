@@ -13,40 +13,7 @@ import {
 } from "../_lib/execution-service";
 import { checkRateLimit } from "../_lib/rate-limit";
 import { checkSpendingCap } from "../_lib/spending-cap";
-import type { ExecuteErrorResponse } from "../_lib/types";
-
-function validateTransferBody(
-  body: Record<string, unknown>
-): ExecuteErrorResponse | null {
-  if (typeof body.network !== "string" || body.network.trim() === "") {
-    return {
-      error: "Missing required field",
-      field: "network",
-      details: "network is required and must be a non-empty string",
-    };
-  }
-
-  if (
-    typeof body.recipientAddress !== "string" ||
-    body.recipientAddress.trim() === ""
-  ) {
-    return {
-      error: "Missing required field",
-      field: "recipientAddress",
-      details: "recipientAddress is required and must be a non-empty string",
-    };
-  }
-
-  if (typeof body.amount !== "string" || body.amount.trim() === "") {
-    return {
-      error: "Missing required field",
-      field: "amount",
-      details: "amount is required and must be a non-empty string",
-    };
-  }
-
-  return null;
-}
+import { validateTransferInput } from "../_lib/validate";
 
 export async function POST(request: Request): Promise<NextResponse> {
   // 1. Auth
@@ -73,9 +40,9 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   // 4. Validate input
-  const validationError = validateTransferBody(body);
-  if (validationError) {
-    return NextResponse.json(validationError, { status: 400 });
+  const validation = validateTransferInput(body);
+  if (!validation.valid) {
+    return NextResponse.json(validation.error, { status: 400 });
   }
 
   const { network, recipientAddress, amount } = body as {
