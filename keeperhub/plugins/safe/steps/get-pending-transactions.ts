@@ -47,6 +47,10 @@ type SafeApiResponse = {
   results: SafeMultisigTransaction[];
 };
 
+type SafeInfoResponse = {
+  nonce: number;
+};
+
 type PendingTransaction = {
   safeTxHash: string;
   to: string;
@@ -174,29 +178,38 @@ async function stepHandler(
     };
   }
 
-  const url = `https://api.safe.global/tx-service/${chainSlug}/api/v1/safes/${address}/multisig-transactions/?executed=false&trusted=true&ordering=-nonce&limit=100`;
+  const baseUrl = `https://api.safe.global/tx-service/${chainSlug}/api/v1/safes/${address}`;
+  const txUrl = `${baseUrl}/multisig-transactions/?executed=false&trusted=true&ordering=-nonce&limit=100`;
+  const authHeaders = {
+    Authorization: `Bearer ${apiKey}`,
+    Accept: "application/json",
+  };
 
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        Accept: "application/json",
-      },
-      redirect: "follow",
-      signal: controller.signal,
-    });
+    const [safeInfoResponse, txResponse] = await Promise.all([
+      fetch(`${baseUrl}/`, {
+        headers: authHeaders,
+        redirect: "follow",
+        signal: controller.signal,
+      }),
+      fetch(txUrl, {
+        headers: authHeaders,
+        redirect: "follow",
+        signal: controller.signal,
+      }),
+    ]);
 
     clearTimeout(timeout);
 
-    if (!response.ok) {
-      const errorBody = await response.text().catch(() => "");
+    if (!txResponse.ok) {
+      const errorBody = await txResponse.text().catch(() => "");
       logUserError(
         ErrorCategory.EXTERNAL_SERVICE,
         "[Safe] API error",
-        { status: response.status, body: errorBody },
+        { status: txResponse.status, body: errorBody },
         {
           plugin_name: PLUGIN_NAME,
           action_name: ACTION_NAME,
@@ -205,12 +218,18 @@ async function stepHandler(
       );
       return {
         success: false,
-        error: `Safe API returned HTTP ${response.status}: ${errorBody}`,
+        error: `Safe API returned HTTP ${txResponse.status}: ${errorBody}`,
       };
     }
 
-    const data = (await response.json()) as SafeApiResponse;
-    let transactions = data.results;
+    let currentNonce = 0;
+    if (safeInfoResponse.ok) {
+      const safeInfo = (await safeInfoResponse.json()) as SafeInfoResponse;
+      currentNonce = safeInfo.nonce;
+    }
+
+    const data = (await txResponse.json()) as SafeApiResponse;
+    let transactions = data.results.filter((tx) => tx.nonce >= currentNonce);
 
     // Filter for transactions the signer has NOT confirmed
     if (input.signerAddress) {
