@@ -123,7 +123,7 @@ export function ProtocolCard({
       className="group cursor-pointer border border-border/50 bg-sidebar py-0 transition-colors hover:brightness-125"
       onClick={() => onSelect(protocol.slug)}
     >
-      <CardHeader className="pb-3 pt-5">
+      <CardHeader className="pb-2 pt-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-lg bg-[#2a3342]">
@@ -161,17 +161,17 @@ export function ProtocolCard({
         </div>
       </CardHeader>
 
-      <CardContent className="flex-1 pb-3 pt-0">
+      <CardContent className="flex-1 pb-2 pt-0">
         <p className="text-muted-foreground text-xs">
           {protocol.description.replace(/ -- /g, ". ")}
         </p>
       </CardContent>
 
-      <div className="px-6 pb-3">
+      <div className="px-6 pb-2">
         <ChainBadges addresses={allChains} />
       </div>
 
-      <CardFooter className="border-t border-border/30 pb-4 pt-3">
+      <CardFooter className="border-t border-border/30 pb-3 pt-2">
         <ActionTypeCounts actions={protocol.actions} />
         <span className="ml-auto text-muted-foreground text-xs">
           {protocol.actions.length}{" "}
