@@ -1,7 +1,7 @@
 "use client";
 
 import type { Monaco, OnMount } from "@monaco-editor/react";
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { AlertTriangle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { CodeEditor } from "@/components/ui/code-editor";
@@ -31,28 +31,31 @@ import {
 // Component
 // ---------------------------------------------------------------------------
 
-export type SqlTemplateEditorProps = {
+export type TemplateCodeEditorProps = {
   value: string;
   onChange: (value: string) => void;
+  language: string;
   disabled?: boolean;
   height?: string;
+  placeholder?: string;
 };
 
-export function SqlTemplateEditor({
+export function TemplateCodeEditor({
   value,
   onChange,
+  language,
   disabled,
-  height = "150px",
-}: SqlTemplateEditorProps) {
-  const [nodes] = useAtom(nodesAtom);
-  const [edges] = useAtom(edgesAtom);
-  const [selectedNodeId] = useAtom(selectedNodeAtom);
+  height = "320px",
+  placeholder,
+}: TemplateCodeEditorProps): React.ReactElement {
+  const nodes = useAtomValue(nodesAtom);
+  const edges = useAtomValue(edgesAtom);
+  const selectedNodeId = useAtomValue(selectedNodeAtom);
   const executionLogs = useAtomValue(executionLogsAtom);
   const currentWorkflowId = useAtomValue(currentWorkflowIdAtom);
   const lastExecutionLogs = useAtomValue(lastExecutionLogsAtom);
   const setLastExecutionLogs = useSetAtom(lastExecutionLogsAtom);
 
-  // Stable refs for Monaco provider access to current React state
   const nodesRef = useStableRef(nodes);
   const edgesRef = useStableRef(edges);
   const selectedNodeRef = useStableRef(selectedNodeId);
@@ -61,24 +64,17 @@ export function SqlTemplateEditor({
   const currentWorkflowIdRef = useStableRef(currentWorkflowId);
   const lastFetchWorkflowIdRef = useRef<string | null>(null);
 
-  // Template mapping: "Label.field" -> nodeId (for display <-> stored conversion)
   const templateMapRef = useRef(new Map<string, string>());
 
-  // Editor + decoration refs
   // biome-ignore lint/suspicious/noExplicitAny: Monaco editor types are complex and vary across versions
   const editorRef = useRef<any>(null);
   const decorationIdsRef = useRef<string[]>([]);
 
-  // Convert stored value -> display value.
-  // Display format: {{Label.field}} (user-friendly, no node IDs)
-  // Stored format: {{@nodeId:Label.field}} (used at runtime)
   const displayValue = useMemo(
     () => value.replace(/\{\{@[^:]+:([^}]+)\}\}/g, "{{$1}}"),
     [value]
   );
 
-  // Rebuild template map from stored value (kept separate from useMemo to
-  // avoid side effects in a pure computation)
   useEffect(() => {
     const map = new Map<string, string>();
     const pattern = /\{\{@([^:]+):([^}]+)\}\}/g;
@@ -88,6 +84,11 @@ export function SqlTemplateEditor({
     templateMapRef.current = map;
   }, [value]);
 
+  /**
+   * Fallback: find a node ID by matching the label portion of a display key.
+   * e.g. for "Manual.timestamp", extract "Manual" and find the node.
+   * Reads only from nodesRef (stable ref), so no reactive deps needed.
+   */
   // biome-ignore lint/correctness/useExhaustiveDependencies: nodesRef is a stable ref; we read .current at call time intentionally
   const resolveNodeIdByLabel = useCallback(
     (displayKey: string): string | undefined => {
@@ -105,7 +106,6 @@ export function SqlTemplateEditor({
     []
   );
 
-  // Convert display value -> stored value using template map
   const handleEditorChange = useCallback(
     (newDisplay: string) => {
       const stored = newDisplay.replace(
@@ -128,7 +128,6 @@ export function SqlTemplateEditor({
     [onChange, resolveNodeIdByLabel]
   );
 
-  // Lazy-load last execution logs (same pattern as template-autocomplete.tsx)
   // biome-ignore lint/correctness/useExhaustiveDependencies: currentWorkflowIdRef is a stable ref read at async resolution time, not a reactive dependency
   useEffect(() => {
     const alreadyHaveLogs = lastExecutionLogs.workflowId === currentWorkflowId;
@@ -142,7 +141,7 @@ export function SqlTemplateEditor({
     lastFetchWorkflowIdRef.current = workflowId;
     let cancelled = false;
 
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: async fetch with cancellation guard mirrors template-autocomplete.tsx
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: async fetch with cancellation guard mirrors sql-template-editor.tsx
     const fetchLogs = async (): Promise<void> => {
       try {
         const executions = await api.workflow.getExecutions(workflowId);
@@ -179,7 +178,6 @@ export function SqlTemplateEditor({
     };
   }, [currentWorkflowId, lastExecutionLogs.workflowId, setLastExecutionLogs]);
 
-  // Get upstream nodes for the currently selected node
   function getUpstreamNodes(): WorkflowNode[] {
     const nodeId = selectedNodeRef.current;
     if (!nodeId) {
@@ -213,7 +211,6 @@ export function SqlTemplateEditor({
     field?: string;
   };
 
-  // Resolve the best available output for a node (runtime > last-run > null)
   function resolveNodeOutput(nodeId: string): unknown {
     const runtimeOutput = executionLogsRef.current[nodeId]?.output;
     if (runtimeOutput !== undefined && runtimeOutput !== null) {
@@ -230,8 +227,6 @@ export function SqlTemplateEditor({
     return null;
   }
 
-  // Build suggestions from runtime/last-run output data.
-  // Uses display format for insertText and updates the template map.
   function suggestionsFromOutput(
     node: WorkflowNode,
     nodeName: string,
@@ -260,8 +255,6 @@ export function SqlTemplateEditor({
     return result;
   }
 
-  // Build suggestions from static field definitions.
-  // Uses display format for insertText and updates the template map.
   function suggestionsFromStaticFields(
     node: WorkflowNode,
     nodeName: string
@@ -282,7 +275,6 @@ export function SqlTemplateEditor({
     return result;
   }
 
-  // Build completion suggestions from upstream nodes
   function buildSuggestions(): Suggestion[] {
     const upstreamNodes = getUpstreamNodes();
     const suggestions: Suggestion[] = [];
@@ -300,7 +292,6 @@ export function SqlTemplateEditor({
     return suggestions;
   }
 
-  // Update decorations for display-format template patterns {{...}}
   const updateDecorations = useCallback(() => {
     const editor = editorRef.current;
     if (!editor) {
@@ -348,25 +339,20 @@ export function SqlTemplateEditor({
     (editor, monaco) => {
       editorRef.current = editor;
 
-      // Initial decoration pass
       updateDecorations();
 
-      // Update decorations on every content change
       editor.onDidChangeModelContent(() => {
         updateDecorations();
       });
 
-      // Register completion provider for @ trigger
       const disposable = monaco.languages.registerCompletionItemProvider(
-        "sql",
+        language,
         {
           triggerCharacters: ["@"],
           provideCompletionItems: (
             model: ReturnType<Monaco["editor"]["createModel"]>,
             position: { lineNumber: number; column: number }
           ) => {
-            // Only provide suggestions for our editor instance (the
-            // provider is registered at the language level, not per-editor)
             if (model !== editorRef.current?.getModel()) {
               return { suggestions: [] };
             }
@@ -378,7 +364,6 @@ export function SqlTemplateEditor({
               endColumn: position.column,
             });
 
-            // Find the last @ that is not inside a completed template
             const atIndex = findActiveAtIndex(textUntilPosition);
             if (atIndex === -1) {
               return { suggestions: [] };
@@ -386,7 +371,7 @@ export function SqlTemplateEditor({
 
             const range = {
               startLineNumber: position.lineNumber,
-              startColumn: atIndex + 1, // 1-based
+              startColumn: atIndex + 1,
               endLineNumber: position.lineNumber,
               endColumn: position.column,
             };
@@ -407,16 +392,13 @@ export function SqlTemplateEditor({
         }
       );
 
-      // Cleanup on unmount
       editor.onDidDispose(() => {
         disposable.dispose();
       });
     },
-    [updateDecorations]
+    [language, updateDecorations]
   );
 
-  // Detect display-format templates referencing labels shared by multiple
-  // nodes in the workflow (ambiguous resolution when nodes keep default labels).
   const duplicateLabelWarnings = useMemo(
     () => findDuplicateTemplateLabels(displayValue, nodes),
     [displayValue, nodes]
@@ -426,7 +408,8 @@ export function SqlTemplateEditor({
     <>
       <div className="overflow-hidden rounded-md border">
         <CodeEditor
-          defaultLanguage="sql"
+          defaultLanguage={language}
+          defaultValue={placeholder}
           height={height}
           onChange={(v) => handleEditorChange(v || "")}
           onMount={handleMount}
@@ -434,9 +417,18 @@ export function SqlTemplateEditor({
             minimap: { enabled: false },
             lineNumbers: "on",
             scrollBeyondLastLine: false,
-            fontSize: 12,
+            fontSize: 13,
+            tabSize: 2,
+            wordWrap: "on",
             readOnly: disabled,
-            wordWrap: "off",
+            padding: { top: 8, bottom: 8 },
+            renderLineHighlight: "gutter",
+            overviewRulerLanes: 0,
+            hideCursorInOverviewRuler: true,
+            scrollbar: {
+              vertical: "auto",
+              horizontal: "auto",
+            },
           }}
           value={displayValue}
         />

@@ -22,36 +22,19 @@ import {
   type WorkflowNode,
 } from "@/lib/workflow-store";
 import { findActionById } from "@/plugins";
-import { getTriggerOutputFields } from "@/keeperhub/lib/trigger-output-fields";
 // start custom keeperhub code //
 import { getReadContractOutputFields } from "@/keeperhub/lib/action-output-fields";
 import { resolveForEachSyntheticOutput } from "@/keeperhub/lib/for-each-utils";
-
-/** Map of nodeId -> execution log entry. Used for last-run fallback in template autocomplete. */
-type ExecutionLogsByNodeId = Record<string, ExecutionLogEntry>;
-
-/** Build nodeId -> log entry map from API execution logs response. */
-function buildExecutionLogsMap(
-  logs: Array<{
-    nodeId: string;
-    nodeName: string;
-    nodeType: string;
-    status: "pending" | "running" | "success" | "error";
-    output?: unknown;
-  }>
-): ExecutionLogsByNodeId {
-  const map: ExecutionLogsByNodeId = {};
-  for (const log of logs) {
-    map[log.nodeId] = {
-      nodeId: log.nodeId,
-      nodeName: log.nodeName,
-      nodeType: log.nodeType,
-      status: log.status,
-      output: log.output,
-    };
-  }
-  return map;
-}
+import {
+  type ExecutionLogsByNodeId,
+  type SchemaField,
+  buildExecutionLogsMap,
+  getNodeDisplayName,
+  isActionType,
+  sanitizeNodeId,
+  schemaToFields,
+} from "@/keeperhub/lib/template-helpers";
+import { getTriggerOutputFields } from "@/keeperhub/lib/trigger-output-fields";
 // end custom keeperhub code //
 
 type TemplateAutocompleteProps = {
@@ -63,95 +46,6 @@ type TemplateAutocompleteProps = {
   filter?: string;
 };
 
-type SchemaField = {
-  name: string;
-  type: "string" | "number" | "boolean" | "array" | "object";
-  itemType?: "string" | "number" | "boolean" | "object";
-  fields?: SchemaField[];
-  description?: string;
-};
-
-// Helper to get a display name for a node
-const getNodeDisplayName = (node: WorkflowNode): string => {
-  if (node.data.label) {
-    return node.data.label;
-  }
-
-  if (node.data.type === "action") {
-    const actionType = node.data.config?.actionType as string | undefined;
-    if (actionType) {
-      // Look up human-readable label from plugin registry
-      const action = findActionById(actionType);
-      if (action?.label) {
-        return action.label;
-      }
-    }
-    return actionType || "HTTP Request";
-  }
-
-  if (node.data.type === "trigger") {
-    const triggerType = node.data.config?.triggerType as string | undefined;
-    return triggerType || "Manual";
-  }
-
-  return "Node";
-};
-
-// Convert schema fields to field descriptions
-const schemaToFields = (
-  schema: SchemaField[],
-  prefix = ""
-): Array<{ field: string; description: string }> => {
-  const fields: Array<{ field: string; description: string }> = [];
-
-  for (const schemaField of schema) {
-    const fieldPath = prefix
-      ? `${prefix}.${schemaField.name}`
-      : schemaField.name;
-    const typeLabel =
-      schemaField.type === "array"
-        ? `${schemaField.itemType}[]`
-        : schemaField.type;
-    const description = schemaField.description || `${typeLabel}`;
-
-    fields.push({ field: fieldPath, description });
-
-    // Add nested fields for objects
-    if (
-      schemaField.type === "object" &&
-      schemaField.fields &&
-      schemaField.fields.length > 0
-    ) {
-      fields.push(...schemaToFields(schemaField.fields, fieldPath));
-    }
-
-    // Add nested fields for array items that are objects
-    if (
-      schemaField.type === "array" &&
-      schemaField.itemType === "object" &&
-      schemaField.fields &&
-      schemaField.fields.length > 0
-    ) {
-      const arrayItemPath = `${fieldPath}[0]`;
-      fields.push(...schemaToFields(schemaField.fields, arrayItemPath));
-    }
-  }
-
-  return fields;
-};
-
-// Helper to check if action type matches (supports both namespaced IDs and legacy labels)
-const isActionType = (
-  actionType: string | undefined,
-  ...matches: string[]
-): boolean => {
-  if (!actionType) return false;
-  return matches.some(
-    (match) =>
-      actionType === match ||
-      actionType.endsWith(`/${match.toLowerCase().replace(/\s+/g, "-")}`)
-  );
-};
 
 // Get common fields based on node action type
 const getCommonFields = (node: WorkflowNode) => {
@@ -298,13 +192,6 @@ const getCommonFields = (node: WorkflowNode) => {
   return [{ field: "data", description: "Output data" }];
 };
 
-// start custom keeperhub code //
-// Sanitize nodeId the same way as workflow executor for consistent lookup
-function sanitizeNodeId(nodeId: string): string {
-  return nodeId.replace(/[^a-zA-Z0-9]/g, "_");
-}
-
-// end keeperhub code //
 
 export function TemplateAutocomplete({
   isOpen,
