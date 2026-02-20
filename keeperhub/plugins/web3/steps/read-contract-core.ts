@@ -22,7 +22,7 @@ export type ReadContractCoreInput = {
   abi: string;
   abiFunction: string;
   functionArgs?: string;
-  _context?: { executionId?: string };
+  _context?: { executionId?: string; organizationId?: string };
 };
 
 export type ReadContractResult =
@@ -69,13 +69,10 @@ export async function readContractCore(
     input;
 
   // Get userId from execution context (for user RPC preferences)
-  const userId = await getUserIdFromExecution(_context?.executionId);
-  if (userId) {
-    console.log(
-      "[Read Contract] Using user RPC preferences for userId:",
-      userId
-    );
-  }
+  // Direct execution: no userId, use chain default RPC
+  const userId = _context?.organizationId
+    ? undefined
+    : await getUserIdFromExecution(_context?.executionId);
 
   // Validate contract address
   if (!ethers.isAddress(contractAddress)) {

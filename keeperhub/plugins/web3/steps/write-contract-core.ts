@@ -35,7 +35,11 @@ export type WriteContractCoreInput = {
   abiFunction: string;
   functionArgs?: string;
   gasLimitMultiplier?: string;
-  _context?: { executionId?: string; triggerType?: string };
+  _context?: {
+    executionId?: string;
+    triggerType?: string;
+    organizationId?: string;
+  };
 };
 
 export type WriteContractResult =
@@ -137,59 +141,73 @@ export async function writeContractCore(
     }
   }
 
-  // Get organizationId from executionId (passed via _context)
-  if (!_context?.executionId) {
+  // Get organizationId from _context (direct execution provides it, workflow execution derives it)
+  if (!(_context?.executionId || _context?.organizationId)) {
     return {
       success: false,
-      error: "Execution ID is required to identify the organization",
+      error: "Execution ID or organization ID is required",
     };
   }
 
   let organizationId: string;
-  try {
-    organizationId = await getOrganizationIdFromExecution(_context.executionId);
-  } catch (error) {
-    logUserError(
-      ErrorCategory.VALIDATION,
-      "[Write Contract] Failed to get organization ID",
-      error,
-      {
-        plugin_name: "web3",
-        action_name: "write-contract",
-      }
-    );
-    return {
-      success: false,
-      error: `Failed to get organization ID: ${getErrorMessage(error)}`,
-    };
-  }
+  let userId: string | undefined;
 
-  // Get userId from execution for RPC preferences
-  let userId: string;
-  try {
-    const execution = await db
-      .select({ userId: workflowExecutions.userId })
-      .from(workflowExecutions)
-      .where(eq(workflowExecutions.id, _context.executionId))
-      .then((rows) => rows[0]);
-    if (!execution) {
-      throw new Error("Execution not found");
+  if (_context.organizationId) {
+    // Direct execution: organizationId provided, no userId needed (use chain default RPC)
+    organizationId = _context.organizationId;
+  } else {
+    // Workflow execution: derive organizationId and userId from executionId
+    const executionId = _context.executionId;
+    if (!executionId) {
+      return {
+        success: false,
+        error: "Execution ID is required to identify the organization",
+      };
     }
-    userId = execution.userId;
-  } catch (error) {
-    logUserError(
-      ErrorCategory.VALIDATION,
-      "[Write Contract] Failed to get user ID",
-      error,
-      {
-        plugin_name: "web3",
-        action_name: "write-contract",
+
+    try {
+      organizationId = await getOrganizationIdFromExecution(executionId);
+    } catch (error) {
+      logUserError(
+        ErrorCategory.VALIDATION,
+        "[Write Contract] Failed to get organization ID",
+        error,
+        {
+          plugin_name: "web3",
+          action_name: "write-contract",
+        }
+      );
+      return {
+        success: false,
+        error: `Failed to get organization ID: ${getErrorMessage(error)}`,
+      };
+    }
+
+    try {
+      const execution = await db
+        .select({ userId: workflowExecutions.userId })
+        .from(workflowExecutions)
+        .where(eq(workflowExecutions.id, executionId))
+        .then((rows) => rows[0]);
+      if (!execution) {
+        throw new Error("Execution not found");
       }
-    );
-    return {
-      success: false,
-      error: `Failed to get user ID: ${getErrorMessage(error)}`,
-    };
+      userId = execution.userId;
+    } catch (error) {
+      logUserError(
+        ErrorCategory.VALIDATION,
+        "[Write Contract] Failed to get user ID",
+        error,
+        {
+          plugin_name: "web3",
+          action_name: "write-contract",
+        }
+      );
+      return {
+        success: false,
+        error: `Failed to get user ID: ${getErrorMessage(error)}`,
+      };
+    }
   }
 
   // Get chain ID and resolve RPC config (with user preferences)
@@ -239,23 +257,25 @@ export async function writeContractCore(
     };
   }
 
-  // Get workflow ID for transaction tracking
+  // Get workflow ID for transaction tracking (only for workflow executions)
   let workflowId: string | undefined;
-  try {
-    const execution = await db
-      .select({ workflowId: workflowExecutions.workflowId })
-      .from(workflowExecutions)
-      .where(eq(workflowExecutions.id, _context.executionId))
-      .then((rows) => rows[0]);
-    workflowId = execution?.workflowId ?? undefined;
-  } catch {
-    // Non-critical - workflowId is optional for tracking
+  if (_context.executionId && !_context.organizationId) {
+    try {
+      const execution = await db
+        .select({ workflowId: workflowExecutions.workflowId })
+        .from(workflowExecutions)
+        .where(eq(workflowExecutions.id, _context.executionId))
+        .then((rows) => rows[0]);
+      workflowId = execution?.workflowId ?? undefined;
+    } catch {
+      // Non-critical - workflowId is optional for tracking
+    }
   }
 
   // Build transaction context
   const txContext: TransactionContext = {
     organizationId,
-    executionId: _context.executionId,
+    executionId: _context.executionId ?? "direct-execution",
     workflowId,
     chainId,
     rpcUrl,
