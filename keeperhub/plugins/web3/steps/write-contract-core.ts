@@ -17,11 +17,11 @@ import {
 import { resolveGasLimitOverrides } from "@/keeperhub/lib/web3/gas-defaults";
 import { getGasStrategy } from "@/keeperhub/lib/web3/gas-strategy";
 import { getNonceManager } from "@/keeperhub/lib/web3/nonce-manager";
+import { resolveOrganizationContext } from "@/keeperhub/lib/web3/resolve-org-context";
 import {
   type TransactionContext,
   withNonceSession,
 } from "@/keeperhub/lib/web3/transaction-manager";
-import { getOrganizationIdFromExecution } from "@/keeperhub/lib/workflow-helpers";
 import { db } from "@/lib/db";
 import { explorerConfigs, workflowExecutions } from "@/lib/db/schema";
 import { getTransactionUrl } from "@/lib/explorer";
@@ -35,7 +35,11 @@ export type WriteContractCoreInput = {
   abiFunction: string;
   functionArgs?: string;
   gasLimitMultiplier?: string;
-  _context?: { executionId?: string; triggerType?: string };
+  _context?: {
+    executionId?: string;
+    triggerType?: string;
+    organizationId?: string;
+  };
 };
 
 export type WriteContractResult =
@@ -137,60 +141,16 @@ export async function writeContractCore(
     }
   }
 
-  // Get organizationId from executionId (passed via _context)
-  if (!_context?.executionId) {
-    return {
-      success: false,
-      error: "Execution ID is required to identify the organization",
-    };
+  // Get organizationId from _context (direct execution provides it, workflow execution derives it)
+  const orgCtx = await resolveOrganizationContext(
+    _context ?? {},
+    "[Write Contract]",
+    "write-contract"
+  );
+  if (!orgCtx.success) {
+    return { success: false, error: orgCtx.error };
   }
-
-  let organizationId: string;
-  try {
-    organizationId = await getOrganizationIdFromExecution(_context.executionId);
-  } catch (error) {
-    logUserError(
-      ErrorCategory.VALIDATION,
-      "[Write Contract] Failed to get organization ID",
-      error,
-      {
-        plugin_name: "web3",
-        action_name: "write-contract",
-      }
-    );
-    return {
-      success: false,
-      error: `Failed to get organization ID: ${getErrorMessage(error)}`,
-    };
-  }
-
-  // Get userId from execution for RPC preferences
-  let userId: string;
-  try {
-    const execution = await db
-      .select({ userId: workflowExecutions.userId })
-      .from(workflowExecutions)
-      .where(eq(workflowExecutions.id, _context.executionId))
-      .then((rows) => rows[0]);
-    if (!execution) {
-      throw new Error("Execution not found");
-    }
-    userId = execution.userId;
-  } catch (error) {
-    logUserError(
-      ErrorCategory.VALIDATION,
-      "[Write Contract] Failed to get user ID",
-      error,
-      {
-        plugin_name: "web3",
-        action_name: "write-contract",
-      }
-    );
-    return {
-      success: false,
-      error: `Failed to get user ID: ${getErrorMessage(error)}`,
-    };
-  }
+  const { organizationId, userId } = orgCtx;
 
   // Get chain ID and resolve RPC config (with user preferences)
   let chainId: number;
@@ -239,27 +199,29 @@ export async function writeContractCore(
     };
   }
 
-  // Get workflow ID for transaction tracking
+  // Get workflow ID for transaction tracking (only for workflow executions)
   let workflowId: string | undefined;
-  try {
-    const execution = await db
-      .select({ workflowId: workflowExecutions.workflowId })
-      .from(workflowExecutions)
-      .where(eq(workflowExecutions.id, _context.executionId))
-      .then((rows) => rows[0]);
-    workflowId = execution?.workflowId ?? undefined;
-  } catch {
-    // Non-critical - workflowId is optional for tracking
+  if (_context?.executionId && !_context?.organizationId) {
+    try {
+      const execution = await db
+        .select({ workflowId: workflowExecutions.workflowId })
+        .from(workflowExecutions)
+        .where(eq(workflowExecutions.id, _context.executionId))
+        .then((rows) => rows[0]);
+      workflowId = execution?.workflowId ?? undefined;
+    } catch {
+      // Non-critical - workflowId is optional for tracking
+    }
   }
 
   // Build transaction context
   const txContext: TransactionContext = {
     organizationId,
-    executionId: _context.executionId,
+    executionId: _context?.executionId ?? "direct-execution",
     workflowId,
     chainId,
     rpcUrl,
-    triggerType: _context.triggerType as TransactionContext["triggerType"],
+    triggerType: _context?.triggerType as TransactionContext["triggerType"],
   };
 
   // Execute transaction with nonce management and gas strategy

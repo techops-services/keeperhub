@@ -9,12 +9,15 @@
  * - organizationApiKeys: Stores organization-scoped API keys for MCP server authentication
  * - organizationTokens: Tracks ERC20 tokens per organization/chain for balance display
  * - supportedTokens: System-wide default tokens (stablecoins) available on each chain
+ * - directExecutions: Audit log for direct API execution requests (transfer, contract-call, check-and-execute)
+ * - organizationSpendCaps: Per-organization daily spending limits for direct execution API
  */
 
 import {
   boolean,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   serial,
@@ -287,3 +290,72 @@ export const workflowPublicTags = pgTable(
 // Type exports for Workflow Public Tags table
 export type WorkflowPublicTag = typeof workflowPublicTags.$inferSelect;
 export type NewWorkflowPublicTag = typeof workflowPublicTags.$inferInsert;
+
+/**
+ * Direct Executions table
+ *
+ * Audit log for direct API execution requests (transfer, contract-call, check-and-execute).
+ * Every execution endpoint creates a record here before starting work.
+ * Used by spending-cap enforcement (SUM of gasUsedWei per org per day).
+ *
+ * NOTE: apiKeyId has no FK -- the key may be revoked/deleted later but the audit record must persist.
+ * gasUsedWei is stored as text to avoid PostgreSQL bigint overflow on wei amounts.
+ */
+export const directExecutions = pgTable(
+  "direct_executions",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => generateId()),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id),
+    apiKeyId: text("api_key_id").notNull(),
+    type: text("type").notNull(), // "transfer" | "contract-call" | "check-and-execute"
+    // biome-ignore lint/suspicious/noExplicitAny: JSONB type - redacted copy of request input, structure varies by execution type
+    input: jsonb("input").$type<any>(),
+    // biome-ignore lint/suspicious/noExplicitAny: JSONB type - execution result structure varies by execution type
+    output: jsonb("output").$type<any>(),
+    status: text("status").notNull().default("pending"), // pending | running | completed | failed
+    transactionHash: text("transaction_hash"),
+    network: text("network").notNull(),
+    error: text("error"),
+    gasUsedWei: text("gas_used_wei"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    completedAt: timestamp("completed_at"),
+  },
+  (table) => [
+    index("idx_direct_executions_org").on(table.organizationId),
+    index("idx_direct_executions_status").on(table.status),
+  ]
+);
+
+// Type exports for Direct Executions table
+export type DirectExecution = typeof directExecutions.$inferSelect;
+export type NewDirectExecution = typeof directExecutions.$inferInsert;
+
+/**
+ * Organization Spend Caps table
+ *
+ * Per-organization daily spending limits for the direct execution API.
+ * One row per organization (enforced by unique constraint on organizationId).
+ * dailyCapWei is stored as text for BigInt compatibility.
+ *
+ * When no row exists for an org, spending is unlimited (no cap enforced).
+ */
+export const organizationSpendCaps = pgTable("organization_spend_caps", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => generateId()),
+  organizationId: text("organization_id")
+    .notNull()
+    .unique()
+    .references(() => organization.id),
+  dailyCapWei: text("daily_cap_wei").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Type exports for Organization Spend Caps table
+export type OrganizationSpendCap = typeof organizationSpendCaps.$inferSelect;
+export type NewOrganizationSpendCap = typeof organizationSpendCaps.$inferInsert;

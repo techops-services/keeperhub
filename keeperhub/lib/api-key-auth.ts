@@ -18,7 +18,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { organizationApiKeys } from "@/lib/db/schema";
 
@@ -77,17 +77,22 @@ export async function authenticateApiKey(
     // Hash the key to compare with stored hash
     const keyHash = createHash("sha256").update(key).digest("hex");
 
+    const now = new Date();
+
     // Find the API key in the database
     const apiKey = await db.query.organizationApiKeys.findFirst({
       where: and(
         eq(organizationApiKeys.keyHash, keyHash),
-        isNull(organizationApiKeys.revokedAt) // Only active keys
+        isNull(organizationApiKeys.revokedAt), // Only active keys
+        or(
+          isNull(organizationApiKeys.expiresAt),
+          gt(organizationApiKeys.expiresAt, now)
+        )
       ),
       columns: {
         id: true,
         organizationId: true,
         createdBy: true,
-        expiresAt: true,
       },
     });
 
@@ -95,15 +100,6 @@ export async function authenticateApiKey(
       return {
         authenticated: false,
         error: "Invalid or revoked API key",
-        statusCode: 401,
-      };
-    }
-
-    // Check if key has expired
-    if (apiKey.expiresAt && new Date() > apiKey.expiresAt) {
-      return {
-        authenticated: false,
-        error: "API key has expired",
         statusCode: 401,
       };
     }
