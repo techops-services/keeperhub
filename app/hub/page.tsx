@@ -1,13 +1,13 @@
 "use client";
 
 import { Search, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FeaturedCarousel } from "@/keeperhub/components/hub/featured-carousel";
 import { getWorkflowTrigger } from "@/keeperhub/components/hub/get-workflow-trigger";
 import { HubHero } from "@/keeperhub/components/hub/hub-hero";
 import { HubResults } from "@/keeperhub/components/hub/hub-results";
-import { ProtocolDetail } from "@/keeperhub/components/hub/protocol-detail";
 import { ProtocolGrid } from "@/keeperhub/components/hub/protocol-grid";
 import { WorkflowSearchFilter } from "@/keeperhub/components/hub/workflow-search-filter";
 import { useDebounce } from "@/keeperhub/lib/hooks/use-debounce";
@@ -16,6 +16,7 @@ import { api, type PublicTag, type SavedWorkflow } from "@/lib/api-client";
 
 export default function HubPage() {
   // start custom KeeperHub code
+  const router = useRouter();
   const [featuredWorkflows, setFeaturedWorkflows] = useState<SavedWorkflow[]>(
     []
   );
@@ -32,7 +33,6 @@ export default function HubPage() {
   const [protocols, setProtocols] = useState<ProtocolDefinition[]>([]);
   const [activeTab, setActiveTab] = useState<string>("workflows");
   const [protocolSearch, setProtocolSearch] = useState("");
-  const [selectedProtocol, setSelectedProtocol] = useState<string | null>(null);
 
   const triggers = useMemo(() => {
     const unique = new Set<string>();
@@ -98,14 +98,7 @@ export default function HubPage() {
 
   const handleTabChange = (val: string): void => {
     setActiveTab(val);
-    if (val !== "protocols") {
-      setSelectedProtocol(null);
-    }
   };
-
-  const selectedProtocolDef = selectedProtocol
-    ? protocols.find((p) => p.slug === selectedProtocol)
-    : undefined;
 
   useEffect(() => {
     const fetchWorkflows = async (): Promise<void> => {
@@ -247,42 +240,35 @@ export default function HubPage() {
                 value="protocols"
               >
                 <div className="container mx-auto">
-                  {selectedProtocolDef ? (
-                    <ProtocolDetail
-                      onBack={() => setSelectedProtocol(null)}
-                      protocol={selectedProtocolDef}
-                    />
-                  ) : (
-                    <div className="grid grid-cols-[1fr_3fr] items-start gap-8">
-                      <div className="sticky top-28">
-                        <div className="flex w-full items-center gap-2 rounded-md border border-input bg-transparent shadow-xs transition-colors focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 min-h-10 px-3 py-1 text-sm">
-                          <Search className="size-4 shrink-0 text-muted-foreground" />
-                          <input
-                            className="flex-1 bg-transparent placeholder:text-muted-foreground focus:outline-none"
-                            onChange={(e) => setProtocolSearch(e.target.value)}
-                            placeholder="Search protocols..."
-                            type="text"
-                            value={protocolSearch}
-                          />
-                          {protocolSearch && (
-                            <button
-                              className="shrink-0 text-muted-foreground hover:text-foreground"
-                              onClick={() => setProtocolSearch("")}
-                              type="button"
-                            >
-                              <X className="size-4" />
-                            </button>
-                          )}
-                        </div>
+                  <div className="grid grid-cols-[1fr_3fr] items-start gap-8">
+                    <div className="sticky top-28">
+                      <div className="flex w-full items-center gap-2 rounded-md border border-input bg-transparent shadow-xs transition-colors focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 min-h-10 px-3 py-1 text-sm">
+                        <Search className="size-4 shrink-0 text-muted-foreground" />
+                        <input
+                          className="flex-1 bg-transparent placeholder:text-muted-foreground focus:outline-none"
+                          onChange={(e) => setProtocolSearch(e.target.value)}
+                          placeholder="Search protocols..."
+                          type="text"
+                          value={protocolSearch}
+                        />
+                        {protocolSearch && (
+                          <button
+                            className="shrink-0 text-muted-foreground hover:text-foreground"
+                            onClick={() => setProtocolSearch("")}
+                            type="button"
+                          >
+                            <X className="size-4" />
+                          </button>
+                        )}
                       </div>
-
-                      <ProtocolGrid
-                        onSelect={setSelectedProtocol}
-                        protocols={protocols}
-                        searchQuery={protocolSearch}
-                      />
                     </div>
-                  )}
+
+                    <ProtocolGrid
+                      onSelect={(slug) => router.push(`/hub/protocol/${slug}`)}
+                      protocols={protocols}
+                      searchQuery={protocolSearch}
+                    />
+                  </div>
                 </div>
               </TabsContent>
             </Tabs>
