@@ -4,6 +4,7 @@ export default {
   code: "Code",
   math: "Math",
   safe: "Safe",
+  sky: "Sky",
   discord: "Discord",
   telegram: "Telegram",
   sendgrid: "SendGrid",
