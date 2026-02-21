@@ -18,9 +18,9 @@ export function createProtocolIconComponent(
       <Image
         alt={name}
         className={className}
-        height={16}
+        height={48}
         src={iconPath}
-        width={16}
+        width={48}
       />
     );
   }

@@ -315,6 +315,7 @@ async function executeActionStep(input: {
   // Build step input WITHOUT credentials, but WITH integrationId reference and logging context
   const stepInput: Record<string, unknown> = {
     ...config,
+    _actionType: actionType,
     _context: context,
   };
 

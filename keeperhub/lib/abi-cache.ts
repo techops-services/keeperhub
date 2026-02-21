@@ -54,7 +54,16 @@ async function fetchAbiFromExplorer(
   );
 
   if (directResult.success && directResult.abi) {
-    return JSON.stringify(directResult.abi);
+    const hasFunctions = directResult.abi.some(
+      (entry) =>
+        typeof entry === "object" &&
+        entry !== null &&
+        (entry as Record<string, unknown>).type === "function"
+    );
+    if (hasFunctions) {
+      return JSON.stringify(directResult.abi);
+    }
+    // ABI has no functions (likely a proxy contract) -- fall through to proxy detection
   }
 
   const proxyResult = await detectProxyViaRpc(contractAddress, chainId);

@@ -9,33 +9,29 @@ import {
   writeContractCore,
 } from "@/keeperhub/plugins/web3/steps/write-contract-core";
 import { type StepInput, withStepLogging } from "@/lib/steps/step-handler";
-
-type ProtocolMeta = {
-  protocolSlug: string;
-  contractKey: string;
-  functionName: string;
-  actionType: "read" | "write";
-};
+import {
+  type ProtocolMeta,
+  resolveProtocolMeta,
+} from "./resolve-protocol-meta";
 
 type ProtocolWriteInput = StepInput & {
   network: string;
-  _protocolMeta: string;
+  _protocolMeta?: string;
+  _actionType?: string;
   [key: string]: unknown;
 };
 
 function buildFunctionArgs(
   input: ProtocolWriteInput,
-  protocolSlug: string,
-  contractKey: string,
-  functionName: string
+  meta: ProtocolMeta
 ): string | undefined {
-  const protocol = getProtocol(protocolSlug);
+  const protocol = getProtocol(meta.protocolSlug);
   if (!protocol) {
     return undefined;
   }
 
   const protocolAction = protocol.actions.find(
-    (a) => a.function === functionName && a.contract === contractKey
+    (a) => a.function === meta.functionName && a.contract === meta.contractKey
   );
 
   if (!protocolAction || protocolAction.inputs.length === 0) {
@@ -55,14 +51,13 @@ export async function protocolWriteStep(
 ): Promise<WriteContractResult> {
   "use step";
 
-  // 1. Parse _protocolMeta JSON
-  let meta: ProtocolMeta;
-  try {
-    meta = JSON.parse(input._protocolMeta) as ProtocolMeta;
-  } catch {
+  // 1. Resolve protocol metadata from config or action type
+  const meta = resolveProtocolMeta(input);
+  if (!meta) {
     return {
       success: false,
-      error: "Invalid _protocolMeta: failed to parse JSON",
+      error:
+        "Invalid _protocolMeta: failed to parse JSON and could not derive from action type",
     };
   }
 
@@ -106,12 +101,7 @@ export async function protocolWriteStep(
   }
 
   // 5. Build function arguments from named inputs ordered by action definition
-  const functionArgs = buildFunctionArgs(
-    input,
-    meta.protocolSlug,
-    meta.contractKey,
-    meta.functionName
-  );
+  const functionArgs = buildFunctionArgs(input, meta);
 
   // 6. Delegate to writeContractCore
   const coreInput: WriteContractCoreInput = {

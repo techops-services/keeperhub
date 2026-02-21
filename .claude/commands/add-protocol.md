@@ -4,12 +4,12 @@ argument-hint: <spec-file-or-protocol-name>
 ---
 
 <objective>
-Add a new KeeperHub protocol plugin. $ARGUMENTS is either:
+Add a new KeeperHub protocol plugin using a multi-agent pipeline. $ARGUMENTS is either:
 - A file path ending in `.md` (spec file, e.g., `specs/F-049-sky-protocol-plugin.md`) -- read and extract all protocol details from it
 - A protocol name (e.g., "Aave", "Uniswap") -- interview the user for contracts, chains, and actions
 - Empty -- ask the user what protocol to add
 
-This command has deep knowledge of the KeeperHub protocol plugin system and creates protocol definition files that follow every convention exactly -- correct imports, defineProtocol shape, validation rules, chain IDs, ABI handling, and post-creation registration.
+This command orchestrates specialized agents across 5 phases: analyze, plan, develop, test, and fix. Each phase has a clear responsibility and handoff, producing higher quality output than a single sequential pass.
 </objective>
 
 <context>
@@ -108,6 +108,12 @@ ICON HANDLING:
 - If user provides an icon URL: download to `public/protocols/{slug}.png`, set `icon: "/protocols/{slug}.png"`
 - If user provides a local image path: copy to `public/protocols/{slug}.png`, set `icon: "/protocols/{slug}.png"`
 - If no icon provided: OMIT the `icon` field entirely from the definition -- do not set it to an empty string or null
+- ICON QUALITY: The icon component in `keeperhub/plugins/protocol/icon.tsx` (`createProtocolIconComponent`) renders at 48x48 via Next.js `<Image>`. Source images MUST be at least 256x256 for crisp display on retina screens. Preferred sources in order:
+  1. Trust Wallet assets: `https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/{checksumAddress}/logo.png` (256x256, transparent, high quality)
+  2. CoinGecko large: `https://assets.coingecko.com/coins/images/{id}/large/{slug}.png`
+  3. Protocol's own website/GitHub brand assets
+  4. User-provided URL (verify dimensions after download with `sips -g pixelWidth -g pixelHeight`)
+  - Avoid CryptoCompare and other aggregator thumbnails -- they are often low-res upscales that appear blurry
 
 ACTION GROUPING:
 - Group related actions with comment headers in the actions array (improves readability)
@@ -211,13 +217,33 @@ WHAT HAPPENS AUTOMATICALLY AFTER REGISTRATION (no manual work needed):
 - API endpoint at `/api/protocols/{slug}` returns protocol JSON
 - Protocol actions appear in `/api/mcp/schemas` for AI workflow generation
 - Address-type input fields get address book popover in the UI
+
+KNOWN ISSUES & RUNTIME CONSIDERATIONS:
+
+1. **_protocolMeta persistence**: The hidden `_protocolMeta` config field (auto-injected by `buildConfigFieldsFromAction`) is only persisted via `defaultValue` when nodes are created through the ActionGrid in the workflow builder. The protocol detail page (`/hub/protocol/{slug}`) creates workflow nodes directly via the API and must explicitly include `_protocolMeta` in the node config. This is already handled in `protocol-detail.tsx` -- do NOT remove that code.
+
+2. **_actionType fallback**: The protocol step handlers (`protocol-read.ts`, `protocol-write.ts`) have a fallback: if `_protocolMeta` is missing from the step input, they derive metadata from `_actionType` (e.g., `"sky/get-usds-balance"` -> protocolSlug: `"sky"`, look up action by slug). This fallback lives in `resolve-protocol-meta.ts`. The workflow executor injects `_actionType` into all step inputs.
+
+3. **Cognitive complexity**: The protocol step functions (`protocol-read.ts`, `protocol-write.ts`) are near the Biome cognitive complexity limit (15). The metadata resolution was extracted to `resolve-protocol-meta.ts` to stay under the limit. Do NOT inline that logic back into the step files.
+
+4. **"use step" bundler constraints**: Protocol step files have `"use step"` -- NEVER export helper functions from them. Shared logic goes in separate files without `"use step"` (e.g., `resolve-protocol-meta.ts`). See MEMORY.md for details.
+
+5. **Testing runtime execution**: Always test a protocol action by actually running a workflow (not just registration/UI). The protocol detail page "Use in Workflow" button is the fastest way. Verify the step executes successfully, not just that the node appears in the builder.
+
+6. **Proxy contract ABI resolution**: The ABI auto-fetch in `abi-cache.ts` checks whether the fetched ABI contains any `"function"` entries before accepting it. Proxy contracts (EIP-1967, etc.) return a valid ABI from Etherscan but with only constructor/error/event/fallback entries and no functions. Without the function check, the code short-circuits before proxy detection runs, causing `"Function X not found in ABI"` errors at runtime. This is fixed -- do NOT remove the `hasFunctions` check in `fetchAbiFromExplorer()`.
+
+7. **Icon rendering quality**: The protocol icon component (`createProtocolIconComponent` in `keeperhub/plugins/protocol/icon.tsx`) renders at 48x48 via Next.js `<Image>`. Source images must be at least 256x256 for crisp retina display. Prefer Trust Wallet assets as the primary icon source.
 </architecture>
 
 <process>
+This command runs as a multi-agent pipeline. You (the main agent) orchestrate 5 phases, spawning specialized agents for analysis, development, testing, and fixing.
+
+## PHASE 0: GATHER (main agent, interactive)
+
 1. PARSE $ARGUMENTS
    - If $ARGUMENTS ends with `.md` and the file exists: read it, extract protocol name, contracts, addresses, chains, and actions
-   - If $ARGUMENTS is a protocol name string: research the protocol, then proceed to step 2 to gather details
-   - If $ARGUMENTS is empty: ask the user what protocol they want to add, then proceed to step 2
+   - If $ARGUMENTS is a protocol name string: research the protocol, then interview user for details
+   - If $ARGUMENTS is empty: ask the user what protocol they want to add
 
 2. GATHER PROTOCOL INFORMATION (skip fields that came from spec file)
    - Protocol name and slug (derive slug as kebab-case from name)
@@ -240,73 +266,358 @@ WHAT HAPPENS AUTOMATICALLY AFTER REGISTRATION (no manual work needed):
      - Inputs array (name, type, label; add decimals for token amounts)
      - Outputs array (for read actions that return values)
 
-3. VALIDATE BEFORE WRITING
-   - All slugs are kebab-case (lowercase, letters/digits/hyphens, starts with letter)
-   - All addresses are valid: 42 chars total, start with 0x, followed by 40 hex chars
-   - Every action.contract value matches an existing contract key
-   - No duplicate action slugs
-   - At least 1 contract and 1 action
-   - All input types are valid Solidity types (address, uint256, int256, bytes32, bool, string, bytes, uint8, uint16, etc.) -- invalid types cause runtime ABI encoding failures
-   - For multi-chain protocols: verify each action's contract has addresses on all intended chains (actions are only available on chains where their contract is deployed)
-   - Read actions that return values MUST have an `outputs` array defined
-   - Protocol slug must not collide with existing plugin type names (check `lib/types/integration.ts`)
+3. BUILD PROTOCOL BRIEF
+   Construct a structured text block containing ALL gathered data. This brief is the single source of truth passed to downstream agents. Format it clearly with sections for metadata, contracts, and actions. Include exact counts:
+   - Total contracts: N
+   - Total actions: N (M read, K write)
+   - Chains: list
 
-4. HANDLE ICON (if provided)
-   - If URL: `curl -o public/protocols/{slug}.png "{url}"`
-   - If local path: `cp {path} public/protocols/{slug}.png`
-   - Set `icon: "/protocols/{slug}.png"` in the definition
-   - If skipped: omit the `icon` field entirely
+## PHASE 1: ANALYZE (Explore agent)
 
-5. CREATE PROTOCOL DEFINITION FILE
-   - Write to `keeperhub/protocols/{slug}.ts`
-   - Follow exact WETH pattern: import, then export default defineProtocol({...})
-   - Add inline comments for chain names (// Ethereum Mainnet, // Base, etc.)
-   - Add comment for proxy contracts: `// Proxy -- ABI auto-resolved via abi-cache`
-   - Group actions by category with comment headers (// Savings, // Token Balances, etc.)
+Spawn a `protocol-analyst` agent using the Task tool:
+- `subagent_type`: `Explore`
+- `name`: `protocol-analyst`
 
-6. REGISTER AND VALIDATE
-   - Run `pnpm discover-plugins` -- confirm no errors, confirm protocol slug appears in output
-   - Run `pnpm check` -- if lint errors appear, fix them (block statements, top-level regex, etc.)
-   - Run `pnpm type-check` -- if type errors appear, fix them
-   - If errors persist after fixing, re-run the relevant check (not all checks)
+Pass the protocol brief in the prompt and instruct the agent to validate:
 
-7. CREATE DOCUMENTATION PAGE
-   - Create `docs/plugins/{slug}.md` following the same structure as existing plugin docs (see `docs/plugins/web3.md` for format)
-   - Frontmatter: `title: "{name} Protocol"`, `description: "..."` summarizing the protocol's purpose and supported chains
-   - Content structure:
-     a. H1 heading: `# {name} Protocol`
-     b. One-paragraph overview: what the protocol does, which chains it supports, whether credentials are needed (write actions require wallet)
-     c. Actions table: columns for Action, Type (Read/Write), Credentials, Description
-     d. For EACH action: an H2 section with:
-        - **Inputs:** list of input fields with types
-        - **Outputs:** list of output fields (for read actions; write actions auto-include success/transactionHash/transactionLink/error)
-        - **When to use:** one-sentence guidance
-        - Optional example workflow snippet showing the action in a realistic pipeline
-     e. A "Supported Chains" section listing each chain with the contracts deployed on it
-   - Add the protocol to `docs/plugins/_meta.ts` nav (insert alphabetically among existing entries, using format `{slug}: "{name}"`)
-   - Add a row to the plugins overview table in `docs/plugins/overview.md` under Available Plugins (category: "Protocol", credentials: "Wallet (for writes)")
+```
+You are the protocol analyst for the KeeperHub /add-protocol pipeline.
 
-8. VERIFY REGISTRATION
-   - Confirm `{slug}` appears as an import in `keeperhub/protocols/index.ts`
-   - Confirm `{slug}` appears in the `IntegrationType` union in `lib/types/integration.ts`
-   - Confirm `docs/plugins/{slug}.md` exists with correct frontmatter and action sections
-   - Confirm `docs/plugins/_meta.ts` includes the `{slug}` entry
-   - Confirm `docs/plugins/overview.md` table includes the protocol row
-   - Report: protocol name, slug, number of contracts, number of actions, chains supported
+You receive a protocol brief and must validate it before any code is written.
+Your job is read-only analysis -- you do NOT create or modify any files.
+
+PROTOCOL BRIEF:
+{paste the complete brief here}
+
+VALIDATION CHECKS (run all of these):
+
+1. SLUG FORMAT: All slugs (protocol + every action) match /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/ (kebab-case, starts with letter)
+2. ADDRESS FORMAT: All contract addresses are valid hex (exactly 42 chars, 0x prefix, followed by 40 hex chars)
+3. CONTRACT REFERENCES: Every action.contract value matches an existing key in the contracts object
+4. NO DUPLICATE ACTIONS: All action slugs are unique
+5. MINIMUM CONTENT: At least 1 contract and 1 action defined
+6. INPUT TYPES: All input types are valid Solidity types (address, uint256, int256, bytes32, bool, string, bytes, uint8, uint16, uint32, uint64, uint128, int8, int16, int32, int64, int128, bytes1-bytes32, tuple, arrays like uint256[], address[])
+7. READ ACTION OUTPUTS: Every read action that returns values has an outputs array defined
+8. SLUG COLLISION: Check lib/types/integration.ts -- the protocol slug must NOT already exist as an IntegrationType entry
+9. FILENAME COLLISION: Check keeperhub/protocols/ -- no existing file named {slug}.ts
+10. CHAIN CONSISTENCY: For each action, verify its contract has addresses on at least 1 chain. Flag actions whose contract is only on a subset of chains (informational, not a failure)
+
+RESPONSE FORMAT:
+Return EXACTLY one of these two formats:
+
+If all checks pass:
+VALIDATION: PASS
+- Contracts: {count}
+- Actions: {count} ({read_count} read, {write_count} write)
+- Chains: {list}
+- Chain-limited actions: {list any actions available on fewer chains than others, or "none"}
+
+If any check fails:
+VALIDATION: FAIL
+Issues:
+1. {description of first issue}
+2. {description of second issue}
+...
+```
+
+**If the analyst returns FAIL:** Present the issues to the user. Correct the brief based on user feedback. Re-run the analyst with the corrected brief. Repeat until PASS.
+
+**If the analyst returns PASS:** Proceed to Phase 2.
+
+## PHASE 2: PLAN (main agent, no subagent)
+
+With the validated brief, construct the exact instructions for the developer agent. This is a synthesis step -- you hold full conversation context and produce precise file-level instructions:
+
+1. Determine the icon handling approach (curl URL, cp local path, or omit)
+2. Map out the defineProtocol structure: contracts object with exact keys/addresses, actions array with exact fields
+3. Determine the documentation structure: frontmatter, overview paragraph, actions table, per-action sections, supported chains
+4. Determine the test file structure: what to test and expected values
+5. Compile all of this into the developer agent's prompt (Phase 3)
+
+## PHASE 3: DEVELOP (general-purpose agent)
+
+Spawn a `protocol-developer` agent using the Task tool:
+- `subagent_type`: `general-purpose`
+- `name`: `protocol-developer`
+
+Pass the full protocol brief AND the file plan from Phase 2. The prompt must include the complete `<architecture>` section from this command (copy it verbatim into the prompt) so the developer has all conventions available.
+
+```
+You are the protocol developer for the KeeperHub /add-protocol pipeline.
+
+Your job is to create all files for a new protocol plugin. Follow every convention EXACTLY.
+
+ARCHITECTURE CONVENTIONS:
+{paste the complete <architecture> section here}
+
+PROTOCOL BRIEF:
+{paste the complete brief here}
+
+FILE PLAN:
+{paste the file plan from Phase 2 here}
+
+TASKS (execute in this order):
+
+1. ICON (if applicable)
+   - If URL provided: run `curl -sL -o public/protocols/{slug}.png "{url}"`
+   - If local path provided: run `cp {path} public/protocols/{slug}.png`
+   - If no icon: skip this step
+
+2. PROTOCOL DEFINITION
+   Create `keeperhub/protocols/{slug}.ts` following the exact WETH pattern:
+   - Single import: `import { defineProtocol } from "@/keeperhub/lib/protocol-registry";`
+   - Single export: `export default defineProtocol({...})`
+   - Inline comments for chain names (// Ethereum Mainnet, // Base, etc.)
+   - Comments for proxy contracts: `// Proxy -- ABI auto-resolved via abi-cache`
+   - Group actions by category with comment headers
+   - Omit `abi` field from all contracts (auto-fetched)
+   - No emojis anywhere
+
+3. REGISTER
+   Run `pnpm discover-plugins` and verify:
+   - No errors in output
+   - Protocol slug appears in the output
+   - `keeperhub/protocols/index.ts` imports the new protocol
+   - `lib/types/integration.ts` includes the slug in IntegrationType
+
+4. DOCUMENTATION
+   Create `docs/plugins/{slug}.md` with this structure:
+   - Frontmatter: `title: "{name} Protocol"`, `description: "..."` summarizing purpose and chains
+   - H1: `# {name} Protocol`
+   - Overview paragraph: what the protocol does, supported chains, credential note (write actions require wallet)
+   - Actions table with columns: Action, Type (Read/Write), Credentials, Description
+   - For EACH action: H2 section with:
+     - **Inputs:** list of input fields with types
+     - **Outputs:** list of output fields (read actions); write actions auto-include success/transactionHash/transactionLink/error
+     - **When to use:** one-sentence guidance
+   - "Example Workflows" section with 2-4 practical multi-step workflow examples showing how the protocol's actions combine with other nodes. Each example should have:
+     - A descriptive title (e.g., "Monitor USDS Savings Position")
+     - A node chain showing the workflow visually: `Trigger -> Protocol Action -> Processing -> Output`
+     - One sentence explaining what it does
+     - Use real KeeperHub nodes: Schedule/Manual/Webhook triggers, Math (Aggregate with divide post-op for wei-to-decimal), Condition (threshold checks), Discord/SendGrid (alerts), HTTP Request (webhooks), other protocol actions
+     - Examples should cover common patterns: balance monitoring with alerts, threshold-based automation, multi-step DeFi operations, portfolio tracking
+     - For read actions returning wei values, show the Math node conversion pattern: `Read Balance -> Math (Sum, divide by 10^18) -> Condition (check threshold)`
+   - "Supported Chains" section listing each chain with contracts deployed on it
+   - No emojis anywhere
+
+5. DOCS NAVIGATION
+   Edit `docs/plugins/_meta.ts`:
+   - Insert `{slug}: "{name}"` in alphabetical order among existing entries
+
+   Edit `docs/plugins/overview.md`:
+   - Add a row to the "Available Plugins" table: `| [{name}](/plugins/{slug}) | Protocol | {action summary} | Wallet (for writes) |`
+   - Insert the row in a logical position (protocols together)
+
+6. UNIT TESTS
+   Create `tests/unit/protocol-{slug}.test.ts` using Vitest:
+   ```typescript
+   import { describe, expect, it } from "vitest";
+   ```
+
+   Import the protocol definition from `@/keeperhub/protocols/{slug}` and test:
+   - **Definition validity**: importing does not throw (defineProtocol validation passes)
+   - **Slug format**: protocol slug and all action slugs match /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/
+   - **Address format**: every contract address is 42-char hex with 0x prefix
+   - **Contract references**: every action.contract references an existing contract key
+   - **No duplicate actions**: all action slugs are unique
+   - **Read action outputs**: every read action has outputs defined
+   - **Chain coverage**: for each action, its contract has addresses on at least 1 chain
+   - **Action count**: total actions matches {expected_action_count}
+   - **Registration**: after import, verify the protocol is registered (import from `@/keeperhub/lib/protocol-registry` and use `getProtocol("{slug}")`)
+
+RESPONSE FORMAT:
+When done, return a structured summary:
+FILES_CREATED:
+- {path}: {description}
+- ...
+
+DISCOVER_PLUGINS_RESULT: {success/failure + any relevant output}
+REGISTRATION_VERIFIED: {yes/no}
+```
+
+## PHASE 4: TEST (general-purpose agent)
+
+Spawn a `protocol-tester` agent using the Task tool:
+- `subagent_type`: `general-purpose`
+- `name`: `protocol-tester`
+
+```
+You are the protocol tester for the KeeperHub /add-protocol pipeline.
+
+Your job is to verify that the protocol "{slug}" was created correctly. Run all checks and report results.
+You do NOT fix issues -- you only report them.
+
+PROTOCOL: {slug}
+EXPECTED ACTION COUNT: {count}
+EXPECTED CHAINS: {chain list}
+
+CHECKS (run all):
+
+1. UNIT TESTS
+   Run: `pnpm vitest run tests/unit/protocol-{slug}.test.ts`
+   Report: PASS or FAIL with test output
+
+2. LINT
+   Run: `pnpm check`
+   If it fails, read `.claude/lint-output.txt` for details.
+   Report: PASS or FAIL with error details
+
+3. TYPE CHECK
+   Run: `pnpm type-check`
+   If it fails, read `.claude/typecheck-output.txt` for details.
+   Report: PASS or FAIL with error details
+
+4. REGISTRATION - BARREL
+   Read `keeperhub/protocols/index.ts` and verify "{slug}" appears as an import.
+   Report: PASS or FAIL
+
+5. REGISTRATION - INTEGRATION TYPE
+   Read `lib/types/integration.ts` and verify "{slug}" appears in the IntegrationType union.
+   Report: PASS or FAIL
+
+6. DOCUMENTATION - PAGE
+   Read `docs/plugins/{slug}.md` and verify:
+   - Has frontmatter with title and description
+   - Has H1 heading
+   - Has actions table
+   - Has per-action H2 sections
+   - Has "Supported Chains" section
+   - No emojis
+   Report: PASS or FAIL with details
+
+7. DOCUMENTATION - NAV
+   Read `docs/plugins/_meta.ts` and verify "{slug}" entry exists.
+   Report: PASS or FAIL
+
+8. DOCUMENTATION - OVERVIEW
+   Read `docs/plugins/overview.md` and verify the protocol row exists in the table.
+   Report: PASS or FAIL
+
+9. CONSISTENCY
+   Read `keeperhub/protocols/{slug}.ts` and cross-check:
+   - Action count matches {expected_action_count}
+   - Chain list matches {expected_chains}
+   - Actions documented in docs match actions in definition
+   Report: PASS or FAIL with discrepancies
+
+10. PROTOCOL DETAIL PAGE - _protocolMeta
+   Read `keeperhub/components/hub/protocol-detail.tsx` and verify:
+   - The `handleUseInWorkflow` function includes `_protocolMeta` in the node config
+   - The _protocolMeta JSON includes protocolSlug, contractKey, functionName, actionType
+   Report: PASS or FAIL
+   NOTE: This is critical -- without _protocolMeta in the config, workflows created from the protocol detail page will fail at runtime with "Invalid _protocolMeta" even though the node appears correctly in the builder.
+
+RESPONSE FORMAT (use exactly this structure):
+
+TEST REPORT:
+1. UNIT TESTS: {PASS|FAIL} {details if fail}
+2. LINT: {PASS|FAIL} {details if fail}
+3. TYPE CHECK: {PASS|FAIL} {details if fail}
+4. REGISTRATION - BARREL: {PASS|FAIL}
+5. REGISTRATION - INTEGRATION TYPE: {PASS|FAIL}
+6. DOCUMENTATION - PAGE: {PASS|FAIL} {details if fail}
+7. DOCUMENTATION - NAV: {PASS|FAIL}
+8. DOCUMENTATION - OVERVIEW: {PASS|FAIL}
+9. CONSISTENCY: {PASS|FAIL} {details if fail}
+10. PROTOCOL DETAIL PAGE: {PASS|FAIL} {details if fail}
+
+OVERALL: {ALL_PASS|HAS_FAILURES}
+FAILURES: {comma-separated list of failed check numbers, or "none"}
+```
+
+**If ALL_PASS:** Proceed to final summary. Skip Phase 5.
+
+**If HAS_FAILURES:** Proceed to Phase 5.
+
+## PHASE 5: FIX (general-purpose agent, conditional)
+
+Only run this phase if Phase 4 reported failures. Spawn a `protocol-fixer` agent:
+- `subagent_type`: `general-purpose`
+- `name`: `protocol-fixer`
+
+```
+You are the protocol fixer for the KeeperHub /add-protocol pipeline.
+
+The tester found issues with the "{slug}" protocol. Fix all failures and verify the fixes.
+
+ARCHITECTURE CONVENTIONS:
+{paste the complete <architecture> section here}
+
+TEST REPORT FROM PHASE 4:
+{paste the complete test report here}
+
+PROTOCOL SLUG: {slug}
+
+FIX PROCEDURE:
+
+For each failure in the test report, fix the root cause:
+
+- UNIT TEST failures: Read the test output, identify what's wrong in the protocol definition or test file, fix it, re-run `pnpm vitest run tests/unit/protocol-{slug}.test.ts`
+- LINT failures: Read `.claude/lint-output.txt`, fix issues in protocol + test + docs files, re-run `pnpm check`
+- TYPE CHECK failures: Read `.claude/typecheck-output.txt`, fix type issues, re-run `pnpm type-check`
+- REGISTRATION failures: Re-run `pnpm discover-plugins`, then verify files
+- DOCUMENTATION failures: Fix missing sections, entries, or formatting in docs files
+
+IMPORTANT RULES:
+- Fix the source of the problem, not the test
+- Follow all conventions from the architecture section (block statements, no emojis, explicit types, etc.)
+- After fixing, re-run the relevant check command to verify
+- You may iterate up to 3 times per failure category
+- Do NOT fix things that are already passing
+
+RESPONSE FORMAT:
+FIX REPORT:
+- {check name}: {FIXED|PARTIALLY_FIXED|ALREADY_PASSING} {details}
+- ...
+
+REMAINING ISSUES: {list of any unfixed issues, or "none"}
+OVERALL: {ALL_FIXED|PARTIALLY_FIXED}
+```
+
+**If ALL_FIXED:** Proceed to final summary.
+
+**If PARTIALLY_FIXED:** Present remaining issues to the user and explain what could not be auto-fixed.
+
+## FINAL SUMMARY
+
+After all phases complete, present a summary to the user:
+
+```
+Protocol: {name} ({slug})
+Contracts: {count}
+Actions: {count} ({read_count} read, {write_count} write)
+Chains: {chain list}
+
+Files created:
+- keeperhub/protocols/{slug}.ts
+- docs/plugins/{slug}.md
+- tests/unit/protocol-{slug}.test.ts
+{- public/protocols/{slug}.png (if icon was provided)}
+
+Files modified:
+- docs/plugins/_meta.ts
+- docs/plugins/overview.md
+- keeperhub/protocols/index.ts (auto-generated)
+- lib/types/integration.ts (auto-generated)
+
+Status: All checks passing (lint, type-check, unit tests, registration, docs)
+```
 </process>
 
 <verification>
-Before completing, verify:
-- `keeperhub/protocols/{slug}.ts` exists with valid `defineProtocol()` call
-- `pnpm discover-plugins` ran without errors
-- Protocol slug appears in `keeperhub/protocols/index.ts` (auto-generated barrel)
-- Protocol type appears in `lib/types/integration.ts` IntegrationType union
-- `pnpm check` passes with zero lint errors
-- `pnpm type-check` passes with zero type errors
-- `docs/plugins/{slug}.md` exists with frontmatter, actions table, per-action sections, and supported chains
-- `docs/plugins/_meta.ts` includes the `{slug}` entry
-- `docs/plugins/overview.md` plugins table includes the protocol row
-- No emojis in any created files
+Before completing, verify all phases executed:
+- Phase 0 (Gather): Protocol brief constructed with all required fields
+- Phase 1 (Analyze): Analyst returned VALIDATION: PASS
+- Phase 2 (Plan): File plan constructed for developer agent
+- Phase 3 (Develop): All files created, discover-plugins ran successfully
+- Phase 4 (Test): All 9 checks reported
+- Phase 5 (Fix): Only if needed -- all issues resolved or user informed of remaining issues
+- Final: `keeperhub/protocols/{slug}.ts` exists with valid defineProtocol() call
+- Final: `pnpm check` and `pnpm type-check` pass
+- Final: Protocol registered in `keeperhub/protocols/index.ts` and `lib/types/integration.ts`
+- Final: Documentation at `docs/plugins/{slug}.md` with nav and overview entries
+- Final: Unit tests at `tests/unit/protocol-{slug}.test.ts` passing
+- Final: No emojis in any created files
 </verification>
 
 <success_criteria>
@@ -314,6 +625,7 @@ Before completing, verify:
 - All validation rules pass at import time (slugs, addresses, contract refs)
 - `pnpm discover-plugins` registers the protocol in generated registries
 - `pnpm check` and `pnpm type-check` pass with zero errors
+- Unit tests at `tests/unit/protocol-{slug}.test.ts` pass
 - Protocol appears in both `keeperhub/protocols/index.ts` and `lib/types/integration.ts`
 - Protocol card appears in the Hub Protocols tab (visible in UI)
 - Protocol actions appear in workflow builder node palette

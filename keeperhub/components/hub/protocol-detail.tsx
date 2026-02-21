@@ -78,6 +78,13 @@ export function ProtocolDetail({
       const actionTypeId = `${protocolDef.slug}/${action.slug}`;
       const actionLabel = `${protocolDef.name}: ${action.label}`;
 
+      const protocolMeta = JSON.stringify({
+        protocolSlug: protocolDef.slug,
+        contractKey: action.contract,
+        functionName: action.function,
+        actionType: action.type,
+      });
+
       const triggerId = nanoid();
       const actionId = nanoid();
       const edgeId = nanoid();
@@ -104,7 +111,10 @@ export function ProtocolDetail({
             label: actionLabel,
             description: "",
             type: "action" as const,
-            config: { actionType: actionTypeId },
+            config: {
+              actionType: actionTypeId,
+              _protocolMeta: protocolMeta,
+            },
             status: "idle" as const,
           },
         },

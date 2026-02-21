@@ -15,6 +15,7 @@ Plugins provide the actions available in your workflows. Each plugin adds one or
 | [Code](/plugins/code) | Code | Execute custom JavaScript in a sandboxed VM | None |
 | [Math](/plugins/math) | Math | Aggregation operations (sum, count, average, median, min, max, product) | None |
 | [Safe](/plugins/safe) | Security | Monitor pending Safe multisig transactions | API key |
+| [Sky](/plugins/sky) | Protocol | USDS savings, token balances, approvals, DAI/MKR converters | Wallet (for writes) |
 | [Discord](/plugins/discord) | Notifications | Send messages to channels | Webhook URL |
 | [Telegram](/plugins/telegram) | Notifications | Send messages to chats | Bot token |
 | [SendGrid](/plugins/sendgrid) | Notifications | Send emails | API key |
