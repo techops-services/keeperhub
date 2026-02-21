@@ -14,6 +14,7 @@ import {
 import { checkRateLimit } from "../_lib/rate-limit";
 import { checkSpendingCap } from "../_lib/spending-cap";
 import { validateTokenFields, validateTransferInput } from "../_lib/validate";
+import { requireWallet } from "../_lib/wallet-check";
 
 export async function POST(request: Request): Promise<NextResponse> {
   // 1. Auth
@@ -58,7 +59,13 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const isTokenTransfer = "tokenAddress" in body || "tokenConfig" in body;
 
-  // 5. Spending cap
+  // 5. Wallet check
+  const walletError = await requireWallet(apiKeyCtx.organizationId);
+  if (walletError) {
+    return walletError;
+  }
+
+  // 6. Spending cap
   const spendCap = await checkSpendingCap(apiKeyCtx.organizationId);
   if (!spendCap.allowed) {
     return NextResponse.json({ error: spendCap.reason }, { status: 403 });

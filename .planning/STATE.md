@@ -82,11 +82,12 @@ None
 |---|-------------|------|--------|-----------|
 | 1 | adjust the hub ui from F-048 on pr 380 | 2026-02-20 | 520f00c | [1-adjust-the-hub-ui-from-f-048-on-pr-380](./quick/1-adjust-the-hub-ui-from-f-048-on-pr-380/) |
 | 2 | protocol detail routes with OG image gen | 2026-02-20 | c8818db | [2-protocol-detail-routes-with-og-image-gen](./quick/2-protocol-detail-routes-with-og-image-gen/) |
+| 8 | address PR #396 review comments | 2026-02-20 | 53726778c | [8-address-pr-396-review-comments](./quick/8-address-pr-396-review-comments/) |
 
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed quick task 2 - protocol detail routes with OG image generation
+Stopped at: Completed quick task 8 - address PR #396 review comments
 Resume file: None
 
 **Next action:** None -- milestone complete. Define next milestone if needed.

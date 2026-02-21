@@ -16,6 +16,7 @@ import {
 import { checkRateLimit } from "../_lib/rate-limit";
 import { checkSpendingCap } from "../_lib/spending-cap";
 import { validateContractCallInput } from "../_lib/validate";
+import { requireWallet } from "../_lib/wallet-check";
 
 type AbiEntry = {
   type: string;
@@ -96,6 +97,11 @@ async function handleWriteCall(
   organizationId: string,
   apiKeyId: string
 ): Promise<NextResponse> {
+  const walletError = await requireWallet(organizationId);
+  if (walletError) {
+    return walletError;
+  }
+
   const spendCap = await checkSpendingCap(organizationId);
   if (!spendCap.allowed) {
     return NextResponse.json({ error: spendCap.reason }, { status: 403 });
