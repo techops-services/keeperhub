@@ -171,6 +171,7 @@ pnpm test:e2e               # E2E tests
 ## Branch Strategy
 
 - **Main branch**: `staging`
+- **PRs target**: `staging` (always use `staging` as base branch when creating PRs)
 - **Feature branches**: `feature/KEEP-XXXX-description`
 
 ---
