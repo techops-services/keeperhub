@@ -18,6 +18,7 @@ import {
 import { checkRateLimit } from "../_lib/rate-limit";
 import { checkSpendingCap } from "../_lib/spending-cap";
 import { validateCheckAndExecuteInput } from "../_lib/validate";
+import { requireWallet } from "../_lib/wallet-check";
 
 type ActionBody = {
   contractAddress: string;
@@ -55,6 +56,11 @@ async function executeConditionalWrite(
   fullBody: Record<string, unknown>,
   conditionResult: ConditionResult
 ): Promise<NextResponse> {
+  const walletError = await requireWallet(organizationId);
+  if (walletError) {
+    return walletError;
+  }
+
   const spendCap = await checkSpendingCap(organizationId);
   if (!spendCap.allowed) {
     return NextResponse.json({ error: spendCap.reason }, { status: 403 });
