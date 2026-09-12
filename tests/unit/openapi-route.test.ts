@@ -249,11 +249,12 @@ describe("GET /api/openapi", () => {
     expect(op["x-workflow-type"]).toBe("write");
   });
 
-  // The write endpoint hands back calldata for the caller to sign and
-  // broadcast, so its example has to be calldata that could be: a real
-  // contract address and a complete ABI encoding. Decoded rather than compared
-  // to a string, so a truncated selector or a placeholder address fails here.
-  it("write workflows: the 200 example is calldata a client could broadcast", async () => {
+  // Two things to hold at once: the encoding has to be exact, and the
+  // addresses have to stay inert. Decoding rather than string-comparing
+  // catches a truncated selector; pinning the recipient catches the change
+  // that would matter most - swapping in a live payee, which no shape
+  // assertion can detect.
+  it("write workflows: the 200 example is exactly encoded and not broadcastable", async () => {
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockResolvedValue([
@@ -292,17 +293,21 @@ describe("GET /api/openapi", () => {
     }
     expect(example.type).toBe(schema.properties.type.const);
 
-    // `to`: a checksummed contract address, not a precompile.
+    // `to`: a well-formed, checksummed address. This response carries no
+    // chain identifier, so it must not name a token that exists on one chain
+    // and is codeless on another - broadcasting there mines a no-op that
+    // looks like success.
     expect(ethers.getAddress(example.to)).toBe(example.to);
-    expect(BigInt(example.to)).toBeGreaterThan(BigInt(0xff_ff));
 
     // `data`: selector plus two 32-byte ABI words, decoding to real arguments.
     expect(example.data).toHaveLength(2 + 8 + 2 * 64);
     const [recipient, amount] = new ethers.Interface([
       "function transfer(address to, uint256 amount)",
     ]).decodeFunctionData("transfer", example.data);
-    expect(ethers.isAddress(recipient)).toBe(true);
     expect(amount).toBeGreaterThan(BigInt(0));
+    // The burn address, so the documented body cannot be pasted into a signer
+    // and send tokens to a real party.
+    expect(recipient).toBe("0x000000000000000000000000000000000000dEaD");
 
     // `value`: wei as a decimal string, as lib/mcp/calldata.ts emits it.
     expect(example.value).toMatch(/^\d+$/);
