@@ -37,7 +37,10 @@ export type ReadContractCoreInput = {
   network: string;
   abi: string;
   abiFunction: string;
-  functionArgs?: string;
+  // The workflow editor sends this as a JSON string. A direct or MCP caller
+  // sends the array itself, which is the shape query-transactions and
+  // batch-write-contract already accept for their array-valued fields.
+  functionArgs?: string | unknown[];
   // See applyReadFailOnError in read-fail-on-error-core.ts. When false, no
   // failure of this step fails the run.
   failOnError?: boolean;
@@ -198,11 +201,18 @@ async function readContractInner(
     };
   }
 
-  // Parse function arguments
+  // Parse function arguments. The field arrives as a JSON string from the
+  // workflow editor and as an array from a direct or MCP caller, so both shapes
+  // are accepted here and validated identically below.
   let args: unknown[] = [];
-  if (functionArgs && functionArgs.trim() !== "") {
+  if (
+    Array.isArray(functionArgs) ||
+    (typeof functionArgs === "string" && functionArgs.trim() !== "")
+  ) {
     try {
-      const parsedArgs = JSON.parse(functionArgs);
+      const parsedArgs: unknown = Array.isArray(functionArgs)
+        ? functionArgs
+        : JSON.parse(String(functionArgs));
       if (!Array.isArray(parsedArgs)) {
         logUserError(
           ErrorCategory.VALIDATION,
