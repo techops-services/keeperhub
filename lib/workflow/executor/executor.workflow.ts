@@ -953,9 +953,83 @@ function replaceConfigTemplate(
   return formatConfigValue(resolved);
 }
 
+type TemplateRenderContext = {
+  outputs: NodeOutputs;
+  tracker?: TemplateResolutionTracker;
+  storedPattern: RegExp;
+  displayPattern: RegExp;
+};
+
+function renderTemplateString(
+  value: string,
+  ctx: TemplateRenderContext
+): string {
+  const result = value.replace(ctx.storedPattern, (m, nodeId, rest) =>
+    replaceConfigTemplate(m, nodeId, rest, ctx.outputs, ctx.tracker)
+  );
+  return result.replace(ctx.displayPattern, (full, displayRef) => {
+    const resolved = resolveDisplayTemplate(displayRef, ctx.outputs);
+    if (resolved === null || resolved === undefined) {
+      recordUnresolved(ctx.tracker, {
+        token: full,
+        reason: "no-path",
+        detail: `Display reference "${displayRef}" did not resolve.`,
+      });
+      return full;
+    }
+    return formatConfigValue(resolved);
+  });
+}
+
+/**
+ * Render one config value.
+ *
+ * Arrays are walked the same way scanForLeftoverLiterals walks them, so the
+ * render half and the scan half agree about what a rendered config contains.
+ * Previously an array fell through to the identity branch at the bottom of the
+ * loop, so a `{{...}}` token inside an array-valued field was never rendered
+ * and the scan that runs immediately after reported it as an unresolved
+ * reference: a correct reference, in the one container the renderer skipped.
+ *
+ * Deliberately not depth-bounded here. The scan stops reporting past depth 10,
+ * so a bound at or below that would leave a band where a token survives
+ * unrendered and unreported, which writes a literal `{{...}}` into a config
+ * with no error at all. Without a bound the array case behaves exactly as the
+ * object case always has, and the scan remains the thing that decides whether
+ * a rendered config is acceptable.
+ */
+function renderTemplateValue(
+  value: unknown,
+  ctx: TemplateRenderContext
+): unknown {
+  if (typeof value === "string") {
+    return renderTemplateString(value, ctx);
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => renderTemplateValue(item, ctx));
+  }
+  if (typeof value === "object" && value !== null) {
+    return renderTemplatesInConfig(value as Record<string, unknown>, ctx);
+  }
+  return value;
+}
+
+function renderTemplatesInConfig(
+  config: Record<string, unknown>,
+  ctx: TemplateRenderContext
+): Record<string, unknown> {
+  const processed: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(config)) {
+    processed[key] = renderTemplateValue(value, ctx);
+  }
+  return processed;
+}
+
 /**
  * Process template variables in config.
- * Recurses into nested objects; supports array paths like data.recipes[0].
+ * Recurses into nested objects and into arrays. `data.recipes[0]` in a
+ * reference is an index into a resolved value and is handled by
+ * replaceConfigTemplate; array-valued config fields are handled here.
  *
  * KEEP-468: optional `tracker` records every reference that fell through to
  * the empty-string or literal-pass-through path so the caller can fail
@@ -966,46 +1040,14 @@ export function processTemplates(
   outputs: NodeOutputs,
   tracker?: TemplateResolutionTracker
 ): Record<string, unknown> {
-  const processed: Record<string, unknown> = {};
-  const storedPattern = /\{\{@([^:]+):([^}]+)\}\}/g;
-  // Fallback: resolve display-format templates {{Label.field}} that were not
-  // converted to stored format by the editor (mirrors extractTemplateParameters).
-  const displayPattern = /\{\{([^@}][^}]*)\}\}/g;
-
-  for (const [key, value] of Object.entries(config)) {
-    if (typeof value === "string") {
-      let result = value.replace(storedPattern, (m, nodeId, rest) =>
-        replaceConfigTemplate(m, nodeId, rest, outputs, tracker)
-      );
-      result = result.replace(displayPattern, (full, displayRef) => {
-        const resolved = resolveDisplayTemplate(displayRef, outputs);
-        if (resolved === null || resolved === undefined) {
-          recordUnresolved(tracker, {
-            token: full,
-            reason: "no-path",
-            detail: `Display reference "${displayRef}" did not resolve.`,
-          });
-          return full;
-        }
-        return formatConfigValue(resolved);
-      });
-      processed[key] = result;
-    } else if (
-      typeof value === "object" &&
-      value !== null &&
-      !Array.isArray(value)
-    ) {
-      processed[key] = processTemplates(
-        value as Record<string, unknown>,
-        outputs,
-        tracker
-      );
-    } else {
-      processed[key] = value;
-    }
-  }
-
-  return processed;
+  return renderTemplatesInConfig(config, {
+    outputs,
+    tracker,
+    storedPattern: /\{\{@([^:]+):([^}]+)\}\}/g,
+    // Fallback: resolve display-format templates {{Label.field}} that were not
+    // converted to stored format by the editor (mirrors extractTemplateParameters).
+    displayPattern: /\{\{([^@}][^}]*)\}\}/g,
+  });
 }
 
 /**
